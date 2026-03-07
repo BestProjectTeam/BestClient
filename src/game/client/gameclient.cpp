@@ -2805,7 +2805,7 @@ void CGameClient::OnPredict()
 			HandlePredictedEvents(Tick);
 	}
 
-	if (FastInputTicks > 0) 
+	if(FastInputTicks > 0)
 	{
 		m_PredictedWorld.CopyWorld(&m_RegularPredictedWorld);
 		// m_PrevPredictedWorld.CopyWorld(&m_PrevRegularPredictedWorld); // not sure if this is worth performance cost, it seems to not matter

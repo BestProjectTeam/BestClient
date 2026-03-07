@@ -49,6 +49,7 @@ class CRenderLayerParams
 public:
 	int m_RenderType;
 	int m_EntityOverlayVal;
+	bool m_RenderAnimatedQuadsInEntities; // TClient
 	vec2 m_Center;
 	float m_Zoom;
 	bool m_RenderText;
@@ -271,9 +272,16 @@ protected:
 	};
 	void CalculateClipping(CQuadCluster &QuadCluster);
 	bool CalculateQuadClipping(const CQuadCluster &QuadCluster, float aQuadOffsetMin[2], float aQuadOffsetMax[2]) const;
+	bool IsParallaxAffectedGroup() const; // TClient
+	bool RenderAnimatedQuadsInEntities(const CRenderLayerParams &Params) const; // TClient
+	bool IsPositionAnimatedQuadRaw(const CQuad *pQuad) const; // TClient
+	bool IsAnimatedQuad(const CQuad *pQuad) const; // TClient
+	bool IsAnimatedQuadCluster(const CQuadCluster &QuadCluster) const; // TClient
 
 	std::vector<CQuadCluster> m_vQuadClusters;
 	CQuad *m_pQuads;
+	std::vector<uint8_t> m_vAnimatedQuads; // TClient
+	bool m_HasAnimatedQuads = false; // TClient
 
 private:
 	IGraphics::CTextureHandle m_TextureHandle;
