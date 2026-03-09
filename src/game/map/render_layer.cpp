@@ -934,63 +934,6 @@ CRenderLayerQuads::CRenderLayerQuads(int GroupId, int LayerId, int Flags, CMapIt
 	m_pLayerQuads = pLayerQuads;
 	m_pQuads = nullptr;
 }
-// TClient
-bool CRenderLayerQuads::RenderAnimatedQuadsInEntities(const CRenderLayerParams &Params) const
-{
-	return Params.m_EntityOverlayVal == 100 && Params.m_RenderAnimatedQuadsInEntities && !IsParallaxAffectedGroup();
-}
-
-// TClient
-bool CRenderLayerQuads::IsParallaxAffectedGroup() const
-{
-	int GroupStart, GroupNum;
-	m_pMap->GetType(MAPITEMTYPE_GROUP, &GroupStart, &GroupNum);
-	if(m_GroupId < 0 || m_GroupId >= GroupNum)
-		return false;
-
-	const CMapItemGroup *pGroup = static_cast<const CMapItemGroup *>(m_pMap->GetItem(GroupStart + m_GroupId));
-	if(!pGroup)
-		return false;
-
-	return pGroup->m_ParallaxX != 100 || pGroup->m_ParallaxY != 100;
-}
-
-// TClient
-bool CRenderLayerQuads::IsPositionAnimatedQuadRaw(const CQuad *pQuad) const
-{
-	if(pQuad->m_PosEnv < 0)
-		return false;
-
-	const CEnvelopeExtrema::CEnvelopeExtremaItem &Extrema = m_pEnvelopeManager->EnvelopeExtrema()->GetExtrema(pQuad->m_PosEnv);
-	if(!Extrema.m_Available)
-		return false;
-
-	return Extrema.m_Rotating || Extrema.m_Minima != Extrema.m_Maxima;
-}
-
-// TClient
-bool CRenderLayerQuads::IsAnimatedQuad(const CQuad *pQuad) const
-{
-	const ptrdiff_t QuadIndex = pQuad - m_pQuads;
-	if(QuadIndex >= 0 && QuadIndex < (ptrdiff_t)m_vAnimatedQuads.size())
-		return m_vAnimatedQuads[QuadIndex] != 0;
-
-	return IsPositionAnimatedQuadRaw(pQuad);
-}
-
-// TClient
-bool CRenderLayerQuads::IsAnimatedQuadCluster(const CQuadCluster &QuadCluster) const
-{
-	if(QuadCluster.m_Grouped)
-		return IsPositionAnimatedQuadRaw(&m_pQuads[QuadCluster.m_StartIndex]);
-
-	for(int QuadClusterId = 0; QuadClusterId < QuadCluster.m_NumQuads; ++QuadClusterId)
-	{
-		if(IsAnimatedQuad(&m_pQuads[QuadCluster.m_StartIndex + QuadClusterId]))
-			return true;
-	}
-	return false;
-}
 
 void CRenderLayerQuads::RenderQuadLayer(float Alpha, const CRenderLayerParams &Params)
 {
@@ -998,13 +941,9 @@ void CRenderLayerQuads::RenderQuadLayer(float Alpha, const CRenderLayerParams &P
 	if(Visuals.m_BufferContainerIndex == -1)
 		return; // no visuals were created
 
-	const bool AnimatedOnly = RenderAnimatedQuadsInEntities(Params); // TClient
-
 	for(auto &QuadCluster : m_vQuadClusters)
 	{
 		if(!IsVisibleInClipRegion(QuadCluster.m_ClipRegion))
-			continue;
-		if(AnimatedOnly && !IsAnimatedQuadCluster(QuadCluster))
 			continue;
 
 		if(!QuadCluster.m_Grouped)
@@ -1013,20 +952,19 @@ void CRenderLayerQuads::RenderQuadLayer(float Alpha, const CRenderLayerParams &P
 			for(int QuadClusterId = 0; QuadClusterId < QuadCluster.m_NumQuads; ++QuadClusterId)
 			{
 				CQuad *pQuad = &m_pQuads[QuadCluster.m_StartIndex + QuadClusterId];
-				const bool AnimatedQuad = !AnimatedOnly || IsAnimatedQuad(pQuad); // TClient
 
 				ColorRGBA Color = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
 				if(pQuad->m_ColorEnv >= 0)
 				{
 					m_pEnvelopeManager->EnvelopeEval()->EnvelopeEval(pQuad->m_ColorEnvOffset, pQuad->m_ColorEnv, Color, 4);
 				}
-				Color.a *= AnimatedQuad ? Alpha : 0.0f; // TClient
+				Color.a *= Alpha;
 
 				SQuadRenderInfo &QInfo = QuadCluster.m_vQuadRenderInfo[QuadClusterId];
 				if(Color.a < 0.0f)
 					Color.a = 0.0f;
 				QInfo.m_Color = Color;
-				const bool IsVisible = Color.a > 0.0f; // TClient
+				const bool IsVisible = Color.a >= 0.0f;
 				AnyVisible |= IsVisible;
 
 				if(IsVisible)
@@ -1097,15 +1035,6 @@ void CRenderLayerQuads::Init()
 		m_TextureHandle = m_pMapImages->Get(m_pLayerQuads->m_Image);
 	else
 		m_TextureHandle.Invalidate();
-
-	m_vAnimatedQuads.resize(m_pLayerQuads->m_NumQuads); // TClient
-	m_HasAnimatedQuads = false; // TClient
-	for(int QuadId = 0; QuadId < m_pLayerQuads->m_NumQuads; ++QuadId)
-	{
-		const bool AnimatedQuad = IsPositionAnimatedQuadRaw(&m_pQuads[QuadId]);
-		m_vAnimatedQuads[QuadId] = AnimatedQuad;
-		m_HasAnimatedQuads |= AnimatedQuad;
-	}
 
 	if(!Graphics()->IsQuadBufferingEnabled())
 		return;
@@ -1284,7 +1213,6 @@ void CRenderLayerQuads::Unload()
 		m_VisualQuad->Unload();
 		m_VisualQuad = std::nullopt;
 	}
-	m_vAnimatedQuads.clear(); // TClient
 }
 
 void CRenderLayerQuads::CQuadLayerVisuals::Unload()
@@ -1421,24 +1349,12 @@ void CRenderLayerQuads::Render(const CRenderLayerParams &Params)
 {
 	UseTexture(GetTexture());
 
-	bool Force = Params.m_RenderType == ERenderType::RENDERTYPE_BACKGROUND_FORCE || Params.m_RenderType == ERenderType::RENDERTYPE_FULL_DESIGN || RenderAnimatedQuadsInEntities(Params); // TClient
+	bool Force = Params.m_RenderType == ERenderType::RENDERTYPE_BACKGROUND_FORCE || Params.m_RenderType == ERenderType::RENDERTYPE_FULL_DESIGN;
 	float Alpha = Force ? 1.f : (100 - Params.m_EntityOverlayVal) / 100.0f;
 	if(!Graphics()->IsQuadBufferingEnabled() || !Params.m_TileAndQuadBuffering)
 	{
 		Graphics()->BlendNormal();
-		if(RenderAnimatedQuadsInEntities(Params)) // TClient
-		{
-			for(int QuadId = 0; QuadId < m_pLayerQuads->m_NumQuads; ++QuadId)
-			{
-				if(!IsAnimatedQuad(&m_pQuads[QuadId]))
-					continue;
-				RenderMap()->ForceRenderQuads(&m_pQuads[QuadId], 1, LAYERRENDERFLAG_TRANSPARENT, m_pEnvelopeManager->EnvelopeEval(), Alpha);
-			}
-		}
-		else
-		{
-			RenderMap()->ForceRenderQuads(m_pQuads, m_pLayerQuads->m_NumQuads, LAYERRENDERFLAG_TRANSPARENT, m_pEnvelopeManager->EnvelopeEval(), Alpha);
-		}
+		RenderMap()->ForceRenderQuads(m_pQuads, m_pLayerQuads->m_NumQuads, LAYERRENDERFLAG_TRANSPARENT, m_pEnvelopeManager->EnvelopeEval(), Alpha);
 	}
 	else
 	{
@@ -1457,7 +1373,7 @@ bool CRenderLayerQuads::DoRender(const CRenderLayerParams &Params)
 {
 	// skip rendering anything but entities if we only want to render entities
 	if(Params.m_EntityOverlayVal == 100 && Params.m_RenderType != ERenderType::RENDERTYPE_BACKGROUND_FORCE)
-		return RenderAnimatedQuadsInEntities(Params) && m_HasAnimatedQuads; // TClient
+		return false;
 
 	// skip rendering if detail layers if not wanted
 	if(m_Flags & LAYERFLAG_DETAIL && !g_Config.m_GfxHighDetail && Params.m_RenderType != ERenderType::RENDERTYPE_FULL_DESIGN) // detail but no details

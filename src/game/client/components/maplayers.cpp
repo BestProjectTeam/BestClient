@@ -53,7 +53,6 @@ void CMapLayers::OnRender()
 
 	// dynamic parameters for ingame rendering
 	m_Params.m_EntityOverlayVal = m_Type == RENDERTYPE_FULL_DESIGN ? 0 : g_Config.m_ClOverlayEntities;
-	m_Params.m_RenderAnimatedQuadsInEntities = g_Config.m_TcAnimatedQuadsEntities != 0; // TClient
 	m_Params.m_Center = GetCurCamera()->m_Center;
 	m_Params.m_Zoom = GetCurCamera()->m_Zoom;
 	m_Params.m_RenderText = g_Config.m_ClTextEntities;
