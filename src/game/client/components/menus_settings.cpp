@@ -3193,29 +3193,51 @@ void CMenus::RenderSettingsDDNet(CUIRect MainView)
 
 void CMenus::RenderSettingsBestClient(CUIRect MainView)
 {
-	CUIRect Label, Left, Right, Button;
-	MainView.HSplitTop(30.0f, &Label, &MainView);
-	Ui()->DoLabel(&Label, "BestClient", 20.0f, TEXTALIGN_ML);
-	MainView.HSplitTop(10.0f, nullptr, &MainView);
-	MainView.VSplitMid(&Left, &Right, 20.0f);
-
-	Left.HSplitTop(20.0f, &Button, &Left);
-	if(DoButton_CheckBox(&g_Config.m_BcTestCheckbox, "BestClient test checkbox", g_Config.m_BcTestCheckbox, &Button))
-		g_Config.m_BcTestCheckbox ^= 1;
-
-	Left.HSplitTop(10.0f, nullptr, &Left);
-	Left.HSplitTop(20.0f, &Button, &Left);
-	static CButtonContainer s_BestClientSettingsButtonId;
-	if(DoButton_Menu(&s_BestClientSettingsButtonId, "BestClient settings file", 0, &Button))
+	enum
 	{
-		char aBuf[IO_MAX_PATH_LENGTH];
-		Storage()->GetCompletePath(IStorage::TYPE_SAVE, s_aConfigDomains[ConfigDomain::BESTCLIENT].m_aConfigPath, aBuf, sizeof(aBuf));
-		Client()->ViewFile(aBuf);
-	}
-	GameClient()->m_Tooltips.DoToolTip(&s_BestClientSettingsButtonId, &Button, "Open settings_BestClient.cfg");
+		BESTCLIENT_TAB_VISUALS = 0,
+		BESTCLIENT_TAB_GAMEPLAY,
+		BESTCLIENT_TAB_OTHERS,
+		NUM_BESTCLIENT_TABS,
+	};
 
-	Right.HSplitTop(20.0f, &Label, &Right);
-	Ui()->DoLabel(&Label, "BestClient config domain: settings_BestClient.cfg", 14.0f, TEXTALIGN_ML);
+	static int s_CurTab = BESTCLIENT_TAB_VISUALS;
+	static CButtonContainer s_aPageTabs[NUM_BESTCLIENT_TABS] = {};
+
+	CUIRect TabBar, Button;
+	MainView.HSplitTop(20.0f, &TabBar, &MainView);
+	const float TabWidth = TabBar.w / (float)NUM_BESTCLIENT_TABS;
+	const char *apTabNames[NUM_BESTCLIENT_TABS] = {
+		Localize("Visuals"),
+		"gameplay",
+		Localize("Others"),
+	};
+
+	for(int Tab = BESTCLIENT_TAB_VISUALS; Tab < NUM_BESTCLIENT_TABS; ++Tab)
+	{
+		TabBar.VSplitLeft(TabWidth, &Button, &TabBar);
+		const int Corners = Tab == BESTCLIENT_TAB_VISUALS ? IGraphics::CORNER_L : (Tab == NUM_BESTCLIENT_TABS - 1 ? IGraphics::CORNER_R : IGraphics::CORNER_NONE);
+		if(DoButton_MenuTab(&s_aPageTabs[Tab], apTabNames[Tab], s_CurTab == Tab, &Button, Corners, nullptr, nullptr, nullptr, nullptr, 4.0f))
+		{
+			s_CurTab = Tab;
+		}
+	}
+
+	MainView.HSplitTop(10.0f, nullptr, &MainView);
+
+	if(s_CurTab == BESTCLIENT_TAB_VISUALS)
+	{
+		// Intentionally empty for now.
+	}
+	else if(s_CurTab == BESTCLIENT_TAB_GAMEPLAY)
+	{
+		// Intentionally empty for now.
+	}
+	else if(s_CurTab == BESTCLIENT_TAB_OTHERS)
+	{
+		// Intentionally empty for now.
+	}
+
 }
 
 CUi::EPopupMenuFunctionResult CMenus::PopupMapPicker(void *pContext, CUIRect View, bool Active)
