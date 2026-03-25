@@ -232,6 +232,56 @@ void CMenus::SetNeedSendInfo()
 		m_NeedSendinfo = true;
 }
 
+CUi::EPopupMenuFunctionResult CMenus::PopupSettingsCountrySelection(void *pContext, CUIRect View, bool Active)
+{
+	SPopupSettingsCountrySelectionContext *pPopupContext = static_cast<SPopupSettingsCountrySelectionContext *>(pContext);
+	CMenus *pMenus = pPopupContext->m_pMenus;
+
+	static CListBox s_ListBox;
+	s_ListBox.SetActive(Active);
+	s_ListBox.DoStart(50.0f, pMenus->GameClient()->m_CountryFlags.Num(), 8, 1, -1, &View, false);
+
+	if(pPopupContext->m_New)
+	{
+		pPopupContext->m_New = false;
+		s_ListBox.ScrollToSelected();
+	}
+
+	for(size_t i = 0; i < pMenus->GameClient()->m_CountryFlags.Num(); ++i)
+	{
+		const CCountryFlags::CCountryFlag &Entry = pMenus->GameClient()->m_CountryFlags.GetByIndex(i);
+
+		const CListboxItem Item = s_ListBox.DoNextItem(&Entry, Entry.m_CountryCode == pPopupContext->m_Selection);
+		if(!Item.m_Visible)
+			continue;
+
+		CUIRect FlagRect, Label;
+		Item.m_Rect.Margin(5.0f, &FlagRect);
+		FlagRect.HSplitBottom(12.0f, &FlagRect, &Label);
+		Label.HSplitTop(2.0f, nullptr, &Label);
+		const float OldWidth = FlagRect.w;
+		FlagRect.w = FlagRect.h * 2.0f;
+		FlagRect.x += (OldWidth - FlagRect.w) / 2.0f;
+		pMenus->GameClient()->m_CountryFlags.Render(Entry.m_CountryCode, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), FlagRect.x, FlagRect.y, FlagRect.w, FlagRect.h);
+
+		pMenus->Ui()->DoLabel(&Label, Entry.m_aCountryCodeString, 10.0f, TEXTALIGN_MC);
+	}
+
+	const int NewSelected = s_ListBox.DoEnd();
+	pPopupContext->m_Selection = NewSelected >= 0 ? pMenus->GameClient()->m_CountryFlags.GetByIndex(NewSelected).m_CountryCode : -1;
+	if(s_ListBox.WasItemSelected() || s_ListBox.WasItemActivated())
+	{
+		if(pPopupContext->m_pCountry != nullptr)
+		{
+			*pPopupContext->m_pCountry = pPopupContext->m_Selection;
+			pMenus->SetNeedSendInfo();
+		}
+		return CUi::POPUP_CLOSE_CURRENT;
+	}
+
+	return CUi::POPUP_KEEP_OPEN;
+}
+
 void CMenus::RenderSettingsPlayer(CUIRect MainView)
 {
 	CUIRect TabBar, PlayerTab, DummyTab, ChangeInfo, QuickSearch;
@@ -408,6 +458,9 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 	unsigned *pColorBody;
 	unsigned *pColorFeet;
 	int *pEmote;
+	int *pCountry;
+	static CLineInput s_NameInput;
+	static CLineInput s_ClanInput;
 	if(!m_Dummy)
 	{
 		pSkinName = g_Config.m_ClPlayerSkin;
@@ -416,6 +469,10 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 		pColorBody = &g_Config.m_ClPlayerColorBody;
 		pColorFeet = &g_Config.m_ClPlayerColorFeet;
 		pEmote = &g_Config.m_ClPlayerDefaultEyes;
+		pCountry = &g_Config.m_PlayerCountry;
+		s_NameInput.SetBuffer(g_Config.m_PlayerName, sizeof(g_Config.m_PlayerName));
+		s_NameInput.SetEmptyText(Client()->PlayerName());
+		s_ClanInput.SetBuffer(g_Config.m_PlayerClan, sizeof(g_Config.m_PlayerClan));
 	}
 	else
 	{
@@ -425,12 +482,16 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 		pColorBody = &g_Config.m_ClDummyColorBody;
 		pColorFeet = &g_Config.m_ClDummyColorFeet;
 		pEmote = &g_Config.m_ClDummyDefaultEyes;
+		pCountry = &g_Config.m_ClDummyCountry;
+		s_NameInput.SetBuffer(g_Config.m_ClDummyName, sizeof(g_Config.m_ClDummyName));
+		s_NameInput.SetEmptyText(Client()->DummyName());
+		s_ClanInput.SetBuffer(g_Config.m_ClDummyClan, sizeof(g_Config.m_ClDummyClan));
 	}
 
 	const float EyeButtonSize = 40.0f;
 	const bool RenderEyesBelow = MainView.w < 750.0f;
 	CUIRect YourSkin, Checkboxes, SkinPrefix, Eyes, Button, Label;
-	MainView.HSplitTop(90.0f, &YourSkin, &MainView);
+	MainView.HSplitTop(130.0f, &YourSkin, &MainView);
 	if(RenderEyesBelow)
 	{
 		YourSkin.VSplitLeft(MainView.w * 0.45f, &YourSkin, &Checkboxes);
@@ -519,15 +580,77 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 	CustomColorsButton.VSplitRight(110.0f, &CustomColorsButton, &RandomColorsButton);
 
 	CustomColorsButton.VSplitRight(5.0f, &CustomColorsButton, nullptr);
+	CSkins::CSkinList &SkinList = GameClient()->m_Skins.SkinList();
 	YourSkin.VSplitLeft(65.0f, &YourSkin, &Button);
 	Button.VSplitLeft(5.0f, nullptr, &Button);
-	Button.HMargin((Button.h - 20.0f) / 2.0f, &Button);
+
+	const float NameClanSkinHeight = 3.0f * 20.0f + 2.0f * 5.0f;
+	if(Button.h > NameClanSkinHeight)
+	{
+		Button.HMargin((Button.h - NameClanSkinHeight) / 2.0f, &Button);
+	}
+
+	CUIRect NameRow, ClanRow, SkinRow;
+	Button.HSplitTop(20.0f, &NameRow, &Button);
+	Button.HSplitTop(5.0f, nullptr, &Button);
+	Button.HSplitTop(20.0f, &ClanRow, &Button);
+	Button.HSplitTop(5.0f, nullptr, &Button);
+	Button.HSplitTop(20.0f, &SkinRow, nullptr);
+
+	CUIRect NameLabel, NameInput, ClanLabel, ClanInput, SkinLabel, SkinInput, FlagButton;
+	NameRow.VSplitLeft(45.0f, &NameLabel, &NameInput);
+	ClanRow.VSplitLeft(45.0f, &ClanLabel, &ClanInput);
+	SkinRow.VSplitLeft(45.0f, &SkinLabel, &SkinInput);
+	SkinInput.VSplitRight(44.0f, &SkinInput, &FlagButton);
+	SkinInput.VSplitRight(5.0f, &SkinInput, nullptr);
+
+	Ui()->DoLabel(&NameLabel, Localize("Name"), 14.0f, TEXTALIGN_ML);
+	Ui()->DoLabel(&ClanLabel, Localize("Clan"), 14.0f, TEXTALIGN_ML);
+	Ui()->DoLabel(&SkinLabel, Localize("Skin"), 14.0f, TEXTALIGN_ML);
+
+	if(Ui()->DoEditBox(&s_NameInput, &NameInput, 14.0f))
+	{
+		SetNeedSendInfo();
+	}
+
+	if(Ui()->DoEditBox(&s_ClanInput, &ClanInput, 14.0f))
+	{
+		SetNeedSendInfo();
+	}
+
+	static CLineInput s_SkinInput;
+	s_SkinInput.SetBuffer(pSkinName, SkinNameSize);
+	s_SkinInput.SetEmptyText("default");
+	if(Ui()->DoClearableEditBox(&s_SkinInput, &SkinInput, 14.0f))
+	{
+		SetNeedSendInfo();
+		m_SkinListScrollToSelected = true;
+		SkinList.ForceRefresh();
+	}
+
+	static CButtonContainer s_FlagButton;
+	if(DoButton_Menu(&s_FlagButton, "", 0, &FlagButton))
+	{
+		static SPopupMenuId s_PopupCountryId;
+		static SPopupSettingsCountrySelectionContext s_PopupCountryContext;
+		s_PopupCountryContext.m_pMenus = this;
+		s_PopupCountryContext.m_pCountry = pCountry;
+		s_PopupCountryContext.m_Selection = *pCountry;
+		s_PopupCountryContext.m_New = true;
+		Ui()->DoPopupMenu(&s_PopupCountryId, FlagButton.x, FlagButton.y + FlagButton.h, 490.0f, 210.0f, &s_PopupCountryContext, PopupSettingsCountrySelection);
+	}
+	GameClient()->m_Tooltips.DoToolTip(&s_FlagButton, &FlagButton, Localize("Choose country flag"));
+
+	CUIRect FlagIcon = FlagButton;
+	const float OldWidth = FlagIcon.w;
+	FlagIcon.w = FlagIcon.h * 2.0f;
+	FlagIcon.x += (OldWidth - FlagIcon.w) / 2.0f;
+	GameClient()->m_CountryFlags.Render(*pCountry, ColorRGBA(1.0f, 1.0f, 1.0f, Ui()->HotItem() == &s_FlagButton ? 1.0f : 0.85f), FlagIcon.x, FlagIcon.y, FlagIcon.w, FlagIcon.h);
 
 	char aBuf[128 + IO_MAX_PATH_LENGTH];
 	str_format(aBuf, sizeof(aBuf), "%s:", Localize("Your skin"));
 	Ui()->DoLabel(&Label, aBuf, 14.0f, TEXTALIGN_ML);
 
-	CSkins::CSkinList &SkinList = GameClient()->m_Skins.SkinList();
 	const CSkin *pDefaultSkin = GameClient()->m_Skins.Find("default");
 	const CSkins::CSkinContainer *pOwnSkinContainer = GameClient()->m_Skins.FindContainerOrNullptr(pSkinName[0] == '\0' ? "default" : pSkinName);
 	if(pOwnSkinContainer != nullptr && pOwnSkinContainer->IsSpecial())
@@ -538,7 +661,7 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 	CTeeRenderInfo OwnSkinInfo;
 	OwnSkinInfo.Apply(pOwnSkinContainer == nullptr || pOwnSkinContainer->Skin() == nullptr ? pDefaultSkin : pOwnSkinContainer->Skin().get());
 	OwnSkinInfo.ApplyColors(*pUseCustomColor, *pColorBody, *pColorFeet);
-	OwnSkinInfo.m_Size = 50.0f;
+	OwnSkinInfo.m_Size = 64.0f;
 
 	// Tee
 	{
@@ -600,17 +723,6 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 	};
 	static char s_StatusTooltipId;
 	RenderSkinStatus(YourSkin, pOwnSkinContainer, &s_StatusTooltipId);
-
-	// Skin name
-	static CLineInput s_SkinInput;
-	s_SkinInput.SetBuffer(pSkinName, SkinNameSize);
-	s_SkinInput.SetEmptyText("default");
-	if(Ui()->DoClearableEditBox(&s_SkinInput, &Button, 14.0f))
-	{
-		SetNeedSendInfo();
-		m_SkinListScrollToSelected = true;
-		SkinList.ForceRefresh();
-	}
 
 	// Random skin button
 	static CButtonContainer s_RandomSkinButton;
@@ -1459,10 +1571,27 @@ void CMenus::RenderSettings(CUIRect MainView)
 	TabBar.HSplitTop(50.0f, &Button, &TabBar);
 	Button.Draw(ms_ColorTabbarActive, IGraphics::CORNER_BR, 10.0f);
 
-	const char *apTabs[SETTINGS_LENGTH] = {
+	if(g_Config.m_UiSettingsPage == SETTINGS_PLAYER)
+		g_Config.m_UiSettingsPage = SETTINGS_TEE;
+
+	static const int s_aVisibleSettingsPages[] = {
+		SETTINGS_LANGUAGE,
+		SETTINGS_GENERAL,
+		SETTINGS_TEE,
+		SETTINGS_APPEARANCE,
+		SETTINGS_CONTROLS,
+		SETTINGS_GRAPHICS,
+		SETTINGS_SOUND,
+		SETTINGS_DDNET,
+		SETTINGS_ASSETS,
+		SETTINGS_TCLIENT,
+		SETTINGS_PROFILES,
+		SETTINGS_CONFIGS,
+	};
+
+	const char *apTabs[] = {
 		Localize("Language"),
 		Localize("General"),
-		Localize("Player"),
 		Client()->IsSixup() ? "Tee 0.7" : Localize("Tee"),
 		Localize("Appearance"),
 		Localize("Controls"),
@@ -1474,14 +1603,16 @@ void CMenus::RenderSettings(CUIRect MainView)
 		Localize("Profiles"),
 		Localize("Configs")};
 
-	static CButtonContainer s_aTabButtons[SETTINGS_LENGTH];
+	static_assert(std::size(s_aVisibleSettingsPages) == std::size(apTabs));
+	static CButtonContainer s_aTabButtons[std::size(s_aVisibleSettingsPages)];
 
-	for(int i = 0; i < SETTINGS_LENGTH; i++)
+	for(size_t i = 0; i < std::size(s_aVisibleSettingsPages); i++)
 	{
+		const int Page = s_aVisibleSettingsPages[i];
 		TabBar.HSplitTop(10.0f, nullptr, &TabBar);
 		TabBar.HSplitTop(26.0f, &Button, &TabBar);
-		if(DoButton_MenuTab(&s_aTabButtons[i], apTabs[i], g_Config.m_UiSettingsPage == i, &Button, IGraphics::CORNER_R, &m_aAnimatorsSettingsTab[i]))
-			g_Config.m_UiSettingsPage = i;
+		if(DoButton_MenuTab(&s_aTabButtons[i], apTabs[i], g_Config.m_UiSettingsPage == Page, &Button, IGraphics::CORNER_R, &m_aAnimatorsSettingsTab[Page]))
+			g_Config.m_UiSettingsPage = Page;
 	}
 
 	if(g_Config.m_UiSettingsPage == SETTINGS_LANGUAGE)

@@ -33,7 +33,7 @@
 
 void CMenus::RenderSettingsTee7(CUIRect MainView)
 {
-	CUIRect SkinPreview, NormalSkinPreview, RedTeamSkinPreview, BlueTeamSkinPreview, Buttons, QuickSearch, DirectoryButton, RefreshButton, SaveDeleteButton, TabBars, TabBar, LeftTab, RightTab;
+	CUIRect SkinPreview, NormalSkinPreview, RedTeamSkinPreview, BlueTeamSkinPreview, Buttons, QuickSearch, DirectoryButton, RefreshButton, SaveDeleteButton, TabBars, TabBar, LeftTab, RightTab, InfoRow;
 	MainView.HSplitBottom(20.0f, &MainView, &Buttons);
 	MainView.HSplitBottom(5.0f, &MainView, nullptr);
 	Buttons.VSplitRight(25.0f, &Buttons, &RefreshButton);
@@ -42,7 +42,7 @@ void CMenus::RenderSettingsTee7(CUIRect MainView)
 	Buttons.VSplitLeft(220.0f, &QuickSearch, &Buttons);
 	Buttons.VSplitLeft(10.0f, nullptr, &Buttons);
 	Buttons.VSplitLeft(120.0f, &SaveDeleteButton, &Buttons);
-	MainView.HSplitTop(50.0f, &TabBars, &MainView);
+	MainView.HSplitTop(78.0f, &TabBars, &MainView);
 	MainView.HSplitTop(10.0f, nullptr, &MainView);
 	TabBars.VSplitMid(&TabBars, &SkinPreview, 20.0f);
 
@@ -95,6 +95,66 @@ void CMenus::RenderSettingsTee7(CUIRect MainView)
 				m_SkinNameInput.Set(m_pSelectedSkin->m_aName);
 		}
 	}
+
+	TabBars.HSplitTop(8.0f, nullptr, &TabBars);
+	TabBars.HSplitTop(20.0f, &InfoRow, &TabBars);
+
+	int *pCountry;
+	static CLineInput s_NameInput;
+	static CLineInput s_ClanInput;
+	if(!m_Dummy)
+	{
+		pCountry = &g_Config.m_PlayerCountry;
+		s_NameInput.SetBuffer(g_Config.m_PlayerName, sizeof(g_Config.m_PlayerName));
+		s_NameInput.SetEmptyText(Client()->PlayerName());
+		s_ClanInput.SetBuffer(g_Config.m_PlayerClan, sizeof(g_Config.m_PlayerClan));
+	}
+	else
+	{
+		pCountry = &g_Config.m_ClDummyCountry;
+		s_NameInput.SetBuffer(g_Config.m_ClDummyName, sizeof(g_Config.m_ClDummyName));
+		s_NameInput.SetEmptyText(Client()->DummyName());
+		s_ClanInput.SetBuffer(g_Config.m_ClDummyClan, sizeof(g_Config.m_ClDummyClan));
+	}
+
+	CUIRect NameSide, ClanSide, NameLabel, NameInput, ClanLabel, ClanInput, FlagButton;
+	InfoRow.VSplitMid(&NameSide, &ClanSide, 10.0f);
+	NameSide.VSplitLeft(45.0f, &NameLabel, &NameInput);
+	ClanSide.VSplitLeft(40.0f, &ClanLabel, &ClanInput);
+	ClanInput.VSplitRight(34.0f, &ClanInput, &FlagButton);
+	ClanInput.VSplitRight(6.0f, &ClanInput, nullptr);
+
+	Ui()->DoLabel(&NameLabel, Localize("Name"), 14.0f, TEXTALIGN_ML);
+	Ui()->DoLabel(&ClanLabel, Localize("Clan"), 14.0f, TEXTALIGN_ML);
+
+	if(Ui()->DoEditBox(&s_NameInput, &NameInput, 14.0f))
+	{
+		SetNeedSendInfo();
+	}
+
+	if(Ui()->DoEditBox(&s_ClanInput, &ClanInput, 14.0f))
+	{
+		SetNeedSendInfo();
+	}
+
+	static CButtonContainer s_FlagButton;
+	if(DoButton_Menu(&s_FlagButton, "", 0, &FlagButton))
+	{
+		static SPopupMenuId s_PopupCountryId;
+		static SPopupSettingsCountrySelectionContext s_PopupCountryContext;
+		s_PopupCountryContext.m_pMenus = this;
+		s_PopupCountryContext.m_pCountry = pCountry;
+		s_PopupCountryContext.m_Selection = *pCountry;
+		s_PopupCountryContext.m_New = true;
+		Ui()->DoPopupMenu(&s_PopupCountryId, FlagButton.x, FlagButton.y + FlagButton.h, 490.0f, 210.0f, &s_PopupCountryContext, PopupSettingsCountrySelection);
+	}
+	GameClient()->m_Tooltips.DoToolTip(&s_FlagButton, &FlagButton, Localize("Choose country flag"));
+
+	CUIRect FlagIcon = FlagButton;
+	const float OldWidth = FlagIcon.w;
+	FlagIcon.w = FlagIcon.h * 2.0f;
+	FlagIcon.x += (OldWidth - FlagIcon.w) / 2.0f;
+	GameClient()->m_CountryFlags.Render(*pCountry, ColorRGBA(1.0f, 1.0f, 1.0f, Ui()->HotItem() == &s_FlagButton ? 1.0f : 0.85f), FlagIcon.x, FlagIcon.y, FlagIcon.w, FlagIcon.h);
 
 	// validate skin parts for solo mode
 	char aSkinParts[protocol7::NUM_SKINPARTS][protocol7::MAX_SKIN_ARRAY_SIZE];
