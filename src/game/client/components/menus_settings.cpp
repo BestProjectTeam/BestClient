@@ -3288,6 +3288,8 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				Ui()->DoLabel(&TypeLabel, Localize("Particle type"), 14.0f, TEXTALIGN_ML);
 
 				static CUi::SDropDownState s_MagicParticlesTypeState;
+				static CScrollRegion s_MagicParticlesTypeScrollRegion;
+				s_MagicParticlesTypeState.m_SelectionPopupContext.m_pScrollRegion = &s_MagicParticlesTypeScrollRegion;
 				const char *apMagicParticleTypes[4] = {
 					Localize("Slice"),
 					Localize("Ball"),
@@ -3370,6 +3372,8 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				Ui()->DoLabel(&TypeLabel, Localize("Particle type"), 14.0f, TEXTALIGN_ML);
 
 				static CUi::SDropDownState s_3DParticlesTypeState;
+				static CScrollRegion s_3DParticlesTypeScrollRegion;
+				s_3DParticlesTypeState.m_SelectionPopupContext.m_pScrollRegion = &s_3DParticlesTypeScrollRegion;
 				const char *ap3DParticleTypes[3] = {
 					Localize("Cube"),
 					Localize("Heart"),
@@ -3393,6 +3397,8 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				Ui()->DoLabel(&ColorModeLabel, Localize("Color mode"), 14.0f, TEXTALIGN_ML);
 
 				static CUi::SDropDownState s_3DParticlesColorModeState;
+				static CScrollRegion s_3DParticlesColorModeScrollRegion;
+				s_3DParticlesColorModeState.m_SelectionPopupContext.m_pScrollRegion = &s_3DParticlesColorModeScrollRegion;
 				const char *ap3DParticleColorModes[2] = {
 					Localize("Custom"),
 					Localize("Random"),
