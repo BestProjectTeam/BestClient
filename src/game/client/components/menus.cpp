@@ -907,6 +907,9 @@ void CMenus::OnInit()
 	Console()->Chain("demo_speed", ConchainDemoSpeed, this);
 
 	m_TextureBlob = Graphics()->LoadTexture("blob.png", IStorage::TYPE_ALL);
+	m_MainMenuLogoTexture = Graphics()->LoadTexture("bestclient/gui_logo.png", IStorage::TYPE_ALL);
+	if(!m_MainMenuLogoTexture.IsValid() || m_MainMenuLogoTexture.IsNullTexture())
+		m_MainMenuLogoTexture = Graphics()->LoadTexture("BestClient/gui_logo.png", IStorage::TYPE_ALL);
 
 	// setup load amount
 	m_LoadingState.m_Current = 0;

@@ -638,6 +638,7 @@ protected:
 	void UpdateColors();
 
 	IGraphics::CTextureHandle m_TextureBlob;
+	IGraphics::CTextureHandle m_MainMenuLogoTexture;
 
 public:
 	void RenderBackground();
@@ -649,6 +650,7 @@ public:
 	void FinishLoading();
 
 	bool IsInit() const { return m_IsInit; }
+	const IGraphics::CTextureHandle &MainMenuLogoTexture() const { return m_MainMenuLogoTexture; }
 
 	bool IsActive() const { return m_MenuActive; }
 	void SetActive(bool Active);

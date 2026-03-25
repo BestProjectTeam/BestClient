@@ -26,7 +26,8 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_START);
 
 	// render logo
-	Graphics()->TextureSet(g_pData->m_aImages[IMAGE_BANNER].m_Id);
+	const IGraphics::CTextureHandle &LogoTexture = GameClient()->m_Menus.MainMenuLogoTexture();
+	Graphics()->TextureSet(LogoTexture.IsValid() && !LogoTexture.IsNullTexture() ? LogoTexture : g_pData->m_aImages[IMAGE_BANNER].m_Id);
 	Graphics()->QuadsBegin();
 	Graphics()->SetColor(1, 1, 1, 1);
 	IGraphics::CQuadItem QuadItem(MainView.w / 2 - 170, 60, 360, 103);
