@@ -1684,6 +1684,7 @@ void CMenus::RenderSettings(CUIRect MainView)
 	else if(g_Config.m_UiSettingsPage == SETTINGS_BESTCLIENT)
 	{
 		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_RESERVED0);
+		RenderSettingsBestClient(MainView);
 	}
 	else if(g_Config.m_UiSettingsPage == SETTINGS_PROFILES)
 	{
@@ -3188,6 +3189,33 @@ void CMenus::RenderSettingsDDNet(CUIRect MainView)
 		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
 	}
 #endif
+}
+
+void CMenus::RenderSettingsBestClient(CUIRect MainView)
+{
+	CUIRect Label, Left, Right, Button;
+	MainView.HSplitTop(30.0f, &Label, &MainView);
+	Ui()->DoLabel(&Label, "BestClient", 20.0f, TEXTALIGN_ML);
+	MainView.HSplitTop(10.0f, nullptr, &MainView);
+	MainView.VSplitMid(&Left, &Right, 20.0f);
+
+	Left.HSplitTop(20.0f, &Button, &Left);
+	if(DoButton_CheckBox(&g_Config.m_BcTestCheckbox, "BestClient test checkbox", g_Config.m_BcTestCheckbox, &Button))
+		g_Config.m_BcTestCheckbox ^= 1;
+
+	Left.HSplitTop(10.0f, nullptr, &Left);
+	Left.HSplitTop(20.0f, &Button, &Left);
+	static CButtonContainer s_BestClientSettingsButtonId;
+	if(DoButton_Menu(&s_BestClientSettingsButtonId, "BestClient settings file", 0, &Button))
+	{
+		char aBuf[IO_MAX_PATH_LENGTH];
+		Storage()->GetCompletePath(IStorage::TYPE_SAVE, s_aConfigDomains[ConfigDomain::BESTCLIENT].m_aConfigPath, aBuf, sizeof(aBuf));
+		Client()->ViewFile(aBuf);
+	}
+	GameClient()->m_Tooltips.DoToolTip(&s_BestClientSettingsButtonId, &Button, "Open settings_BestClient.cfg");
+
+	Right.HSplitTop(20.0f, &Label, &Right);
+	Ui()->DoLabel(&Label, "BestClient config domain: settings_BestClient.cfg", 14.0f, TEXTALIGN_ML);
 }
 
 CUi::EPopupMenuFunctionResult CMenus::PopupMapPicker(void *pContext, CUIRect View, bool Active)
