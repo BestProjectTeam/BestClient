@@ -34,6 +34,7 @@
 
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <memory>
 #include <numeric>
 #include <string>
@@ -4116,7 +4117,168 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 	}
 	else if(s_CurTab == BESTCLIENT_TAB_GAMEPLAY)
 	{
-		// Intentionally empty for now.
+		const float LineSize = 20.0f;
+		const float HeadlineFontSize = 20.0f;
+		const float FontSize = 14.0f;
+		const float EditBoxFontSize = 14.0f;
+		const float MarginSmall = 5.0f;
+		const float MarginBetweenViews = 30.0f;
+		const ColorRGBA BlockColor = ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f);
+
+		static CScrollRegion s_BestClientGameplayScrollRegion;
+		vec2 GameplayScrollOffset(0.0f, 0.0f);
+		CScrollRegionParams GameplayScrollParams;
+		GameplayScrollParams.m_ScrollUnit = 60.0f;
+		GameplayScrollParams.m_Flags = CScrollRegionParams::FLAG_CONTENT_STATIC_WIDTH;
+		GameplayScrollParams.m_ScrollbarMargin = 5.0f;
+		s_BestClientGameplayScrollRegion.Begin(&MainView, &GameplayScrollOffset, &GameplayScrollParams);
+
+		MainView.y += GameplayScrollOffset.y;
+		MainView.VSplitRight(5.0f, &MainView, nullptr);
+		MainView.VSplitLeft(5.0f, nullptr, &MainView);
+
+		CUIRect LeftView, RightView;
+		MainView.VSplitMid(&LeftView, &RightView, MarginBetweenViews);
+		LeftView.VSplitLeft(MarginSmall, nullptr, &LeftView);
+		RightView.VSplitRight(MarginSmall, &RightView, nullptr);
+
+		auto BeginBlock = [&](CUIRect &ColumnRef, float ContentHeight, CUIRect &Content) {
+			CUIRect Block;
+			ColumnRef.HSplitTop(ContentHeight + MarginSmall * 2.0f, &Block, &ColumnRef);
+			Block.Draw(BlockColor, IGraphics::CORNER_ALL, 10.0f);
+			Block.Margin(MarginSmall, &Content);
+		};
+
+		CUIRect Column = LeftView;
+		{
+			static char s_aBindCommand[BINDSYSTEM_MAX_CMD] = "";
+			static int s_SelectedBindIndex = 0;
+			static int s_LastSelectedBindIndex = -1;
+
+			const float WheelPreviewHeight = 96.0f;
+			const float ContentHeight = LineSize + MarginSmall +
+				WheelPreviewHeight + MarginSmall +
+				LineSize + MarginSmall +
+				LineSize + MarginSmall +
+				LineSize + MarginSmall +
+				LineSize * 0.8f + MarginSmall +
+				LineSize;
+
+			CUIRect Content, Label, Button;
+			BeginBlock(Column, ContentHeight, Content);
+
+			Content.HSplitTop(LineSize, &Label, &Content);
+			Ui()->DoLabel(&Label, Localize("BindSystem"), HeadlineFontSize, TEXTALIGN_ML);
+			Content.HSplitTop(MarginSmall, nullptr, &Content);
+
+			int HoveringIndex = -1;
+			CUIRect WheelPreview;
+			Content.HSplitTop(WheelPreviewHeight, &WheelPreview, &Content);
+			const vec2 Center = WheelPreview.Center();
+			const float LineInset = 18.0f;
+			const float LineHalfWidth = maximum(40.0f, WheelPreview.w / 2.0f - LineInset);
+			const float LineHeight = minimum(WheelPreview.h * 0.78f, 44.0f);
+			const float SelectBandHalfHeight = LineHeight * 1.2f;
+			const float LabelW = 52.0f;
+			const float LabelH = 52.0f;
+			const float TextHalfRange = maximum(0.0f, LineHalfWidth - LabelW / 2.0f - 2.0f);
+
+			Graphics()->DrawRect(Center.x - LineHalfWidth, Center.y - LineHeight / 2.0f, LineHalfWidth * 2.0f, LineHeight, ColorRGBA(0.0f, 0.0f, 0.0f, 0.3f), IGraphics::CORNER_ALL, 8.0f);
+
+			const vec2 MouseDelta = Ui()->MousePos() - Center;
+			const int SegmentCount = static_cast<int>(GameClient()->m_BindSystem.m_vBinds.size());
+			const bool HoverInsideLine = absolute(MouseDelta.x) <= LineHalfWidth && absolute(MouseDelta.y) <= SelectBandHalfHeight;
+			if(HoverInsideLine && SegmentCount > 0)
+			{
+				const float HoverPos01 = TextHalfRange > 0.0f ? (MouseDelta.x + TextHalfRange) / (2.0f * TextHalfRange) : 0.5f;
+				HoveringIndex = std::clamp((int)std::round(HoverPos01 * (SegmentCount - 1)), 0, SegmentCount - 1);
+
+				if(Ui()->MouseButtonClicked(0) || Ui()->MouseButtonClicked(2))
+				{
+					s_SelectedBindIndex = HoveringIndex;
+					str_copy(s_aBindCommand, GameClient()->m_BindSystem.m_vBinds[HoveringIndex].m_aCommand);
+				}
+			}
+
+			s_SelectedBindIndex = std::clamp(s_SelectedBindIndex, 0, maximum(0, SegmentCount - 1));
+			if(s_SelectedBindIndex != s_LastSelectedBindIndex &&
+				s_SelectedBindIndex < static_cast<int>(GameClient()->m_BindSystem.m_vBinds.size()))
+			{
+				str_copy(s_aBindCommand, GameClient()->m_BindSystem.m_vBinds[s_SelectedBindIndex].m_aCommand);
+				s_LastSelectedBindIndex = s_SelectedBindIndex;
+			}
+
+			for(int i = 0; i < static_cast<int>(GameClient()->m_BindSystem.m_vBinds.size()); i++)
+			{
+				TextRender()->TextColor(ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));
+				float SegmentFontSize = FontSize * 1.1f;
+				if(i == s_SelectedBindIndex)
+				{
+					SegmentFontSize = FontSize * 1.7f;
+					TextRender()->TextColor(ColorRGBA(0.5f, 1.0f, 0.75f, 1.0f));
+				}
+				else if(i == HoveringIndex)
+				{
+					SegmentFontSize = FontSize * 1.35f;
+				}
+
+				const CBindSystem::CBind Bind = GameClient()->m_BindSystem.m_vBinds[i];
+				const float Pos01 = GameClient()->m_BindSystem.m_vBinds.size() <= 1 ? 0.5f : (float)i / (float)(GameClient()->m_BindSystem.m_vBinds.size() - 1);
+				const vec2 Pos = vec2(Center.x - TextHalfRange + Pos01 * (TextHalfRange * 2.0f), Center.y);
+				const CUIRect Rect = CUIRect{Pos.x - LabelW / 2.0f, Pos.y - LabelH / 2.0f, LabelW, LabelH};
+				Ui()->DoLabel(&Rect, Bind.m_aName, SegmentFontSize, TEXTALIGN_MC);
+			}
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+			Content.HSplitTop(MarginSmall, nullptr, &Content);
+			Content.HSplitTop(LineSize, &Button, &Content);
+			char aSlotLabel[64];
+			str_format(aSlotLabel, sizeof(aSlotLabel), "%s %d", Localize("Selected slot"), s_SelectedBindIndex + 1);
+			Ui()->DoLabel(&Button, aSlotLabel, FontSize, TEXTALIGN_ML);
+
+			Content.HSplitTop(MarginSmall, nullptr, &Content);
+			Content.HSplitTop(LineSize, &Button, &Content);
+			Button.VSplitLeft(150.0f, &Label, &Button);
+			Ui()->DoLabel(&Label, Localize("Command:"), FontSize, TEXTALIGN_ML);
+			static CLineInput s_BindInput;
+			s_BindInput.SetBuffer(s_aBindCommand, sizeof(s_aBindCommand));
+			s_BindInput.SetEmptyText(Localize("Command"));
+			Ui()->DoEditBox(&s_BindInput, &Button, EditBoxFontSize);
+
+			if(s_SelectedBindIndex < static_cast<int>(GameClient()->m_BindSystem.m_vBinds.size()))
+				str_copy(GameClient()->m_BindSystem.m_vBinds[s_SelectedBindIndex].m_aCommand, s_aBindCommand);
+
+			static CButtonContainer s_ClearButton;
+			Content.HSplitTop(MarginSmall, nullptr, &Content);
+			Content.HSplitTop(LineSize, &Button, &Content);
+			if(DoButton_Menu(&s_ClearButton, Localize("Clear command"), 0, &Button) &&
+				s_SelectedBindIndex < static_cast<int>(GameClient()->m_BindSystem.m_vBinds.size()))
+			{
+				GameClient()->m_BindSystem.m_vBinds[s_SelectedBindIndex].m_aCommand[0] = '\0';
+				s_aBindCommand[0] = '\0';
+			}
+
+			Content.HSplitTop(MarginSmall, nullptr, &Content);
+			Content.HSplitTop(LineSize * 0.8f, &Label, &Content);
+			Ui()->DoLabel(&Label, Localize("In game: hold bind key, press 1..6, release key to execute"), FontSize * 0.8f, TEXTALIGN_ML);
+
+			Content.HSplitTop(MarginSmall, nullptr, &Content);
+			Content.HSplitTop(LineSize, &Label, &Content);
+			static CButtonContainer s_ReaderButtonWheel;
+			static CButtonContainer s_ClearButtonWheel;
+			DoLine_KeyReader(Label, s_ReaderButtonWheel, s_ClearButtonWheel, Localize("BindSystem key"), "+bs");
+		}
+
+		const float LeftColumnEndY = Column.y;
+		Column = RightView;
+		const float RightColumnEndY = Column.y;
+		CUIRect ScrollRegion;
+		ScrollRegion.x = MainView.x;
+		ScrollRegion.y = maximum(LeftColumnEndY, RightColumnEndY) + MarginSmall * 2.0f;
+		ScrollRegion.w = MainView.w;
+		ScrollRegion.h = 0.0f;
+		s_BestClientGameplayScrollRegion.AddRect(ScrollRegion);
+		s_BestClientGameplayScrollRegion.End();
 	}
 	else if(s_CurTab == BESTCLIENT_TAB_FUN)
 	{

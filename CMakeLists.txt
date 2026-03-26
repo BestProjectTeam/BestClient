@@ -2526,6 +2526,8 @@ if(CLIENT)
     components/bestclient/audio_capture_device_score.h
     components/bestclient/audio_visualizer.cpp
     components/bestclient/audio_visualizer.h
+    components/bestclient/bindsystem.cpp
+    components/bestclient/bindsystem.h
     components/bestclient/chat_bubbles.cpp
     components/bestclient/chat_bubbles.h
     components/bestclient/magic_particles.cpp
