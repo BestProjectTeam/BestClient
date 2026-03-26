@@ -221,22 +221,28 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	}
 
 	CUIRect CurVersion, ConsoleButton;
-	MainView.HSplitBottom(60.0f, nullptr, &CurVersion);
+	MainView.HSplitBottom(74.0f, nullptr, &CurVersion);
 	CurVersion.VSplitRight(40.0f, &CurVersion, nullptr);
 	CurVersion.HSplitTop(20.0f, &ConsoleButton, &CurVersion);
 	CurVersion.HSplitTop(5.0f, nullptr, &CurVersion);
 	ConsoleButton.VSplitRight(40.0f, nullptr, &ConsoleButton);
 
-	CUIRect VersionLine1, VersionLine2;
+	CUIRect VersionLine1, VersionLine2, VersionLine3;
 	CurVersion.HSplitTop(16.0f, &VersionLine1, &CurVersion);
+	CurVersion.HSplitTop(2.0f, nullptr, &CurVersion);
 	CurVersion.HSplitTop(16.0f, &VersionLine2, &CurVersion);
+	CurVersion.HSplitTop(2.0f, nullptr, &CurVersion);
+	CurVersion.HSplitTop(16.0f, &VersionLine3, &CurVersion);
 
 	char aDDNetBuf[64];
-	char aClientBuf[64];
+	char aTClientBuf[64];
+	char aBestClientBuf[64];
 	str_format(aDDNetBuf, sizeof(aDDNetBuf), "DDNet %s", GAME_RELEASE_VERSION);
-	str_format(aClientBuf, sizeof(aClientBuf), "%s %s | BestClient %s", CLIENT_NAME, CLIENT_RELEASE_VERSION, BestClient_VERSION);
+	str_format(aTClientBuf, sizeof(aTClientBuf), "%s %s", CLIENT_NAME, CLIENT_RELEASE_VERSION);
+	str_format(aBestClientBuf, sizeof(aBestClientBuf), "BestClient %s", BestClient_VERSION);
 	Ui()->DoLabel(&VersionLine1, aDDNetBuf, 14.0f, TEXTALIGN_MR);
-	Ui()->DoLabel(&VersionLine2, aClientBuf, 14.0f, TEXTALIGN_MR);
+	Ui()->DoLabel(&VersionLine2, aTClientBuf, 14.0f, TEXTALIGN_MR);
+	Ui()->DoLabel(&VersionLine3, aBestClientBuf, 14.0f, TEXTALIGN_MR);
 
 	static CButtonContainer s_ConsoleButton;
 	SetIconMode();
