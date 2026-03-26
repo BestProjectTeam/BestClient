@@ -3200,8 +3200,8 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 	{
 		BESTCLIENT_TAB_VISUALS = 0,
 		BESTCLIENT_TAB_GAMEPLAY,
-		BESTCLIENT_TAB_FUN,
 		BESTCLIENT_TAB_OTHERS,
+		BESTCLIENT_TAB_FUN,
 		NUM_BESTCLIENT_TABS,
 	};
 
@@ -3213,9 +3213,9 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 	const float TabWidth = TabBar.w / (float)NUM_BESTCLIENT_TABS;
 	const char *apTabNames[NUM_BESTCLIENT_TABS] = {
 		Localize("Visuals"),
-		Localize("Gameplay"),
-		Localize("Fun"),
+		"Gameplay",
 		Localize("Others"),
+		Localize("Fun"),
 	};
 
 	for(int Tab = BESTCLIENT_TAB_VISUALS; Tab < NUM_BESTCLIENT_TABS; ++Tab)
