@@ -94,6 +94,19 @@ void CMenusSettingsControls::OnInterfacesInit(CGameClient *pClient)
 		{EBindOptionGroup::DUMMY, Localizable("Toggle dummy"), "toggle cl_dummy 0 1"},
 		{EBindOptionGroup::DUMMY, Localizable("Dummy copy"), "toggle cl_dummy_copy_moves 0 1"},
 		{EBindOptionGroup::DUMMY, Localizable("Hammerfly dummy"), "toggle cl_dummy_hammer 0 1"},
+		{EBindOptionGroup::BEST_CLIENT, Localizable("Dummy pseudo"), "+toggle cl_dummy_hammer 1 0"},
+		{EBindOptionGroup::BEST_CLIENT, Localizable("Deepfly toggle"), "BC_deepfly_toggle"},
+		{EBindOptionGroup::BEST_CLIENT, Localizable("45 deg bind"), "+BC_45_degrees"},
+		{EBindOptionGroup::BEST_CLIENT, Localizable("Small sens bind"), "BC_small_sens"},
+		{EBindOptionGroup::BEST_CLIENT, Localizable("Cinematic camera"), "BC_cinematic_camera_toggle"},
+		{EBindOptionGroup::BEST_CLIENT, Localizable("Left jump"), "+jump; +left"},
+		{EBindOptionGroup::BEST_CLIENT, Localizable("Right jump"), "+jump; +right"},
+		{EBindOptionGroup::BEST_CLIENT, Localizable("World Editor"), "toggle_world_editor"},
+		{EBindOptionGroup::BEST_CLIENT_PRACTICE, Localizable("say /r"), "say /r"},
+		{EBindOptionGroup::BEST_CLIENT_PRACTICE, Localizable("say /invincible"), "say /invincible"},
+		{EBindOptionGroup::BEST_CLIENT_PRACTICE, Localizable("say /telecursor"), "say /telecursor"},
+		{EBindOptionGroup::BEST_CLIENT_PRACTICE, Localizable("say /weapons"), "say /weapons"},
+		{EBindOptionGroup::BEST_CLIENT_PRACTICE, Localizable("say /unweapons"), "say /unweapons"},
 		{EBindOptionGroup::MISCELLANEOUS, Localizable("Emoticon"), "+emote"},
 		{EBindOptionGroup::MISCELLANEOUS, Localizable("Spectator mode"), "+spectate"},
 		{EBindOptionGroup::MISCELLANEOUS, Localizable("Spectate next"), "spectate_next"},
@@ -193,6 +206,8 @@ void CMenusSettingsControls::Render(CUIRect MainView)
 	RenderSettingsBindsBlock(EBindOptionGroup::VOTING, &RightColumn, Localize("Voting"));
 	RenderSettingsBindsBlock(EBindOptionGroup::CHAT, &RightColumn, Localize("Chat"));
 	RenderSettingsBindsBlock(EBindOptionGroup::DUMMY, &RightColumn, Localize("Dummy"));
+	RenderSettingsBindsBlock(EBindOptionGroup::BEST_CLIENT, &RightColumn, Localize("BestClient"));
+	RenderSettingsBindsBlock(EBindOptionGroup::BEST_CLIENT_PRACTICE, &RightColumn, Localize("BestClient Practice"));
 	RenderSettingsBindsBlock(EBindOptionGroup::MISCELLANEOUS, &RightColumn, Localize("Miscellaneous"));
 	if(std::any_of(m_vBindOptions.begin(), m_vBindOptions.end(), [](const CBindOption &Option) { return Option.m_Group == EBindOptionGroup::CUSTOM; }))
 	{
