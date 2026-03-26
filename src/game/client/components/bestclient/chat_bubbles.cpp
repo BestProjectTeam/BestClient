@@ -436,6 +436,8 @@ void CChatBubbles::OnRender()
 		const CGameClient::CClientData &ClientData = GameClient()->m_aClients[ClientId];
 		if(!ClientData.m_Active || !ClientData.m_RenderInfo.Valid())
 			continue;
+		if(!GameClient()->OptimizerAllowRenderPos(ClientData.m_RenderPos))
+			continue;
 		if(ClientData.m_RenderPos.x < ScreenX0 || ClientData.m_RenderPos.x > ScreenX1 || ClientData.m_RenderPos.y < ScreenY0 || ClientData.m_RenderPos.y > ScreenY1)
 			continue;
 		RenderChatBubbles(ClientId);

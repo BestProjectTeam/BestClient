@@ -15,6 +15,11 @@ CMapLayers::CMapLayers(ERenderType Type, bool OnlineOnly)
 	m_Params.m_RenderInvalidTiles = false;
 	m_Params.m_TileAndQuadBuffering = true;
 	m_Params.m_RenderTileBorder = true;
+	m_Params.m_FpsFogEnabled = false;
+	m_Params.m_FpsFogMode = 0;
+	m_Params.m_FpsFogRadiusTiles = 0;
+	m_Params.m_FpsFogZoomPercent = 0;
+	m_Params.m_FpsFogCullMapTiles = false;
 }
 
 void CMapLayers::OnInit()
@@ -60,6 +65,12 @@ void CMapLayers::OnRender()
 	m_Params.m_DebugRenderQuadClips = g_Config.m_DbgRenderQuadClips;
 	m_Params.m_DebugRenderClusterClips = g_Config.m_DbgRenderClusterClips;
 	m_Params.m_DebugRenderTileClips = g_Config.m_DbgRenderTileClips;
+	const bool OptimizerFpsFogEnabled = GameClient()->OptimizerFpsFogEnabled();
+	m_Params.m_FpsFogEnabled = OptimizerFpsFogEnabled;
+	m_Params.m_FpsFogMode = g_Config.m_BcOptimizerFpsFogMode;
+	m_Params.m_FpsFogRadiusTiles = g_Config.m_BcOptimizerFpsFogRadiusTiles;
+	m_Params.m_FpsFogZoomPercent = g_Config.m_BcOptimizerFpsFogZoomPercent;
+	m_Params.m_FpsFogCullMapTiles = OptimizerFpsFogEnabled && g_Config.m_BcOptimizerFpsFogCullMapTiles != 0;
 
 	m_MapRenderer.Render(m_Params);
 }

@@ -165,6 +165,13 @@ void C3DParticles::OnRender()
 		return;
 	}
 
+	if(GameClient()->OptimizerDisableParticles())
+	{
+		if(!m_vParticles.empty())
+			ResetParticles();
+		return;
+	}
+
 	if(!g_Config.m_Bc3dParticles)
 	{
 		if(!m_vParticles.empty())
@@ -284,6 +291,8 @@ void C3DParticles::OnRender()
 		std::swap(SpawnMinY, SpawnMaxY);
 
 	int TargetCount = std::clamp(g_Config.m_Bc3dParticlesCount, 0, PARTICLE_MAX_RENDERED);
+	if(GameClient()->OptimizerDisableParticles())
+		TargetCount = minimum(TargetCount, 32);
 	if((int)m_vParticles.size() > TargetCount)
 		m_vParticles.resize(TargetCount);
 

@@ -70,6 +70,8 @@ bool COrbitAura::CanRenderAura(int &ClientId, vec2 &BasePos, ColorRGBA &BaseColo
 	const float Delta = std::clamp(Client()->RenderFrameTime(), 0.0f, 0.1f);
 	const float CurrentTime = Client()->LocalTime();
 	BasePos = ClientData.m_RenderPos;
+	if(!GameClient()->OptimizerAllowRenderPos(BasePos))
+		return false;
 	Alpha = BaseAlpha * GetIdleVisibility(BasePos, Delta, CurrentTime);
 	if(Alpha <= 0.001f)
 		return false;

@@ -67,6 +67,13 @@ void CTrails::OnRender()
 			m_HistoryValid[ClientId] = true;
 
 		CTeeRenderInfo TeeInfo = GameClient()->m_aClients[ClientId].m_RenderInfo;
+		const vec2 RenderPos = GameClient()->m_aClients[ClientId].m_RenderPos;
+		if(!GameClient()->OptimizerAllowRenderPos(RenderPos))
+		{
+			if(m_HistoryValid[ClientId])
+				ClearHistory(ClientId);
+			continue;
+		}
 
 		const bool PredictPlayer = ShouldPredictPlayer(ClientId);
 		int StartTick;

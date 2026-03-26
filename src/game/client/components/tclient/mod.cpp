@@ -103,6 +103,8 @@ void CMod::OnRender()
 		auto RenderHitbox = [&](vec2 Position, float Alpha) {
 			if(Alpha <= 0.0f)
 				return;
+			if(!GameClient()->OptimizerAllowRenderPos(Position))
+				return;
 			const float RadiusInner = 16.0f;
 			const float RadiusOuter = 30.0f;
 			Graphics()->QuadsBegin();

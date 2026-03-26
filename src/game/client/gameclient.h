@@ -288,6 +288,8 @@ private:
 	void ProcessEvents();
 	void UpdatePositions();
 	void UpdateAutoTeamLock();
+	void OptimizerUpdateProcessPriorities();
+	void RenderOptimizerFpsFogRect();
 
 	int m_EditorMovementDelay = 5;
 	void UpdateEditorIngameMoved();
@@ -302,6 +304,10 @@ private:
 	int m_LastFlagCarrierBlue;
 
 	int m_aCheckInfo[NUM_DUMMIES];
+	unsigned long m_OptimizerDdnetPrevPriorityClass = 0;
+	bool m_OptimizerDdnetPriorityHighActive = false;
+	bool m_OptimizerDiscordPriorityBelowNormalActive = false;
+	float m_OptimizerDiscordPriorityLastUpdateTime = -1.0f;
 
 	char m_aDDNetVersionStr[64];
 	static void ConTeam(IConsole::IResult *pResult, void *pUserData);
@@ -762,6 +768,13 @@ public:
 	bool AntiPingGrenade() const { return g_Config.m_ClAntiPing && g_Config.m_ClAntiPingGrenade && !m_Snap.m_SpecInfo.m_Active && Client()->State() != IClient::STATE_DEMOPLAYBACK; }
 	bool AntiPingWeapons() const { return g_Config.m_ClAntiPing && g_Config.m_ClAntiPingWeapons && !m_Snap.m_SpecInfo.m_Active && Client()->State() != IClient::STATE_DEMOPLAYBACK; }
 	bool AntiPingGunfire() const { return AntiPingGrenade() && AntiPingWeapons() && g_Config.m_ClAntiPingGunfire; }
+	bool OptimizerEnabled() const;
+	bool OptimizerDisableParticles() const;
+	bool OptimizerFpsFogEnabled() const;
+	void OptimizerFpsFogHalfExtents(float &HalfW, float &HalfH) const;
+	bool OptimizerAllowRenderPos(vec2 WorldPos) const;
+	void OptimizerSetDdnetPriorityHigh();
+	void OptimizerSetDiscordPriorityBelowNormal();
 	bool Predict() const;
 	bool PredictDummy() const { return g_Config.m_ClPredictDummy && Client()->DummyConnected() && m_Snap.m_LocalClientId >= 0 && m_aLocalIds[!g_Config.m_ClDummy] >= 0 && !m_aClients[m_aLocalIds[!g_Config.m_ClDummy]].m_Paused; }
 	const CTuningParams *GetTuning(int i) const { return &m_aTuningList[i]; }

@@ -17,6 +17,8 @@ void CMagicParticles::ResetState()
 
 bool CMagicParticles::CanSpawnParticles(int &Count, float &Radius, float &Size, float &AlphaDelay, int &Type, vec2 &BasePos) const
 {
+	if(GameClient()->OptimizerDisableParticles())
+		return false;
 	if(!g_Config.m_BcMagicParticles)
 		return false;
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)

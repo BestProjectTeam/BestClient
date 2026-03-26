@@ -14,6 +14,7 @@
 #include <game/localization.h>
 #include <game/mapitems.h>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 
@@ -299,6 +300,43 @@ void CRenderLayerTile::RenderTileLayer(const ColorRGBA &Color, const CRenderLaye
 
 	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
 	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
+
+	if(Params.m_FpsFogEnabled && Params.m_FpsFogCullMapTiles)
+	{
+		const float CenterX = (ScreenX0 + ScreenX1) * 0.5f;
+		const float CenterY = (ScreenY0 + ScreenY1) * 0.5f;
+
+		float HalfW = 0.0f;
+		float HalfH = 0.0f;
+		if(Params.m_FpsFogMode == 0)
+		{
+			const float Radius = (float)Params.m_FpsFogRadiusTiles * 32.0f;
+			HalfW = Radius;
+			HalfH = Radius;
+		}
+		else
+		{
+			const float Percent = std::clamp(Params.m_FpsFogZoomPercent, 1, 100) / 100.0f;
+			HalfW = (ScreenX1 - ScreenX0) * Percent * 0.5f;
+			HalfH = (ScreenY1 - ScreenY0) * Percent * 0.5f;
+		}
+
+		if(HalfW > 0.0f && HalfH > 0.0f)
+		{
+			const float FogX0 = CenterX - HalfW;
+			const float FogX1 = CenterX + HalfW;
+			const float FogY0 = CenterY - HalfH;
+			const float FogY1 = CenterY + HalfH;
+
+			ScreenX0 = std::max(ScreenX0, FogX0);
+			ScreenX1 = std::min(ScreenX1, FogX1);
+			ScreenY0 = std::max(ScreenY0, FogY0);
+			ScreenY1 = std::min(ScreenY1, FogY1);
+
+			if(ScreenX0 >= ScreenX1 || ScreenY0 >= ScreenY1)
+				return;
+		}
+	}
 
 	int ScreenRectY0 = std::floor(ScreenY0 / 32);
 	int ScreenRectX0 = std::floor(ScreenX0 / 32);

@@ -23,6 +23,9 @@ void CFreezeBars::RenderFreezeBar(const int ClientId)
 		return;
 	}
 
+	if(!GameClient()->OptimizerAllowRenderPos(GameClient()->m_aClients[ClientId].m_RenderPos))
+		return;
+
 	vec2 Position = GameClient()->m_aClients[ClientId].m_RenderPos;
 	Position.x -= FreezeBarHalfWidth;
 	Position.y += 32;

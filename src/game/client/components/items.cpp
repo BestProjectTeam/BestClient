@@ -228,6 +228,8 @@ void CItems::RenderProjectile(const CProjectileData *pCurrent, int ItemId)
 	}
 
 	vec2 Pos = CalcPos(pCurrent->m_StartPos, pCurrent->m_StartVel, Curvature, Speed, Ct);
+	if(!GameClient()->OptimizerAllowRenderPos(Pos))
+		return;
 	vec2 PrevPos = CalcPos(pCurrent->m_StartPos, pCurrent->m_StartVel, Curvature, Speed, Ct - 0.001f);
 
 	float Alpha = 1.f;
@@ -285,6 +287,8 @@ void CItems::RenderPickup(const CNetObj_Pickup *pPrev, const CNetObj_Pickup *pCu
 	int QuadOffset = 2;
 	float IntraTick = IsPredicted ? Client()->PredIntraGameTick(g_Config.m_ClDummy) : Client()->IntraGameTick(g_Config.m_ClDummy);
 	vec2 Pos = mix(vec2(pPrev->m_X, pPrev->m_Y), vec2(pCurrent->m_X, pCurrent->m_Y), IntraTick);
+	if(!GameClient()->OptimizerAllowRenderPos(Pos))
+		return;
 	if(pCurrent->m_Type == POWERUP_HEALTH)
 	{
 		QuadOffset = m_PickupHealthOffset;
@@ -382,6 +386,8 @@ void CItems::RenderFlags()
 void CItems::RenderFlag(const CNetObj_Flag *pPrev, const CNetObj_Flag *pCurrent, const CNetObj_GameData *pPrevGameData, const CNetObj_GameData *pCurGameData)
 {
 	vec2 Pos = mix(vec2(pPrev->m_X, pPrev->m_Y), vec2(pCurrent->m_X, pCurrent->m_Y), Client()->IntraGameTick(g_Config.m_ClDummy));
+	if(!GameClient()->OptimizerAllowRenderPos(Pos))
+		return;
 	if(pCurGameData)
 	{
 		int FlagCarrier = (pCurrent->m_Team == TEAM_RED) ? pCurGameData->m_FlagCarrierRed : pCurGameData->m_FlagCarrierBlue;
@@ -415,6 +421,9 @@ void CItems::RenderFlag(const CNetObj_Flag *pPrev, const CNetObj_Flag *pCurrent,
 
 void CItems::RenderLaser(const CLaserData *pCurrent, bool IsPredicted)
 {
+	if(!GameClient()->OptimizerAllowRenderPos((pCurrent->m_From + pCurrent->m_To) * 0.5f))
+		return;
+
 	int Type = std::clamp(pCurrent->m_Type, -1, NUM_LASERTYPES - 1);
 	int ColorIn, ColorOut;
 	switch(Type)

@@ -228,6 +228,8 @@ void CPlayers::RenderHookCollLine(
 
 	vec2 Direction = direction(Angle);
 	vec2 Position = GameClient()->m_aClients[ClientId].m_RenderPos;
+	if(!GameClient()->OptimizerAllowRenderPos(Position))
+		return;
 
 	static constexpr float HOOK_START_DISTANCE = CCharacterCore::PhysicalSize() * 1.5f;
 	float HookLength = (float)GameClient()->m_aClients[ClientId].m_Predicted.m_Tuning.m_HookLength;
@@ -517,6 +519,10 @@ void CPlayers::RenderHook(
 	else
 		HookPos = mix(vec2(Prev.m_HookX, Prev.m_HookY), vec2(Player.m_HookX, Player.m_HookY), Intra);
 
+	const bool Local = GameClient()->m_Snap.m_LocalClientId == ClientId;
+	if(!Local && (!GameClient()->OptimizerAllowRenderPos(Pos) || !GameClient()->OptimizerAllowRenderPos(HookPos)))
+		return;
+
 	float d = distance(Pos, HookPos);
 	vec2 Dir = normalize(Pos - HookPos);
 
@@ -527,7 +533,6 @@ void CPlayers::RenderHook(
 	Graphics()->SetColor(1.0f, 1.0f, 1.0f, Alpha);
 
 	// TClient
-	bool Local = GameClient()->m_Snap.m_LocalClientId == ClientId;
 	bool DontOthers = !g_Config.m_TcRainbowOthers && !Local;
 	if(g_Config.m_TcRainbowHook && !DontOthers)
 		Graphics()->SetColor(GameClient()->m_Rainbow.m_RainbowColor.WithAlpha(Alpha));
@@ -634,6 +639,9 @@ void CPlayers::RenderPlayer(
 			vec2(GameClient()->m_Snap.m_aCharacters[ClientId].m_Prev.m_X, GameClient()->m_Snap.m_aCharacters[ClientId].m_Prev.m_Y),
 			vec2(GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur.m_X, GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur.m_Y),
 			Client()->IntraGameTick(g_Config.m_ClDummy));
+
+	if(!GameClient()->OptimizerAllowRenderPos(Position))
+		return;
 
 	GameClient()->m_Flow.Add(Position, Vel * 100.0f, 10.0f);
 

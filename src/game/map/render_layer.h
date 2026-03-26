@@ -59,6 +59,11 @@ public:
 	bool m_DebugRenderQuadClips;
 	bool m_DebugRenderClusterClips;
 	bool m_DebugRenderTileClips;
+	bool m_FpsFogEnabled;
+	int m_FpsFogMode;
+	int m_FpsFogRadiusTiles;
+	int m_FpsFogZoomPercent;
+	bool m_FpsFogCullMapTiles;
 };
 
 class CRenderLayer : public CRenderComponent

@@ -78,8 +78,18 @@
 #include <game/version.h>
 
 #include <chrono>
+#include <algorithm>
 #include <cmath>
+#include <cwchar>
 #include <limits>
+
+#if defined(CONF_FAMILY_WINDOWS)
+#include <windows.h>
+#include <tlhelp32.h>
+#ifdef ERROR
+#undef ERROR
+#endif
+#endif
 
 using namespace std::chrono_literals;
 
@@ -90,6 +100,246 @@ int CGameClient::DDNetVersion() const { return DDNET_VERSION_NUMBER; }
 const char *CGameClient::DDNetVersionStr() const { return m_aDDNetVersionStr; }
 int CGameClient::ClientVersion7() const { return CLIENT_VERSION7; }
 const char *CGameClient::GetItemName(int Type) const { return m_NetObjHandler.GetObjName(Type); }
+
+bool CGameClient::OptimizerEnabled() const
+{
+	return g_Config.m_BcOptimizer != 0;
+}
+
+bool CGameClient::OptimizerDisableParticles() const
+{
+	return OptimizerEnabled() && g_Config.m_BcOptimizerDisableParticles != 0;
+}
+
+bool CGameClient::OptimizerFpsFogEnabled() const
+{
+	return OptimizerEnabled() && g_Config.m_BcOptimizerFpsFog != 0;
+}
+
+void CGameClient::OptimizerFpsFogHalfExtents(float &HalfW, float &HalfH) const
+{
+	HalfW = 0.0f;
+	HalfH = 0.0f;
+
+	if(!OptimizerFpsFogEnabled())
+		return;
+
+	if(g_Config.m_BcOptimizerFpsFogMode == 0)
+	{
+		const float Radius = (float)g_Config.m_BcOptimizerFpsFogRadiusTiles * 32.0f;
+		HalfW = Radius;
+		HalfH = Radius;
+		return;
+	}
+
+	float Width = 0.0f;
+	float Height = 0.0f;
+	Graphics()->CalcScreenParams(Graphics()->ScreenAspect(), m_Camera.m_Zoom, &Width, &Height);
+	const float Percent = std::clamp(g_Config.m_BcOptimizerFpsFogZoomPercent, 1, 100) / 100.0f;
+	HalfW = Width * Percent * 0.5f;
+	HalfH = Height * Percent * 0.5f;
+}
+
+bool CGameClient::OptimizerAllowRenderPos(vec2 WorldPos) const
+{
+	if(!OptimizerFpsFogEnabled())
+		return true;
+
+	float HalfW = 0.0f;
+	float HalfH = 0.0f;
+	OptimizerFpsFogHalfExtents(HalfW, HalfH);
+	if(HalfW <= 0.0f || HalfH <= 0.0f)
+		return true;
+
+	const vec2 Center = m_Camera.m_Center;
+	return std::abs(WorldPos.x - Center.x) <= HalfW && std::abs(WorldPos.y - Center.y) <= HalfH;
+}
+
+#if defined(CONF_FAMILY_WINDOWS)
+static bool SetPriorityClassForPid(DWORD Pid, DWORD PriorityClass)
+{
+	const HANDLE Process = OpenProcess(PROCESS_SET_INFORMATION | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, Pid);
+	if(Process == nullptr)
+		return false;
+	const bool Ok = SetPriorityClass(Process, PriorityClass) != 0;
+	CloseHandle(Process);
+	return Ok;
+}
+
+static int SetPriorityClassForProcessNames(const wchar_t *const *ppExeNames, size_t NumNames, DWORD PriorityClass)
+{
+	const HANDLE Snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if(Snapshot == INVALID_HANDLE_VALUE)
+		return -1;
+
+	PROCESSENTRY32W Entry;
+	Entry.dwSize = sizeof(Entry);
+	if(!Process32FirstW(Snapshot, &Entry))
+	{
+		CloseHandle(Snapshot);
+		return -1;
+	}
+
+	int SuccessCount = 0;
+	do
+	{
+		bool Match = false;
+		for(size_t i = 0; i < NumNames; i++)
+		{
+			if(_wcsicmp(Entry.szExeFile, ppExeNames[i]) == 0)
+			{
+				Match = true;
+				break;
+			}
+		}
+
+		if(Match && SetPriorityClassForPid(Entry.th32ProcessID, PriorityClass))
+			SuccessCount++;
+	} while(Process32NextW(Snapshot, &Entry));
+
+	CloseHandle(Snapshot);
+	return SuccessCount;
+}
+#endif
+
+void CGameClient::OptimizerSetDdnetPriorityHigh()
+{
+#if defined(CONF_FAMILY_WINDOWS)
+	if(SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS) == 0)
+		log_warn("optimizer", "Failed to set DDNet priority to High (error %lu)", (unsigned long)GetLastError());
+	else
+		log_info("optimizer", "DDNet priority set to High");
+#else
+	log_info("optimizer", "Setting process priority is only supported on Windows");
+#endif
+}
+
+void CGameClient::OptimizerSetDiscordPriorityBelowNormal()
+{
+#if defined(CONF_FAMILY_WINDOWS)
+	static const wchar_t *const s_apDiscordExeNames[] = {L"Discord.exe", L"DiscordPTB.exe", L"DiscordCanary.exe"};
+	const int Count = SetPriorityClassForProcessNames(s_apDiscordExeNames, std::size(s_apDiscordExeNames), BELOW_NORMAL_PRIORITY_CLASS);
+	if(Count < 0)
+	{
+		log_warn("optimizer", "Failed to enumerate processes to set Discord priority (error %lu)", (unsigned long)GetLastError());
+	}
+	else if(Count == 0)
+	{
+		log_info("optimizer", "No Discord processes found to set priority");
+	}
+	else
+	{
+		log_info("optimizer", "Set Discord priority to Below Normal for %d process(es)", Count);
+	}
+#else
+	log_info("optimizer", "Setting process priority is only supported on Windows");
+#endif
+}
+
+void CGameClient::OptimizerUpdateProcessPriorities()
+{
+#if defined(CONF_FAMILY_WINDOWS)
+	const bool WantDdnetHigh = OptimizerEnabled() && g_Config.m_BcOptimizerDdnetPriorityHigh != 0;
+	if(WantDdnetHigh && !m_OptimizerDdnetPriorityHighActive)
+	{
+		const DWORD Prev = GetPriorityClass(GetCurrentProcess());
+		m_OptimizerDdnetPrevPriorityClass = Prev != 0 ? (unsigned long)Prev : (unsigned long)NORMAL_PRIORITY_CLASS;
+		m_OptimizerDdnetPriorityHighActive = true;
+	}
+	else if(!WantDdnetHigh && m_OptimizerDdnetPriorityHighActive)
+	{
+		SetPriorityClass(GetCurrentProcess(), (DWORD)m_OptimizerDdnetPrevPriorityClass);
+		m_OptimizerDdnetPriorityHighActive = false;
+	}
+
+	if(m_OptimizerDdnetPriorityHighActive)
+		SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
+
+	static const wchar_t *const s_apDiscordExeNames[] = {L"Discord.exe", L"DiscordPTB.exe", L"DiscordCanary.exe"};
+	const bool WantDiscordBelow = OptimizerEnabled() && g_Config.m_BcOptimizerDiscordPriorityBelowNormal != 0;
+	if(WantDiscordBelow && !m_OptimizerDiscordPriorityBelowNormalActive)
+	{
+		SetPriorityClassForProcessNames(s_apDiscordExeNames, std::size(s_apDiscordExeNames), BELOW_NORMAL_PRIORITY_CLASS);
+		m_OptimizerDiscordPriorityBelowNormalActive = true;
+		m_OptimizerDiscordPriorityLastUpdateTime = -1.0f;
+	}
+	else if(!WantDiscordBelow && m_OptimizerDiscordPriorityBelowNormalActive)
+	{
+		SetPriorityClassForProcessNames(s_apDiscordExeNames, std::size(s_apDiscordExeNames), NORMAL_PRIORITY_CLASS);
+		m_OptimizerDiscordPriorityBelowNormalActive = false;
+		m_OptimizerDiscordPriorityLastUpdateTime = -1.0f;
+	}
+
+	if(m_OptimizerDiscordPriorityBelowNormalActive)
+	{
+		const float Now = Client()->LocalTime();
+		if(m_OptimizerDiscordPriorityLastUpdateTime < 0.0f || (Now - m_OptimizerDiscordPriorityLastUpdateTime) >= 2.0f)
+		{
+			SetPriorityClassForProcessNames(s_apDiscordExeNames, std::size(s_apDiscordExeNames), BELOW_NORMAL_PRIORITY_CLASS);
+			m_OptimizerDiscordPriorityLastUpdateTime = Now;
+		}
+	}
+#else
+	(void)0;
+#endif
+}
+
+void CGameClient::RenderOptimizerFpsFogRect()
+{
+	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
+		return;
+
+	if(!OptimizerFpsFogEnabled() || g_Config.m_BcOptimizerFpsFogRenderRect == 0)
+		return;
+
+	float HalfW = 0.0f;
+	float HalfH = 0.0f;
+	OptimizerFpsFogHalfExtents(HalfW, HalfH);
+	if(HalfW <= 0.0f || HalfH <= 0.0f)
+		return;
+
+	const vec2 Center = m_Camera.m_Center;
+
+	float PrevScreenX0, PrevScreenY0, PrevScreenX1, PrevScreenY1;
+	Graphics()->GetScreen(&PrevScreenX0, &PrevScreenY0, &PrevScreenX1, &PrevScreenY1);
+
+	if(const CMapItemGroup *pGameGroup = Layers()->GameGroup())
+	{
+		int ParallaxZoom = std::clamp(maximum(pGameGroup->m_ParallaxX, pGameGroup->m_ParallaxY), 0, 100);
+		float aPoints[4];
+		Graphics()->MapScreenToWorld(
+			Center.x, Center.y,
+			pGameGroup->m_ParallaxX, pGameGroup->m_ParallaxY, (float)ParallaxZoom,
+			pGameGroup->m_OffsetX, pGameGroup->m_OffsetY,
+			Graphics()->ScreenAspect(), m_Camera.m_Zoom, aPoints);
+		Graphics()->MapScreen(aPoints[0], aPoints[1], aPoints[2], aPoints[3]);
+	}
+	else
+	{
+		float Width = 0.0f;
+		float Height = 0.0f;
+		Graphics()->CalcScreenParams(Graphics()->ScreenAspect(), m_Camera.m_Zoom, &Width, &Height);
+		Graphics()->MapScreen(Center.x - Width * 0.5f, Center.y - Height * 0.5f, Center.x + Width * 0.5f, Center.y + Height * 0.5f);
+	}
+
+	const vec2 TL{Center.x - HalfW, Center.y - HalfH};
+	const vec2 TR{Center.x + HalfW, Center.y - HalfH};
+	const vec2 BR{Center.x + HalfW, Center.y + HalfH};
+	const vec2 BL{Center.x - HalfW, Center.y + HalfH};
+
+	Graphics()->TextureClear();
+	Graphics()->LinesBegin();
+	Graphics()->SetColor(1.0f, 0.65f, 0.05f, 0.8f);
+	const IGraphics::CLineItem aLines[] = {
+		IGraphics::CLineItem(TL.x, TL.y, TR.x, TR.y),
+		IGraphics::CLineItem(TR.x, TR.y, BR.x, BR.y),
+		IGraphics::CLineItem(BR.x, BR.y, BL.x, BL.y),
+		IGraphics::CLineItem(BL.x, BL.y, TL.x, TL.y),
+	};
+	Graphics()->LinesDraw(aLines, std::size(aLines));
+	Graphics()->LinesEnd();
+	Graphics()->MapScreen(PrevScreenX0, PrevScreenY0, PrevScreenX1, PrevScreenY1);
+}
 
 void CGameClient::OnConsoleInit()
 {
@@ -883,6 +1133,9 @@ void CGameClient::OnRender()
 	// render all systems
 	for(auto &pComponent : m_vpAll)
 		pComponent->OnRender();
+
+	OptimizerUpdateProcessPriorities();
+	RenderOptimizerFpsFogRect();
 
 	// clear all events/input for this frame
 	Input()->Clear();

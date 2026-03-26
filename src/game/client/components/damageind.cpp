@@ -67,6 +67,12 @@ void CDamageInd::OnRender()
 		}
 		else
 		{
+			if(!GameClient()->OptimizerAllowRenderPos(m_aItems[i].m_Pos))
+			{
+				i++;
+				continue;
+			}
+
 			vec2 Pos = mix(m_aItems[i].m_Pos + m_aItems[i].m_Dir * 75.0f, m_aItems[i].m_Pos, std::clamp((m_aItems[i].m_RemainingLife - 0.60f) / 0.15f, 0.0f, 1.0f));
 			const float LifeAlpha = m_aItems[i].m_RemainingLife / 0.1f;
 			Graphics()->SetColor(m_aItems[i].m_Color.WithMultipliedAlpha(LifeAlpha));

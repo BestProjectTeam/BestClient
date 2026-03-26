@@ -48,6 +48,8 @@ void CPlayerIndicator::OnRender()
 				!OtherTee.m_Spec &&
 				GameClient()->m_Snap.m_aCharacters[i].m_Active)
 			{
+				if(!GameClient()->OptimizerAllowRenderPos(OtherTee.m_RenderPos))
+					continue;
 				if(g_Config.m_TcPlayerIndicatorFreeze && !(OtherTee.m_FreezeEnd > 0 || OtherTee.m_DeepFrozen))
 					continue;
 

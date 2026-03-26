@@ -3718,6 +3718,89 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		const float LeftColumnEndY = Column.y;
 		Column = RightView;
 
+		// Optimizer (right column block)
+		{
+			static float s_OptimizerPhase = 0.0f;
+			static float s_OptimizerFogPhase = 0.0f;
+			const float Dt = Client()->RenderFrameTime();
+			const bool Enabled = g_Config.m_BcOptimizer != 0;
+			const bool FogOn = Enabled && g_Config.m_BcOptimizerFpsFog != 0;
+			if(ModuleUiRevealAnimationsEnabled())
+			{
+				BCUiAnimations::UpdatePhase(s_OptimizerPhase, Enabled ? 1.0f : 0.0f, Dt, ModuleUiRevealAnimationDuration());
+				BCUiAnimations::UpdatePhase(s_OptimizerFogPhase, FogOn ? 1.0f : 0.0f, Dt, 0.16f);
+			}
+			else
+			{
+				s_OptimizerPhase = Enabled ? 1.0f : 0.0f;
+				s_OptimizerFogPhase = FogOn ? 1.0f : 0.0f;
+			}
+
+			const float RadioTargetHeight = 22.0f;
+			const float FogTargetHeight = 3.0f * LineSize + RadioTargetHeight;
+			const float BaseTargetHeight = 5.0f * LineSize;
+			const float ExtraTargetHeight = BaseTargetHeight + FogTargetHeight * s_OptimizerFogPhase;
+			const float ContentHeight = LineSize + MarginSmall + LineSize + ExtraTargetHeight * s_OptimizerPhase;
+			CUIRect Content, Label, Row, Visible;
+			BeginBlock(Column, ContentHeight, Content);
+
+			Content.HSplitTop(LineSize, &Label, &Content);
+			Ui()->DoLabel(&Label, Localize("Optimizer"), HeadlineFontSize, TEXTALIGN_ML);
+			Content.HSplitTop(MarginSmall, nullptr, &Content);
+
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcOptimizer, Localize("Enable optimizer"), &g_Config.m_BcOptimizer, &Content, LineSize);
+
+			const float ExpandedHeight = ExtraTargetHeight * s_OptimizerPhase;
+			if(ExpandedHeight > 0.0f)
+			{
+				Content.HSplitTop(ExpandedHeight, &Visible, &Content);
+				Ui()->ClipEnable(&Visible);
+				struct SScopedClip
+				{
+					CUi *m_pUi;
+					~SScopedClip() { m_pUi->ClipDisable(); }
+				} ClipGuard{Ui()};
+
+				CUIRect Expand = {Visible.x, Visible.y, Visible.w, ExtraTargetHeight};
+				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcOptimizerDisableParticles, Localize("Disable all particles render"), &g_Config.m_BcOptimizerDisableParticles, &Expand, LineSize);
+				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_GfxHighDetail, Localize("High Detail"), &g_Config.m_GfxHighDetail, &Expand, LineSize);
+				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcOptimizerFpsFog, Localize("FPS fog (cull outside limit)"), &g_Config.m_BcOptimizerFpsFog, &Expand, LineSize);
+				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcOptimizerDdnetPriorityHigh, Localize("DDNet priority: High"), &g_Config.m_BcOptimizerDdnetPriorityHigh, &Expand, LineSize);
+				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcOptimizerDiscordPriorityBelowNormal, Localize("Discord priority: Below Normal"), &g_Config.m_BcOptimizerDiscordPriorityBelowNormal, &Expand, LineSize);
+
+				const float FogHeight = FogTargetHeight * s_OptimizerFogPhase;
+				if(FogHeight > 0.0f)
+				{
+					CUIRect FogVisible;
+					Expand.HSplitTop(FogHeight, &FogVisible, &Expand);
+					Ui()->ClipEnable(&FogVisible);
+					SScopedClip FogClipGuard{Ui()};
+
+					CUIRect FogExpand = {FogVisible.x, FogVisible.y, FogVisible.w, FogTargetHeight};
+					DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcOptimizerFpsFogRenderRect, Localize("Render FPS fog rectangle"), &g_Config.m_BcOptimizerFpsFogRenderRect, &FogExpand, LineSize);
+					DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcOptimizerFpsFogCullMapTiles, Localize("Cull map tiles outside FPS fog"), &g_Config.m_BcOptimizerFpsFogCullMapTiles, &FogExpand, LineSize);
+
+					static std::vector<CButtonContainer> s_OptimizerFogModeButtons = {{}, {}};
+					int FogMode = g_Config.m_BcOptimizerFpsFogMode;
+					if(DoLine_RadioMenu(FogExpand, Localize("FPS fog mode"),
+						   s_OptimizerFogModeButtons,
+						   {Localize("Manual radius"), Localize("By zoom")},
+						   {0, 1},
+						   FogMode))
+					{
+						g_Config.m_BcOptimizerFpsFogMode = FogMode;
+					}
+
+					FogExpand.HSplitTop(LineSize, &Row, &FogExpand);
+					if(g_Config.m_BcOptimizerFpsFogMode == 0)
+						Ui()->DoScrollbarOption(&g_Config.m_BcOptimizerFpsFogRadiusTiles, &g_Config.m_BcOptimizerFpsFogRadiusTiles, &Row, Localize("Radius (tiles)"), 5, 300);
+					else
+						Ui()->DoScrollbarOption(&g_Config.m_BcOptimizerFpsFogZoomPercent, &g_Config.m_BcOptimizerFpsFogZoomPercent, &Row, Localize("Visible area (%)"), 10, 100, &CUi::ms_LinearScrollbarScale, 0, "%");
+				}
+			}
+		}
+		Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
+
 		// Camera Drift (right column block)
 		{
 			static float s_CameraDriftPhase = 0.0f;
