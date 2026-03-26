@@ -40,7 +40,7 @@ MACRO_CONFIG_INT(BcChatTypingAnimationMs, bc_chat_typing_animation_ms, 180, 1, 5
 MACRO_CONFIG_INT(BcChatAnimationType, bc_chat_animation_type, 3, 1, 4, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Chat animation type")
 
 // General visuals
-MACRO_CONFIG_INT(BcSettingsLayout, bc_settings_layout, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Settings layout (0 = new, 1 = old)")
+MACRO_CONFIG_INT(BcSettingsLayout, bc_settings_layout, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Settings layout (0 = new, 1 = old)")
 MACRO_CONFIG_INT(BcEmoticonShadow, bc_emoticon_shadow, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Draw shadow behind emoticons")
 MACRO_CONFIG_INT(BcChatSaveDraft, bc_chat_save_draft, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Keep unfinished chat input when closing chat")
 

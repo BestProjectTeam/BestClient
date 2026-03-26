@@ -1564,13 +1564,262 @@ bool CMenus::RenderLanguageSelection(CUIRect MainView)
 
 void CMenus::RenderSettings(CUIRect MainView)
 {
-	// render background
+	const bool NeedRestart = m_NeedRestartGraphics || m_NeedRestartSound || m_NeedRestartUpdate;
+	auto RenderSettingsPage = [&](CUIRect PageView) {
+		if(g_Config.m_UiSettingsPage == SETTINGS_LANGUAGE)
+		{
+			GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_LANGUAGE);
+			RenderLanguageSettings(PageView);
+		}
+		else if(g_Config.m_UiSettingsPage == SETTINGS_GENERAL)
+		{
+			GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_GENERAL);
+			RenderSettingsGeneral(PageView);
+		}
+		else if(g_Config.m_UiSettingsPage == SETTINGS_PLAYER)
+		{
+			GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_PLAYER);
+			RenderSettingsPlayer(PageView);
+		}
+		else if(g_Config.m_UiSettingsPage == SETTINGS_TEE)
+		{
+			GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_TEE);
+			if(Client()->IsSixup())
+				RenderSettingsTee7(PageView);
+			else
+				RenderSettingsTee(PageView);
+		}
+		else if(g_Config.m_UiSettingsPage == SETTINGS_APPEARANCE)
+		{
+			GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_APPEARANCE);
+			RenderSettingsAppearance(PageView);
+		}
+		else if(g_Config.m_UiSettingsPage == SETTINGS_CONTROLS)
+		{
+			GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_CONTROLS);
+			m_MenusSettingsControls.Render(PageView);
+		}
+		else if(g_Config.m_UiSettingsPage == SETTINGS_GRAPHICS)
+		{
+			GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_GRAPHICS);
+			RenderSettingsGraphics(PageView);
+		}
+		else if(g_Config.m_UiSettingsPage == SETTINGS_SOUND)
+		{
+			GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_SOUND);
+			RenderSettingsSound(PageView);
+		}
+		else if(g_Config.m_UiSettingsPage == SETTINGS_DDNET)
+		{
+			GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_DDNET);
+			RenderSettingsDDNet(PageView);
+		}
+		else if(g_Config.m_UiSettingsPage == SETTINGS_ASSETS)
+		{
+			GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_ASSETS);
+			RenderSettingsCustom(PageView);
+		}
+		else if(g_Config.m_UiSettingsPage == SETTINGS_TCLIENT)
+		{
+			GameClient()->m_MenuBackground.ChangePosition(13);
+			RenderSettingsTClient(PageView);
+		}
+		else if(g_Config.m_UiSettingsPage == SETTINGS_BESTCLIENT)
+		{
+			GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_RESERVED0);
+			RenderSettingsBestClient(PageView);
+		}
+		else if(g_Config.m_UiSettingsPage == SETTINGS_PROFILES)
+		{
+			GameClient()->m_MenuBackground.ChangePosition(14);
+			RenderSettingsTClientProfiles(PageView);
+		}
+		else if(g_Config.m_UiSettingsPage == SETTINGS_CONFIGS)
+		{
+			GameClient()->m_MenuBackground.ChangePosition(15);
+			RenderSettingsTClientConfigs(PageView);
+		}
+		else
+		{
+			dbg_assert_failed("ui_settings_page invalid");
+		}
+	};
+
+	auto RenderRestartWarning = [&](CUIRect RestartBar) {
+		CUIRect RestartWarning, RestartButton;
+		RestartBar.VSplitRight(125.0f, &RestartWarning, &RestartButton);
+		RestartWarning.VSplitRight(10.0f, &RestartWarning, nullptr);
+		if(m_NeedRestartUpdate)
+		{
+			TextRender()->TextColor(1.0f, 0.4f, 0.4f, 1.0f);
+			Ui()->DoLabel(&RestartWarning, Localize("DDNet Client needs to be restarted to complete update!"), 14.0f, TEXTALIGN_ML);
+			TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
+		}
+		else
+		{
+			Ui()->DoLabel(&RestartWarning, Localize("You must restart the game for all settings to take effect."), 14.0f, TEXTALIGN_ML);
+		}
+
+		static CButtonContainer s_RestartButton;
+		if(DoButton_Menu(&s_RestartButton, Localize("Restart"), 0, &RestartButton))
+		{
+			if(Client()->State() == IClient::STATE_ONLINE || GameClient()->Editor()->HasUnsavedData())
+				m_Popup = POPUP_RESTART;
+			else
+				Client()->Restart();
+		}
+	};
+
+	if(g_Config.m_UiSettingsPage == SETTINGS_LANGUAGE)
+		g_Config.m_UiSettingsPage = SETTINGS_GENERAL;
+	if(g_Config.m_UiSettingsPage == SETTINGS_PLAYER)
+		g_Config.m_UiSettingsPage = SETTINGS_TEE;
+
+	g_Config.m_BcSettingsLayout = minimum(maximum(g_Config.m_BcSettingsLayout, 0), 1);
+
+	if(g_Config.m_BcSettingsLayout == 0)
+	{
+		CUIRect ContentView, RootTabBar, RestartBar;
+		MainView.Draw(ms_ColorTabbarActive, IGraphics::CORNER_B, 10.0f);
+		MainView.Margin(20.0f, &MainView);
+		ContentView = MainView;
+		if(NeedRestart)
+		{
+			ContentView.HSplitBottom(20.0f, &ContentView, &RestartBar);
+			ContentView.HSplitBottom(10.0f, &ContentView, nullptr);
+		}
+
+		enum
+		{
+			ROOT_TAB_GENERAL = 0,
+			ROOT_TAB_APPEARANCE,
+			ROOT_TAB_TCLIENT,
+			ROOT_TAB_BESTCLIENT,
+			ROOT_TAB_LENGTH,
+		};
+
+		auto GetRootTabByPage = [&](int Page) {
+			if(Page == SETTINGS_GENERAL || Page == SETTINGS_CONTROLS || Page == SETTINGS_TEE || Page == SETTINGS_DDNET)
+				return ROOT_TAB_GENERAL;
+			if(Page == SETTINGS_APPEARANCE || Page == SETTINGS_GRAPHICS || Page == SETTINGS_SOUND || Page == SETTINGS_ASSETS)
+				return ROOT_TAB_APPEARANCE;
+			if(Page == SETTINGS_TCLIENT || Page == SETTINGS_PROFILES || Page == SETTINGS_CONFIGS)
+				return ROOT_TAB_TCLIENT;
+			return ROOT_TAB_BESTCLIENT;
+		};
+
+		ContentView.HSplitTop(36.0f, &RootTabBar, &ContentView);
+		RootTabBar.HMargin(6.0f, &RootTabBar);
+
+		const char *apRootTabs[ROOT_TAB_LENGTH] = {
+			Localize("General"),
+			Localize("Appearance"),
+			TCLocalize("TClient"),
+			"bestclient",
+		};
+		static CButtonContainer s_aRootTabButtons[ROOT_TAB_LENGTH];
+		const int CurRootTab = GetRootTabByPage(g_Config.m_UiSettingsPage);
+		const float RootTabWidth = RootTabBar.w / (float)ROOT_TAB_LENGTH;
+		CUIRect RootTabs = RootTabBar;
+		for(int i = 0; i < ROOT_TAB_LENGTH; ++i)
+		{
+			CUIRect RootTabButton;
+			RootTabs.VSplitLeft(RootTabWidth, &RootTabButton, &RootTabs);
+			const int Corners = i == 0 ? (IGraphics::CORNER_TL | IGraphics::CORNER_BL) : (i == ROOT_TAB_LENGTH - 1 ? (IGraphics::CORNER_TR | IGraphics::CORNER_BR) : IGraphics::CORNER_NONE);
+			if(DoButton_MenuTab(&s_aRootTabButtons[i], apRootTabs[i], CurRootTab == i, &RootTabButton, Corners, nullptr, nullptr, nullptr, nullptr, 4.0f))
+			{
+				if(i == ROOT_TAB_GENERAL)
+					g_Config.m_UiSettingsPage = SETTINGS_GENERAL;
+				else if(i == ROOT_TAB_APPEARANCE)
+					g_Config.m_UiSettingsPage = SETTINGS_APPEARANCE;
+				else if(i == ROOT_TAB_TCLIENT)
+					g_Config.m_UiSettingsPage = SETTINGS_TCLIENT;
+				else
+					g_Config.m_UiSettingsPage = SETTINGS_BESTCLIENT;
+			}
+		}
+
+		const int ActiveRootTab = GetRootTabByPage(g_Config.m_UiSettingsPage);
+		ContentView.HSplitTop(6.0f, nullptr, &ContentView);
+
+		if(ActiveRootTab != ROOT_TAB_BESTCLIENT)
+		{
+			CUIRect SubTabBar;
+			ContentView.HSplitTop(24.0f, &SubTabBar, &ContentView);
+
+			const char *apSubTabs[4] = {};
+			int aSubTabPages[4] = {};
+			int NumSubTabs = 0;
+			if(ActiveRootTab == ROOT_TAB_GENERAL)
+			{
+				apSubTabs[0] = Localize("General");
+				apSubTabs[1] = Localize("Controls");
+				apSubTabs[2] = Client()->IsSixup() ? "Tee (0.7)" : Localize("Tee");
+				apSubTabs[3] = Localize("DDNet");
+				aSubTabPages[0] = SETTINGS_GENERAL;
+				aSubTabPages[1] = SETTINGS_CONTROLS;
+				aSubTabPages[2] = SETTINGS_TEE;
+				aSubTabPages[3] = SETTINGS_DDNET;
+				NumSubTabs = 4;
+			}
+			else if(ActiveRootTab == ROOT_TAB_APPEARANCE)
+			{
+				apSubTabs[0] = Localize("Appearance");
+				apSubTabs[1] = Localize("Graphics");
+				apSubTabs[2] = Localize("Sound");
+				apSubTabs[3] = Localize("Assets");
+				aSubTabPages[0] = SETTINGS_APPEARANCE;
+				aSubTabPages[1] = SETTINGS_GRAPHICS;
+				aSubTabPages[2] = SETTINGS_SOUND;
+				aSubTabPages[3] = SETTINGS_ASSETS;
+				NumSubTabs = 4;
+			}
+			else if(ActiveRootTab == ROOT_TAB_TCLIENT)
+			{
+				apSubTabs[0] = TCLocalize("TClient");
+				apSubTabs[1] = Localize("Profiles");
+				apSubTabs[2] = Localize("Configs");
+				aSubTabPages[0] = SETTINGS_TCLIENT;
+				aSubTabPages[1] = SETTINGS_PROFILES;
+				aSubTabPages[2] = SETTINGS_CONFIGS;
+				NumSubTabs = 3;
+			}
+
+			static CButtonContainer s_aGeneralSubTabButtons[4];
+			static CButtonContainer s_aAppearanceSubTabButtons[4];
+			static CButtonContainer s_aTClientSubTabButtons[3];
+			CButtonContainer *pSubButtons = ActiveRootTab == ROOT_TAB_GENERAL ? s_aGeneralSubTabButtons : (ActiveRootTab == ROOT_TAB_APPEARANCE ? s_aAppearanceSubTabButtons : s_aTClientSubTabButtons);
+
+			CUIRect SubTabs = SubTabBar;
+			const float SubTabWidth = SubTabBar.w / (float)NumSubTabs;
+			for(int i = 0; i < NumSubTabs; ++i)
+			{
+				CUIRect SubButton;
+				SubTabs.VSplitLeft(SubTabWidth, &SubButton, &SubTabs);
+				const int Corners = i == 0 ? (IGraphics::CORNER_TL | IGraphics::CORNER_BL) : (i == NumSubTabs - 1 ? (IGraphics::CORNER_TR | IGraphics::CORNER_BR) : IGraphics::CORNER_NONE);
+				if(DoButton_MenuTab(&pSubButtons[i], apSubTabs[i], g_Config.m_UiSettingsPage == aSubTabPages[i], &SubButton, Corners, &m_aAnimatorsSettingsTab[aSubTabPages[i]], nullptr, nullptr, nullptr, 4.0f))
+					g_Config.m_UiSettingsPage = aSubTabPages[i];
+			}
+
+			ContentView.HSplitTop(10.0f, nullptr, &ContentView);
+		}
+		else
+		{
+			ContentView.HSplitTop(10.0f, nullptr, &ContentView);
+		}
+
+		RenderSettingsPage(ContentView);
+		if(NeedRestart)
+			RenderRestartWarning(RestartBar);
+		return;
+	}
+
+	// old settings layout
 	CUIRect Button, TabBar, RestartBar;
 	MainView.VSplitRight(120.0f, &MainView, &TabBar);
 	MainView.Draw(ms_ColorTabbarActive, IGraphics::CORNER_B, 10.0f);
 	MainView.Margin(20.0f, &MainView);
 
-	const bool NeedRestart = m_NeedRestartGraphics || m_NeedRestartSound || m_NeedRestartUpdate;
 	if(NeedRestart)
 	{
 		MainView.HSplitBottom(20.0f, &MainView, &RestartBar);
@@ -1579,11 +1828,6 @@ void CMenus::RenderSettings(CUIRect MainView)
 
 	TabBar.HSplitTop(50.0f, &Button, &TabBar);
 	Button.Draw(ms_ColorTabbarActive, IGraphics::CORNER_BR, 10.0f);
-
-	if(g_Config.m_UiSettingsPage == SETTINGS_LANGUAGE)
-		g_Config.m_UiSettingsPage = SETTINGS_GENERAL;
-	if(g_Config.m_UiSettingsPage == SETTINGS_PLAYER)
-		g_Config.m_UiSettingsPage = SETTINGS_TEE;
 
 	static const int s_aVisibleSettingsPages[] = {
 		SETTINGS_GENERAL,
@@ -1626,113 +1870,9 @@ void CMenus::RenderSettings(CUIRect MainView)
 			g_Config.m_UiSettingsPage = Page;
 	}
 
-	if(g_Config.m_UiSettingsPage == SETTINGS_LANGUAGE)
-	{
-		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_LANGUAGE);
-		RenderLanguageSettings(MainView);
-	}
-	else if(g_Config.m_UiSettingsPage == SETTINGS_GENERAL)
-	{
-		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_GENERAL);
-		RenderSettingsGeneral(MainView);
-	}
-	else if(g_Config.m_UiSettingsPage == SETTINGS_PLAYER)
-	{
-		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_PLAYER);
-		RenderSettingsPlayer(MainView);
-	}
-	else if(g_Config.m_UiSettingsPage == SETTINGS_TEE)
-	{
-		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_TEE);
-		if(Client()->IsSixup())
-			RenderSettingsTee7(MainView);
-		else
-			RenderSettingsTee(MainView);
-	}
-	else if(g_Config.m_UiSettingsPage == SETTINGS_APPEARANCE)
-	{
-		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_APPEARANCE);
-		RenderSettingsAppearance(MainView);
-	}
-	else if(g_Config.m_UiSettingsPage == SETTINGS_CONTROLS)
-	{
-		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_CONTROLS);
-		m_MenusSettingsControls.Render(MainView);
-	}
-	else if(g_Config.m_UiSettingsPage == SETTINGS_GRAPHICS)
-	{
-		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_GRAPHICS);
-		RenderSettingsGraphics(MainView);
-	}
-	else if(g_Config.m_UiSettingsPage == SETTINGS_SOUND)
-	{
-		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_SOUND);
-		RenderSettingsSound(MainView);
-	}
-	else if(g_Config.m_UiSettingsPage == SETTINGS_DDNET)
-	{
-		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_DDNET);
-		RenderSettingsDDNet(MainView);
-	}
-	else if(g_Config.m_UiSettingsPage == SETTINGS_ASSETS)
-	{
-		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_ASSETS);
-		RenderSettingsCustom(MainView);
-	}
-	else if(g_Config.m_UiSettingsPage == SETTINGS_TCLIENT)
-	{
-		GameClient()->m_MenuBackground.ChangePosition(13);
-		RenderSettingsTClient(MainView);
-	}
-	else if(g_Config.m_UiSettingsPage == SETTINGS_BESTCLIENT)
-	{
-		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_RESERVED0);
-		RenderSettingsBestClient(MainView);
-	}
-	else if(g_Config.m_UiSettingsPage == SETTINGS_PROFILES)
-	{
-		GameClient()->m_MenuBackground.ChangePosition(14);
-		RenderSettingsTClientProfiles(MainView);
-	}
-	else if(g_Config.m_UiSettingsPage == SETTINGS_CONFIGS)
-	{
-		GameClient()->m_MenuBackground.ChangePosition(15);
-		RenderSettingsTClientConfigs(MainView);
-	}
-	else
-	{
-		dbg_assert_failed("ui_settings_page invalid");
-	}
-
+	RenderSettingsPage(MainView);
 	if(NeedRestart)
-	{
-		CUIRect RestartWarning, RestartButton;
-		RestartBar.VSplitRight(125.0f, &RestartWarning, &RestartButton);
-		RestartWarning.VSplitRight(10.0f, &RestartWarning, nullptr);
-		if(m_NeedRestartUpdate)
-		{
-			TextRender()->TextColor(1.0f, 0.4f, 0.4f, 1.0f);
-			Ui()->DoLabel(&RestartWarning, Localize("DDNet Client needs to be restarted to complete update!"), 14.0f, TEXTALIGN_ML);
-			TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
-		}
-		else
-		{
-			Ui()->DoLabel(&RestartWarning, Localize("You must restart the game for all settings to take effect."), 14.0f, TEXTALIGN_ML);
-		}
-
-		static CButtonContainer s_RestartButton;
-		if(DoButton_Menu(&s_RestartButton, Localize("Restart"), 0, &RestartButton))
-		{
-			if(Client()->State() == IClient::STATE_ONLINE || GameClient()->Editor()->HasUnsavedData())
-			{
-				m_Popup = POPUP_RESTART;
-			}
-			else
-			{
-				Client()->Restart();
-			}
-		}
-	}
+		RenderRestartWarning(RestartBar);
 }
 
 bool CMenus::RenderHslaScrollbars(CUIRect *pRect, unsigned int *pColor, bool Alpha, float DarkestLight)
@@ -3298,19 +3438,19 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		CUIRect Column = LeftView;
 		Column.HSplitTop(10.0f, nullptr, &Column);
 
-		// General (left column block)
+		// Misc (left column block)
 		{
 			const float ContentHeight = LineSize + MarginSmall + 3.0f * LineSize;
 			CUIRect Content, Label;
 			BeginBlock(Column, ContentHeight, Content);
 
 			Content.HSplitTop(LineSize, &Label, &Content);
-			Ui()->DoLabel(&Label, Localize("Основное"), HeadlineFontSize, TEXTALIGN_ML);
+			Ui()->DoLabel(&Label, Localize("misc"), HeadlineFontSize, TEXTALIGN_ML);
 			Content.HSplitTop(MarginSmall, nullptr, &Content);
 
 			static CButtonContainer s_SettingsLayoutButton;
 			int UseNewMenuLayout = g_Config.m_BcSettingsLayout == 0 ? 1 : 0;
-			DoButton_CheckBoxAutoVMarginAndSet(&s_SettingsLayoutButton, Localize("new menu layout"), &UseNewMenuLayout, &Content, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&s_SettingsLayoutButton, Localize("Use new menu layout"), &UseNewMenuLayout, &Content, LineSize);
 			g_Config.m_BcSettingsLayout = UseNewMenuLayout ? 0 : 1;
 
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcEmoticonShadow, Localize("Тень у эмоций"), &g_Config.m_BcEmoticonShadow, &Content, LineSize);
