@@ -31,6 +31,7 @@
 #include "components/bestclient/3d_particles.h"
 #include "components/bestclient/afterimage.h"
 #include "components/bestclient/audio_visualizer.h"
+#include "components/bestclient/bestclient.h"
 #include "components/bestclient/bindsystem.h"
 #include "components/bestclient/chat_bubbles.h"
 #include "components/bestclient/magic_particles.h"
@@ -226,6 +227,7 @@ public:
 	CAudioVisualizer m_AudioVisualizer;
 	CMusicPlayer m_MusicPlayer;
 	CBindSystem m_BindSystem;
+	CBestClient m_BestClient;
 
 	CTooltips m_Tooltips;
 

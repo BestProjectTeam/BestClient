@@ -393,6 +393,7 @@ void CGameClient::OnConsoleInit()
 					      &m_3DParticles,
 					      &m_Translate, // TClient
 					      &m_Ghost,
+					      &m_BestClient, // BestClient binds
 					      &m_TClient, // TClient (Must be before chat and players)
 					      &m_Afterimage,
 					      &m_Players,
