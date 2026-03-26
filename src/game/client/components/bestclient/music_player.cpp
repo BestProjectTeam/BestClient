@@ -109,6 +109,15 @@ struct SNowPlayingSnapshot
 	SMusicArt m_Art;
 };
 
+static bool ShouldForceOrderedNavigation(const SNowPlayingSnapshot &Snapshot)
+{
+	if(!Snapshot.m_Valid)
+		return false;
+	const bool HasAlbumContext = !Snapshot.m_Album.empty();
+	const bool HasQueueContext = Snapshot.m_CanPrev && Snapshot.m_CanNext && Snapshot.m_DurationMs > 0;
+	return HasAlbumContext || HasQueueContext;
+}
+
 static uint32_t HashBytes(std::string_view Value)
 {
 	uint32_t Hash = 2166136261u;
@@ -301,6 +310,8 @@ class CLinuxNowPlayingProvider final : public INowPlayingProvider
 {
 	DBusConnection *m_pConnection = nullptr;
 	std::string m_CurrentService;
+	SNowPlayingSnapshot m_LastSnapshot;
+	bool m_ShuffleForcedForCurrentService = false;
 
 	bool EnsureConnection()
 	{
@@ -623,6 +634,67 @@ class CLinuxNowPlayingProvider final : public INowPlayingProvider
 			dbus_message_unref(pReply);
 	}
 
+	bool SetShuffle(bool Enabled)
+	{
+		if(m_CurrentService.empty() || !EnsureConnection())
+			return false;
+
+		DBusMessage *pMsg = dbus_message_new_method_call(
+			m_CurrentService.c_str(),
+			"/org/mpris/MediaPlayer2",
+			"org.freedesktop.DBus.Properties",
+			"Set");
+		if(pMsg == nullptr)
+			return false;
+
+		const char *pInterface = "org.mpris.MediaPlayer2.Player";
+		const char *pProperty = "Shuffle";
+		dbus_bool_t ShuffleValue = Enabled ? true : false;
+
+		DBusMessageIter ArgsIter;
+		DBusMessageIter VariantIter;
+		dbus_message_iter_init_append(pMsg, &ArgsIter);
+		if(!dbus_message_iter_append_basic(&ArgsIter, DBUS_TYPE_STRING, &pInterface) ||
+			!dbus_message_iter_append_basic(&ArgsIter, DBUS_TYPE_STRING, &pProperty) ||
+			!dbus_message_iter_open_container(&ArgsIter, DBUS_TYPE_VARIANT, DBUS_TYPE_BOOLEAN_AS_STRING, &VariantIter) ||
+			!dbus_message_iter_append_basic(&VariantIter, DBUS_TYPE_BOOLEAN, &ShuffleValue) ||
+			!dbus_message_iter_close_container(&ArgsIter, &VariantIter))
+		{
+			dbus_message_unref(pMsg);
+			return false;
+		}
+
+		DBusError Error;
+		dbus_error_init(&Error);
+		DBusMessage *pReply = dbus_connection_send_with_reply_and_block(m_pConnection, pMsg, 1000, &Error);
+		dbus_message_unref(pMsg);
+		if(dbus_error_is_set(&Error))
+		{
+			dbus_error_free(&Error);
+			if(pReply != nullptr)
+				dbus_message_unref(pReply);
+			return false;
+		}
+
+		if(pReply != nullptr)
+			dbus_message_unref(pReply);
+		return true;
+	}
+
+	void DisableShuffleForOrderedNavigation()
+	{
+		if(!ShouldForceOrderedNavigation(m_LastSnapshot))
+		{
+			m_ShuffleForcedForCurrentService = false;
+			return;
+		}
+		if(m_ShuffleForcedForCurrentService)
+			return;
+
+		if(SetShuffle(false))
+			m_ShuffleForcedForCurrentService = true;
+	}
+
 public:
 	~CLinuxNowPlayingProvider() override
 	{
@@ -661,16 +733,29 @@ public:
 		if(BestScore < 0)
 		{
 			m_CurrentService.clear();
+			m_LastSnapshot = SNowPlayingSnapshot();
+			m_ShuffleForcedForCurrentService = false;
 			return false;
 		}
 
+		if(m_CurrentService != Out.m_ServiceId)
+			m_ShuffleForcedForCurrentService = false;
 		m_CurrentService = Out.m_ServiceId;
+		m_LastSnapshot = Out;
 		return true;
 	}
 
-	void Previous() override { SendPlayerMethod("Previous"); }
+	void Previous() override
+	{
+		DisableShuffleForOrderedNavigation();
+		SendPlayerMethod("Previous");
+	}
 	void PlayPause() override { SendPlayerMethod("PlayPause"); }
-	void Next() override { SendPlayerMethod("Next"); }
+	void Next() override
+	{
+		DisableShuffleForOrderedNavigation();
+		SendPlayerMethod("Next");
+	}
 };
 #endif
 
@@ -745,6 +830,23 @@ class CWindowsNowPlayingProvider final : public INowPlayingProvider
 		catch(...)
 		{
 			return nullptr;
+		}
+	}
+
+	template<typename TSession>
+	static void DisableShuffleForOrderedNavigation(TSession &&Session, const SNowPlayingSnapshot &Snapshot)
+	{
+		if(!ShouldForceOrderedNavigation(Snapshot))
+			return;
+		if constexpr(requires { Session.TryChangeShuffleActiveAsync(false); })
+		{
+			try
+			{
+				Session.TryChangeShuffleActiveAsync(false).get();
+			}
+			catch(...)
+			{
+			}
 		}
 	}
 
@@ -939,6 +1041,8 @@ class CWindowsNowPlayingProvider final : public INowPlayingProvider
 
 		WmControl::GlobalSystemMediaTransportControlsSessionManager Manager = RequestManager();
 		std::string CurrentSessionId;
+		SNowPlayingSnapshot LastSnapshot;
+		std::string OrderedShuffleSessionId;
 
 		while(true)
 		{
@@ -968,16 +1072,35 @@ class CWindowsNowPlayingProvider final : public INowPlayingProvider
 				Manager = RequestManager();
 
 			if(Manager && RequestPrev)
-				WithSession(Manager, CurrentSessionId, [](auto &&Session) { Session.TrySkipPreviousAsync().get(); });
+				WithSession(Manager, CurrentSessionId, [&](auto &&Session) {
+					const std::string SessionIdValue = SessionId(Session);
+					if(ShouldForceOrderedNavigation(LastSnapshot) && OrderedShuffleSessionId != SessionIdValue)
+					{
+						DisableShuffleForOrderedNavigation(Session, LastSnapshot);
+						OrderedShuffleSessionId = SessionIdValue;
+					}
+					Session.TrySkipPreviousAsync().get();
+				});
 			if(Manager && RequestPlayPause)
 				WithSession(Manager, CurrentSessionId, [](auto &&Session) { Session.TryTogglePlayPauseAsync().get(); });
 			if(Manager && RequestNext)
-				WithSession(Manager, CurrentSessionId, [](auto &&Session) { Session.TrySkipNextAsync().get(); });
+				WithSession(Manager, CurrentSessionId, [&](auto &&Session) {
+					const std::string SessionIdValue = SessionId(Session);
+					if(ShouldForceOrderedNavigation(LastSnapshot) && OrderedShuffleSessionId != SessionIdValue)
+					{
+						DisableShuffleForOrderedNavigation(Session, LastSnapshot);
+						OrderedShuffleSessionId = SessionIdValue;
+					}
+					Session.TrySkipNextAsync().get();
+				});
 
 			if(PollRequested || RequestPrev || RequestPlayPause || RequestNext)
 			{
 				SNowPlayingSnapshot Snapshot;
 				const bool HasSnapshot = PollSessions(Manager, CurrentSessionId, Snapshot);
+				LastSnapshot = HasSnapshot ? Snapshot : SNowPlayingSnapshot();
+				if(!HasSnapshot || !ShouldForceOrderedNavigation(LastSnapshot))
+					OrderedShuffleSessionId.clear();
 				StoreSnapshot(Snapshot, HasSnapshot);
 			}
 		}
