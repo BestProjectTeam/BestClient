@@ -78,6 +78,9 @@ class CChat : public CComponent
 
 	CLine m_aLines[MAX_LINES];
 	int m_CurrentLine;
+	int m_BacklogCurLine;
+	bool m_ScrollbarDragging;
+	float m_ScrollbarDragOffset;
 
 	enum
 	{
@@ -208,7 +211,7 @@ public:
 	void OnConsoleInit() override;
 	void OnStateChange(int NewState, int OldState) override;
 	void OnRender() override;
-	void OnPrepareLines(float y);
+	void OnPrepareLines(float y, int StartLine);
 	void Reset();
 	void OnRelease() override;
 	void OnMessage(int MsgType, void *pRawMsg) override;

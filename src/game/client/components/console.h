@@ -59,6 +59,8 @@ class CGameConsole : public CComponent
 		int m_CurSelEnd = 0;
 		bool m_HasSelection = false;
 		int m_NewLineCounter = 0;
+		bool m_ScrollbarDragging = false;
+		float m_ScrollbarDragOffset = 0.0f;
 
 		CGameConsole *m_pGameConsole;
 
@@ -137,6 +139,8 @@ class CGameConsole : public CComponent
 		static void PossibleArgumentsCompleteCallback(int Index, const char *pStr, void *pUser);
 
 		void UpdateEntryTextAttributes(CBacklogEntry *pEntry) const;
+		int TotalBacklogLines();
+		float LogLineWidth() const;
 
 		bool IsInputHidden() const;
 		void UpdateCompletionSuggestions();
