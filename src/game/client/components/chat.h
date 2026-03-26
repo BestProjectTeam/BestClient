@@ -41,6 +41,9 @@ class CChat : public CComponent
 	};
 
 	CLineInputBuffered<MAX_LINE_LENGTH> m_Input;
+	char m_aSavedInputText[MAX_LINE_LENGTH] = "";
+	bool m_SavedInputPending = false;
+
 	class CLine
 	{
 	public:

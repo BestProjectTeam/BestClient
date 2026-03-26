@@ -1010,11 +1010,19 @@ void CPlayers::RenderPlayer(
 		return;
 
 	int QuadOffsetToEmoticon = NUM_WEAPONS * 2 + 2 + 2;
+	constexpr float EmoticonShadowOpacity = 0.75f;
+	constexpr float EmoticonShadowOffsetX = 2.0f;
+	constexpr float EmoticonShadowOffsetY = 2.0f;
 	if((Player.m_PlayerFlags & PLAYERFLAG_CHATTING) && !GameClient()->m_aClients[ClientId].m_Afk)
 	{
 		int CurEmoticon = (SPRITE_DOTDOT - SPRITE_OOP);
 		Graphics()->TextureSet(GameClient()->m_EmoticonsSkin.m_aSpriteEmoticons[CurEmoticon]);
 		int QuadOffset = QuadOffsetToEmoticon + CurEmoticon;
+		if(g_Config.m_BcEmoticonShadow)
+		{
+			Graphics()->SetColor(0.0f, 0.0f, 0.0f, Alpha * EmoticonShadowOpacity);
+			Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, Position.x + 24.f + EmoticonShadowOffsetX, Position.y - 40.f + EmoticonShadowOffsetY);
+		}
 		Graphics()->SetColor(1.0f, 1.0f, 1.0f, Alpha);
 		Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, Position.x + 24.f, Position.y - 40.f);
 
@@ -1027,6 +1035,11 @@ void CPlayers::RenderPlayer(
 		int CurEmoticon = (SPRITE_ZZZ - SPRITE_OOP);
 		Graphics()->TextureSet(GameClient()->m_EmoticonsSkin.m_aSpriteEmoticons[CurEmoticon]);
 		int QuadOffset = QuadOffsetToEmoticon + CurEmoticon;
+		if(g_Config.m_BcEmoticonShadow)
+		{
+			Graphics()->SetColor(0.0f, 0.0f, 0.0f, Alpha * EmoticonShadowOpacity);
+			Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, Position.x + 24.f + EmoticonShadowOffsetX, Position.y - 40.f + EmoticonShadowOffsetY);
+		}
 		Graphics()->SetColor(1.0f, 1.0f, 1.0f, Alpha);
 		Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, Position.x + 24.f, Position.y - 40.f);
 
@@ -1062,6 +1075,12 @@ void CPlayers::RenderPlayer(
 			// client_datas::emoticon is an offset from the first emoticon
 			int QuadOffset = QuadOffsetToEmoticon + GameClient()->m_aClients[ClientId].m_Emoticon;
 			Graphics()->TextureSet(GameClient()->m_EmoticonsSkin.m_aSpriteEmoticons[GameClient()->m_aClients[ClientId].m_Emoticon]);
+			if(g_Config.m_BcEmoticonShadow)
+			{
+				Graphics()->SetColor(0.0f, 0.0f, 0.0f, a * Alpha * EmoticonShadowOpacity);
+				Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, Position.x + EmoticonShadowOffsetX * h, Position.y - 23.f - 32.f * h + EmoticonShadowOffsetY * h, 1.f, (64.f * h) / 64.f);
+			}
+			Graphics()->SetColor(1.0f, 1.0f, 1.0f, a * Alpha);
 			Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, Position.x, Position.y - 23.f - 32.f * h, 1.f, (64.f * h) / 64.f);
 
 			Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
@@ -1427,11 +1446,19 @@ void CPlayers::RenderPlayerGhost(
 	}
 
 	int QuadOffsetToEmoticon = NUM_WEAPONS * 2 + 2 + 2;
+	constexpr float EmoticonShadowOpacity = 0.75f;
+	constexpr float EmoticonShadowOffsetX = 2.0f;
+	constexpr float EmoticonShadowOffsetY = 2.0f;
 	if((Player.m_PlayerFlags & PLAYERFLAG_CHATTING) && !GameClient()->m_aClients[ClientId].m_Afk)
 	{
 		int CurEmoticon = (SPRITE_DOTDOT - SPRITE_OOP);
 		Graphics()->TextureSet(GameClient()->m_EmoticonsSkin.m_aSpriteEmoticons[CurEmoticon]);
 		int QuadOffset = QuadOffsetToEmoticon + CurEmoticon;
+		if(g_Config.m_BcEmoticonShadow)
+		{
+			Graphics()->SetColor(0.0f, 0.0f, 0.0f, Alpha * EmoticonShadowOpacity);
+			Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, Position.x + 24.f + EmoticonShadowOffsetX, Position.y - 40.f + EmoticonShadowOffsetY);
+		}
 		Graphics()->SetColor(1.0f, 1.0f, 1.0f, Alpha);
 		Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, Position.x + 24.f, Position.y - 40.f);
 
@@ -1447,6 +1474,11 @@ void CPlayers::RenderPlayerGhost(
 		int CurEmoticon = (SPRITE_ZZZ - SPRITE_OOP);
 		Graphics()->TextureSet(GameClient()->m_EmoticonsSkin.m_aSpriteEmoticons[CurEmoticon]);
 		int QuadOffset = QuadOffsetToEmoticon + CurEmoticon;
+		if(g_Config.m_BcEmoticonShadow)
+		{
+			Graphics()->SetColor(0.0f, 0.0f, 0.0f, Alpha * EmoticonShadowOpacity);
+			Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, Position.x + 24.f + EmoticonShadowOffsetX, Position.y - 40.f + EmoticonShadowOffsetY);
+		}
 		Graphics()->SetColor(1.0f, 1.0f, 1.0f, Alpha);
 		Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, Position.x + 24.f, Position.y - 40.f);
 
@@ -1482,6 +1514,12 @@ void CPlayers::RenderPlayerGhost(
 			// client_datas::emoticon is an offset from the first emoticon
 			int QuadOffset = QuadOffsetToEmoticon + GameClient()->m_aClients[ClientId].m_Emoticon;
 			Graphics()->TextureSet(GameClient()->m_EmoticonsSkin.m_aSpriteEmoticons[GameClient()->m_aClients[ClientId].m_Emoticon]);
+			if(g_Config.m_BcEmoticonShadow)
+			{
+				Graphics()->SetColor(0.0f, 0.0f, 0.0f, a * Alpha * EmoticonShadowOpacity);
+				Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, Position.x + EmoticonShadowOffsetX * h, Position.y - 23.f - 32.f * h + EmoticonShadowOffsetY * h, 1.f, (64.f * h) / 64.f);
+			}
+			Graphics()->SetColor(1.0f, 1.0f, 1.0f, a * Alpha);
 			Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, Position.x, Position.y - 23.f - 32.f * h, 1.f, (64.f * h) / 64.f);
 
 			Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);

@@ -171,6 +171,8 @@ void CChat::Reset()
 	m_ServerSupportsCommandInfo = false;
 	m_ServerCommandsNeedSorting = false;
 	m_aCurrentInputText[0] = '\0';
+	m_aSavedInputText[0] = '\0';
+	m_SavedInputPending = false;
 	DisableMode();
 	m_vServerCommands.clear();
 
@@ -372,8 +374,24 @@ void CChat::ConChat(IConsole::IResult *pResult, void *pUserData)
 	else
 		((CChat *)pUserData)->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "console", "expected all or team as mode");
 
-	if(pResult->GetString(1)[0] || g_Config.m_ClChatReset)
-		((CChat *)pUserData)->m_Input.Set(pResult->GetString(1));
+	CChat *pChat = (CChat *)pUserData;
+	if(pResult->GetString(1)[0])
+	{
+		pChat->m_Input.Set(pResult->GetString(1));
+	}
+	else if(g_Config.m_ClChatReset || !g_Config.m_BcChatSaveDraft)
+	{
+		if(g_Config.m_BcChatSaveDraft && pChat->m_SavedInputPending)
+			pChat->m_Input.Set(pChat->m_aSavedInputText);
+		else
+			pChat->m_Input.Clear();
+
+		if(!g_Config.m_BcChatSaveDraft)
+		{
+			pChat->m_SavedInputPending = false;
+			pChat->m_aSavedInputText[0] = '\0';
+		}
+	}
 }
 
 void CChat::ConShowChat(IConsole::IResult *pResult, void *pUserData)
@@ -457,11 +475,37 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 
 	if(Event.m_Flags & IInput::FLAG_PRESS && Event.m_Key == KEY_ESCAPE)
 	{
+		const bool SaveDraft = g_Config.m_BcChatSaveDraft != 0;
 		DisableMode();
 		GameClient()->OnRelease();
 		if(g_Config.m_ClChatReset)
 		{
+			if(SaveDraft)
+			{
+				if(m_SavedInputPending)
+				{
+					m_SavedInputPending = false;
+					m_aSavedInputText[0] = '\0';
+				}
+				else if(m_Input.GetString()[0] != '\0')
+				{
+					str_copy(m_aSavedInputText, m_Input.GetString(), sizeof(m_aSavedInputText));
+					m_SavedInputPending = true;
+				}
+			}
+			else
+			{
+				m_SavedInputPending = false;
+				m_aSavedInputText[0] = '\0';
+			}
 			m_Input.Clear();
+			m_pHistoryEntry = nullptr;
+		}
+		else if(!SaveDraft)
+		{
+			m_Input.Clear();
+			m_SavedInputPending = false;
+			m_aSavedInputText[0] = '\0';
 			m_pHistoryEntry = nullptr;
 		}
 	}
@@ -479,6 +523,8 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 			; // Do nothing as specid was executed
 		else
 			SendChatQueued(m_Input.GetString());
+		m_SavedInputPending = false;
+		m_aSavedInputText[0] = '\0';
 		m_pHistoryEntry = nullptr;
 		DisableMode();
 		GameClient()->OnRelease();

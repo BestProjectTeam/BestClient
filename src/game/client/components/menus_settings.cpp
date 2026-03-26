@@ -3298,6 +3298,26 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		CUIRect Column = LeftView;
 		Column.HSplitTop(10.0f, nullptr, &Column);
 
+		// General (left column block)
+		{
+			const float ContentHeight = LineSize + MarginSmall + 3.0f * LineSize;
+			CUIRect Content, Label;
+			BeginBlock(Column, ContentHeight, Content);
+
+			Content.HSplitTop(LineSize, &Label, &Content);
+			Ui()->DoLabel(&Label, Localize("Основное"), HeadlineFontSize, TEXTALIGN_ML);
+			Content.HSplitTop(MarginSmall, nullptr, &Content);
+
+			static CButtonContainer s_SettingsLayoutButton;
+			int UseNewMenuLayout = g_Config.m_BcSettingsLayout == 0 ? 1 : 0;
+			DoButton_CheckBoxAutoVMarginAndSet(&s_SettingsLayoutButton, Localize("new menu layout"), &UseNewMenuLayout, &Content, LineSize);
+			g_Config.m_BcSettingsLayout = UseNewMenuLayout ? 0 : 1;
+
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcEmoticonShadow, Localize("Тень у эмоций"), &g_Config.m_BcEmoticonShadow, &Content, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatSaveDraft, Localize("Сохранять недописанное сообщение"), &g_Config.m_BcChatSaveDraft, &Content, LineSize);
+		}
+		Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
+
 		// Magic particles (left column block)
 		{
 			static float s_MagicParticlesPhase = 0.0f;
