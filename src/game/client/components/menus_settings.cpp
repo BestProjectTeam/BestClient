@@ -42,6 +42,19 @@
 
 using namespace std::chrono_literals;
 
+static void SetBestClientTabFlag(int32_t &Flags, int Tab, bool Hidden)
+{
+	if(Hidden)
+		Flags |= (1 << Tab);
+	else
+		Flags &= ~(1 << Tab);
+}
+
+static bool IsBestClientTabFlagSet(int32_t Flags, int Tab)
+{
+	return (Flags & (1 << Tab)) != 0;
+}
+
 void CMenus::RenderSettingsGeneral(CUIRect MainView)
 {
 	char aBuf[128 + IO_MAX_PATH_LENGTH];
@@ -3375,6 +3388,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		BESTCLIENT_TAB_GAMEPLAY,
 		BESTCLIENT_TAB_OTHERS,
 		BESTCLIENT_TAB_FUN,
+		BESTCLIENT_TAB_INFO,
 		NUM_BESTCLIENT_TABS,
 	};
 
@@ -3383,22 +3397,54 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 
 	CUIRect TabBar, Button;
 	MainView.HSplitTop(24.0f, &TabBar, &MainView);
-	const float TabWidth = TabBar.w / (float)NUM_BESTCLIENT_TABS;
 	const char *apTabNames[NUM_BESTCLIENT_TABS] = {
 		Localize("Visuals"),
 		"Gameplay",
 		Localize("Others"),
 		Localize("Fun"),
+		Localize("Info"),
 	};
 
+	auto IsTabHidden = [&](int Tab) {
+		// Keep Info always visible.
+		return Tab != BESTCLIENT_TAB_INFO && IsBestClientTabFlagSet(g_Config.m_BcBestClientSettingsTabs, Tab);
+	};
+
+	int TabCount = 0;
+	int FirstVisibleTab = -1;
 	for(int Tab = BESTCLIENT_TAB_VISUALS; Tab < NUM_BESTCLIENT_TABS; ++Tab)
 	{
+		if(IsTabHidden(Tab))
+			continue;
+		if(FirstVisibleTab == -1)
+			FirstVisibleTab = Tab;
+		++TabCount;
+	}
+
+	if(FirstVisibleTab == -1)
+	{
+		s_CurTab = BESTCLIENT_TAB_INFO;
+		FirstVisibleTab = BESTCLIENT_TAB_INFO;
+		TabCount = 1;
+	}
+
+	if(s_CurTab < BESTCLIENT_TAB_VISUALS || s_CurTab >= NUM_BESTCLIENT_TABS || IsTabHidden(s_CurTab))
+		s_CurTab = FirstVisibleTab;
+
+	const float TabWidth = TabBar.w / (float)TabCount;
+	int VisibleIndex = 0;
+	for(int Tab = BESTCLIENT_TAB_VISUALS; Tab < NUM_BESTCLIENT_TABS; ++Tab)
+	{
+		if(IsTabHidden(Tab))
+			continue;
+
 		TabBar.VSplitLeft(TabWidth, &Button, &TabBar);
-		const int Corners = Tab == BESTCLIENT_TAB_VISUALS ? IGraphics::CORNER_L : (Tab == NUM_BESTCLIENT_TABS - 1 ? IGraphics::CORNER_R : IGraphics::CORNER_NONE);
+		const int Corners = VisibleIndex == 0 ? IGraphics::CORNER_L : (VisibleIndex == TabCount - 1 ? IGraphics::CORNER_R : IGraphics::CORNER_NONE);
 		if(DoButton_MenuTab(&s_aPageTabs[Tab], apTabNames[Tab], s_CurTab == Tab, &Button, Corners, nullptr, nullptr, nullptr, nullptr, 4.0f))
 		{
 			s_CurTab = Tab;
 		}
+		VisibleIndex++;
 	}
 
 	MainView.HSplitTop(10.0f, nullptr, &MainView);
@@ -4836,7 +4882,215 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 	{
 		// Intentionally empty for now.
 	}
+	else if(s_CurTab == BESTCLIENT_TAB_INFO)
+	{
+		RenderSettingsBestClientInfo(MainView);
+	}
 
+}
+
+void CMenus::RenderSettingsBestClientInfo(CUIRect MainView)
+{
+	enum
+	{
+		BESTCLIENT_TAB_VISUALS = 0,
+		BESTCLIENT_TAB_GAMEPLAY,
+		BESTCLIENT_TAB_OTHERS,
+		BESTCLIENT_TAB_FUN,
+		BESTCLIENT_TAB_INFO,
+		NUM_BESTCLIENT_TABS,
+	};
+
+	const float LineSize = 20.0f;
+	const float MarginSmall = 5.0f;
+	const float MarginBetweenViews = 30.0f;
+	const float HeadlineFontSize = 20.0f;
+	const float HeadlineHeight = HeadlineFontSize;
+
+	CUIRect LeftView, RightView, Button, Label, LowerLeftView;
+	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+
+	MainView.VSplitMid(&LeftView, &RightView, MarginBetweenViews);
+	LeftView.VSplitLeft(MarginSmall, nullptr, &LeftView);
+	RightView.VSplitRight(MarginSmall, &RightView, nullptr);
+	LeftView.HSplitMid(&LeftView, &LowerLeftView, 0.0f);
+
+	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
+	Ui()->DoLabel(&Label, TCLocalize("BestClient Links"), HeadlineFontSize, TEXTALIGN_ML);
+	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+
+	static CButtonContainer s_DiscordButton, s_WebsiteButton, s_TelegramButton, s_CheckUpdateButton;
+	CUIRect ButtonLeft, ButtonRight;
+
+	LeftView.HSplitTop(LineSize * 2.0f, &Button, &LeftView);
+	Button.VSplitMid(&ButtonLeft, &ButtonRight, MarginSmall);
+	if(DoButtonLineSize_Menu(&s_DiscordButton, TCLocalize("Discord"), 0, &ButtonLeft, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+		Client()->ViewLink("https://discord.gg/bestclient");
+	if(DoButtonLineSize_Menu(&s_TelegramButton, TCLocalize("Telegram"), 0, &ButtonRight, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+		Client()->ViewLink("https://t.me/bestddnet");
+
+	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+	LeftView.HSplitTop(LineSize * 2.0f, &Button, &LeftView);
+	Button.VSplitMid(&ButtonLeft, &ButtonRight, MarginSmall);
+
+	if(DoButtonLineSize_Menu(&s_WebsiteButton, TCLocalize("Website"), 0, &ButtonLeft, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+		Client()->ViewLink("https://bestclient.fun");
+	if(DoButtonLineSize_Menu(&s_CheckUpdateButton, TCLocalize("Check update"), 0, &ButtonRight, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+		GameClient()->m_TClient.FetchTClientInfo();
+
+#if defined(CONF_AUTOUPDATE)
+	const bool NeedUpdate = GameClient()->m_TClient.NeedUpdate();
+	const IUpdater::EUpdaterState UpdateState = Updater()->GetCurrentState();
+	const bool ShowDownloadButton = NeedUpdate && UpdateState == IUpdater::CLEAN;
+	const bool ShowRetryButton = NeedUpdate && UpdateState == IUpdater::FAIL;
+	const bool ShowRestartButton = UpdateState == IUpdater::NEED_RESTART;
+	const bool ShowUpdateProgress = UpdateState >= IUpdater::GETTING_MANIFEST && UpdateState < IUpdater::NEED_RESTART;
+	if(ShowDownloadButton || ShowRetryButton || ShowRestartButton || ShowUpdateProgress || UpdateState == IUpdater::FAIL)
+	{
+		LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+		LeftView.HSplitTop(LineSize * 2.0f, &Button, &LeftView);
+		Button.VSplitMid(&ButtonLeft, &ButtonRight, MarginSmall);
+
+		char aUpdateLabel[128] = "";
+		if(ShowDownloadButton)
+			str_format(aUpdateLabel, sizeof(aUpdateLabel), "BestClient %s Is release", GameClient()->m_TClient.m_aVersionStr);
+		else if(ShowUpdateProgress)
+		{
+			if(UpdateState == IUpdater::GETTING_MANIFEST)
+				str_copy(aUpdateLabel, TCLocalize("Preparing update..."), sizeof(aUpdateLabel));
+			else
+				str_format(aUpdateLabel, sizeof(aUpdateLabel), "%s %d%%", TCLocalize("Downloading"), Updater()->GetCurrentPercent());
+		}
+		else if(ShowRestartButton)
+			str_copy(aUpdateLabel, TCLocalize("Update downloaded"), sizeof(aUpdateLabel));
+		else
+			str_copy(aUpdateLabel, TCLocalize("Update failed"), sizeof(aUpdateLabel));
+
+		if(ShowDownloadButton)
+			TextRender()->TextColor(1.0f, 0.4f, 0.4f, 1.0f);
+		Ui()->DoLabel(&ButtonLeft, aUpdateLabel, HeadlineFontSize / 1.6f, TEXTALIGN_ML);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+		if(ShowDownloadButton || ShowRetryButton)
+		{
+			static CButtonContainer s_DownloadUpdateButton;
+			if(DoButtonLineSize_Menu(&s_DownloadUpdateButton, TCLocalize("Download"), 0, &ButtonRight, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+				Updater()->InitiateUpdate();
+		}
+		else if(ShowRestartButton)
+		{
+			static CButtonContainer s_RestartUpdateButton;
+			if(DoButtonLineSize_Menu(&s_RestartUpdateButton, TCLocalize("Restart"), 0, &ButtonRight, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+				Updater()->ApplyUpdateAndRestart();
+		}
+		else if(ShowUpdateProgress)
+		{
+			Ui()->RenderProgressBar(ButtonRight, Updater()->GetCurrentPercent() / 100.0f);
+		}
+	}
+#endif
+
+	LeftView = LowerLeftView;
+	LeftView.HSplitBottom(LineSize * 2.0f + MarginSmall * 2.0f + HeadlineFontSize, nullptr, &LeftView);
+	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
+	Ui()->DoLabel(&Label, TCLocalize("Config Files"), HeadlineFontSize, TEXTALIGN_ML);
+	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+
+	char aBuf[128 + IO_MAX_PATH_LENGTH];
+	CUIRect BestClientConfig;
+	LeftView.HSplitTop(LineSize * 2.0f, &Button, &LeftView);
+	BestClientConfig = Button;
+
+	static CButtonContainer s_Config;
+	if(DoButtonLineSize_Menu(&s_Config, TCLocalize("BestClient Settings"), 0, &BestClientConfig, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+	{
+		Storage()->GetCompletePath(IStorage::TYPE_SAVE, s_aConfigDomains[ConfigDomain::BESTCLIENT].m_aConfigPath, aBuf, sizeof(aBuf));
+		Client()->ViewFile(aBuf);
+	}
+
+	RightView.HSplitTop(HeadlineHeight, &Label, &RightView);
+	Ui()->DoLabel(&Label, TCLocalize("BestClient Developers"), HeadlineFontSize, TEXTALIGN_ML);
+	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+
+	const float TeeSize = 64.0f;
+	const float DevNameFontSize = 24.0f;
+	const float CardSize = TeeSize + MarginSmall * 2.0f;
+	CUIRect TeeRect, DevCardRect;
+	static CButtonContainer s_LinkButton1, s_LinkButton2, s_LinkButton3;
+	{
+		RightView.HSplitTop(CardSize, &DevCardRect, &RightView);
+		DevCardRect.VSplitLeft(CardSize, &TeeRect, &Label);
+		Label.VSplitLeft(TextRender()->TextWidth(DevNameFontSize, "RoflikBEST"), &Label, &Button);
+		Button.VSplitLeft(MarginSmall, nullptr, &Button);
+		Button.w = DevNameFontSize;
+		Button.h = DevNameFontSize;
+		Button.y = Label.y + (Label.h / 2.0f - Button.h / 2.0f);
+		Ui()->DoLabel(&Label, "RoflikBEST", DevNameFontSize, TEXTALIGN_ML);
+		if(Ui()->DoButton_FontIcon(&s_LinkButton1, FontIcon::ARROW_UP_RIGHT_FROM_SQUARE, 0, &Button, IGraphics::CORNER_ALL))
+			Client()->ViewLink("https://github.com/roflikbest");
+		RenderDevSkin(TeeRect.Center(), TeeSize, "mushkitt", "mushkitt", false, 0, 0, 0, false, true);
+	}
+	{
+		RightView.HSplitTop(CardSize, &DevCardRect, &RightView);
+		DevCardRect.VSplitLeft(CardSize, &TeeRect, &Label);
+		Label.VSplitLeft(TextRender()->TextWidth(DevNameFontSize, "noxygalaxy"), &Label, &Button);
+		Button.VSplitLeft(MarginSmall, nullptr, &Button);
+		Button.w = DevNameFontSize;
+		Button.h = DevNameFontSize;
+		Button.y = Label.y + (Label.h / 2.0f - Button.h / 2.0f);
+		Ui()->DoLabel(&Label, "noxygalaxy", DevNameFontSize, TEXTALIGN_ML);
+		if(Ui()->DoButton_FontIcon(&s_LinkButton3, FontIcon::ARROW_UP_RIGHT_FROM_SQUARE, 0, &Button, IGraphics::CORNER_ALL))
+			Client()->ViewLink("https://github.com/noxygalaxy");
+		RenderDevSkin(TeeRect.Center(), TeeSize, "Niko_OneShot", "Niko_OneShot", false, 0, 0, 0, false, true);
+	}
+	{
+		RightView.HSplitTop(CardSize, &DevCardRect, &RightView);
+		DevCardRect.VSplitLeft(CardSize, &TeeRect, &Label);
+		Label.VSplitLeft(TextRender()->TextWidth(DevNameFontSize, "sqwinix"), &Label, &Button);
+		Button.VSplitLeft(MarginSmall, nullptr, &Button);
+		Button.w = DevNameFontSize;
+		Button.h = DevNameFontSize;
+		Button.y = Label.y + (Label.h / 2.0f - Button.h / 2.0f);
+		Ui()->DoLabel(&Label, "sqwinix", DevNameFontSize, TEXTALIGN_ML);
+		if(Ui()->DoButton_FontIcon(&s_LinkButton2, FontIcon::ARROW_UP_RIGHT_FROM_SQUARE, 0, &Button, IGraphics::CORNER_ALL))
+			Client()->ViewLink("https://github.com/sqwinixxx");
+		RenderDevSkin(TeeRect.Center(), TeeSize, "sticker_nanami", "sticker_nanami", true, 0, 0, 0, false, true, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));
+	}
+
+	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+	RightView.HSplitTop(HeadlineHeight, &Label, &RightView);
+	Ui()->DoLabel(&Label, TCLocalize("Hide Settings Tabs"), HeadlineFontSize, TEXTALIGN_ML);
+	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+	CUIRect LeftSettings, RightSettings;
+	RightView.VSplitMid(&LeftSettings, &RightSettings, MarginSmall);
+
+	const char *apTabNames[] = {
+		Localize("Visuals"),
+		"Gameplay",
+		Localize("Others"),
+		Localize("Fun"),
+		Localize("Info"),
+	};
+
+	static CButtonContainer s_aShowTabButtons[NUM_BESTCLIENT_TABS] = {};
+	int HideableTabCount = 0;
+	int HideableVisibleIndex = 0;
+	for(int i = 0; i < NUM_BESTCLIENT_TABS; ++i)
+	{
+		// Keep Info visible the same way as in legacy BestClient.
+		if(i == BESTCLIENT_TAB_INFO)
+			continue;
+
+		++HideableTabCount;
+		int Hidden = IsBestClientTabFlagSet(g_Config.m_BcBestClientSettingsTabs, i);
+		CUIRect *pColumn = HideableVisibleIndex % 2 == 0 ? &LeftSettings : &RightSettings;
+		DoButton_CheckBoxAutoVMarginAndSet(&s_aShowTabButtons[i], apTabNames[i], &Hidden, pColumn, LineSize);
+		SetBestClientTabFlag(g_Config.m_BcBestClientSettingsTabs, i, Hidden);
+		++HideableVisibleIndex;
+	}
+	const int HideableRows = (HideableTabCount + 1) / 2;
+	RightView.HSplitTop(LineSize * (HideableRows + 0.5f), nullptr, &RightView);
 }
 
 CUi::EPopupMenuFunctionResult CMenus::PopupMapPicker(void *pContext, CUIRect View, bool Active)
