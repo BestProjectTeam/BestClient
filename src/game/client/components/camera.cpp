@@ -403,10 +403,27 @@ void CCamera::OnRender()
 			GameClient()->m_Controls.ClampMousePos();
 			m_CamType = CAMTYPE_SPEC;
 		}
-		m_Center = GameClient()->m_Controls.m_aMousePos[g_Config.m_ClDummy];
+		const vec2 TargetCenter = GameClient()->m_Controls.m_aMousePos[g_Config.m_ClDummy];
+		if(g_Config.m_BcCinematicCamera)
+		{
+			if(!m_CinematicCameraSmoothing)
+			{
+				m_CinematicCameraPosition = m_Center;
+				m_CinematicCameraSmoothing = true;
+			}
+			const float FollowSpeed = 8.0f;
+			m_CinematicCameraPosition += (TargetCenter - m_CinematicCameraPosition) * minimum(Client()->RenderFrameTime() * FollowSpeed, 1.0f);
+			m_Center = m_CinematicCameraPosition;
+		}
+		else
+		{
+			m_Center = TargetCenter;
+			m_CinematicCameraSmoothing = false;
+		}
 	}
 	else
 	{
+		m_CinematicCameraSmoothing = false;
 		if(m_CamType != CAMTYPE_PLAYER)
 		{
 			GameClient()->m_Controls.m_aMousePos[g_Config.m_ClDummy] = m_aLastPos[g_Config.m_ClDummy];

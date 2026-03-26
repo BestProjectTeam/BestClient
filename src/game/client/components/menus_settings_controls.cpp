@@ -101,7 +101,6 @@ void CMenusSettingsControls::OnInterfacesInit(CGameClient *pClient)
 		{EBindOptionGroup::BEST_CLIENT, Localizable("Cinematic camera"), "BC_cinematic_camera_toggle"},
 		{EBindOptionGroup::BEST_CLIENT, Localizable("Left jump"), "+jump; +left"},
 		{EBindOptionGroup::BEST_CLIENT, Localizable("Right jump"), "+jump; +right"},
-		{EBindOptionGroup::BEST_CLIENT, Localizable("World Editor"), "toggle_world_editor"},
 		{EBindOptionGroup::BEST_CLIENT_PRACTICE, Localizable("say /r"), "say /r"},
 		{EBindOptionGroup::BEST_CLIENT_PRACTICE, Localizable("say /invincible"), "say /invincible"},
 		{EBindOptionGroup::BEST_CLIENT_PRACTICE, Localizable("say /telecursor"), "say /telecursor"},

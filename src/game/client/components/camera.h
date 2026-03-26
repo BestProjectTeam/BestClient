@@ -64,6 +64,8 @@ private:
 	float m_DynamicFovTarget;
 	float m_DynamicFovCurrent;
 	float m_DynamicFovAppliedFactor;
+	bool m_CinematicCameraSmoothing;
+	vec2 m_CinematicCameraPosition;
 
 public:
 	static constexpr float ZOOM_STEP = 0.866025f;

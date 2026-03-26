@@ -15,6 +15,10 @@ class CTClient : public CComponent
 	std::deque<vec2> m_aAirRescuePositions[NUM_DUMMIES];
 	void AirRescue();
 	static void ConAirRescue(IConsole::IResult *pResult, void *pUserData);
+	static void ConToggle45Degrees(IConsole::IResult *pResult, void *pUserData);
+	static void ConToggleSmallSens(IConsole::IResult *pResult, void *pUserData);
+	static void ConToggleDeepfly(IConsole::IResult *pResult, void *pUserData);
+	static void ConToggleCinematicCamera(IConsole::IResult *pResult, void *pUserData);
 
 	static void ConCalc(IConsole::IResult *pResult, void *pUserData);
 	static void ConRandomTee(IConsole::IResult *pResult, void *pUserData);
@@ -40,6 +44,14 @@ class CTClient : public CComponent
 	void DoFinishCheck();
 
 	bool ServerCommandExists(const char *pCommand);
+
+	int m_45degreestoggle = 0;
+	int m_45degreestogglelastinput = 0;
+	int m_45degreesEnabled = 0;
+	int m_Smallsenstoggle = 0;
+	int m_Smallsenstogglelastinput = 0;
+	int m_SmallsensEnabled = 0;
+	char m_Oldmouse1Bind[128] = {};
 
 public:
 	CTClient();
