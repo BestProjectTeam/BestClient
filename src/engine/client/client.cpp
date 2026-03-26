@@ -2912,7 +2912,11 @@ void CClient::Update()
 					SendInput();
 				}
 
-				if(g_Config.m_TcFastInput && GameClient()->CheckNewInput())
+				const bool HasFastInput =
+					g_Config.m_TcFastInput &&
+					((g_Config.m_BcFastInputMode == 0 && g_Config.m_TcFastInputAmount > 0) ||
+						(g_Config.m_BcFastInputMode == 1 && g_Config.m_BcFastInputLowDelta > 0));
+				if(HasFastInput && GameClient()->CheckNewInput())
 				{
 					Repredict = true;
 				}

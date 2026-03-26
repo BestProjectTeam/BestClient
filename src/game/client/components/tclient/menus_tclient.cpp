@@ -555,13 +555,101 @@ void CMenus::RenderSettingsTClientSettings(CUIRect MainView)
 	Column.HSplitTop(MarginSmall, nullptr, &Column);
 
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcFastInput, TCLocalize("Fast Input (reduced visual delay)"), &g_Config.m_TcFastInput, &Column, LineSize);
-
-	Column.HSplitTop(LineSize, &Button, &Column);
-	DoSliderWithScaledValue(&g_Config.m_TcFastInputAmount, &g_Config.m_TcFastInputAmount, &Button, TCLocalize("Amount"), 1, 40, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "ms");
-
-	Column.HSplitTop(MarginSmall, nullptr, &Column);
 	if(g_Config.m_TcFastInput)
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcFastInputOthers, TCLocalize("Fast Input others"), &g_Config.m_TcFastInputOthers, &Column, LineSize);
+	{
+		Column.HSplitTop(MarginSmall, nullptr, &Column);
+
+		static CButtonContainer s_FastInputModeFast;
+		static CButtonContainer s_FastInputModeLowDelta;
+		const int OldMode = g_Config.m_BcFastInputMode;
+
+		Column.HSplitTop(LineSize, &Button, &Column);
+		{
+			CUIRect Left, Right;
+			Button.VSplitMid(&Left, &Right, 2.0f);
+			Left.HMargin(2.0f, &Left);
+			Right.HMargin(2.0f, &Right);
+
+			if(DoButton_Menu(&s_FastInputModeFast, TCLocalize("Fast input"), g_Config.m_BcFastInputMode == 0, &Left, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_L))
+				g_Config.m_BcFastInputMode = 0;
+			if(DoButton_Menu(&s_FastInputModeLowDelta, TCLocalize("Low delta"), g_Config.m_BcFastInputMode == 1, &Right, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
+				g_Config.m_BcFastInputMode = 1;
+		}
+
+		if(g_Config.m_BcFastInputMode != OldMode)
+		{
+			if(g_Config.m_BcFastInputMode == 1 && g_Config.m_BcFastInputLowDelta <= 0 && g_Config.m_TcFastInputAmount > 0)
+				g_Config.m_BcFastInputLowDelta = std::clamp(g_Config.m_TcFastInputAmount * 5, 0, 500); // ms -> 0.01 ticks
+			if(g_Config.m_BcFastInputMode == 0 && g_Config.m_TcFastInputAmount <= 0 && g_Config.m_BcFastInputLowDelta > 0)
+				g_Config.m_TcFastInputAmount = std::clamp((g_Config.m_BcFastInputLowDelta + 2) / 5, 0, 40); // 0.01 ticks -> ms
+		}
+
+		Column.HSplitTop(MarginSmall, nullptr, &Column);
+		Column.HSplitTop(LineSize, &Button, &Column);
+		if(g_Config.m_BcFastInputMode == 0)
+		{
+			DoSliderWithScaledValue(&g_Config.m_TcFastInputAmount, &g_Config.m_TcFastInputAmount, &Button, TCLocalize("Amount"), 0, 40, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "ms");
+		}
+		else
+		{
+			const int Min = 0;
+			const int Max = 500; // 0..5.00 ticks
+			int Value = std::clamp(g_Config.m_BcFastInputLowDelta, Min, Max);
+
+			const int Increment = std::max(1, (Max - Min) / 35);
+			if(Input()->ModifierIsPressed() && Input()->KeyPress(KEY_MOUSE_WHEEL_UP) && Ui()->MouseInside(&Button))
+				Value = std::clamp(Value + Increment, Min, Max);
+			if(Input()->ModifierIsPressed() && Input()->KeyPress(KEY_MOUSE_WHEEL_DOWN) && Ui()->MouseInside(&Button))
+				Value = std::clamp(Value - Increment, Min, Max);
+
+			char aBuf[256];
+			str_format(aBuf, sizeof(aBuf), "%s: %.2ft", TCLocalize("Amount"), Value / 100.0f);
+
+			CUIRect AmountLabel, ScrollBar;
+			Button.VSplitMid(&AmountLabel, &ScrollBar, minimum(10.0f, Button.w * 0.05f));
+			const float LabelFontSize = AmountLabel.h * CUi::ms_FontmodHeight * 0.8f;
+			Ui()->DoLabel(&AmountLabel, aBuf, LabelFontSize, TEXTALIGN_ML);
+
+			const float Rel = (Value - Min) / (float)(Max - Min);
+			const float NewRel = Ui()->DoScrollbarH(&g_Config.m_BcFastInputLowDelta, &ScrollBar, Rel);
+			Value = (int)(Min + NewRel * (Max - Min) + 0.5f);
+			g_Config.m_BcFastInputLowDelta = std::clamp(Value, Min, Max);
+
+			Column.HSplitTop(MarginSmall, nullptr, &Column);
+
+			static CButtonContainer s_EcoFreezeChimera;
+			static CButtonContainer s_TrueLowDelta;
+			const int EcoFreezeChimeraValue = 80;
+			const int TrueLowDeltaValue = 130;
+
+			Column.HSplitTop(LineSize, &Button, &Column);
+			{
+				CUIRect Left, Right;
+				Button.VSplitMid(&Left, &Right, 2.0f);
+				Left.HMargin(2.0f, &Left);
+				Right.HMargin(2.0f, &Right);
+
+				if(DoButton_Menu(&s_EcoFreezeChimera, TCLocalize("eco-freeze chimera"), g_Config.m_BcFastInputLowDelta == EcoFreezeChimeraValue, &Left, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_L))
+				{
+					char aCmd[64];
+					str_format(aCmd, sizeof(aCmd), "bc_fast_input_low_delta \"%d\"", EcoFreezeChimeraValue);
+					Console()->ExecuteLine(aCmd, IConsole::CLIENT_ID_UNSPECIFIED);
+				}
+				if(DoButton_Menu(&s_TrueLowDelta, TCLocalize("true low delta"), g_Config.m_BcFastInputLowDelta == TrueLowDeltaValue, &Right, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
+				{
+					char aCmd[64];
+					str_format(aCmd, sizeof(aCmd), "bc_fast_input_low_delta \"%d\"", TrueLowDeltaValue);
+					Console()->ExecuteLine(aCmd, IConsole::CLIENT_ID_UNSPECIFIED);
+				}
+			}
+		}
+
+		Column.HSplitTop(MarginSmall, nullptr, &Column);
+		if(g_Config.m_BcFastInputMode == 0)
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcFastInputOthers, TCLocalize("Fast Input others"), &g_Config.m_TcFastInputOthers, &Column, LineSize);
+		else
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcLowDeltaOthers, TCLocalize("low delta others"), &g_Config.m_BcLowDeltaOthers, &Column, LineSize);
+	}
 	else
 		Column.HSplitTop(LineSize, nullptr, &Column);
 

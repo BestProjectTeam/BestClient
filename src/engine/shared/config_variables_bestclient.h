@@ -57,6 +57,11 @@ MACRO_CONFIG_INT(BcShowhudDummyCoordIndicator, bc_showhud_dummy_coord_indicator,
 MACRO_CONFIG_COL(BcShowhudDummyCoordIndicatorColor, bc_showhud_dummy_coord_indicator_color, 255, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Player-below indicator color")
 MACRO_CONFIG_COL(BcShowhudDummyCoordIndicatorSameHeightColor, bc_showhud_dummy_coord_indicator_same_height_color, 65407, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Player-below indicator color when aligned vertically")
 
+// Fast input
+MACRO_CONFIG_INT(BcFastInputMode, bc_fast_input_mode, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fast input mode (0 = fast input, 1 = low delta)")
+MACRO_CONFIG_INT(BcFastInputLowDelta, bc_fast_input_low_delta, 0, 0, 500, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fast input amount for low delta mode in 0.01 ticks (0-5)")
+MACRO_CONFIG_INT(BcLowDeltaOthers, bc_low_delta_others, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Apply low delta to other tees")
+
 // Auto team lock
 MACRO_CONFIG_INT(BcAutoTeamLock, bc_auto_team_lock, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically lock your team after joining it")
 MACRO_CONFIG_INT(BcAutoTeamLockDelay, bc_auto_team_lock_delay, 5, 0, 30, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Delay before auto-locking team after joining, in seconds")

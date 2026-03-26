@@ -274,6 +274,9 @@ class CConfigManager : public IConfigManager
 	static void Con_Reset(IConsole::IResult *pResult, void *pUserData);
 	static void Con_Toggle(IConsole::IResult *pResult, void *pUserData);
 	static void Con_ToggleStroke(IConsole::IResult *pResult, void *pUserData);
+	static void Con_TcFastInputModeLegacy(IConsole::IResult *pResult, void *pUserData);
+	static void Con_TcFastInputLowDeltaLegacy(IConsole::IResult *pResult, void *pUserData);
+	static void Con_TcLowDeltaOthersLegacy(IConsole::IResult *pResult, void *pUserData);
 
 public:
 	CConfigManager();
