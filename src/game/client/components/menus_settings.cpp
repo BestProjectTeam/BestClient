@@ -3882,6 +3882,60 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		}
 		Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
 
+		// Chat media (left column block)
+		{
+			static float s_ChatMediaPhase = 0.0f;
+			const bool ChatMediaEnabled = g_Config.m_BcChatMediaPreview != 0;
+			UpdateRevealPhase(s_ChatMediaPhase, ChatMediaEnabled);
+			const float KeyReaderHeight = LineSize + MarginSmall;
+			const float ExpandedTargetHeight = 5.0f * LineSize + KeyReaderHeight;
+			const float ContentHeight = LineSize + MarginSmall + LineSize + ExpandedTargetHeight * s_ChatMediaPhase;
+			CUIRect Content, Label, Row, Visible;
+			BeginBlock(Column, ContentHeight, Content);
+
+			Content.HSplitTop(LineSize, &Label, &Content);
+			Ui()->DoLabel(&Label, Localize("Chat Media"), HeadlineFontSize, TEXTALIGN_ML);
+			Content.HSplitTop(MarginSmall, nullptr, &Content);
+
+			CChat &Chat = GameClient()->m_Chat;
+			if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatMediaPreview, Localize("Render media previews from chat links"), &g_Config.m_BcChatMediaPreview, &Content, LineSize))
+				Chat.RebuildChat();
+
+			const float ExpandedHeight = ExpandedTargetHeight * s_ChatMediaPhase;
+			if(ExpandedHeight > 0.0f)
+			{
+				Content.HSplitTop(ExpandedHeight, &Visible, &Content);
+				Ui()->ClipEnable(&Visible);
+				struct SScopedClip
+				{
+					CUi *m_pUi;
+					~SScopedClip() { m_pUi->ClipDisable(); }
+				} ClipGuard{Ui()};
+
+				CUIRect Expand = {Visible.x, Visible.y, Visible.w, ExpandedTargetHeight};
+
+				if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatMediaPhotos, Localize("Show photos in chat media"), &g_Config.m_BcChatMediaPhotos, &Expand, LineSize))
+					Chat.RebuildChat();
+
+				if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatMediaGifs, Localize("Show GIFs in chat media"), &g_Config.m_BcChatMediaGifs, &Expand, LineSize))
+					Chat.RebuildChat();
+
+				Expand.HSplitTop(LineSize, &Row, &Expand);
+				if(Ui()->DoScrollbarOption(&g_Config.m_BcChatMediaPreviewMaxWidth, &g_Config.m_BcChatMediaPreviewMaxWidth, &Row, Localize("Media preview width"), 120, 400))
+					Chat.RebuildChat();
+
+				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatMediaViewer, Localize("Enable fullscreen media viewer in chat"), &g_Config.m_BcChatMediaViewer, &Expand, LineSize);
+
+				Expand.HSplitTop(LineSize, &Row, &Expand);
+				Ui()->DoScrollbarOption(&g_Config.m_BcChatMediaViewerMaxZoom, &g_Config.m_BcChatMediaViewerMaxZoom, &Row, Localize("Viewer max zoom"), 100, 2000, &CUi::ms_LinearScrollbarScale, 0u, "%");
+
+				static CButtonContainer s_HideMediaBindReader;
+				static CButtonContainer s_HideMediaBindClear;
+				DoLine_KeyReader(Expand, s_HideMediaBindReader, s_HideMediaBindClear, Localize("Hide media bind"), "toggle_chat_media_hidden");
+			}
+		}
+		Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
+
 		// Chat bubbles (left column block)
 		{
 			static float s_BcChatBubblesPhase = 0.0f;

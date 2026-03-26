@@ -4,33 +4,64 @@
 #include "chat.h"
 
 #include <base/io.h>
+#include <base/log.h>
 #include <base/time.h>
 
+#include <engine/engine.h>
 #include <engine/editor.h>
 #include <engine/external/regex.h>
+#include <engine/font_icons.h>
 #include <engine/graphics.h>
 #include <engine/keys.h>
 #include <engine/shared/config.h>
 #include <engine/shared/csv.h>
+#include <engine/shared/http.h>
 #include <engine/textrender.h>
 
 #include <generated/protocol.h>
 #include <generated/protocol7.h>
 
 #include <game/client/animstate.h>
-#include <game/client/bc_ui_animations.h>
 #include <game/client/components/censor.h>
 #include <game/client/components/scoreboard.h>
 #include <game/client/components/skins.h>
 #include <game/client/components/sounds.h>
 #include <game/client/components/tclient/colored_parts.h>
 #include <game/client/gameclient.h>
+#include <game/client/bc_ui_animations.h>
 #include <game/localization.h>
+
+#include <algorithm>
+#include <cerrno>
+#include <cctype>
+#include <cinttypes>
+#include <limits>
+#include <string>
+#include <utility>
+#include <vector>
 
 char CChat::ms_aDisplayText[MAX_LINE_LENGTH] = "";
 static constexpr float CHAT_SCROLLBAR_WIDTH = 5.0f;
 static constexpr float CHAT_SCROLLBAR_MARGIN = 0.0f;
 static constexpr int CHAT_TYPING_ANIM_MAX_TEXT_BYTES = 16;
+static constexpr int CHAT_MEDIA_MAX_CONCURRENT_DOWNLOADS = 3;
+static constexpr int CHAT_MEDIA_MAX_COMPLETED_DECODE_PER_FRAME = 1;
+static constexpr int CHAT_MEDIA_MAX_TEXTURE_UPLOADS_PER_FRAME = 2;
+static constexpr int64_t CHAT_MEDIA_TEXTURE_UPLOAD_BUDGET_US = 1500; // keep frame hitches low
+static constexpr int64_t CHAT_MEDIA_MAX_RESPONSE_SIZE = 20 * 1024 * 1024;
+static constexpr int CHAT_MEDIA_MAX_GIF_FRAMES = 120;
+static constexpr int CHAT_MEDIA_MAX_DIMENSION = 768;
+static constexpr int CHAT_MEDIA_DOUBLE_CLICK_MS = 300;
+static constexpr int CHAT_MEDIA_MAX_RESOLVE_DEPTH = 2;
+static constexpr int CHAT_MEDIA_MAX_VIDEO_ANIMATION_MS = 15000;
+static constexpr int CHAT_MEDIA_MAX_RETRIES = 3;
+static constexpr float CHAT_MEDIA_MAX_PREVIEW_HEIGHT = 70.0f;
+static constexpr float CHAT_MEDIA_MAX_PREVIEW_HEIGHT_SCOREBOARD = 56.0f;
+static constexpr int CHAT_MEDIA_MAX_URL_LENGTH = 240;
+static constexpr int CHAT_MEDIA_MAX_HTML_CANDIDATES = 32;
+static constexpr size_t CHAT_MEDIA_MAX_ANIMATED_MEMORY_BYTES = 20ull * 1024ull * 1024ull;
+static constexpr bool CHAT_MEDIA_ANIMATE_VIDEOS = true;
+static constexpr float CHAT_MEDIA_MIN_PREVIEW_SIDE = 28.0f;
 
 static bool ChatTypingAnimSupportsText(const char *pText)
 {
@@ -46,16 +77,114 @@ static bool ChatTypingAnimSupportsText(const char *pText)
 	return true;
 }
 
+class CChat::CMediaDecodeJob : public IJob
+{
+	EMediaKind m_MediaKind;
+	IGraphics *m_pGraphics;
+	std::vector<unsigned char> m_vData;
+	char m_aContextName[512];
+	SMediaDecodedFrames m_DecodedFrames;
+	bool m_Success = false;
+
+protected:
+	void Run() override
+	{
+		if(State() == IJob::STATE_ABORTED || m_vData.empty())
+			return;
+
+		SMediaDecodeLimits Limits;
+		Limits.m_MaxDimension = CHAT_MEDIA_MAX_DIMENSION;
+		Limits.m_MaxFrames = CHAT_MEDIA_MAX_GIF_FRAMES;
+		Limits.m_MaxTotalBytes = CHAT_MEDIA_MAX_ANIMATED_MEMORY_BYTES;
+		Limits.m_MaxAnimationDurationMs = CHAT_MEDIA_MAX_VIDEO_ANIMATION_MS;
+
+		switch(m_MediaKind)
+		{
+		case EMediaKind::PHOTO:
+			m_Success = MediaDecoder::DecodeStaticImageCpu(m_pGraphics, m_vData.data(), m_vData.size(), m_aContextName, m_DecodedFrames, CHAT_MEDIA_MAX_DIMENSION);
+			break;
+		case EMediaKind::ANIMATED:
+			// Animate previews for short animations within limits (frames/dimension/memory).
+			// Long animations fall back to a single-frame thumbnail via m_MaxAnimationDurationMs.
+			Limits.m_DecodeAllFrames = true;
+			m_Success = MediaDecoder::DecodeImageWithFfmpegCpu(m_pGraphics, m_vData.data(), m_vData.size(), m_aContextName, m_DecodedFrames, Limits);
+			break;
+		case EMediaKind::VIDEO:
+			Limits.m_DecodeAllFrames = CHAT_MEDIA_ANIMATE_VIDEOS;
+			m_Success = MediaDecoder::DecodeImageWithFfmpegCpu(m_pGraphics, m_vData.data(), m_vData.size(), m_aContextName, m_DecodedFrames, Limits);
+			break;
+		case EMediaKind::UNKNOWN:
+		default:
+			m_Success = false;
+			break;
+		}
+
+		if(State() == IJob::STATE_ABORTED)
+		{
+			m_Success = false;
+			m_DecodedFrames.Free();
+		}
+	}
+
+public:
+	CMediaDecodeJob(IGraphics *pGraphics, EMediaKind MediaKind, const unsigned char *pData, size_t DataSize, const char *pContextName) :
+		m_MediaKind(MediaKind),
+		m_pGraphics(pGraphics)
+	{
+		Abortable(true);
+		if(pData != nullptr && DataSize > 0)
+			m_vData.assign(pData, pData + DataSize);
+		str_copy(m_aContextName, pContextName ? pContextName : "", sizeof(m_aContextName));
+	}
+
+	~CMediaDecodeJob() override
+	{
+		m_DecodedFrames.Free();
+	}
+
+	bool Success() const { return m_Success; }
+	SMediaDecodedFrames &DecodedFrames() { return m_DecodedFrames; }
+};
+
 CChat::CLine::CLine()
 {
 	m_TextContainerIndex.Reset();
 	m_QuadContainerIndex = -1;
+	m_MediaState = EMediaState::NONE;
+	m_MediaKind = EMediaKind::UNKNOWN;
+	m_aMediaUrl[0] = '\0';
+	m_MediaCandidateIndex = -1;
+	m_MediaRetryCount = 0;
+	m_MediaUploadIndex = 0;
+	m_MediaTotalDurationMs = 0;
+	m_MediaAnimated = false;
+	m_MediaRevealed = false;
+	m_MediaWidth = 0;
+	m_MediaHeight = 0;
+	m_MediaResolveDepth = 0;
+	m_MediaAnimationStart = 0;
+	m_aTextHeight[0] = 0.0f;
+	m_aTextHeight[1] = 0.0f;
+	m_aMediaPreviewWidth[0] = 0.0f;
+	m_aMediaPreviewWidth[1] = 0.0f;
+	m_aMediaPreviewHeight[0] = 0.0f;
+	m_aMediaPreviewHeight[1] = 0.0f;
+	m_SelectionStart = -1;
+	m_SelectionEnd = -1;
+	m_NameRectValid = false;
+	m_TranslateRectValid = false;
+	m_TranslateLanguageRectValid = false;
+	m_MediaPreviewRectValid = false;
+	m_MediaRetryRectValid = false;
 }
 
 void CChat::CLine::Reset(CChat &This)
 {
 	This.TextRender()->DeleteTextContainer(m_TextContainerIndex);
 	This.Graphics()->DeleteQuadContainer(m_QuadContainerIndex);
+	if(This.m_MediaViewerOpen && This.ValidateMediaViewerLine() && &This.m_aLines[This.m_MediaViewerLineIndex] == this)
+		This.CloseMediaViewer();
+	This.ResetLineMedia(*this);
 	m_Initialized = false;
 	m_Time = 0;
 	m_aText[0] = '\0';
@@ -64,12 +193,44 @@ void CChat::CLine::Reset(CChat &This)
 	m_TimesRepeated = 0;
 	m_pManagedTeeRenderInfo = nullptr;
 	m_pTranslateResponse = nullptr;
+	m_SelectionStart = -1;
+	m_SelectionEnd = -1;
+	m_NameRectValid = false;
+	m_TranslateRectValid = false;
+	m_TranslateLanguageRectValid = false;
+	m_MediaPreviewRectValid = false;
+	m_MediaRetryRectValid = false;
 }
 
 CChat::CChat()
 {
 	m_Mode = MODE_NONE;
+	m_BacklogCurLine = 0;
+	m_ScrollbarDragging = false;
+	m_ScrollbarDragOffset = 0.0f;
+	m_MouseIsPress = false;
+	m_MousePress = vec2(0.0f, 0.0f);
+	m_MouseRelease = vec2(0.0f, 0.0f);
+	m_HasSelection = false;
+	m_WantsSelectionCopy = false;
+	m_PrevModeActive = false;
+	m_PrevChatSelectionActive = false;
+	m_TranslateButtonPressed = false;
+	m_TranslateButtonRectValid = false;
+	m_HideMediaByBind = false;
+	m_MediaViewerOpen = false;
+	m_MediaViewerLineIndex = -1;
+	m_MediaViewerZoom = 1.0f;
+	m_MediaViewerPan = vec2(0.0f, 0.0f);
+	m_MediaViewerDragging = false;
+	m_MediaViewerDragStartMouse = vec2(0.0f, 0.0f);
+	m_MediaViewerPanStart = vec2(0.0f, 0.0f);
+	m_MediaViewerLastClickTime = 0;
+	m_aPreviousDisplayedInputText[0] = '\0';
+	m_ChatOpenAnimationStart = 0;
+	m_vTypingGlyphAnims.clear();
 
+	m_Input.SetClipboardLineCallback([this](const char *pStr) { SendChatQueued(pStr); });
 	m_Input.SetCalculateOffsetCallback([this]() { return m_IsInputCensored; });
 	m_Input.SetDisplayTextCallback([this](char *pStr, size_t NumChars) {
 		m_IsInputCensored = false;
@@ -130,6 +291,8 @@ void CChat::RebuildChat()
 		// recalculate sizes
 		Line.m_aYOffset[0] = -1.0f;
 		Line.m_aYOffset[1] = -1.0f;
+		if(Line.m_MediaState == EMediaState::NONE && HasAllowedMediaCandidates(Line))
+			QueueMediaDownload(Line);
 	}
 }
 
@@ -139,6 +302,8 @@ void CChat::ClearLines()
 		Line.Reset(*this);
 	m_PrevScoreBoardShowed = false;
 	m_PrevShowChat = false;
+	m_PrevModeActive = false;
+	m_PrevChatSelectionActive = false;
 }
 
 void CChat::OnWindowResize()
@@ -157,22 +322,34 @@ void CChat::Reset()
 	m_PlaceholderOffset = 0;
 	m_PlaceholderLength = 0;
 	m_pHistoryEntry = nullptr;
-	m_PendingChatCounter = 0;
+	m_vPendingChatQueue.clear();
 	m_LastChatSend = 0;
 	m_CurrentLine = 0;
-	m_BacklogCurLine = 0;
-	m_ScrollbarDragging = false;
-	m_ScrollbarDragOffset = 0.0f;
-	m_ChatOpenAnimationStart = 0;
-	m_vTypingGlyphAnims.clear();
-	m_aPreviousDisplayedInputText[0] = '\0';
 	m_IsInputCensored = false;
 	m_EditingNewLine = true;
+	m_aSavedInputText[0] = '\0';
+	m_SavedInputPending = false;
+	m_aPreviousDisplayedInputText[0] = '\0';
+	m_ChatOpenAnimationStart = 0;
+	m_vTypingGlyphAnims.clear();
 	m_ServerSupportsCommandInfo = false;
 	m_ServerCommandsNeedSorting = false;
 	m_aCurrentInputText[0] = '\0';
-	m_aSavedInputText[0] = '\0';
-	m_SavedInputPending = false;
+	m_BacklogCurLine = 0;
+	m_ScrollbarDragging = false;
+	m_ScrollbarDragOffset = 0.0f;
+	m_LastMousePos = std::nullopt;
+	m_TranslateButtonPressed = false;
+	m_TranslateButtonRectValid = false;
+	m_HideMediaByBind = false;
+	m_MediaViewerOpen = false;
+	m_MediaViewerLineIndex = -1;
+	m_MediaViewerZoom = 1.0f;
+	m_MediaViewerPan = vec2(0.0f, 0.0f);
+	m_MediaViewerDragging = false;
+	m_MediaViewerDragStartMouse = vec2(0.0f, 0.0f);
+	m_MediaViewerPanStart = vec2(0.0f, 0.0f);
+	m_MediaViewerLastClickTime = 0;
 	DisableMode();
 	m_vServerCommands.clear();
 
@@ -203,6 +380,8 @@ void CChat::RefreshTypingAnimation()
 	const size_t CurrentLen = str_length(pCurrent);
 	const size_t PreviousLen = str_length(m_aPreviousDisplayedInputText);
 
+	// Fall back only for invalid UTF-8, otherwise keep per-glyph animation for
+	// normal multi-byte text such as Cyrillic.
 	if(!ChatTypingAnimSupportsText(pCurrent) || !ChatTypingAnimSupportsText(m_aPreviousDisplayedInputText))
 	{
 		SyncTypingAnimationBaseline();
@@ -218,6 +397,7 @@ void CChat::RefreshTypingAnimation()
 		return;
 	}
 
+	// Find edit boundaries aligned to UTF-8 codepoints (byte-wise diff breaks for multi-byte chars like Cyrillic).
 	size_t PrefixBytes = 0;
 	{
 		const char *pCurScan = pCurrent;
@@ -319,33 +499,9 @@ void CChat::RefreshTypingAnimation()
 	str_copy(m_aPreviousDisplayedInputText, pCurrent, sizeof(m_aPreviousDisplayedInputText));
 }
 
-bool CChat::WasChatAutoHidden() const
-{
-	if(g_Config.m_ClShowChat == 0 || g_Config.m_ClShowChat == 2 || m_Mode != MODE_NONE)
-		return false;
-
-	const int64_t Now = time();
-	bool HadAnyLines = false;
-	for(int i = 0; i < MAX_LINES; i++)
-	{
-		const CLine &Line = m_aLines[((m_CurrentLine - i) + MAX_LINES) % MAX_LINES];
-		if(!Line.m_Initialized)
-			break;
-
-		HadAnyLines = true;
-		if(Now <= Line.m_Time + 16 * time_freq())
-			return false;
-	}
-
-	return HadAnyLines;
-}
-
 void CChat::OnRelease()
 {
 	m_Show = false;
-	m_ChatOpenAnimationStart = 0;
-	ResetTypingAnimation();
-	m_aPreviousDisplayedInputText[0] = '\0';
 }
 
 void CChat::OnStateChange(int NewState, int OldState)
@@ -444,6 +600,7 @@ void CChat::OnConsoleInit()
 	Console()->Register("+show_chat", "", CFGFLAG_CLIENT, ConShowChat, this, "Show chat");
 	Console()->Register("echo", "r[message]", CFGFLAG_CLIENT | CFGFLAG_STORE, ConEcho, this, "Echo the text in chat window");
 	Console()->Register("clear_chat", "", CFGFLAG_CLIENT | CFGFLAG_STORE, ConClearChat, this, "Clear chat messages");
+	Console()->Register("toggle_chat_media_hidden", "", CFGFLAG_CLIENT, ConToggleHideChatMedia, this, "Toggle hidden media mode in chat");
 }
 
 void CChat::OnInit()
@@ -454,21 +611,2350 @@ void CChat::OnInit()
 	Console()->Chain("cl_chat_width", ConchainChatWidth, this);
 }
 
+namespace
+{
+struct STranslateLanguageOption
+{
+	const char *m_pCode;
+	const char *m_pLabel;
+};
+
+constexpr STranslateLanguageOption gs_aTranslateSourceOptions[] = {
+	{"auto", "Auto"},
+	{"ru", "Russian"},
+	{"en", "English"},
+	{"de", "German"},
+	{"zh", "Chinese"},
+	{"pt", "Brazilian"},
+};
+
+constexpr STranslateLanguageOption gs_aTranslateTargetOptions[] = {
+	{"auto", "Auto"},
+	{"ru", "Russian"},
+	{"en", "English"},
+	{"de", "German"},
+	{"zh", "Chinese"},
+	{"pt", "Brazilian"},
+};
+
+template<size_t N>
+int TranslateLanguageIndex(const char *pCode, const STranslateLanguageOption (&aOptions)[N])
+{
+	for(size_t i = 0; i < N; ++i)
+	{
+		if(str_comp_nocase(pCode, aOptions[i].m_pCode) == 0)
+			return (int)i;
+	}
+	return 0;
+}
+
+template<size_t N>
+void ApplyTranslateLanguage(char *pConfig, size_t ConfigSize, int Index, const STranslateLanguageOption (&aOptions)[N])
+{
+	Index = std::clamp(Index, 0, (int)N - 1);
+	str_copy(pConfig, aOptions[Index].m_pCode, ConfigSize);
+}
+}
+
+void CChat::OpenTranslateSettingsPopup(const CUIRect &ButtonRect)
+{
+	Ui()->DoPopupMenu(&m_TranslateSettingsPopupId, ButtonRect.x, ButtonRect.y, 300.0f, 205.0f, this, PopupTranslateSettings);
+}
+
+CUi::EPopupMenuFunctionResult CChat::PopupTranslateSettings(void *pContext, CUIRect View, bool Active)
+{
+	CChat *pChat = static_cast<CChat *>(pContext);
+	(void)Active;
+	const float Spacing = 5.0f;
+	const float RowHeight = 20.0f;
+	const float FontSize = 11.0f;
+	static CUi::SDropDownState s_TargetDropDown;
+	static CScrollRegion s_TargetScroll;
+	s_TargetDropDown.m_SelectionPopupContext.m_pScrollRegion = &s_TargetScroll;
+
+	CUIRect Row;
+	View.HSplitTop(14.0f, &Row, &View);
+	pChat->Ui()->DoLabel(&Row, Localize("Chat translate"), 12.0f, TEXTALIGN_ML);
+
+	View.HSplitTop(Spacing, nullptr, &View);
+	View.HSplitTop(18.0f, &Row, &View);
+	if(pChat->GameClient()->m_Menus.DoButton_CheckBox(&pChat->m_TranslateSettingsEnableButton, Localize("Auto translate messages"), g_Config.m_TcTranslateAuto, &Row))
+		g_Config.m_TcTranslateAuto ^= 1;
+
+	View.HSplitTop(Spacing, nullptr, &View);
+	View.HSplitTop(RowHeight, &Row, &View);
+	CUIRect Label, DropDown;
+	Row.VSplitLeft(145.0f, &Label, &DropDown);
+	pChat->Ui()->DoLabel(&Label, Localize("Target language"), FontSize, TEXTALIGN_ML);
+
+	static const char *s_apTargetLabels[] = {
+		"Auto", "Russian", "English", "German", "Chinese", "Brazilian"};
+	const int TargetIndex = TranslateLanguageIndex(g_Config.m_TcTranslateTarget, gs_aTranslateTargetOptions);
+	const int NewTargetIndex = pChat->Ui()->DoDropDown(&DropDown, TargetIndex, s_apTargetLabels, std::size(s_apTargetLabels), s_TargetDropDown);
+	if(NewTargetIndex != TargetIndex)
+		ApplyTranslateLanguage(g_Config.m_TcTranslateTarget, sizeof(g_Config.m_TcTranslateTarget), NewTargetIndex, gs_aTranslateTargetOptions);
+
+	return CUi::POPUP_KEEP_OPEN;
+}
+
+void CChat::RenderTranslateSettingsButton(const CUIRect &ButtonRect)
+{
+	m_TranslateButtonRect.m_X = ButtonRect.x;
+	m_TranslateButtonRect.m_Y = ButtonRect.y;
+	m_TranslateButtonRect.m_W = ButtonRect.w;
+	m_TranslateButtonRect.m_H = ButtonRect.h;
+	m_TranslateButtonRectValid = true;
+
+	const vec2 MousePos = ChatMousePos();
+	const bool Hovered = MousePos.x >= ButtonRect.x && MousePos.x <= ButtonRect.x + ButtonRect.w &&
+		MousePos.y >= ButtonRect.y && MousePos.y <= ButtonRect.y + ButtonRect.h;
+	const bool IsOpen = Ui()->IsPopupOpen(&m_TranslateSettingsPopupId);
+	const ColorRGBA ButtonColor = IsOpen ? ColorRGBA(0.35f, 0.45f, 0.70f, 0.90f) :
+		(Hovered ? ColorRGBA(0.28f, 0.28f, 0.28f, 0.90f) : ColorRGBA(0.16f, 0.16f, 0.16f, 0.82f));
+	const float ButtonRounding = maximum(3.0f, ButtonRect.h * 0.28f);
+
+	ButtonRect.Draw(ButtonColor, IGraphics::CORNER_ALL, ButtonRounding);
+
+	CUIRect IconRect;
+	ButtonRect.Margin(1.0f, &IconRect);
+	const float IconSize = IconRect.h * CUi::ms_FontmodHeight;
+	TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+	TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
+	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.95f);
+	Ui()->DoLabel(&IconRect, FontIcon::COMMENT, IconSize, TEXTALIGN_MC);
+	TextRender()->SetRenderFlags(0);
+	TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+	if(Hovered)
+		Ui()->SetHotItem(&m_TranslateSettingsButton);
+	GameClient()->m_Tooltips.DoToolTip(&m_TranslateSettingsButton, &ButtonRect, Localize("Chat translate settings"));
+}
+
+namespace
+{
+static bool IsUrlStart(const char *pStr)
+{
+	return str_startswith(pStr, "http://") || str_startswith(pStr, "https://");
+}
+
+static bool IsTokenEnd(char c)
+{
+	return c == '\0' || c == ' ' || c == '\n' || c == '\r' || c == '\t';
+}
+
+static bool IsTrimmedUrlChar(char c)
+{
+	return c == '.' || c == ',' || c == '!' || c == '?' || c == ';' || c == ':' ||
+		c == ')' || c == ']' || c == '}' || c == '"' || c == '\'' || c == '>';
+}
+
+static std::string ExtractUrlHostLower(const std::string &Url)
+{
+	const size_t SchemePos = Url.find("://");
+	if(SchemePos == std::string::npos)
+		return {};
+
+	const size_t HostStart = SchemePos + 3;
+	const size_t HostEnd = Url.find_first_of("/?#", HostStart);
+	std::string HostPort = Url.substr(HostStart, HostEnd == std::string::npos ? std::string::npos : HostEnd - HostStart);
+
+	// Strip userinfo (user:pass@host).
+	const size_t AtPos = HostPort.rfind('@');
+	if(AtPos != std::string::npos)
+		HostPort = HostPort.substr(AtPos + 1);
+
+	// Strip port (host:port) while supporting IPv6 literals in brackets.
+	if(!HostPort.empty() && HostPort.front() == '[')
+	{
+		const size_t Close = HostPort.find(']');
+		if(Close != std::string::npos)
+			HostPort = HostPort.substr(1, Close - 1);
+	}
+	else
+	{
+		const size_t ColonPos = HostPort.find(':');
+		if(ColonPos != std::string::npos)
+			HostPort = HostPort.substr(0, ColonPos);
+	}
+
+	while(!HostPort.empty() && HostPort.back() == '.')
+		HostPort.pop_back();
+
+	std::transform(HostPort.begin(), HostPort.end(), HostPort.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+	return HostPort;
+}
+
+static bool HostIsOrEndsWith(const std::string &HostLower, const char *pDomainLower)
+{
+	const std::string Domain(pDomainLower);
+	if(HostLower == Domain)
+		return true;
+	if(HostLower.size() <= Domain.size())
+		return false;
+	const size_t Start = HostLower.size() - Domain.size();
+	return HostLower.compare(Start, Domain.size(), Domain) == 0 && HostLower[Start - 1] == '.';
+}
+
+static bool IsYouTubeUrl(const std::string &Url)
+{
+	const std::string HostLower = ExtractUrlHostLower(Url);
+	if(HostLower.empty())
+		return false;
+
+	// Prevent media previews for YouTube links (the media preview fetcher may otherwise resolve
+	// thumbnails/embeds from HTML/JSON-LD).
+	return HostIsOrEndsWith(HostLower, "youtube.com") ||
+		HostIsOrEndsWith(HostLower, "youtu.be") ||
+		HostIsOrEndsWith(HostLower, "youtube-nocookie.com") ||
+		HostIsOrEndsWith(HostLower, "ytimg.com") ||
+		HostIsOrEndsWith(HostLower, "googlevideo.com");
+}
+
+static bool IsGifSignature(const unsigned char *pData, size_t DataSize)
+{
+	return DataSize >= 6 && (mem_comp(pData, "GIF87a", 6) == 0 || mem_comp(pData, "GIF89a", 6) == 0);
+}
+
+static std::string ExtractUrlExtensionLower(const std::string &Url)
+{
+	const size_t QueryPos = Url.find_first_of("?#");
+	const std::string Path = Url.substr(0, QueryPos);
+	const size_t SlashPos = Path.find_last_of('/');
+	const size_t DotPos = Path.find_last_of('.');
+	if(DotPos == std::string::npos || (SlashPos != std::string::npos && DotPos < SlashPos))
+		return {};
+
+	std::string Ext = Path.substr(DotPos + 1);
+	std::transform(Ext.begin(), Ext.end(), Ext.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+	return Ext;
+}
+
+static bool IsLikelyImageExtension(const std::string &Ext)
+{
+	return Ext == "png" || Ext == "jpg" || Ext == "jpeg" || Ext == "gif" || Ext == "webp" || Ext == "bmp" || Ext == "avif" || Ext == "apng";
+}
+
+static bool IsLikelyAnimatedImageExtension(const std::string &Ext)
+{
+	return Ext == "gif" || Ext == "webp" || Ext == "apng" || Ext == "avif";
+}
+
+static bool IsLikelyVideoExtension(const std::string &Ext)
+{
+	return Ext == "mp4" || Ext == "webm" || Ext == "mov" || Ext == "m4v" || Ext == "mkv" || Ext == "avi" ||
+		Ext == "gifv" || Ext == "mpg" || Ext == "mpeg" || Ext == "ogv" || Ext == "3gp" || Ext == "3g2" ||
+		Ext == "flv" || Ext == "wmv" || Ext == "asf" || Ext == "ts" || Ext == "m2ts" || Ext == "mts" || Ext == "f4v";
+}
+
+static bool IsBlockedMediaExtension(const std::string &Ext)
+{
+	return Ext == "svg" || Ext == "svgz" || Ext == "ico" || Ext == "css" || Ext == "js" || Ext == "json" || Ext == "txt" || Ext == "xml" || Ext == "pdf" || Ext == "html" || Ext == "htm";
+}
+
+static bool IsLikelyMediaExtension(const std::string &Ext)
+{
+	return IsLikelyImageExtension(Ext) || IsLikelyVideoExtension(Ext);
+}
+
+static bool IsPngSignature(const unsigned char *pData, size_t DataSize)
+{
+	static const unsigned char s_aPngSig[8] = {0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'};
+	return DataSize >= 8 && mem_comp(pData, s_aPngSig, 8) == 0;
+}
+
+static bool IsJpegSignature(const unsigned char *pData, size_t DataSize)
+{
+	return DataSize >= 3 && pData[0] == 0xff && pData[1] == 0xd8 && pData[2] == 0xff;
+}
+
+static bool IsWebpSignature(const unsigned char *pData, size_t DataSize)
+{
+	return DataSize >= 12 && mem_comp(pData, "RIFF", 4) == 0 && mem_comp(pData + 8, "WEBP", 4) == 0;
+}
+
+static bool IsBmpSignature(const unsigned char *pData, size_t DataSize)
+{
+	return DataSize >= 2 && pData[0] == 'B' && pData[1] == 'M';
+}
+
+static bool IsMp4LikeSignature(const unsigned char *pData, size_t DataSize)
+{
+	return DataSize >= 12 && mem_comp(pData + 4, "ftyp", 4) == 0;
+}
+
+static bool IsWebmSignature(const unsigned char *pData, size_t DataSize)
+{
+	static const unsigned char s_aWebmSig[4] = {0x1a, 0x45, 0xdf, 0xa3};
+	return DataSize >= 4 && mem_comp(pData, s_aWebmSig, 4) == 0;
+}
+
+static bool IsOggSignature(const unsigned char *pData, size_t DataSize)
+{
+	return DataSize >= 4 && mem_comp(pData, "OggS", 4) == 0;
+}
+
+static bool IsImagePayloadSignature(const unsigned char *pData, size_t DataSize)
+{
+	return IsPngSignature(pData, DataSize) || IsJpegSignature(pData, DataSize) || IsGifSignature(pData, DataSize) || IsWebpSignature(pData, DataSize) || IsBmpSignature(pData, DataSize);
+}
+
+static bool IsVideoPayloadSignature(const unsigned char *pData, size_t DataSize)
+{
+	return IsMp4LikeSignature(pData, DataSize) || IsWebmSignature(pData, DataSize) || IsOggSignature(pData, DataSize);
+}
+
+static std::string ToLowerAscii(std::string Value)
+{
+	std::transform(Value.begin(), Value.end(), Value.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+	return Value;
+}
+
+static void ReplaceAll(std::string &Value, const char *pFrom, const char *pTo)
+{
+	const std::string From(pFrom);
+	const std::string To(pTo);
+	size_t Pos = 0;
+	while((Pos = Value.find(From, Pos)) != std::string::npos)
+	{
+		Value.replace(Pos, From.size(), To);
+		Pos += To.size();
+	}
+}
+
+static std::string DecodeHtmlUrl(std::string Value)
+{
+	ReplaceAll(Value, "&amp;", "&");
+	ReplaceAll(Value, "&quot;", "\"");
+	ReplaceAll(Value, "&#39;", "'");
+	ReplaceAll(Value, "&lt;", "<");
+	ReplaceAll(Value, "&gt;", ">");
+	ReplaceAll(Value, "\\/", "/");
+	return Value;
+}
+
+static void TrimAsciiWhitespace(std::string &Value)
+{
+	while(!Value.empty() && std::isspace((unsigned char)Value.front()))
+		Value.erase(Value.begin());
+	while(!Value.empty() && std::isspace((unsigned char)Value.back()))
+		Value.pop_back();
+}
+
+static bool ExtractHtmlAttribute(const std::string &Tag, const std::string &TagLower, const char *pAttrName, std::string &OutValue)
+{
+	const std::string AttrName = ToLowerAscii(pAttrName);
+	size_t Pos = 0;
+	while((Pos = TagLower.find(AttrName, Pos)) != std::string::npos)
+	{
+		const bool LeftBoundary = Pos == 0 || std::isspace((unsigned char)TagLower[Pos - 1]) || TagLower[Pos - 1] == '<' || TagLower[Pos - 1] == '/';
+		if(!LeftBoundary)
+		{
+			Pos += AttrName.size();
+			continue;
+		}
+
+		size_t EqPos = Pos + AttrName.size();
+		while(EqPos < TagLower.size() && std::isspace((unsigned char)TagLower[EqPos]))
+			EqPos++;
+		if(EqPos >= TagLower.size() || TagLower[EqPos] != '=')
+		{
+			Pos += AttrName.size();
+			continue;
+		}
+		EqPos++;
+		while(EqPos < Tag.size() && std::isspace((unsigned char)Tag[EqPos]))
+			EqPos++;
+		if(EqPos >= Tag.size())
+			return false;
+
+		size_t ValueBegin = EqPos;
+		size_t ValueEnd = EqPos;
+		if(Tag[EqPos] == '"' || Tag[EqPos] == '\'')
+		{
+			const char Quote = Tag[EqPos];
+			ValueBegin = EqPos + 1;
+			ValueEnd = Tag.find(Quote, ValueBegin);
+			if(ValueEnd == std::string::npos)
+				return false;
+		}
+		else
+		{
+			while(ValueEnd < Tag.size() && !std::isspace((unsigned char)Tag[ValueEnd]) && Tag[ValueEnd] != '>')
+				ValueEnd++;
+		}
+
+		OutValue = DecodeHtmlUrl(Tag.substr(ValueBegin, ValueEnd - ValueBegin));
+		TrimAsciiWhitespace(OutValue);
+		return !OutValue.empty();
+	}
+	return false;
+}
+
+static bool ResolveRelativeUrl(const std::string &BaseUrl, const std::string &CandidateUrl, std::string &OutResolvedUrl)
+{
+	if(CandidateUrl.empty())
+		return false;
+	if(str_startswith(CandidateUrl.c_str(), "http://") || str_startswith(CandidateUrl.c_str(), "https://"))
+	{
+		OutResolvedUrl = CandidateUrl;
+		return true;
+	}
+	if(str_startswith(CandidateUrl.c_str(), "//"))
+	{
+		const size_t SchemePos = BaseUrl.find("://");
+		if(SchemePos == std::string::npos)
+			return false;
+		OutResolvedUrl = BaseUrl.substr(0, SchemePos) + ":" + CandidateUrl;
+		return true;
+	}
+	if(CandidateUrl[0] == '#')
+		return false;
+
+	const size_t SchemePos = BaseUrl.find("://");
+	if(SchemePos == std::string::npos)
+		return false;
+	const size_t HostStart = SchemePos + 3;
+	const size_t PathStart = BaseUrl.find('/', HostStart);
+	const std::string Origin = PathStart == std::string::npos ? BaseUrl : BaseUrl.substr(0, PathStart);
+
+	if(CandidateUrl[0] == '/')
+	{
+		OutResolvedUrl = Origin + CandidateUrl;
+		return true;
+	}
+
+	std::string BasePath = PathStart == std::string::npos ? "/" : BaseUrl.substr(PathStart);
+	const size_t QueryPos = BasePath.find_first_of("?#");
+	if(QueryPos != std::string::npos)
+		BasePath.resize(QueryPos);
+	size_t LastSlash = BasePath.find_last_of('/');
+	if(LastSlash == std::string::npos)
+		BasePath = "/";
+	else
+		BasePath.resize(LastSlash + 1);
+
+	OutResolvedUrl = Origin + BasePath + CandidateUrl;
+	return true;
+}
+
+static bool ResolveAndFilterCandidateUrl(const char *pBaseUrl, const std::string &RawCandidate, std::string &OutResolvedUrl, bool AllowUnknownExtensions)
+{
+	std::string Candidate = DecodeHtmlUrl(RawCandidate);
+	TrimAsciiWhitespace(Candidate);
+	if(Candidate.empty())
+		return false;
+
+	const std::string CandidateLower = ToLowerAscii(Candidate);
+	if(str_startswith(CandidateLower.c_str(), "data:") || str_startswith(CandidateLower.c_str(), "blob:") ||
+		str_startswith(CandidateLower.c_str(), "javascript:") || str_startswith(CandidateLower.c_str(), "mailto:") ||
+		str_startswith(CandidateLower.c_str(), "about:"))
+	{
+		return false;
+	}
+
+	std::string Resolved;
+	if(IsUrlStart(Candidate.c_str()))
+		Resolved = Candidate;
+	else
+	{
+		if(!pBaseUrl || !IsUrlStart(pBaseUrl) || !ResolveRelativeUrl(pBaseUrl, Candidate, Resolved))
+			return false;
+	}
+
+	if(!IsUrlStart(Resolved.c_str()))
+		return false;
+	if((int)Resolved.size() > CHAT_MEDIA_MAX_URL_LENGTH)
+		return false;
+	for(char c : Resolved)
+	{
+		if((unsigned char)c < 32 || c == ' ' || c == '\t' || c == '\n' || c == '\r')
+			return false;
+	}
+
+	const std::string LowerResolved = ToLowerAscii(Resolved);
+	const std::string Ext = ExtractUrlExtensionLower(LowerResolved);
+	if(!Ext.empty() && IsBlockedMediaExtension(Ext))
+		return false;
+	if(!AllowUnknownExtensions && !Ext.empty() && !IsLikelyMediaExtension(Ext))
+		return false;
+
+	OutResolvedUrl = Resolved;
+	return true;
+}
+
+static bool IsLikelyHtmlDocument(const unsigned char *pData, size_t DataSize)
+{
+	if(!pData || DataSize == 0)
+		return false;
+
+	const size_t ScanSize = minimum(DataSize, (size_t)8192);
+	std::string Prefix((const char *)pData, ScanSize);
+	const std::string PrefixLower = ToLowerAscii(Prefix);
+	return PrefixLower.find("<!doctype html") != std::string::npos ||
+		PrefixLower.find("<html") != std::string::npos ||
+		PrefixLower.find("<head") != std::string::npos ||
+		PrefixLower.find("<meta") != std::string::npos;
+}
+
+static void FindMetaContentsByKey(const std::string &Html, const std::string &HtmlLower, const char *pKey, std::vector<std::string> &vOutValues)
+{
+	const std::string KeyLower = ToLowerAscii(pKey);
+	size_t Pos = 0;
+	while((Pos = HtmlLower.find("<meta", Pos)) != std::string::npos)
+	{
+		const size_t EndPos = HtmlLower.find('>', Pos);
+		if(EndPos == std::string::npos)
+			break;
+		if(EndPos - Pos > 3072)
+		{
+			Pos = EndPos + 1;
+			continue;
+		}
+
+		const std::string Tag = Html.substr(Pos, EndPos - Pos + 1);
+		const std::string TagLower = HtmlLower.substr(Pos, EndPos - Pos + 1);
+		std::string NameOrProperty;
+		const bool MatchesProperty = ExtractHtmlAttribute(Tag, TagLower, "property", NameOrProperty) && ToLowerAscii(NameOrProperty) == KeyLower;
+		const bool MatchesName = ExtractHtmlAttribute(Tag, TagLower, "name", NameOrProperty) && ToLowerAscii(NameOrProperty) == KeyLower;
+		if(MatchesProperty || MatchesName)
+		{
+			std::string Value;
+			if(ExtractHtmlAttribute(Tag, TagLower, "content", Value) ||
+				ExtractHtmlAttribute(Tag, TagLower, "src", Value) ||
+				ExtractHtmlAttribute(Tag, TagLower, "href", Value))
+			{
+				vOutValues.push_back(Value);
+			}
+		}
+		Pos = EndPos + 1;
+	}
+}
+
+static void CollectLinkMediaHrefs(const std::string &Html, const std::string &HtmlLower, std::vector<std::string> &vOutValues)
+{
+	size_t Pos = 0;
+	while((Pos = HtmlLower.find("<link", Pos)) != std::string::npos)
+	{
+		const size_t EndPos = HtmlLower.find('>', Pos);
+		if(EndPos == std::string::npos)
+			break;
+
+		const std::string Tag = Html.substr(Pos, EndPos - Pos + 1);
+		const std::string TagLower = HtmlLower.substr(Pos, EndPos - Pos + 1);
+		std::string Rel;
+		if(ExtractHtmlAttribute(Tag, TagLower, "rel", Rel))
+		{
+			const std::string RelLower = ToLowerAscii(Rel);
+			if(RelLower.find("image_src") != std::string::npos || RelLower.find("thumbnail") != std::string::npos ||
+				RelLower.find("image") != std::string::npos || RelLower.find("video") != std::string::npos)
+			{
+				std::string Value;
+				if(ExtractHtmlAttribute(Tag, TagLower, "href", Value))
+					vOutValues.push_back(Value);
+			}
+		}
+
+		Pos = EndPos + 1;
+	}
+}
+
+static void CollectImageTagSources(const std::string &Html, const std::string &HtmlLower, std::vector<std::string> &vOutValues)
+{
+	size_t Pos = 0;
+	while((Pos = HtmlLower.find("<img", Pos)) != std::string::npos)
+	{
+		const size_t EndPos = HtmlLower.find('>', Pos);
+		if(EndPos == std::string::npos)
+			break;
+		if(EndPos - Pos > 4096)
+		{
+			Pos = EndPos + 1;
+			continue;
+		}
+
+		const std::string Tag = Html.substr(Pos, EndPos - Pos + 1);
+		const std::string TagLower = HtmlLower.substr(Pos, EndPos - Pos + 1);
+		std::string Value;
+		if(ExtractHtmlAttribute(Tag, TagLower, "src", Value) ||
+			ExtractHtmlAttribute(Tag, TagLower, "data-src", Value) ||
+			ExtractHtmlAttribute(Tag, TagLower, "data-original", Value))
+		{
+			vOutValues.push_back(Value);
+		}
+
+		Pos = EndPos + 1;
+	}
+}
+
+static void CollectVideoTagSources(const std::string &Html, const std::string &HtmlLower, std::vector<std::string> &vOutValues)
+{
+	size_t Pos = 0;
+	while((Pos = HtmlLower.find("<video", Pos)) != std::string::npos)
+	{
+		const size_t EndPos = HtmlLower.find('>', Pos);
+		if(EndPos == std::string::npos)
+			break;
+		if(EndPos - Pos > 4096)
+		{
+			Pos = EndPos + 1;
+			continue;
+		}
+
+		const std::string Tag = Html.substr(Pos, EndPos - Pos + 1);
+		const std::string TagLower = HtmlLower.substr(Pos, EndPos - Pos + 1);
+		std::string Value;
+		if(ExtractHtmlAttribute(Tag, TagLower, "src", Value) ||
+			ExtractHtmlAttribute(Tag, TagLower, "poster", Value) ||
+			ExtractHtmlAttribute(Tag, TagLower, "data-src", Value))
+		{
+			vOutValues.push_back(Value);
+		}
+
+		Pos = EndPos + 1;
+	}
+}
+
+static void CollectSourceTagSources(const std::string &Html, const std::string &HtmlLower, std::vector<std::string> &vOutValues)
+{
+	size_t Pos = 0;
+	while((Pos = HtmlLower.find("<source", Pos)) != std::string::npos)
+	{
+		const size_t EndPos = HtmlLower.find('>', Pos);
+		if(EndPos == std::string::npos)
+			break;
+		if(EndPos - Pos > 4096)
+		{
+			Pos = EndPos + 1;
+			continue;
+		}
+
+		const std::string Tag = Html.substr(Pos, EndPos - Pos + 1);
+		const std::string TagLower = HtmlLower.substr(Pos, EndPos - Pos + 1);
+		std::string Value;
+		if(ExtractHtmlAttribute(Tag, TagLower, "src", Value))
+			vOutValues.push_back(Value);
+
+		Pos = EndPos + 1;
+	}
+}
+
+static bool TryParseJsonQuotedValue(const std::string &Json, size_t QuotePos, std::string &OutValue, size_t &OutEndPos)
+{
+	if(QuotePos >= Json.size() || (Json[QuotePos] != '"' && Json[QuotePos] != '\''))
+		return false;
+	const char Quote = Json[QuotePos];
+	std::string Value;
+	size_t Pos = QuotePos + 1;
+	while(Pos < Json.size())
+	{
+		const char c = Json[Pos++];
+		if(c == '\\')
+		{
+			if(Pos >= Json.size())
+				break;
+			Value.push_back(Json[Pos++]);
+			continue;
+		}
+		if(c == Quote)
+		{
+			OutValue = Value;
+			OutEndPos = Pos;
+			return true;
+		}
+		Value.push_back(c);
+	}
+	return false;
+}
+
+static void FindJsonValuesByKey(const std::string &Json, const std::string &JsonLower, const char *pKey, std::vector<std::string> &vOutValues)
+{
+	const std::string KeyPattern = "\"" + ToLowerAscii(pKey) + "\"";
+	size_t Pos = 0;
+	while((Pos = JsonLower.find(KeyPattern, Pos)) != std::string::npos)
+	{
+		const size_t ColonPos = JsonLower.find(':', Pos + KeyPattern.size());
+		if(ColonPos == std::string::npos)
+			break;
+
+		size_t ValuePos = ColonPos + 1;
+		while(ValuePos < Json.size() && std::isspace((unsigned char)Json[ValuePos]))
+			ValuePos++;
+		if(ValuePos >= Json.size())
+			break;
+
+		if(Json[ValuePos] == '"' || Json[ValuePos] == '\'')
+		{
+			std::string Value;
+			size_t EndPos = ValuePos;
+			if(TryParseJsonQuotedValue(Json, ValuePos, Value, EndPos))
+			{
+				vOutValues.push_back(Value);
+				Pos = EndPos;
+				continue;
+			}
+		}
+		else
+		{
+			size_t EndPos = ValuePos;
+			while(EndPos < Json.size() && Json[EndPos] != ',' && Json[EndPos] != '}' && Json[EndPos] != ']' && !std::isspace((unsigned char)Json[EndPos]))
+				EndPos++;
+			if(EndPos > ValuePos)
+			{
+				vOutValues.emplace_back(Json.substr(ValuePos, EndPos - ValuePos));
+				Pos = EndPos;
+				continue;
+			}
+		}
+
+		Pos += KeyPattern.size();
+	}
+}
+
+static void CollectJsonLdMediaCandidates(const std::string &Html, const std::string &HtmlLower, std::vector<std::string> &vOutValues)
+{
+	size_t Pos = 0;
+	while((Pos = HtmlLower.find("<script", Pos)) != std::string::npos)
+	{
+		const size_t TagEnd = HtmlLower.find('>', Pos);
+		if(TagEnd == std::string::npos)
+			break;
+		const size_t ClosePos = HtmlLower.find("</script>", TagEnd + 1);
+		if(ClosePos == std::string::npos)
+			break;
+
+		const std::string Tag = Html.substr(Pos, TagEnd - Pos + 1);
+		const std::string TagLower = HtmlLower.substr(Pos, TagEnd - Pos + 1);
+		std::string TypeValue;
+		if(!ExtractHtmlAttribute(Tag, TagLower, "type", TypeValue) || ToLowerAscii(TypeValue).find("ld+json") == std::string::npos)
+		{
+			Pos = ClosePos + 9;
+			continue;
+		}
+
+		const std::string ScriptBody = Html.substr(TagEnd + 1, ClosePos - (TagEnd + 1));
+		const std::string ScriptBodyLower = ToLowerAscii(ScriptBody);
+		const char *apJsonKeys[] = {"contentUrl", "thumbnailUrl", "video", "embedUrl", "url", "mp4", "srcUrl"};
+		for(const char *pKey : apJsonKeys)
+			FindJsonValuesByKey(ScriptBody, ScriptBodyLower, pKey, vOutValues);
+
+		Pos = ClosePos + 9;
+	}
+}
+
+static void ExtractMediaUrlsFromHtmlDocument(const unsigned char *pData, size_t DataSize, const char *pBaseUrl, std::vector<std::string> &vOutUrls)
+{
+	vOutUrls.clear();
+	if(!pData || DataSize == 0 || !pBaseUrl || !IsLikelyHtmlDocument(pData, DataSize))
+		return;
+
+	const size_t MaxHtmlParseSize = 256 * 1024;
+	const size_t HtmlSize = minimum(DataSize, MaxHtmlParseSize);
+	const std::string Html((const char *)pData, HtmlSize);
+	const std::string HtmlLower = ToLowerAscii(Html);
+
+	struct SPrioritizedCandidate
+	{
+		int m_Priority = 0;
+		std::string m_Value;
+	};
+
+	std::vector<SPrioritizedCandidate> vRawCandidates;
+	const auto AddCandidates = [&](int Priority, const std::vector<std::string> &vValues) {
+		for(const std::string &Value : vValues)
+		{
+			vRawCandidates.push_back({Priority, Value});
+			if((int)vRawCandidates.size() >= CHAT_MEDIA_MAX_HTML_CANDIDATES * 8)
+				return;
+		}
+	};
+
+	const char *apMetaVideoKeys[] = {"og:video", "og:video:url", "og:video:secure_url", "twitter:video", "twitter:video:src", "twitter:player:stream"};
+	for(const char *pKey : apMetaVideoKeys)
+	{
+		std::vector<std::string> vValues;
+		FindMetaContentsByKey(Html, HtmlLower, pKey, vValues);
+		AddCandidates(0, vValues);
+	}
+
+	const char *apMetaImageKeys[] = {"og:image", "og:image:url", "og:image:secure_url", "twitter:image", "twitter:image:src"};
+	for(const char *pKey : apMetaImageKeys)
+	{
+		std::vector<std::string> vValues;
+		FindMetaContentsByKey(Html, HtmlLower, pKey, vValues);
+		AddCandidates(1, vValues);
+	}
+
+	{
+		std::vector<std::string> vValues;
+		CollectVideoTagSources(Html, HtmlLower, vValues);
+		AddCandidates(1, vValues);
+	}
+	{
+		std::vector<std::string> vValues;
+		CollectSourceTagSources(Html, HtmlLower, vValues);
+		AddCandidates(1, vValues);
+	}
+	{
+		std::vector<std::string> vValues;
+		CollectLinkMediaHrefs(Html, HtmlLower, vValues);
+		AddCandidates(2, vValues);
+	}
+	{
+		std::vector<std::string> vValues;
+		CollectJsonLdMediaCandidates(Html, HtmlLower, vValues);
+		AddCandidates(2, vValues);
+	}
+	{
+		std::vector<std::string> vValues;
+		CollectImageTagSources(Html, HtmlLower, vValues);
+		AddCandidates(3, vValues);
+	}
+
+	std::vector<std::pair<int, std::string>> vResolvedCandidates;
+	for(const auto &Candidate : vRawCandidates)
+	{
+		if((int)vResolvedCandidates.size() >= CHAT_MEDIA_MAX_HTML_CANDIDATES)
+			break;
+		std::string Resolved;
+		if(!ResolveAndFilterCandidateUrl(pBaseUrl, Candidate.m_Value, Resolved, true))
+			continue;
+		if(str_comp(Resolved.c_str(), pBaseUrl) == 0)
+			continue;
+
+		bool Exists = false;
+		for(const auto &Entry : vResolvedCandidates)
+		{
+			if(str_comp(Entry.second.c_str(), Resolved.c_str()) == 0)
+			{
+				Exists = true;
+				break;
+			}
+		}
+		if(!Exists)
+			vResolvedCandidates.emplace_back(Candidate.m_Priority, std::move(Resolved));
+	}
+
+	std::stable_sort(vResolvedCandidates.begin(), vResolvedCandidates.end(),
+		[](const auto &A, const auto &B) { return A.first < B.first; });
+
+	for(const auto &Entry : vResolvedCandidates)
+	{
+		if((int)vOutUrls.size() >= CHAT_MEDIA_MAX_HTML_CANDIDATES)
+			break;
+		vOutUrls.push_back(Entry.second);
+	}
+}
+} // namespace
+
+bool CChat::IsDirectMediaUrl(const char *pUrl)
+{
+	if(!pUrl || !IsUrlStart(pUrl))
+		return false;
+
+	const std::string Ext = ExtractUrlExtensionLower(pUrl);
+	return !Ext.empty() && (IsLikelyImageExtension(Ext) || IsLikelyVideoExtension(Ext));
+}
+
+CChat::EMediaKind CChat::MediaKindFromUrl(const char *pUrl)
+{
+	if(!pUrl)
+		return EMediaKind::UNKNOWN;
+
+	const std::string Ext = ExtractUrlExtensionLower(pUrl);
+	if(IsLikelyVideoExtension(Ext))
+		return EMediaKind::VIDEO;
+	if(IsLikelyAnimatedImageExtension(Ext))
+		return EMediaKind::ANIMATED;
+	if(IsLikelyImageExtension(Ext))
+		return EMediaKind::PHOTO;
+	return EMediaKind::UNKNOWN;
+}
+
+void CChat::ExtractMediaUrlsFromText(const char *pText, std::vector<std::string> &vOutUrls)
+{
+	vOutUrls.clear();
+	if(!pText)
+		return;
+
+	const char *pCur = pText;
+	while(*pCur)
+	{
+		if(!IsUrlStart(pCur))
+		{
+			++pCur;
+			continue;
+		}
+
+		const char *pEnd = pCur;
+		while(!IsTokenEnd(*pEnd))
+			++pEnd;
+
+		std::string Url(pCur, pEnd - pCur);
+		while(!Url.empty() && IsTrimmedUrlChar(Url.back()))
+			Url.pop_back();
+
+		if(IsYouTubeUrl(Url))
+		{
+			pCur = pEnd;
+			continue;
+		}
+
+		if(IsUrlStart(Url.c_str()) && (int)Url.size() <= CHAT_MEDIA_MAX_URL_LENGTH)
+		{
+			bool Exists = false;
+			for(const auto &ExistingUrl : vOutUrls)
+			{
+				if(str_comp(ExistingUrl.c_str(), Url.c_str()) == 0)
+				{
+					Exists = true;
+					break;
+				}
+			}
+			if(!Exists)
+			{
+				vOutUrls.push_back(Url);
+				if((int)vOutUrls.size() >= CHAT_MEDIA_MAX_HTML_CANDIDATES)
+					return;
+			}
+		}
+
+		pCur = pEnd;
+	}
+}
+
+void CChat::ResetLineMedia(CLine &Line)
+{
+	if(Line.m_pMediaRequest)
+	{
+		Line.m_pMediaRequest->Abort();
+		Line.m_pMediaRequest = nullptr;
+	}
+	if(Line.m_pMediaDecodeJob)
+	{
+		Line.m_pMediaDecodeJob->Abort();
+		Line.m_pMediaDecodeJob = nullptr;
+	}
+
+	Line.m_OptMediaDecodedFrames.reset();
+	Line.m_MediaUploadIndex = 0;
+	Line.m_vMediaFrameEndMs.clear();
+	Line.m_MediaTotalDurationMs = 0;
+	MediaDecoder::UnloadFrames(Graphics(), Line.m_vMediaFrames);
+	Line.m_MediaState = EMediaState::NONE;
+	Line.m_MediaKind = EMediaKind::UNKNOWN;
+	Line.m_aMediaUrl[0] = '\0';
+	Line.m_vMediaCandidates.clear();
+	Line.m_MediaCandidateIndex = -1;
+	Line.m_MediaRetryCount = 0;
+	Line.m_MediaAnimated = false;
+	Line.m_MediaRevealed = false;
+	Line.m_MediaWidth = 0;
+	Line.m_MediaHeight = 0;
+	Line.m_MediaResolveDepth = 0;
+	Line.m_MediaAnimationStart = 0;
+	Line.m_aMediaPreviewWidth[0] = 0.0f;
+	Line.m_aMediaPreviewWidth[1] = 0.0f;
+	Line.m_aMediaPreviewHeight[0] = 0.0f;
+	Line.m_aMediaPreviewHeight[1] = 0.0f;
+	Line.m_MediaPreviewRectValid = false;
+	Line.m_MediaRetryRectValid = false;
+}
+
+void CChat::SetMediaCandidates(CLine &Line, const std::vector<std::string> &vCandidates)
+{
+	Line.m_vMediaCandidates.clear();
+	for(const std::string &Candidate : vCandidates)
+	{
+		if(!IsUrlStart(Candidate.c_str()))
+			continue;
+		if((int)Candidate.size() > CHAT_MEDIA_MAX_URL_LENGTH)
+			continue;
+
+		bool Exists = false;
+		for(const std::string &Existing : Line.m_vMediaCandidates)
+		{
+			if(str_comp(Existing.c_str(), Candidate.c_str()) == 0)
+			{
+				Exists = true;
+				break;
+			}
+		}
+		if(!Exists)
+		{
+			Line.m_vMediaCandidates.push_back(Candidate);
+			if((int)Line.m_vMediaCandidates.size() >= CHAT_MEDIA_MAX_HTML_CANDIDATES)
+				break;
+		}
+	}
+
+	Line.m_MediaCandidateIndex = -1;
+	Line.m_MediaKind = EMediaKind::UNKNOWN;
+	Line.m_aMediaUrl[0] = '\0';
+	if(!Line.m_vMediaCandidates.empty())
+	{
+		Line.m_MediaCandidateIndex = 0;
+		str_copy(Line.m_aMediaUrl, Line.m_vMediaCandidates.front().c_str(), sizeof(Line.m_aMediaUrl));
+		Line.m_MediaKind = MediaKindFromUrl(Line.m_aMediaUrl);
+	}
+}
+
+void CChat::InsertMediaCandidates(CLine &Line, const std::vector<std::string> &vCandidates, int InsertIndex)
+{
+	if(vCandidates.empty())
+		return;
+
+	int InsertPos = std::clamp(InsertIndex, 0, (int)Line.m_vMediaCandidates.size());
+	for(const std::string &Candidate : vCandidates)
+	{
+		if(!IsUrlStart(Candidate.c_str()))
+			continue;
+		if((int)Candidate.size() > CHAT_MEDIA_MAX_URL_LENGTH)
+			continue;
+
+		bool Exists = false;
+		for(const std::string &Existing : Line.m_vMediaCandidates)
+		{
+			if(str_comp(Existing.c_str(), Candidate.c_str()) == 0)
+			{
+				Exists = true;
+				break;
+			}
+		}
+		if(Exists)
+			continue;
+
+		Line.m_vMediaCandidates.insert(Line.m_vMediaCandidates.begin() + InsertPos, Candidate);
+		InsertPos++;
+		if((int)Line.m_vMediaCandidates.size() >= CHAT_MEDIA_MAX_HTML_CANDIDATES)
+			break;
+	}
+}
+
+bool CChat::QueueNextMediaCandidate(CLine &Line, const char *pReason)
+{
+	Line.m_OptMediaDecodedFrames.reset();
+	Line.m_MediaUploadIndex = 0;
+	Line.m_vMediaFrameEndMs.clear();
+	Line.m_MediaTotalDurationMs = 0;
+	MediaDecoder::UnloadFrames(Graphics(), Line.m_vMediaFrames);
+	Line.m_MediaAnimated = false;
+	Line.m_MediaWidth = 0;
+	Line.m_MediaHeight = 0;
+
+	const int NextIndex = Line.m_MediaCandidateIndex + 1;
+	for(int CandidateIndex = maximum(0, NextIndex); CandidateIndex < (int)Line.m_vMediaCandidates.size(); ++CandidateIndex)
+	{
+		if(!IsUrlStart(Line.m_vMediaCandidates[CandidateIndex].c_str()))
+			continue;
+		if(!IsMediaUrlAllowed(Line.m_vMediaCandidates[CandidateIndex].c_str()))
+			continue;
+
+		Line.m_MediaCandidateIndex = CandidateIndex;
+		str_copy(Line.m_aMediaUrl, Line.m_vMediaCandidates[CandidateIndex].c_str(), sizeof(Line.m_aMediaUrl));
+		Line.m_MediaState = EMediaState::QUEUED;
+		Line.m_MediaKind = MediaKindFromUrl(Line.m_aMediaUrl);
+		Line.m_pMediaRequest = nullptr;
+		Line.m_pMediaDecodeJob = nullptr;
+		Line.m_MediaRevealed = false;
+		Line.m_MediaPreviewRectValid = false;
+		Line.m_MediaRetryRectValid = false;
+		Line.m_aYOffset[0] = -1.0f;
+		Line.m_aYOffset[1] = -1.0f;
+		if(g_Config.m_Debug)
+			log_debug("chat/media", "Trying fallback candidate (%d/%d): %s (%s)", CandidateIndex + 1, (int)Line.m_vMediaCandidates.size(), Line.m_aMediaUrl, pReason ? pReason : "unknown");
+		return true;
+	}
+
+	if(g_Config.m_Debug)
+		log_debug("chat/media", "No fallback media candidates left (%s)", pReason ? pReason : "unknown");
+	return false;
+}
+
+bool CChat::RetryMediaLine(CLine &Line)
+{
+	if(Line.m_MediaState != EMediaState::FAILED)
+		return false;
+
+	if(Line.m_MediaRetryCount >= CHAT_MEDIA_MAX_RETRIES)
+	{
+		if(g_Config.m_Debug)
+			log_debug("chat/media", "Retry limit reached for message media");
+		return false;
+	}
+
+	if(Line.m_vMediaCandidates.empty())
+	{
+		if(g_Config.m_Debug)
+			log_debug("chat/media", "Cannot retry media without candidates");
+		return false;
+	}
+
+	if(Line.m_pMediaRequest)
+	{
+		Line.m_pMediaRequest->Abort();
+		Line.m_pMediaRequest = nullptr;
+	}
+	if(Line.m_pMediaDecodeJob)
+	{
+		Line.m_pMediaDecodeJob->Abort();
+		Line.m_pMediaDecodeJob = nullptr;
+	}
+
+	Line.m_OptMediaDecodedFrames.reset();
+	Line.m_MediaUploadIndex = 0;
+	Line.m_vMediaFrameEndMs.clear();
+	Line.m_MediaTotalDurationMs = 0;
+	MediaDecoder::UnloadFrames(Graphics(), Line.m_vMediaFrames);
+
+	Line.m_MediaRetryCount++;
+	Line.m_MediaCandidateIndex = 0;
+	str_copy(Line.m_aMediaUrl, Line.m_vMediaCandidates.front().c_str(), sizeof(Line.m_aMediaUrl));
+	Line.m_MediaState = EMediaState::QUEUED;
+	Line.m_MediaKind = MediaKindFromUrl(Line.m_aMediaUrl);
+	Line.m_MediaAnimated = false;
+	Line.m_MediaRevealed = false;
+	Line.m_MediaWidth = 0;
+	Line.m_MediaHeight = 0;
+	Line.m_MediaResolveDepth = 0;
+	Line.m_MediaAnimationStart = 0;
+	Line.m_MediaPreviewRectValid = false;
+	Line.m_MediaRetryRectValid = false;
+	Line.m_aYOffset[0] = -1.0f;
+	Line.m_aYOffset[1] = -1.0f;
+	if(g_Config.m_Debug)
+		log_debug("chat/media", "Retrying media preview (%d/%d): %s", Line.m_MediaRetryCount, CHAT_MEDIA_MAX_RETRIES, Line.m_aMediaUrl);
+	return true;
+}
+
+void CChat::QueueMediaDownload(CLine &Line)
+{
+	if(!g_Config.m_BcChatMediaPreview || !AnyMediaAllowed() || Line.m_vMediaCandidates.empty())
+		return;
+	if(Line.m_MediaCandidateIndex < 0 || Line.m_MediaCandidateIndex >= (int)Line.m_vMediaCandidates.size())
+	{
+		if(!QueueNextMediaCandidate(Line, "initial candidate"))
+		{
+			Line.m_MediaState = EMediaState::NONE;
+			return;
+		}
+	}
+	if(Line.m_aMediaUrl[0] == '\0')
+		return;
+	if(!IsMediaUrlAllowed(Line.m_aMediaUrl))
+	{
+		if(!QueueNextMediaCandidate(Line, "media type disabled"))
+			Line.m_MediaState = EMediaState::NONE;
+		return;
+	}
+	Line.m_MediaState = EMediaState::QUEUED;
+}
+
+void CChat::StartMediaDownload(CLine &Line)
+{
+	if(Line.m_MediaState != EMediaState::QUEUED || Line.m_aMediaUrl[0] == '\0')
+		return;
+	if(!IsMediaUrlAllowed(Line.m_aMediaUrl))
+	{
+		if(!QueueNextMediaCandidate(Line, "media type disabled"))
+			Line.m_MediaState = EMediaState::NONE;
+		return;
+	}
+	if((int)str_length(Line.m_aMediaUrl) >= 255)
+	{
+		if(g_Config.m_Debug)
+			log_debug("chat/media", "Skipping overlong URL (>255): %s", Line.m_aMediaUrl);
+		if(!QueueNextMediaCandidate(Line, "overlong URL"))
+			Line.m_MediaState = EMediaState::FAILED;
+		return;
+	}
+	for(const char *p = Line.m_aMediaUrl; *p; ++p)
+	{
+		if((unsigned char)*p < 32 || *p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')
+		{
+			if(g_Config.m_Debug)
+				log_debug("chat/media", "Skipping invalid URL characters: %s", Line.m_aMediaUrl);
+			if(!QueueNextMediaCandidate(Line, "invalid URL characters"))
+				Line.m_MediaState = EMediaState::FAILED;
+			return;
+		}
+	}
+
+	std::shared_ptr<CHttpRequest> pGet = HttpGet(Line.m_aMediaUrl);
+	pGet->Timeout(CTimeout{8000, 0, 4096, 8});
+	pGet->MaxResponseSize(CHAT_MEDIA_MAX_RESPONSE_SIZE);
+	pGet->FailOnErrorStatus(false);
+	pGet->LogProgress(HTTPLOG::NONE);
+	Line.m_pMediaRequest = pGet;
+	Line.m_MediaState = EMediaState::LOADING;
+	Http()->Run(pGet);
+}
+
+bool CChat::StartMediaDecode(CLine &Line, EMediaKind MediaKind, const unsigned char *pData, size_t DataSize)
+{
+	if(!pData || DataSize == 0 || DataSize > (size_t)CHAT_MEDIA_MAX_RESPONSE_SIZE)
+		return false;
+	if(Line.m_pMediaDecodeJob)
+	{
+		Line.m_pMediaDecodeJob->Abort();
+		Line.m_pMediaDecodeJob = nullptr;
+	}
+
+	Line.m_OptMediaDecodedFrames.reset();
+	Line.m_MediaUploadIndex = 0;
+	Line.m_vMediaFrameEndMs.clear();
+	Line.m_MediaTotalDurationMs = 0;
+	MediaDecoder::UnloadFrames(Graphics(), Line.m_vMediaFrames);
+	Line.m_MediaAnimated = false;
+	Line.m_MediaWidth = 0;
+	Line.m_MediaHeight = 0;
+	Line.m_MediaAnimationStart = 0;
+
+	Line.m_pMediaDecodeJob = std::make_shared<CMediaDecodeJob>(Graphics(), MediaKind, pData, DataSize, Line.m_aMediaUrl);
+	Engine()->AddJob(Line.m_pMediaDecodeJob);
+	Line.m_MediaState = EMediaState::DECODING;
+	return true;
+}
+
+bool CChat::DecodeImageWithFfmpeg(const unsigned char *pData, size_t DataSize, const char *pContextName, CLine &Line, bool DecodeAllFrames, int MaxAnimationDurationMs)
+{
+	if(!pData || DataSize == 0 || DataSize > (size_t)CHAT_MEDIA_MAX_RESPONSE_SIZE)
+		return false;
+
+	return MediaDecoder::DecodeImageWithFfmpeg(Graphics(), pData, DataSize, pContextName, Line.m_vMediaFrames, Line.m_MediaAnimated, Line.m_MediaWidth, Line.m_MediaHeight, Line.m_MediaAnimationStart, DecodeAllFrames, MaxAnimationDurationMs);
+}
+
+bool CChat::DecodeStaticImage(const unsigned char *pData, size_t DataSize, const char *pContextName, CLine &Line)
+{
+	if(!pData || DataSize == 0 || DataSize > (size_t)CHAT_MEDIA_MAX_RESPONSE_SIZE)
+		return false;
+	return MediaDecoder::DecodeStaticImage(Graphics(), pData, DataSize, pContextName, Line.m_vMediaFrames, Line.m_MediaAnimated, Line.m_MediaWidth, Line.m_MediaHeight, Line.m_MediaAnimationStart);
+}
+
+bool CChat::DecodeAnimatedGif(const unsigned char *pData, size_t DataSize, const char *pContextName, CLine &Line)
+{
+	if(!pData || DataSize == 0 || DataSize > (size_t)CHAT_MEDIA_MAX_RESPONSE_SIZE)
+		return false;
+	if(!MediaDecoder::DecodeAnimatedImage(Graphics(), pData, DataSize, pContextName, Line.m_vMediaFrames, Line.m_MediaAnimated, Line.m_MediaWidth, Line.m_MediaHeight, Line.m_MediaAnimationStart, CHAT_MEDIA_MAX_VIDEO_ANIMATION_MS))
+		return false;
+	if(Line.m_vMediaFrames.empty())
+		return false;
+	Line.m_MediaAnimated = Line.m_vMediaFrames.size() > 1;
+	return true;
+}
+
+bool CChat::AnyMediaAllowed() const
+{
+	return g_Config.m_BcChatMediaPhotos || g_Config.m_BcChatMediaGifs;
+}
+
+bool CChat::IsMediaKindAllowed(EMediaKind Kind) const
+{
+	switch(Kind)
+	{
+	case EMediaKind::PHOTO:
+		return g_Config.m_BcChatMediaPhotos;
+	case EMediaKind::ANIMATED:
+	case EMediaKind::VIDEO:
+		return g_Config.m_BcChatMediaGifs;
+	case EMediaKind::UNKNOWN:
+	default:
+		return AnyMediaAllowed();
+	}
+}
+
+bool CChat::IsMediaUrlAllowed(const char *pUrl) const
+{
+	return IsMediaKindAllowed(MediaKindFromUrl(pUrl));
+}
+
+bool CChat::HasAllowedMediaCandidates(const CLine &Line) const
+{
+	for(const std::string &Candidate : Line.m_vMediaCandidates)
+	{
+		if(IsMediaUrlAllowed(Candidate.c_str()))
+			return true;
+	}
+	return Line.m_aMediaUrl[0] != '\0' && IsMediaUrlAllowed(Line.m_aMediaUrl);
+}
+
+bool CChat::ShouldDisplayMediaSlot(const CLine &Line) const
+{
+	if(!g_Config.m_BcChatMediaPreview || !AnyMediaAllowed())
+		return false;
+	if(Line.m_MediaState == EMediaState::FAILED)
+		return false;
+	if((Line.m_MediaState == EMediaState::READY || Line.m_MediaState == EMediaState::LOADING || Line.m_MediaState == EMediaState::DECODING || Line.m_MediaState == EMediaState::QUEUED) && Line.m_MediaKind != EMediaKind::UNKNOWN)
+		return IsMediaKindAllowed(Line.m_MediaKind);
+	return HasAllowedMediaCandidates(Line);
+}
+
+bool CChat::ShouldHideMediaPreview(const CLine &Line) const
+{
+	return m_HideMediaByBind && !Line.m_MediaRevealed && ShouldDisplayMediaSlot(Line);
+}
+
+void CChat::ResetHiddenMediaReveals()
+{
+	for(auto &Line : m_aLines)
+	{
+		Line.m_MediaRevealed = false;
+		Line.m_MediaPreviewRectValid = false;
+		Line.m_MediaRetryRectValid = false;
+		Line.m_aYOffset[0] = -1.0f;
+		Line.m_aYOffset[1] = -1.0f;
+	}
+}
+
+void CChat::UpdateMediaDownloads()
+{
+	if(!g_Config.m_BcChatMediaPreview || !AnyMediaAllowed())
+	{
+		if(m_MediaViewerOpen)
+			CloseMediaViewer();
+		return;
+	}
+
+	int ActiveDownloads = 0;
+	for(auto &Line : m_aLines)
+	{
+		if(Line.m_MediaState == EMediaState::LOADING && Line.m_pMediaRequest && !Line.m_pMediaRequest->Done())
+			ActiveDownloads++;
+	}
+
+	const auto FailLine = [this](CLine &Line, bool SuppressedBySettings) {
+		if(SuppressedBySettings)
+		{
+			Line.m_OptMediaDecodedFrames.reset();
+			Line.m_MediaUploadIndex = 0;
+			Line.m_vMediaFrameEndMs.clear();
+			Line.m_MediaTotalDurationMs = 0;
+			MediaDecoder::UnloadFrames(Graphics(), Line.m_vMediaFrames);
+			Line.m_MediaState = EMediaState::NONE;
+			Line.m_MediaAnimated = false;
+			Line.m_MediaWidth = 0;
+			Line.m_MediaHeight = 0;
+			Line.m_MediaRetryRectValid = false;
+			Line.m_MediaPreviewRectValid = false;
+			Line.m_aYOffset[0] = -1.0f;
+			Line.m_aYOffset[1] = -1.0f;
+			return;
+		}
+
+		Line.m_OptMediaDecodedFrames.reset();
+		Line.m_MediaUploadIndex = 0;
+		Line.m_vMediaFrameEndMs.clear();
+		Line.m_MediaTotalDurationMs = 0;
+		MediaDecoder::UnloadFrames(Graphics(), Line.m_vMediaFrames);
+		Line.m_MediaState = EMediaState::FAILED;
+		Line.m_MediaAnimated = false;
+		Line.m_MediaWidth = 0;
+		Line.m_MediaHeight = 0;
+		Line.m_MediaRetryRectValid = false;
+		Line.m_aYOffset[0] = -1.0f;
+		Line.m_aYOffset[1] = -1.0f;
+		if(g_Config.m_Debug)
+		{
+			if(Line.m_vMediaCandidates.empty())
+				log_debug("chat/media", "Media failed: no candidates");
+			else
+				log_debug("chat/media", "Media failed after exhausting %d candidates", (int)Line.m_vMediaCandidates.size());
+		}
+	};
+
+	int CompletedRequestsThisFrame = 0;
+	for(auto &Line : m_aLines)
+	{
+		if(CompletedRequestsThisFrame >= CHAT_MEDIA_MAX_COMPLETED_DECODE_PER_FRAME)
+			break;
+		if(Line.m_MediaState != EMediaState::LOADING || !Line.m_pMediaRequest || !Line.m_pMediaRequest->Done())
+			continue;
+
+		bool StartedDecode = false;
+		bool SuppressedBySettings = false;
+		const char *pFailureReason = "download failed";
+		const bool HttpDone = Line.m_pMediaRequest->State() == EHttpState::DONE;
+		const int StatusCode = HttpDone ? Line.m_pMediaRequest->StatusCode() : -1;
+		if(HttpDone && StatusCode >= 200 && StatusCode < 400)
+		{
+			unsigned char *pResult = nullptr;
+			size_t ResultSize = 0;
+			Line.m_pMediaRequest->Result(&pResult, &ResultSize);
+			if(pResult && ResultSize > 0)
+			{
+				MediaDecoder::UnloadFrames(Graphics(), Line.m_vMediaFrames);
+
+				if(Line.m_MediaResolveDepth < CHAT_MEDIA_MAX_RESOLVE_DEPTH)
+				{
+					std::vector<std::string> vExtractedUrls;
+					ExtractMediaUrlsFromHtmlDocument(pResult, ResultSize, Line.m_aMediaUrl, vExtractedUrls);
+					const int CandidateCountBefore = (int)Line.m_vMediaCandidates.size();
+					InsertMediaCandidates(Line, vExtractedUrls, Line.m_MediaCandidateIndex + 1);
+					if((int)Line.m_vMediaCandidates.size() > CandidateCountBefore)
+					{
+						Line.m_MediaResolveDepth++;
+						if(g_Config.m_Debug)
+							log_debug("chat/media", "Extracted %d fallback candidates from HTML: %s", (int)Line.m_vMediaCandidates.size() - CandidateCountBefore, Line.m_aMediaUrl);
+					}
+				}
+
+				const bool IsHtmlResponse = IsLikelyHtmlDocument(pResult, ResultSize);
+				if(IsHtmlResponse)
+				{
+					pFailureReason = "html response";
+				}
+				else
+				{
+					const std::string Ext = ExtractUrlExtensionLower(Line.m_aMediaUrl);
+					const bool IsGif = IsGifSignature(pResult, ResultSize) || Ext == "gif";
+					const bool IsVideoCandidate = IsLikelyVideoExtension(Ext) || IsVideoPayloadSignature(pResult, ResultSize);
+					const bool IsImageCandidate = IsLikelyImageExtension(Ext) || IsImagePayloadSignature(pResult, ResultSize);
+					const bool IsAnimatedImageCandidate = IsLikelyAnimatedImageExtension(Ext) && !IsVideoCandidate;
+					const bool LooksLikeMediaPayload = IsGif || IsVideoCandidate || IsImageCandidate;
+					EMediaKind MediaKind = EMediaKind::UNKNOWN;
+					if(IsGif || IsAnimatedImageCandidate)
+						MediaKind = EMediaKind::ANIMATED;
+					else if(IsVideoCandidate || (!IsImageCandidate && Ext.empty()))
+						MediaKind = EMediaKind::VIDEO;
+					else if(IsImageCandidate)
+						MediaKind = EMediaKind::PHOTO;
+					Line.m_MediaKind = MediaKind;
+					if(!LooksLikeMediaPayload)
+					{
+						pFailureReason = "unsupported payload";
+					}
+					else if(ResultSize < 16)
+					{
+						pFailureReason = "payload too small";
+					}
+					else
+					{
+						if(!IsMediaKindAllowed(MediaKind))
+						{
+							SuppressedBySettings = true;
+							pFailureReason = "media type disabled";
+						}
+						else
+						{
+							StartedDecode = StartMediaDecode(Line, MediaKind, pResult, ResultSize);
+							if(!StartedDecode)
+								pFailureReason = "decode job failed";
+						}
+					}
+				}
+			}
+			else if(g_Config.m_Debug)
+			{
+				pFailureReason = "empty response";
+				log_debug("chat/media", "Empty HTTP response for media URL: %s", Line.m_aMediaUrl);
+			}
+		}
+		else if(g_Config.m_Debug)
+		{
+			pFailureReason = "http failure";
+			log_debug("chat/media", "HTTP request failed for media URL (state=%d, status=%d): %s", (int)Line.m_pMediaRequest->State(), StatusCode, Line.m_aMediaUrl);
+		}
+
+		Line.m_pMediaRequest = nullptr;
+		ActiveDownloads = maximum(0, ActiveDownloads - 1);
+		CompletedRequestsThisFrame++;
+
+		if(StartedDecode)
+			continue;
+
+		if(QueueNextMediaCandidate(Line, pFailureReason))
+			continue;
+
+		FailLine(Line, SuppressedBySettings);
+	}
+
+	int CompletedUploadsThisFrame = 0;
+	for(auto &Line : m_aLines)
+	{
+		if(CompletedUploadsThisFrame >= CHAT_MEDIA_MAX_COMPLETED_DECODE_PER_FRAME)
+			break;
+		if(Line.m_MediaState != EMediaState::DECODING || !Line.m_pMediaDecodeJob || !Line.m_pMediaDecodeJob->Done())
+			continue;
+
+		bool Success = false;
+		const char *pFailureReason = "decode failed";
+		if(Line.m_pMediaDecodeJob->State() == IJob::STATE_DONE && Line.m_pMediaDecodeJob->Success() && !Line.m_pMediaDecodeJob->DecodedFrames().Empty())
+		{
+			const int Width = Line.m_pMediaDecodeJob->DecodedFrames().m_Width;
+			const int Height = Line.m_pMediaDecodeJob->DecodedFrames().m_Height;
+			Line.m_OptMediaDecodedFrames.emplace(std::move(Line.m_pMediaDecodeJob->DecodedFrames()));
+			Line.m_MediaUploadIndex = 0;
+			Line.m_MediaWidth = Width;
+			Line.m_MediaHeight = Height;
+			Line.m_MediaAnimated = false;
+			Line.m_MediaAnimationStart = 0;
+			Success = true;
+		}
+		else if(g_Config.m_Debug)
+		{
+			log_debug("chat/media", "Media decode job failed: %s", Line.m_aMediaUrl);
+		}
+
+		Line.m_pMediaDecodeJob = nullptr;
+		CompletedUploadsThisFrame++;
+
+		if(Success)
+			continue;
+
+		Line.m_OptMediaDecodedFrames.reset();
+		Line.m_MediaUploadIndex = 0;
+		if(QueueNextMediaCandidate(Line, pFailureReason))
+			continue;
+
+		FailLine(Line, false);
+	}
+
+	const auto ClampFrameDurationMs = [](int DurationMs) -> int {
+		constexpr int MediaFpsCap = 120;
+		constexpr int MediaMinFrameMs = (1000 + MediaFpsCap - 1) / MediaFpsCap; // ceil(1000/fps)
+		constexpr int MediaMaxFrameMs = 10000;
+		return std::clamp(DurationMs, MediaMinFrameMs, MediaMaxFrameMs);
+	};
+
+	auto UploadDecodedFramesStep = [&](CLine &Line, int MaxFramesToUpload, int64_t TimeBudgetUs, int &UploadedFramesOut, bool &FinishedOut) -> bool {
+		UploadedFramesOut = 0;
+		FinishedOut = false;
+		if(!Line.m_OptMediaDecodedFrames.has_value())
+			return true;
+		SMediaDecodedFrames &DecodedFrames = *Line.m_OptMediaDecodedFrames;
+		if(DecodedFrames.m_vFrames.empty())
+		{
+			FinishedOut = true;
+			return false;
+		}
+
+		const int64_t Start = time_get();
+		while(Line.m_MediaUploadIndex < (int)DecodedFrames.m_vFrames.size())
+		{
+			if(UploadedFramesOut >= MaxFramesToUpload)
+				break;
+			if(TimeBudgetUs > 0)
+			{
+				const int64_t ElapsedUs = ((time_get() - Start) * 1000000) / time_freq();
+				if(ElapsedUs >= TimeBudgetUs)
+					break;
+			}
+
+			SMediaRawFrame &RawFrame = DecodedFrames.m_vFrames[Line.m_MediaUploadIndex];
+			SMediaFrame Frame;
+			Frame.m_DurationMs = RawFrame.m_DurationMs;
+			Frame.m_Texture = Graphics()->LoadTextureRawMove(RawFrame.m_Image, 0, Line.m_aMediaUrl);
+			if(!Frame.m_Texture.IsValid())
+				return false;
+			Line.m_vMediaFrames.push_back(Frame);
+			Line.m_MediaUploadIndex++;
+			UploadedFramesOut++;
+		}
+
+		FinishedOut = Line.m_MediaUploadIndex >= (int)DecodedFrames.m_vFrames.size();
+		return true;
+	};
+
+	int UploadedTexturesThisFrame = 0;
+	const int64_t UploadStart = time_get();
+	for(auto &Line : m_aLines)
+	{
+		if(!Line.m_Initialized || !Line.m_OptMediaDecodedFrames.has_value())
+			continue;
+		if(UploadedTexturesThisFrame >= CHAT_MEDIA_MAX_TEXTURE_UPLOADS_PER_FRAME)
+			break;
+
+		const int64_t ElapsedUs = ((time_get() - UploadStart) * 1000000) / time_freq();
+		const int64_t RemainingUs = CHAT_MEDIA_TEXTURE_UPLOAD_BUDGET_US - ElapsedUs;
+		if(RemainingUs <= 0)
+			break;
+
+		const int FramesBudget = CHAT_MEDIA_MAX_TEXTURE_UPLOADS_PER_FRAME - UploadedTexturesThisFrame;
+		int UploadedNow = 0;
+		bool Finished = false;
+		const bool Success = UploadDecodedFramesStep(Line, FramesBudget, RemainingUs, UploadedNow, Finished);
+		UploadedTexturesThisFrame += UploadedNow;
+
+		if(!Success)
+		{
+			Line.m_OptMediaDecodedFrames.reset();
+			Line.m_MediaUploadIndex = 0;
+			Line.m_vMediaFrameEndMs.clear();
+			Line.m_MediaTotalDurationMs = 0;
+			MediaDecoder::UnloadFrames(Graphics(), Line.m_vMediaFrames);
+			if(QueueNextMediaCandidate(Line, "upload failed"))
+				continue;
+			FailLine(Line, false);
+			continue;
+		}
+
+		if(!Line.m_vMediaFrames.empty() && Line.m_MediaState != EMediaState::READY)
+		{
+			Line.m_MediaState = EMediaState::READY;
+			Line.m_MediaRetryRectValid = false;
+			Line.m_MediaPreviewRectValid = false;
+			Line.m_aYOffset[0] = -1.0f;
+			Line.m_aYOffset[1] = -1.0f;
+		}
+
+		if(Finished)
+		{
+			Line.m_OptMediaDecodedFrames.reset();
+			Line.m_MediaUploadIndex = 0;
+			Line.m_vMediaFrameEndMs.clear();
+			Line.m_MediaTotalDurationMs = 0;
+			if(Line.m_vMediaFrames.size() > 1)
+			{
+				Line.m_vMediaFrameEndMs.reserve(Line.m_vMediaFrames.size());
+				int TotalDuration = 0;
+				for(const auto &Frame : Line.m_vMediaFrames)
+				{
+					TotalDuration += ClampFrameDurationMs(Frame.m_DurationMs);
+					Line.m_vMediaFrameEndMs.push_back(TotalDuration);
+				}
+				Line.m_MediaTotalDurationMs = TotalDuration;
+				Line.m_MediaAnimated = TotalDuration > 0;
+				if(Line.m_MediaAnimated)
+					Line.m_MediaAnimationStart = time_get();
+			}
+			else
+			{
+				Line.m_MediaAnimated = false;
+				Line.m_MediaAnimationStart = 0;
+			}
+		}
+	}
+
+	for(auto &Line : m_aLines)
+	{
+		if(ActiveDownloads >= CHAT_MEDIA_MAX_CONCURRENT_DOWNLOADS)
+			break;
+		if(Line.m_MediaState == EMediaState::QUEUED)
+		{
+			StartMediaDownload(Line);
+			if(Line.m_MediaState == EMediaState::LOADING)
+				ActiveDownloads++;
+		}
+	}
+}
+
+bool CChat::ValidateMediaViewerLine() const
+{
+	if(!m_MediaViewerOpen)
+		return false;
+	if(m_MediaViewerLineIndex < 0 || m_MediaViewerLineIndex >= MAX_LINES)
+		return false;
+	const CLine &Line = m_aLines[m_MediaViewerLineIndex];
+	return Line.m_Initialized && Line.m_MediaState == EMediaState::READY && !Line.m_vMediaFrames.empty();
+}
+
+void CChat::CloseMediaViewer()
+{
+	m_MediaViewerOpen = false;
+	m_MediaViewerLineIndex = -1;
+	m_MediaViewerZoom = 1.0f;
+	m_MediaViewerPan = vec2(0.0f, 0.0f);
+	m_MediaViewerDragging = false;
+}
+
+void CChat::OpenMediaViewer(int LineIndex)
+{
+	if(!g_Config.m_BcChatMediaViewer)
+		return;
+
+	if(LineIndex < 0 || LineIndex >= MAX_LINES)
+		return;
+	CLine &Line = m_aLines[LineIndex];
+	if(!Line.m_Initialized || Line.m_MediaState != EMediaState::READY || Line.m_vMediaFrames.empty())
+		return;
+	m_MediaViewerOpen = true;
+	m_MediaViewerLineIndex = LineIndex;
+	m_MediaViewerZoom = 1.0f;
+	m_MediaViewerPan = vec2(0.0f, 0.0f);
+	m_MediaViewerDragging = false;
+	m_MediaViewerLastClickTime = 0;
+}
+
+bool CChat::GetCurrentFrameTexture(CLine &Line, IGraphics::CTextureHandle &Texture) const
+{
+	if(Line.m_vMediaFrames.empty())
+		return false;
+	if(!Line.m_MediaAnimated || Line.m_vMediaFrames.size() == 1)
+	{
+		Texture = Line.m_vMediaFrames.front().m_Texture;
+		return Texture.IsValid();
+	}
+
+	if(Line.m_MediaTotalDurationMs <= 0 || (int)Line.m_vMediaFrameEndMs.size() != (int)Line.m_vMediaFrames.size())
+	{
+		// Fallback (should be rare, e.g. old state after config toggle).
+		return MediaDecoder::GetCurrentFrameTexture(Line.m_vMediaFrames, Line.m_MediaAnimated, Line.m_MediaAnimationStart, Texture);
+	}
+
+	const int64_t ElapsedMs = ((time_get() - Line.m_MediaAnimationStart) * 1000) / time_freq();
+	const int Offset = (int)(ElapsedMs % (int64_t)Line.m_MediaTotalDurationMs);
+	const auto It = std::upper_bound(Line.m_vMediaFrameEndMs.begin(), Line.m_vMediaFrameEndMs.end(), Offset);
+	const int Index = It == Line.m_vMediaFrameEndMs.end() ? 0 : (int)(It - Line.m_vMediaFrameEndMs.begin());
+	Texture = Line.m_vMediaFrames[Index].m_Texture;
+	return Texture.IsValid();
+}
+
+vec2 CChat::ChatMousePos() const
+{
+	const float Height = 300.0f;
+	const float Width = Height * Graphics()->ScreenAspect();
+	const vec2 WindowSize(maximum(1.0f, (float)Graphics()->WindowWidth()), maximum(1.0f, (float)Graphics()->WindowHeight()));
+	const vec2 UiMousePos = Ui()->UpdatedMousePos() * vec2(Ui()->Screen()->w, Ui()->Screen()->h) / WindowSize;
+	const vec2 UiToChatScale(Width / Ui()->Screen()->w, Height / Ui()->Screen()->h);
+	return UiMousePos * UiToChatScale;
+}
+
+std::string CChat::MediaPlaceholderText(const CLine &Line) const
+{
+	const char *pUrl = Line.m_aMediaUrl;
+	if(pUrl[0] == '\0' && !Line.m_vMediaCandidates.empty())
+		pUrl = Line.m_vMediaCandidates.front().c_str();
+
+	const std::string Ext = ExtractUrlExtensionLower(pUrl);
+	if(IsLikelyVideoExtension(Ext))
+		return "Video";
+	if(Line.m_MediaAnimated || IsLikelyAnimatedImageExtension(Ext))
+		return "GIF";
+	if(IsLikelyImageExtension(Ext))
+		return "Photo";
+	return "Media";
+}
+
+std::string CChat::BuildVisibleMessageText(const CLine &Line, bool UseMediaLabelWhenEmpty) const
+{
+	if(!ShouldDisplayMediaSlot(Line))
+		return Line.m_aText;
+
+	std::string Result;
+	bool RemovedUrl = false;
+	for(const char *pCur = Line.m_aText; *pCur;)
+	{
+		if(IsUrlStart(pCur))
+		{
+			RemovedUrl = true;
+			while(*pCur && !IsTokenEnd(*pCur))
+				++pCur;
+			continue;
+		}
+
+		Result.push_back(*pCur);
+		++pCur;
+	}
+
+	std::string Compacted;
+	Compacted.reserve(Result.size());
+	bool PrevWhitespace = false;
+	for(char c : Result)
+	{
+		if(std::isspace((unsigned char)c))
+		{
+			if(!PrevWhitespace)
+				Compacted.push_back(' ');
+			PrevWhitespace = true;
+		}
+		else
+		{
+			Compacted.push_back(c);
+			PrevWhitespace = false;
+		}
+	}
+	TrimAsciiWhitespace(Compacted);
+
+	if(Compacted.empty() && RemovedUrl && UseMediaLabelWhenEmpty)
+		return MediaPlaceholderText(Line);
+
+	return Compacted;
+}
+
+void CChat::ConToggleHideChatMedia(IConsole::IResult *pResult, void *pUserData)
+{
+	CChat *pThis = static_cast<CChat *>(pUserData);
+	(void)pResult;
+	pThis->m_HideMediaByBind = !pThis->m_HideMediaByBind;
+	pThis->CloseMediaViewer();
+	pThis->ResetHiddenMediaReveals();
+	pThis->RebuildChat();
+	pThis->Echo(pThis->m_HideMediaByBind ? "Chat media hidden" : "Chat media visible");
+}
+
+std::string CChat::BuildPlainTextLine(const CLine &Line) const
+{
+	char aClientId[16] = "";
+	if(g_Config.m_ClShowIds && Line.m_ClientId >= 0 && Line.m_aName[0] != '\0')
+	{
+		GameClient()->FormatClientId(Line.m_ClientId, aClientId, EClientIdFormat::INDENT_AUTO);
+	}
+
+	char aCount[12] = "";
+	if(Line.m_TimesRepeated > 0)
+	{
+		if(Line.m_ClientId < 0)
+			str_format(aCount, sizeof(aCount), "[%d] ", Line.m_TimesRepeated + 1);
+		else
+			str_format(aCount, sizeof(aCount), " [%d]", Line.m_TimesRepeated + 1);
+	}
+
+	bool TextHiddenByStreamer = false;
+	std::string VisibleTextStorage;
+	const char *pText = Line.m_aText;
+	if(Config()->m_ClStreamerMode && Line.m_ClientId == SERVER_MSG)
+	{
+		if(str_startswith(Line.m_aText, "Team save in progress. You'll be able to load with '/load ") && str_endswith(Line.m_aText, "'"))
+		{
+			TextHiddenByStreamer = true;
+			pText = "Team save in progress. You'll be able to load with '/load *** *** ***'";
+		}
+		else if(str_startswith(Line.m_aText, "Team save in progress. You'll be able to load with '/load") && str_endswith(Line.m_aText, "if it fails"))
+		{
+			TextHiddenByStreamer = true;
+			pText = "Team save in progress. You'll be able to load with '/load *** *** ***' if save is successful or with '/load *** *** ***' if it fails";
+		}
+		else if(str_startswith(Line.m_aText, "Team successfully saved by ") && str_endswith(Line.m_aText, " to continue"))
+		{
+			TextHiddenByStreamer = true;
+			pText = "Team successfully saved by ***. Use '/load *** *** ***' to continue";
+		}
+	}
+	else
+	{
+		VisibleTextStorage = BuildVisibleMessageText(Line, true);
+		pText = VisibleTextStorage.c_str();
+	}
+
+	const CColoredParts ColoredParts(pText, Line.m_ClientId == CLIENT_MSG);
+	pText = ColoredParts.Text();
+
+	const char *pTranslatedError = nullptr;
+	const char *pTranslatedText = nullptr;
+	const char *pTranslatedLanguage = nullptr;
+	if(Line.m_pTranslateResponse != nullptr && Line.m_pTranslateResponse->m_Text[0])
+	{
+		if(TextHiddenByStreamer)
+			pTranslatedError = TCLocalize("Translated text hidden due to streamer mode");
+		else if(Line.m_pTranslateResponse->m_Error)
+			pTranslatedError = Line.m_pTranslateResponse->m_Text;
+		else
+		{
+			pTranslatedText = Line.m_pTranslateResponse->m_Text;
+			if(Line.m_pTranslateResponse->m_Language[0] != '\0')
+				pTranslatedLanguage = Line.m_pTranslateResponse->m_Language;
+		}
+	}
+
+	std::string Result;
+	if(Line.m_ClientId >= 0 && Line.m_aName[0] != '\0' && Line.m_Friend && g_Config.m_ClMessageFriend)
+		Result += "♥ ";
+	Result += aClientId;
+	Result += Line.m_aName;
+	Result += aCount;
+	if(Line.m_ClientId >= 0 && Line.m_aName[0] != '\0')
+		Result += ": ";
+	if(pTranslatedText)
+	{
+		Result += pTranslatedText;
+		if(pTranslatedLanguage)
+		{
+			Result += " [";
+			Result += pTranslatedLanguage;
+			Result += "]";
+		}
+	}
+	else if(pTranslatedError)
+	{
+		Result += pText;
+		Result += "\n";
+		Result += pTranslatedError;
+	}
+	else
+	{
+		Result += pText;
+	}
+	return Result;
+}
+
+void CChat::RenderTextLine(CLine &Line, float y, float FontSize, float LineWidth, float TextBegin, float RealMsgPaddingTee, float RealMsgPaddingY, bool IsScoreBoardOpen, float Blend, std::string *pSelectionString)
+{
+	char aClientId[16] = "";
+	if(g_Config.m_ClShowIds && Line.m_ClientId >= 0 && Line.m_aName[0] != '\0')
+	{
+		GameClient()->FormatClientId(Line.m_ClientId, aClientId, EClientIdFormat::INDENT_AUTO);
+	}
+
+	char aCount[12] = "";
+	if(Line.m_TimesRepeated > 0)
+	{
+		if(Line.m_ClientId < 0)
+			str_format(aCount, sizeof(aCount), "[%d] ", Line.m_TimesRepeated + 1);
+		else
+			str_format(aCount, sizeof(aCount), " [%d]", Line.m_TimesRepeated + 1);
+	}
+
+	bool TextHiddenByStreamer = false;
+	std::string VisibleTextStorage;
+	const char *pText = Line.m_aText;
+	if(Config()->m_ClStreamerMode && Line.m_ClientId == SERVER_MSG)
+	{
+		if(str_startswith(Line.m_aText, "Team save in progress. You'll be able to load with '/load ") && str_endswith(Line.m_aText, "'"))
+		{
+			TextHiddenByStreamer = true;
+			pText = "Team save in progress. You'll be able to load with '/load *** *** ***'";
+		}
+		else if(str_startswith(Line.m_aText, "Team save in progress. You'll be able to load with '/load") && str_endswith(Line.m_aText, "if it fails"))
+		{
+			TextHiddenByStreamer = true;
+			pText = "Team save in progress. You'll be able to load with '/load *** *** ***' if save is successful or with '/load *** *** ***' if it fails";
+		}
+		else if(str_startswith(Line.m_aText, "Team successfully saved by ") && str_endswith(Line.m_aText, " to continue"))
+		{
+			TextHiddenByStreamer = true;
+			pText = "Team successfully saved by ***. Use '/load *** *** ***' to continue";
+		}
+	}
+	else
+	{
+		VisibleTextStorage = BuildVisibleMessageText(Line, false);
+		pText = VisibleTextStorage.c_str();
+	}
+
+	const CColoredParts ColoredParts(pText, Line.m_ClientId == CLIENT_MSG);
+	pText = ColoredParts.Text();
+
+	std::optional<ColorRGBA> CustomColor;
+	if(!ColoredParts.Colors().empty() && ColoredParts.Colors()[0].m_Index == 0)
+		CustomColor = ColoredParts.Colors()[0].m_Color;
+
+	const char *pTranslatedError = nullptr;
+	const char *pTranslatedText = nullptr;
+	const char *pTranslatedLanguage = nullptr;
+	if(Line.m_pTranslateResponse != nullptr && Line.m_pTranslateResponse->m_Text[0])
+	{
+		if(TextHiddenByStreamer)
+			pTranslatedError = TCLocalize("Translated text hidden due to streamer mode");
+		else if(Line.m_pTranslateResponse->m_Error)
+			pTranslatedError = Line.m_pTranslateResponse->m_Text;
+		else
+		{
+			pTranslatedText = Line.m_pTranslateResponse->m_Text;
+			if(Line.m_pTranslateResponse->m_Language[0] != '\0')
+				pTranslatedLanguage = Line.m_pTranslateResponse->m_Language;
+		}
+	}
+
+	CTextCursor LineCursor;
+	LineCursor.SetPosition(vec2(TextBegin, y + RealMsgPaddingY / 2.0f));
+	LineCursor.m_FontSize = FontSize;
+	LineCursor.m_LineWidth = LineWidth;
+	if(m_MouseIsPress || m_HasSelection || m_WantsSelectionCopy)
+	{
+		LineCursor.m_CalculateSelectionMode = TEXT_CURSOR_SELECTION_MODE_CALCULATE;
+		LineCursor.m_PressMouse = m_MousePress;
+		LineCursor.m_ReleaseMouse = m_MouseRelease;
+	}
+
+	if(Line.m_ClientId >= 0 && Line.m_aName[0] != '\0')
+	{
+		LineCursor.m_X += RealMsgPaddingTee;
+		if(Line.m_Friend && g_Config.m_ClMessageFriend)
+		{
+			TextRender()->TextColor(color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageFriendColor)).WithAlpha(Blend));
+			TextRender()->TextEx(&LineCursor, "♥ ");
+		}
+	}
+
+	ColorRGBA NameColor;
+	if(CustomColor)
+		NameColor = *CustomColor;
+	else if(Line.m_ClientId == SERVER_MSG)
+		NameColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageSystemColor));
+	else if(Line.m_ClientId == CLIENT_MSG)
+		NameColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageClientColor));
+	else if(Line.m_ClientId >= 0 && g_Config.m_TcWarList && g_Config.m_TcWarListChat && GameClient()->m_WarList.GetAnyWar(Line.m_ClientId))
+		NameColor = GameClient()->m_WarList.GetPriorityColor(Line.m_ClientId);
+	else if(Line.m_Team)
+		NameColor = CalculateNameColor(ColorHSLA(g_Config.m_ClMessageTeamColor));
+	else if(Line.m_NameColor == TEAM_RED)
+		NameColor = ColorRGBA(1.0f, 0.5f, 0.5f, Blend);
+	else if(Line.m_NameColor == TEAM_BLUE)
+		NameColor = ColorRGBA(0.7f, 0.7f, 1.0f, Blend);
+	else if(Line.m_NameColor == TEAM_SPECTATORS)
+		NameColor = ColorRGBA(0.75f, 0.5f, 0.75f, Blend);
+	else if(Line.m_ClientId >= 0 && g_Config.m_ClChatTeamColors && GameClient()->m_Teams.Team(Line.m_ClientId))
+		NameColor = GameClient()->GetDDTeamColor(GameClient()->m_Teams.Team(Line.m_ClientId), 0.75f);
+	else
+		NameColor = ColorRGBA(0.8f, 0.8f, 0.8f, 1.0f);
+	NameColor.a *= Blend;
+
+	TextRender()->TextColor(NameColor);
+	TextRender()->TextEx(&LineCursor, aClientId);
+	TextRender()->TextEx(&LineCursor, Line.m_aName);
+	if(Line.m_TimesRepeated > 0)
+	{
+		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.3f * Blend);
+		TextRender()->TextEx(&LineCursor, aCount);
+	}
+	if(Line.m_ClientId >= 0 && Line.m_aName[0] != '\0')
+	{
+		TextRender()->TextColor(NameColor);
+		TextRender()->TextEx(&LineCursor, ": ");
+	}
+
+	ColorRGBA Color;
+	if(CustomColor)
+		Color = *CustomColor;
+	else if(Line.m_ClientId == SERVER_MSG)
+		Color = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageSystemColor));
+	else if(Line.m_ClientId == CLIENT_MSG)
+		Color = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageClientColor));
+	else if(Line.m_Highlighted)
+		Color = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageHighlightColor));
+	else if(Line.m_Team)
+		Color = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageTeamColor));
+	else
+		Color = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageColor));
+	Color.a *= Blend;
+	TextRender()->TextColor(Color);
+
+	const float PrefixWidth = LineCursor.m_LongestLineWidth;
+	LineCursor.m_LongestLineWidth = 0.0f;
+	if(!IsScoreBoardOpen && !g_Config.m_ClChatOld)
+	{
+		LineCursor.m_StartX = LineCursor.m_X;
+		LineCursor.m_LineWidth -= PrefixWidth;
+	}
+
+	if(pTranslatedText)
+	{
+		TextRender()->TextEx(&LineCursor, pTranslatedText);
+		if(pTranslatedLanguage)
+		{
+			ColorRGBA ColorLang = Color;
+			ColorLang.r *= 0.8f;
+			ColorLang.g *= 0.8f;
+			ColorLang.b *= 0.8f;
+			TextRender()->TextColor(ColorLang);
+			TextRender()->TextEx(&LineCursor, " [");
+			TextRender()->TextEx(&LineCursor, pTranslatedLanguage);
+			TextRender()->TextEx(&LineCursor, "]");
+		}
+	}
+	else if(pTranslatedError)
+	{
+		TextRender()->TextColor(Color);
+		TextRender()->TextEx(&LineCursor, pText);
+		ColorRGBA ColorSub = Color;
+		ColorSub.r = 0.7f;
+		ColorSub.g = 0.6f;
+		ColorSub.b = 0.6f;
+		TextRender()->TextColor(ColorSub);
+		TextRender()->TextEx(&LineCursor, "\n");
+		LineCursor.m_FontSize *= 0.8f;
+		TextRender()->TextEx(&LineCursor, pTranslatedError);
+		LineCursor.m_FontSize /= 0.8f;
+	}
+	else
+	{
+		LineCursor.m_vColorSplits = {};
+		ColoredParts.AddSplitsToCursor(LineCursor);
+		TextRender()->TextEx(&LineCursor, pText);
+		LineCursor.m_vColorSplits.clear();
+	}
+
+	if((m_MouseIsPress || m_HasSelection || m_WantsSelectionCopy) && LineCursor.m_SelectionStart >= 0 && LineCursor.m_SelectionEnd >= 0 && LineCursor.m_SelectionStart != LineCursor.m_SelectionEnd)
+	{
+		m_HasSelection = true;
+		if(pSelectionString != nullptr)
+		{
+			const std::string PlainText = BuildPlainTextLine(Line);
+			const int SelectionMin = minimum(LineCursor.m_SelectionStart, LineCursor.m_SelectionEnd);
+			const int SelectionMax = maximum(LineCursor.m_SelectionStart, LineCursor.m_SelectionEnd);
+			const size_t OffUTF8Start = str_utf8_offset_chars_to_bytes(PlainText.c_str(), SelectionMin);
+			const size_t OffUTF8End = str_utf8_offset_chars_to_bytes(PlainText.c_str(), SelectionMax);
+			const bool HasNewLine = !pSelectionString->empty();
+			pSelectionString->insert(0, PlainText.substr(OffUTF8Start, OffUTF8End - OffUTF8Start) + (HasNewLine ? "\n" : ""));
+		}
+	}
+
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
+}
+
+bool CChat::GetMediaViewerRect(const CLine &Line, float ScreenWidth, float ScreenHeight, float &x, float &y, float &w, float &h) const
+{
+	if(Line.m_MediaWidth <= 0 || Line.m_MediaHeight <= 0)
+		return false;
+
+	const float Margin = FontSize() * 2.0f;
+	const float MaxW = maximum(16.0f, ScreenWidth - Margin * 2.0f);
+	const float MaxH = maximum(16.0f, ScreenHeight - Margin * 2.0f);
+	const float FitScale = minimum(MaxW / (float)Line.m_MediaWidth, MaxH / (float)Line.m_MediaHeight);
+	const float BaseW = (float)Line.m_MediaWidth * FitScale;
+	const float BaseH = (float)Line.m_MediaHeight * FitScale;
+
+	w = BaseW * m_MediaViewerZoom;
+	h = BaseH * m_MediaViewerZoom;
+	x = (ScreenWidth - w) / 2.0f + m_MediaViewerPan.x;
+	y = (ScreenHeight - h) / 2.0f + m_MediaViewerPan.y;
+	return true;
+}
+
+void CChat::ClampMediaViewerPan(const CLine &Line, float ScreenWidth, float ScreenHeight)
+{
+	float x = 0.0f;
+	float y = 0.0f;
+	float w = 0.0f;
+	float h = 0.0f;
+	if(!GetMediaViewerRect(Line, ScreenWidth, ScreenHeight, x, y, w, h))
+		return;
+
+	float ClampedX = x;
+	float ClampedY = y;
+	if(w <= ScreenWidth)
+		ClampedX = (ScreenWidth - w) / 2.0f;
+	else
+		ClampedX = maximum(ScreenWidth - w, minimum(0.0f, ClampedX));
+	if(h <= ScreenHeight)
+		ClampedY = (ScreenHeight - h) / 2.0f;
+	else
+		ClampedY = maximum(ScreenHeight - h, minimum(0.0f, ClampedY));
+
+	m_MediaViewerPan.x += ClampedX - x;
+	m_MediaViewerPan.y += ClampedY - y;
+}
+
 bool CChat::OnInput(const IInput::CEvent &Event)
 {
+	if((Event.m_Flags & IInput::FLAG_PRESS) && Event.m_Key == KEY_MOUSE_1 && g_Config.m_BcChatMediaPreview &&
+		(Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK))
+	{
+		bool HasRetryTargets = false;
+		for(const auto &Line : m_aLines)
+		{
+			if(Line.m_MediaRetryRectValid && Line.m_MediaState == EMediaState::FAILED)
+			{
+				HasRetryTargets = true;
+				break;
+			}
+		}
+		if(HasRetryTargets)
+		{
+			const vec2 MousePos = ChatMousePos();
+			for(auto &Line : m_aLines)
+			{
+				if(!Line.m_MediaRetryRectValid || Line.m_MediaState != EMediaState::FAILED)
+					continue;
+
+				const SRenderRect &Rect = Line.m_MediaRetryRect;
+				if(MousePos.x >= Rect.m_X && MousePos.x <= Rect.m_X + Rect.m_W &&
+					MousePos.y >= Rect.m_Y && MousePos.y <= Rect.m_Y + Rect.m_H)
+				{
+					if(RetryMediaLine(Line))
+						return true;
+				}
+			}
+		}
+	}
+
 	if(m_Mode == MODE_NONE)
 		return false;
 
+	if((Event.m_Flags & IInput::FLAG_PRESS) && Event.m_Key == KEY_ESCAPE && Ui()->IsPopupOpen())
+	{
+		Ui()->ClosePopupMenus();
+		return true;
+	}
+
+	if(Event.m_Key == KEY_MOUSE_1 && m_TranslateButtonRectValid)
+	{
+		const vec2 MousePos = ChatMousePos();
+		const bool InsideTranslateButton =
+			MousePos.x >= m_TranslateButtonRect.m_X && MousePos.x <= m_TranslateButtonRect.m_X + m_TranslateButtonRect.m_W &&
+			MousePos.y >= m_TranslateButtonRect.m_Y && MousePos.y <= m_TranslateButtonRect.m_Y + m_TranslateButtonRect.m_H;
+
+		if(Event.m_Flags & IInput::FLAG_PRESS)
+		{
+			m_TranslateButtonPressed = InsideTranslateButton;
+			if(InsideTranslateButton)
+			{
+				m_MouseIsPress = false;
+				m_HasSelection = false;
+				return true;
+			}
+		}
+		else if(Event.m_Flags & IInput::FLAG_RELEASE)
+		{
+			const bool ActivateButton = m_TranslateButtonPressed && InsideTranslateButton;
+			m_TranslateButtonPressed = false;
+			if(ActivateButton)
+			{
+				CUIRect ButtonRect = {m_TranslateButtonRect.m_X, m_TranslateButtonRect.m_Y, m_TranslateButtonRect.m_W, m_TranslateButtonRect.m_H};
+				if(Ui()->IsPopupOpen(&m_TranslateSettingsPopupId))
+					Ui()->ClosePopupMenu(&m_TranslateSettingsPopupId);
+				else
+					OpenTranslateSettingsPopup(ButtonRect);
+				return true;
+			}
+		}
+	}
+
+	if(m_MediaViewerOpen && (!g_Config.m_BcChatMediaPreview || !g_Config.m_BcChatMediaViewer))
+		CloseMediaViewer();
+
+	if(m_MediaViewerOpen && !ValidateMediaViewerLine())
+		CloseMediaViewer();
+
+	if((Event.m_Flags & IInput::FLAG_PRESS) && Event.m_Key == KEY_MOUSE_1 && m_HideMediaByBind && !m_MediaViewerOpen)
+	{
+		const vec2 MousePos = ChatMousePos();
+		for(int i = m_BacklogCurLine; i < MAX_LINES; i++)
+		{
+			const int LineIndex = ((m_CurrentLine - i) + MAX_LINES) % MAX_LINES;
+			CLine &Line = m_aLines[LineIndex];
+			if(!Line.m_Initialized)
+				break;
+			if(!Line.m_MediaPreviewRectValid || !ShouldHideMediaPreview(Line))
+				continue;
+			const SRenderRect &Rect = Line.m_MediaPreviewRect;
+			if(MousePos.x >= Rect.m_X && MousePos.x <= Rect.m_X + Rect.m_W &&
+				MousePos.y >= Rect.m_Y && MousePos.y <= Rect.m_Y + Rect.m_H)
+			{
+				Line.m_MediaRevealed = true;
+				Line.m_aYOffset[0] = -1.0f;
+				Line.m_aYOffset[1] = -1.0f;
+				RebuildChat();
+				return true;
+			}
+		}
+	}
+
+	if(m_MediaViewerOpen && ValidateMediaViewerLine())
+	{
+		CLine &ViewerLine = m_aLines[m_MediaViewerLineIndex];
+		const float ScreenHeight = 300.0f;
+		const float ScreenWidth = ScreenHeight * Graphics()->ScreenAspect();
+		const vec2 MousePos = ChatMousePos();
+		float ViewerX = 0.0f;
+		float ViewerY = 0.0f;
+		float ViewerW = 0.0f;
+		float ViewerH = 0.0f;
+		GetMediaViewerRect(ViewerLine, ScreenWidth, ScreenHeight, ViewerX, ViewerY, ViewerW, ViewerH);
+
+		if((Event.m_Flags & IInput::FLAG_PRESS) && Event.m_Key == KEY_ESCAPE)
+		{
+			CloseMediaViewer();
+			return true;
+		}
+
+		if(Event.m_Flags & IInput::FLAG_PRESS)
+		{
+			const float MaxZoom = maximum(1.0f, g_Config.m_BcChatMediaViewerMaxZoom / 100.0f);
+			const float ZoomStep = 1.12f;
+			if(Event.m_Key == KEY_MOUSE_WHEEL_UP || Event.m_Key == KEY_MOUSE_WHEEL_DOWN)
+			{
+				const float OldZoom = m_MediaViewerZoom;
+				float NewZoom = OldZoom;
+				if(Event.m_Key == KEY_MOUSE_WHEEL_UP)
+					NewZoom = minimum(MaxZoom, OldZoom * ZoomStep);
+				else
+					NewZoom = maximum(1.0f, OldZoom / ZoomStep);
+
+				if(NewZoom != OldZoom && ViewerW > 0.0f && ViewerH > 0.0f)
+				{
+					const float RelX = (MousePos.x - ViewerX) / ViewerW;
+					const float RelY = (MousePos.y - ViewerY) / ViewerH;
+					m_MediaViewerZoom = NewZoom;
+					float NewX = 0.0f;
+					float NewY = 0.0f;
+					float NewW = 0.0f;
+					float NewH = 0.0f;
+					GetMediaViewerRect(ViewerLine, ScreenWidth, ScreenHeight, NewX, NewY, NewW, NewH);
+					const float TargetX = MousePos.x - RelX * NewW;
+					const float TargetY = MousePos.y - RelY * NewH;
+					m_MediaViewerPan.x += TargetX - NewX;
+					m_MediaViewerPan.y += TargetY - NewY;
+					ClampMediaViewerPan(ViewerLine, ScreenWidth, ScreenHeight);
+				}
+				return true;
+			}
+
+			if(Event.m_Key == KEY_MOUSE_1)
+			{
+				const bool InsideMedia = MousePos.x >= ViewerX && MousePos.x <= ViewerX + ViewerW &&
+					MousePos.y >= ViewerY && MousePos.y <= ViewerY + ViewerH;
+				if(!InsideMedia)
+				{
+					CloseMediaViewer();
+					return true;
+				}
+
+				const int64_t Now = time_get();
+				if(m_MediaViewerLastClickTime > 0 &&
+					(Now - m_MediaViewerLastClickTime) * 1000 / time_freq() <= CHAT_MEDIA_DOUBLE_CLICK_MS)
+				{
+					m_MediaViewerZoom = 1.0f;
+					m_MediaViewerPan = vec2(0.0f, 0.0f);
+					m_MediaViewerDragging = false;
+					m_MediaViewerLastClickTime = 0;
+					return true;
+				}
+
+				m_MediaViewerLastClickTime = Now;
+				m_MediaViewerDragging = true;
+				m_MediaViewerDragStartMouse = MousePos;
+				m_MediaViewerPanStart = m_MediaViewerPan;
+				return true;
+			}
+		}
+
+		if((Event.m_Flags & IInput::FLAG_RELEASE) && Event.m_Key == KEY_MOUSE_1)
+		{
+			m_MediaViewerDragging = false;
+			return true;
+		}
+	}
+
+	if((Event.m_Flags & IInput::FLAG_PRESS) && Event.m_Key == KEY_MOUSE_1 && g_Config.m_BcChatMediaViewer && !m_MediaViewerOpen)
+	{
+		const vec2 MousePos = ChatMousePos();
+		for(int i = m_BacklogCurLine; i < MAX_LINES; i++)
+		{
+			const int LineIndex = ((m_CurrentLine - i) + MAX_LINES) % MAX_LINES;
+			CLine &Line = m_aLines[LineIndex];
+			if(!Line.m_Initialized)
+				break;
+			if(!Line.m_MediaPreviewRectValid)
+				continue;
+			const SRenderRect &Rect = Line.m_MediaPreviewRect;
+			if(MousePos.x >= Rect.m_X && MousePos.x <= Rect.m_X + Rect.m_W &&
+				MousePos.y >= Rect.m_Y && MousePos.y <= Rect.m_Y + Rect.m_H)
+			{
+				OpenMediaViewer(LineIndex);
+				return m_MediaViewerOpen;
+			}
+		}
+	}
+
 	if(Event.m_Flags & IInput::FLAG_PRESS)
 	{
+		if(Input()->ModifierIsPressed() && Event.m_Key == KEY_C && !m_Input.HasSelection() && m_HasSelection)
+		{
+			m_WantsSelectionCopy = true;
+			return true;
+		}
+
 		if(Event.m_Key == KEY_MOUSE_WHEEL_UP)
 		{
 			m_BacklogCurLine = minimum(m_BacklogCurLine + 1, MAX_LINES - 1);
+			m_HasSelection = false;
 			return true;
 		}
 		if(Event.m_Key == KEY_MOUSE_WHEEL_DOWN)
 		{
 			m_BacklogCurLine = maximum(m_BacklogCurLine - 1, 0);
+			m_HasSelection = false;
 			return true;
 		}
 	}
@@ -508,6 +2994,8 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 			m_aSavedInputText[0] = '\0';
 			m_pHistoryEntry = nullptr;
 		}
+		m_HasSelection = false;
+		m_WantsSelectionCopy = false;
 	}
 	else if(Event.m_Flags & IInput::FLAG_PRESS && (Event.m_Key == KEY_RETURN || Event.m_Key == KEY_KP_ENTER))
 	{
@@ -529,6 +3017,8 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 		DisableMode();
 		GameClient()->OnRelease();
 		m_Input.Clear();
+		m_HasSelection = false;
+		m_WantsSelectionCopy = false;
 	}
 	if(Event.m_Flags & IInput::FLAG_PRESS && Event.m_Key == KEY_TAB)
 	{
@@ -548,7 +3038,7 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 			str_truncate(m_aCompletionBuffer, sizeof(m_aCompletionBuffer), m_Input.GetString() + m_PlaceholderOffset, m_PlaceholderLength);
 		}
 
-		if(!m_CompletionUsed && m_aCompletionBuffer[0] != '/')
+		if(!m_CompletionUsed && m_aCompletionBuffer[0] != '/' && m_aCompletionBuffer[0] != '!')
 		{
 			// Create the completion list of player names through which the player can iterate
 			const char *PlayerName, *FoundInput;
@@ -573,6 +3063,171 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 					return Player1.m_Score < Player2.m_Score;
 				});
 		}
+
+		auto DoVoiceAutocomplete = [&]() -> bool {
+			const char *pInput = m_Input.GetString();
+			if(!pInput || pInput[0] != '!')
+				return false;
+
+			const int InputLen = str_length(pInput);
+			int aTokenStarts[8];
+			int aTokenEnds[8];
+			int NumTokens = 0;
+			bool InToken = false;
+			int TokenStart = 0;
+			for(int i = 0; i <= InputLen && NumTokens < 8; ++i)
+			{
+				const char c = pInput[i];
+				const bool IsSpace = c == '\0' || std::isspace((unsigned char)c);
+				if(!InToken && !IsSpace)
+				{
+					InToken = true;
+					TokenStart = i;
+				}
+				else if(InToken && IsSpace)
+				{
+					InToken = false;
+					aTokenStarts[NumTokens] = TokenStart;
+					aTokenEnds[NumTokens] = i;
+					NumTokens++;
+				}
+			}
+			if(NumTokens <= 0)
+				return false;
+
+			int PlaceholderToken = -1;
+			for(int t = 0; t < NumTokens; ++t)
+			{
+				if(aTokenStarts[t] == m_PlaceholderOffset)
+				{
+					PlaceholderToken = t;
+					break;
+				}
+				if(m_PlaceholderOffset >= aTokenStarts[t] && m_PlaceholderOffset < aTokenEnds[t])
+					PlaceholderToken = t;
+			}
+			if(PlaceholderToken < 0 && m_PlaceholderLength == 0)
+			{
+				// Cursor is on whitespace (e.g. "!voice "): treat as completing the next token.
+				if(m_PlaceholderOffset >= 0 && (m_PlaceholderOffset == InputLen || std::isspace((unsigned char)pInput[m_PlaceholderOffset])))
+					PlaceholderToken = NumTokens;
+			}
+			if(PlaceholderToken < 0)
+				return false;
+
+			char aToken0[64];
+			str_truncate(aToken0, sizeof(aToken0), pInput + aTokenStarts[0], aTokenEnds[0] - aTokenStarts[0]);
+
+			const char *apSuggestions[24];
+			int NumSuggestions = 0;
+
+			if(PlaceholderToken == 0)
+			{
+				apSuggestions[NumSuggestions++] = "!voice";
+				apSuggestions[NumSuggestions++] = "!voicegroup";
+			}
+			else
+			{
+				if(str_comp_nocase(aToken0, "!voice") == 0)
+				{
+					if(PlaceholderToken == 1)
+					{
+						apSuggestions[NumSuggestions++] = "on";
+						apSuggestions[NumSuggestions++] = "off";
+						apSuggestions[NumSuggestions++] = "status";
+						apSuggestions[NumSuggestions++] = "mode";
+						apSuggestions[NumSuggestions++] = "server";
+						apSuggestions[NumSuggestions++] = "mute";
+						apSuggestions[NumSuggestions++] = "unmute";
+						apSuggestions[NumSuggestions++] = "volume";
+					}
+					else if(PlaceholderToken == 2 && NumTokens >= 2)
+					{
+						char aSub[32];
+						str_truncate(aSub, sizeof(aSub), pInput + aTokenStarts[1], aTokenEnds[1] - aTokenStarts[1]);
+						if(str_comp_nocase(aSub, "mode") == 0)
+						{
+							apSuggestions[NumSuggestions++] = "automatic";
+							apSuggestions[NumSuggestions++] = "ppt";
+						}
+						else if(str_comp_nocase(aSub, "server") == 0)
+						{
+							apSuggestions[NumSuggestions++] = "reload";
+						}
+						else
+						{
+							return false;
+						}
+					}
+					else
+					{
+						return false;
+					}
+				}
+				else if(str_comp_nocase(aToken0, "!voicegroup") == 0)
+				{
+					if(PlaceholderToken == 1)
+					{
+						apSuggestions[NumSuggestions++] = "create";
+						apSuggestions[NumSuggestions++] = "leave";
+						apSuggestions[NumSuggestions++] = "private";
+						apSuggestions[NumSuggestions++] = "public";
+						apSuggestions[NumSuggestions++] = "join";
+						apSuggestions[NumSuggestions++] = "invite";
+						apSuggestions[NumSuggestions++] = "list";
+					}
+					else
+					{
+						return false;
+					}
+				}
+				else
+				{
+					return false;
+				}
+			}
+
+			if(NumSuggestions <= 0)
+				return false;
+
+			const char *pCompletion = nullptr;
+			if(ShiftPressed && m_CompletionUsed)
+				m_CompletionChosen--;
+			else if(!ShiftPressed)
+				m_CompletionChosen++;
+			m_CompletionChosen = (m_CompletionChosen % NumSuggestions + NumSuggestions) % NumSuggestions;
+			m_CompletionUsed = true;
+
+			for(int i = 0; i < NumSuggestions; ++i)
+			{
+				const int Index = (m_CompletionChosen + (ShiftPressed ? -i : i) + NumSuggestions) % NumSuggestions;
+				const char *pCandidate = apSuggestions[Index];
+				if(str_startswith_nocase(pCandidate, m_aCompletionBuffer))
+				{
+					pCompletion = pCandidate;
+					m_CompletionChosen = Index;
+					break;
+				}
+			}
+			if(!pCompletion)
+				return false;
+
+			char aBuf[MAX_LINE_LENGTH];
+			str_truncate(aBuf, sizeof(aBuf), m_Input.GetString(), m_PlaceholderOffset);
+			str_append(aBuf, pCompletion);
+
+			const char *pAfter = m_Input.GetString() + m_PlaceholderOffset + m_PlaceholderLength;
+			const char *pSeparator = *pAfter == '\0' ? " " : (*pAfter != ' ' ? " " : "");
+			if(*pSeparator)
+				str_append(aBuf, pSeparator);
+
+			str_append(aBuf, pAfter);
+
+			m_PlaceholderLength = str_length(pCompletion) + str_length(pSeparator);
+			m_Input.Set(aBuf);
+			m_Input.SetCursorOffset(m_PlaceholderOffset + m_PlaceholderLength);
+			return true;
+		};
 
 		if(GameClient()->m_BindChat.ChatDoAutocomplete(ShiftPressed))
 		{
@@ -641,6 +3296,9 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 				m_Input.SetCursorOffset(m_PlaceholderOffset + m_PlaceholderLength);
 			}
 		}
+		else if(DoVoiceAutocomplete())
+		{
+		}
 		else
 		{
 			// find next possible name
@@ -686,7 +3344,7 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 
 				// quote the name
 				char aQuoted[128];
-				if((m_Input.GetString()[0] == '/' || GameClient()->m_BindChat.CheckBindChat(m_Input.GetString())) && (str_find(pCompletionString, " ") || str_find(pCompletionString, "\"")))
+				if((m_Input.GetString()[0] == '/' || m_Input.GetString()[0] == '!' || GameClient()->m_BindChat.CheckBindChat(m_Input.GetString())) && (str_find(pCompletionString, " ") || str_find(pCompletionString, "\"")))
 				{
 					// escape the name
 					str_copy(aQuoted, "\"");
@@ -773,10 +3431,18 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 
 bool CChat::OnCursorMove(float x, float y, IInput::ECursorType CursorType)
 {
-	if(m_Mode == MODE_NONE || GameClient()->m_Menus.IsActive() || GameClient()->m_GameConsole.IsActive())
+	if(m_Mode == MODE_NONE)
 		return false;
 
 	Ui()->ConvertMouseMove(&x, &y, CursorType);
+	if(m_MediaViewerOpen && m_MediaViewerDragging && ValidateMediaViewerLine())
+	{
+		const float Height = 300.0f;
+		const float Width = Height * Graphics()->ScreenAspect();
+		const vec2 UiToChatScale(Width / Ui()->Screen()->w, Height / Ui()->Screen()->h);
+		m_MediaViewerPan += vec2(x * UiToChatScale.x, y * UiToChatScale.y);
+		ClampMediaViewerPan(m_aLines[m_MediaViewerLineIndex], Width, Height);
+	}
 	Ui()->OnCursorMove(x, y);
 	return true;
 }
@@ -785,10 +3451,30 @@ void CChat::SetUiMousePos(vec2 Pos)
 {
 	const vec2 WindowSize = vec2(Graphics()->WindowWidth(), Graphics()->WindowHeight());
 	const CUIRect *pScreen = Ui()->Screen();
-
 	const vec2 UpdatedMousePos = Ui()->UpdatedMousePos();
 	Pos = Pos / vec2(pScreen->w, pScreen->h) * WindowSize;
 	Ui()->OnCursorMove(Pos.x - UpdatedMousePos.x, Pos.y - UpdatedMousePos.y);
+}
+
+bool CChat::WasChatAutoHidden() const
+{
+	if(g_Config.m_ClShowChat == 0 || g_Config.m_ClShowChat == 2 || m_Mode != MODE_NONE)
+		return false;
+
+	const int64_t Now = time();
+	bool HadAnyLines = false;
+	for(int i = 0; i < MAX_LINES; i++)
+	{
+		const CLine &Line = m_aLines[((m_CurrentLine - i) + MAX_LINES) % MAX_LINES];
+		if(!Line.m_Initialized)
+			break;
+
+		HadAnyLines = true;
+		if(Now <= Line.m_Time + 16 * time_freq())
+			return false;
+	}
+
+	return HadAnyLines;
 }
 
 void CChat::EnableMode(int Team)
@@ -810,27 +3496,44 @@ void CChat::EnableMode(int Team)
 		m_BacklogCurLine = 0;
 		m_ScrollbarDragging = false;
 		m_ScrollbarDragOffset = 0.0f;
+		m_MouseIsPress = false;
+		m_HasSelection = false;
+		m_WantsSelectionCopy = false;
 		m_ChatOpenAnimationStart = AnimateWholeChatOpen ? time_get() : 0;
 		ResetTypingAnimation();
+		const vec2 WindowSize(maximum(1.0f, (float)Graphics()->WindowWidth()), maximum(1.0f, (float)Graphics()->WindowHeight()));
+		m_LastMousePos = Ui()->UpdatedMousePos() * vec2(Ui()->Screen()->w, Ui()->Screen()->h) / WindowSize;
+		SetUiMousePos(Ui()->Screen()->Center());
 		m_Input.Activate(EInputPriority::CHAT);
 		SyncTypingAnimationBaseline();
-		SetUiMousePos(Ui()->Screen()->Center());
+
+		}
 	}
-}
 
 void CChat::DisableMode()
 {
 	if(m_Mode != MODE_NONE)
 	{
+		CloseMediaViewer();
+		Ui()->ClosePopupMenus();
 		m_Mode = MODE_NONE;
 		m_BacklogCurLine = 0;
 		m_ScrollbarDragging = false;
-		m_Input.Deactivate();
+		m_MouseIsPress = false;
+		m_HasSelection = false;
+		m_WantsSelectionCopy = false;
 		m_ChatOpenAnimationStart = 0;
 		ResetTypingAnimation();
 		m_aPreviousDisplayedInputText[0] = '\0';
+		ResetHiddenMediaReveals();
+		if(m_LastMousePos.has_value())
+			SetUiMousePos(m_LastMousePos.value());
+		const vec2 WindowSize(maximum(1.0f, (float)Graphics()->WindowWidth()), maximum(1.0f, (float)Graphics()->WindowHeight()));
+		m_LastMousePos = Ui()->UpdatedMousePos() * vec2(Ui()->Screen()->w, Ui()->Screen()->h) / WindowSize;
+		m_Input.Deactivate();
+
+		}
 	}
-}
 
 void CChat::OnMessage(int MsgType, void *pRawMsg)
 {
@@ -840,10 +3543,6 @@ void CChat::OnMessage(int MsgType, void *pRawMsg)
 	if(MsgType == NETMSGTYPE_SV_CHAT)
 	{
 		CNetMsg_Sv_Chat *pMsg = (CNetMsg_Sv_Chat *)pRawMsg;
-
-		auto &Re = GameClient()->m_TClient.m_RegexChatIgnore;
-		if(Re.error().empty() && Re.test(pMsg->m_pMessage))
-			return;
 
 		/*
 		if(g_Config.m_ClCensorChat)
@@ -959,7 +3658,7 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 					  (GameClient()->m_Snap.m_LocalClientId != ClientId && GameClient()->m_aClients[ClientId].m_Foe))))
 		return;
 
-	// TClient
+	// BestClient
 	if(ClientId == CLIENT_MSG && !g_Config.m_TcShowChatClient)
 		return;
 
@@ -1097,6 +3796,20 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 	CurrentLine.m_Highlighted = Highlighted;
 
 	str_copy(CurrentLine.m_aText, pLine);
+	if(g_Config.m_BcChatMediaPreview && AnyMediaAllowed())
+	{
+		std::vector<std::string> vMediaUrls;
+		ExtractMediaUrlsFromText(CurrentLine.m_aText, vMediaUrls);
+		SetMediaCandidates(CurrentLine, vMediaUrls);
+		if(!CurrentLine.m_vMediaCandidates.empty())
+		{
+			QueueMediaDownload(CurrentLine);
+		}
+		else if(g_Config.m_Debug && str_find(CurrentLine.m_aText, "http"))
+		{
+			log_debug("chat/media", "No usable media candidates in message: %s", CurrentLine.m_aText);
+		}
+	}
 
 	if(CurrentLine.m_ClientId == SERVER_MSG)
 	{
@@ -1184,7 +3897,8 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 		if(Now - m_aLastSoundPlayed[CHAT_HIGHLIGHT] >= time_freq() * 3 / 10)
 		{
 			char aBuf[1024];
-			str_format(aBuf, sizeof(aBuf), "%s: %s", CurrentLine.m_aName, CurrentLine.m_aText);
+			const std::string VisibleText = BuildVisibleMessageText(CurrentLine, true);
+			str_format(aBuf, sizeof(aBuf), "%s: %s", CurrentLine.m_aName, VisibleText.c_str());
 			Client()->Notify("DDNet Chat", aBuf);
 			if(g_Config.m_SndHighlight)
 			{
@@ -1217,20 +3931,27 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 		}
 	}
 
-	// TClient
+	// BestClient
 	GameClient()->m_Translate.AutoTranslate(CurrentLine);
 }
 
-void CChat::OnPrepareLines(float y, int StartLine)
+void CChat::OnPrepareLines(float y, int StartLine, int HoveredTranslateLineIndex)
 {
 	float x = 5.0f;
 	float FontSize = this->FontSize();
 
 	const bool IsScoreBoardOpen = GameClient()->m_Scoreboard.IsActive() && (Graphics()->ScreenAspect() > 1.7f); // only assume scoreboard when screen ratio is widescreen(something around 16:9)
 	const bool ShowLargeArea = m_Show || (m_Mode != MODE_NONE && g_Config.m_ClShowChat == 1) || g_Config.m_ClShowChat == 2;
-	const bool ForceRecreate = IsScoreBoardOpen != m_PrevScoreBoardShowed || ShowLargeArea != m_PrevShowChat;
+	const bool ModeActive = m_Mode != MODE_NONE;
+	const bool ChatSelectionActive = m_HasSelection && !m_MouseIsPress && !m_WantsSelectionCopy && !m_Input.HasSelection();
+	const bool ForceSelectionRefresh = m_MouseIsPress || m_WantsSelectionCopy || ChatSelectionActive != m_PrevChatSelectionActive;
+	const bool ForceRecreate = IsScoreBoardOpen != m_PrevScoreBoardShowed || ShowLargeArea != m_PrevShowChat || ModeActive != m_PrevModeActive || ForceSelectionRefresh || HoveredTranslateLineIndex != m_HoveredTranslateLineIndex;
+	const bool KeepLinesAlive = m_MediaViewerOpen && ValidateMediaViewerLine();
 	m_PrevScoreBoardShowed = IsScoreBoardOpen;
 	m_PrevShowChat = ShowLargeArea;
+	m_PrevModeActive = ModeActive;
+	m_PrevChatSelectionActive = ChatSelectionActive;
+	m_HoveredTranslateLineIndex = HoveredTranslateLineIndex;
 
 	const int TeeSize = MessageTeeSize();
 	float RealMsgPaddingX = MessagePaddingX();
@@ -1251,16 +3972,18 @@ void CChat::OnPrepareLines(float y, int StartLine)
 	float Begin = x;
 	float TextBegin = Begin + RealMsgPaddingX / 2.0f;
 	int OffsetType = IsScoreBoardOpen ? 1 : 0;
+	const float MaxPreviewHeight = IsScoreBoardOpen ? CHAT_MEDIA_MAX_PREVIEW_HEIGHT_SCOREBOARD : CHAT_MEDIA_MAX_PREVIEW_HEIGHT;
 
 	for(int i = StartLine; i < MAX_LINES; i++)
 	{
-		CLine &Line = m_aLines[((m_CurrentLine - i) + MAX_LINES) % MAX_LINES];
+		const int LineIndex = ((m_CurrentLine - i) + MAX_LINES) % MAX_LINES;
+		CLine &Line = m_aLines[LineIndex];
 		if(!Line.m_Initialized)
 			break;
-		if(Now > Line.m_Time + 16 * time_freq() && !m_PrevShowChat)
+		if(Now > Line.m_Time + 16 * time_freq() && !m_PrevShowChat && !KeepLinesAlive)
 			break;
 
-		if(Line.m_TextContainerIndex.Valid() && !ForceRecreate)
+		if(Line.m_TextContainerIndex.Valid() && Line.m_aYOffset[OffsetType] >= 0.0f && !ForceRecreate)
 			continue;
 
 		TextRender()->DeleteTextContainer(Line.m_TextContainerIndex);
@@ -1278,21 +4001,31 @@ void CChat::OnPrepareLines(float y, int StartLine)
 		else
 			str_format(aCount, sizeof(aCount), " [%d]", Line.m_TimesRepeated + 1);
 
+		bool TextHiddenByStreamer = false;
+		std::string VisibleTextStorage;
 		const char *pText = Line.m_aText;
 		if(Config()->m_ClStreamerMode && Line.m_ClientId == SERVER_MSG)
 		{
 			if(str_startswith(Line.m_aText, "Team save in progress. You'll be able to load with '/load ") && str_endswith(Line.m_aText, "'"))
 			{
+				TextHiddenByStreamer = true;
 				pText = "Team save in progress. You'll be able to load with '/load *** *** ***'";
 			}
 			else if(str_startswith(Line.m_aText, "Team save in progress. You'll be able to load with '/load") && str_endswith(Line.m_aText, "if it fails"))
 			{
+				TextHiddenByStreamer = true;
 				pText = "Team save in progress. You'll be able to load with '/load *** *** ***' if save is successful or with '/load *** *** ***' if it fails";
 			}
 			else if(str_startswith(Line.m_aText, "Team successfully saved by ") && str_endswith(Line.m_aText, " to continue"))
 			{
+				TextHiddenByStreamer = true;
 				pText = "Team successfully saved by ***. Use '/load *** *** ***' to continue";
 			}
+		}
+		else
+		{
+			VisibleTextStorage = BuildVisibleMessageText(Line, false);
+			pText = VisibleTextStorage.c_str();
 		}
 
 		const CColoredParts ColoredParts(pText, Line.m_ClientId == CLIENT_MSG);
@@ -1306,7 +4039,7 @@ void CChat::OnPrepareLines(float y, int StartLine)
 		if(Line.m_pTranslateResponse != nullptr && Line.m_pTranslateResponse->m_Text[0])
 		{
 			// If hidden and there is translated text
-			if(pText != Line.m_aText)
+			if(TextHiddenByStreamer)
 			{
 				pTranslatedError = TCLocalize("Translated text hidden due to streamer mode");
 			}
@@ -1321,6 +4054,12 @@ void CChat::OnPrepareLines(float y, int StartLine)
 					pTranslatedLanguage = Line.m_pTranslateResponse->m_Language;
 			}
 		}
+		const bool ShowOriginalOnHover = pTranslatedText != nullptr && HoveredTranslateLineIndex == LineIndex;
+		const char *pDisplayedTranslatedText = ShowOriginalOnHover ? pText : pTranslatedText;
+		const char *pDisplayedTranslatedLanguage = ShowOriginalOnHover ? nullptr : pTranslatedLanguage;
+
+		Line.m_SelectionStart = -1;
+		Line.m_SelectionEnd = -1;
 
 		// get the y offset (calculate it if we haven't done that yet)
 		if(Line.m_aYOffset[OffsetType] < 0.0f)
@@ -1351,48 +4090,99 @@ void CChat::OnPrepareLines(float y, int StartLine)
 				TextRender()->TextEx(&MeasureCursor, ": ");
 			}
 
-			CTextCursor AppendCursor = MeasureCursor;
-			AppendCursor.m_LongestLineWidth = 0.0f;
+			const float PrefixWidth = MeasureCursor.m_LongestLineWidth;
+			MeasureCursor.m_LongestLineWidth = 0.0f;
 			if(!IsScoreBoardOpen && !g_Config.m_ClChatOld)
 			{
-				AppendCursor.m_StartX = MeasureCursor.m_X;
-				AppendCursor.m_LineWidth -= MeasureCursor.m_LongestLineWidth;
+				MeasureCursor.m_StartX = MeasureCursor.m_X;
+				MeasureCursor.m_LineWidth -= PrefixWidth;
 			}
 
-			if(pTranslatedText)
+			if(pDisplayedTranslatedText)
 			{
-				TextRender()->TextEx(&AppendCursor, pTranslatedText);
-				if(pTranslatedLanguage)
+				TextRender()->TextEx(&MeasureCursor, pDisplayedTranslatedText);
+				if(pDisplayedTranslatedLanguage)
 				{
-					TextRender()->TextEx(&AppendCursor, " [");
-					TextRender()->TextEx(&AppendCursor, pTranslatedLanguage);
-					TextRender()->TextEx(&AppendCursor, "]");
+					TextRender()->TextEx(&MeasureCursor, " [");
+					TextRender()->TextEx(&MeasureCursor, pDisplayedTranslatedLanguage);
+					TextRender()->TextEx(&MeasureCursor, "]");
 				}
-				TextRender()->TextEx(&AppendCursor, "\n");
-				AppendCursor.m_FontSize *= 0.8f;
-				TextRender()->TextEx(&AppendCursor, pText);
-				AppendCursor.m_FontSize /= 0.8f;
 			}
 			else if(pTranslatedError)
 			{
-				TextRender()->TextEx(&AppendCursor, pText);
-				TextRender()->TextEx(&AppendCursor, "\n");
-				AppendCursor.m_FontSize *= 0.8f;
-				TextRender()->TextEx(&AppendCursor, pTranslatedError);
-				AppendCursor.m_FontSize /= 0.8f;
+				TextRender()->TextEx(&MeasureCursor, pText);
+				TextRender()->TextEx(&MeasureCursor, "\n");
+				MeasureCursor.m_FontSize *= 0.8f;
+				TextRender()->TextEx(&MeasureCursor, pTranslatedError);
+				MeasureCursor.m_FontSize /= 0.8f;
 			}
 			else
 			{
-				TextRender()->TextEx(&AppendCursor, pText);
+				TextRender()->TextEx(&MeasureCursor, pText);
 			}
 
-			Line.m_aYOffset[OffsetType] = AppendCursor.Height() + RealMsgPaddingY;
+			Line.m_aTextHeight[OffsetType] = MeasureCursor.Height();
+			Line.m_aMediaPreviewWidth[OffsetType] = 0.0f;
+			Line.m_aMediaPreviewHeight[OffsetType] = 0.0f;
+			float TotalHeight = Line.m_aTextHeight[OffsetType] + RealMsgPaddingY;
+			const bool ShowMediaSlot = ShouldDisplayMediaSlot(Line);
+			const bool HideMediaPreview = ShouldHideMediaPreview(Line);
+			if(ShowMediaSlot && (HideMediaPreview || (Line.m_MediaState == EMediaState::READY && Line.m_MediaWidth > 0 && Line.m_MediaHeight > 0 && !Line.m_vMediaFrames.empty())))
+			{
+				const float MaxPreviewWidth = minimum(LineWidth, (float)g_Config.m_BcChatMediaPreviewMaxWidth);
+				if(MaxPreviewWidth > 0.0f && MaxPreviewHeight > 0.0f)
+				{
+					if(Line.m_MediaState == EMediaState::READY && Line.m_MediaWidth > 0 && Line.m_MediaHeight > 0 && !Line.m_vMediaFrames.empty())
+					{
+						const float ScaleByWidth = MaxPreviewWidth / (float)Line.m_MediaWidth;
+						const float ScaleByHeight = MaxPreviewHeight / (float)Line.m_MediaHeight;
+						float Scale = minimum(1.0f, minimum(ScaleByWidth, ScaleByHeight));
+						float PreviewW = maximum(1.0f, (float)Line.m_MediaWidth * Scale);
+						float PreviewH = maximum(1.0f, (float)Line.m_MediaHeight * Scale);
+						if(PreviewW < CHAT_MEDIA_MIN_PREVIEW_SIDE || PreviewH < CHAT_MEDIA_MIN_PREVIEW_SIDE)
+						{
+							const float UpscaleByW = CHAT_MEDIA_MIN_PREVIEW_SIDE / PreviewW;
+							const float UpscaleByH = CHAT_MEDIA_MIN_PREVIEW_SIDE / PreviewH;
+							const float Upscale = maximum(UpscaleByW, UpscaleByH);
+							const float MaxUpscale = minimum(MaxPreviewWidth / PreviewW, MaxPreviewHeight / PreviewH);
+							if(MaxUpscale > 1.0f)
+							{
+								const float UseUpscale = minimum(Upscale, MaxUpscale);
+								PreviewW *= UseUpscale;
+								PreviewH *= UseUpscale;
+							}
+						}
+						Line.m_aMediaPreviewWidth[OffsetType] = maximum(1.0f, PreviewW);
+						Line.m_aMediaPreviewHeight[OffsetType] = maximum(1.0f, PreviewH);
+					}
+					else
+					{
+						Line.m_aMediaPreviewWidth[OffsetType] = MaxPreviewWidth;
+						Line.m_aMediaPreviewHeight[OffsetType] = maximum(FontSize * 1.6f, 18.0f);
+					}
+					TotalHeight += FontSize * 0.4f + Line.m_aMediaPreviewHeight[OffsetType];
+				}
+			}
+			else if(ShowMediaSlot && (Line.m_MediaState == EMediaState::QUEUED || Line.m_MediaState == EMediaState::LOADING || Line.m_MediaState == EMediaState::DECODING))
+			{
+				Line.m_aMediaPreviewWidth[OffsetType] = minimum(LineWidth, (float)g_Config.m_BcChatMediaPreviewMaxWidth);
+				Line.m_aMediaPreviewHeight[OffsetType] = maximum(FontSize * 1.2f, 12.0f);
+				TotalHeight += FontSize * 0.4f + Line.m_aMediaPreviewHeight[OffsetType];
+			}
+			else if(ShowMediaSlot && Line.m_MediaState == EMediaState::FAILED)
+			{
+				Line.m_aMediaPreviewWidth[OffsetType] = minimum(LineWidth, (float)g_Config.m_BcChatMediaPreviewMaxWidth);
+				Line.m_aMediaPreviewHeight[OffsetType] = maximum(FontSize * 2.1f, 18.0f);
+				TotalHeight += FontSize * 0.4f + Line.m_aMediaPreviewHeight[OffsetType];
+			}
+
+			Line.m_aYOffset[OffsetType] = TotalHeight;
 		}
 
 		y -= Line.m_aYOffset[OffsetType];
 
 		// cut off if msgs waste too much space
-		if(y < HeightLimit)
+		if(y < HeightLimit && i != StartLine)
 			break;
 
 		// the position the text was created
@@ -1406,6 +4196,12 @@ void CChat::OnPrepareLines(float y, int StartLine)
 		LineCursor.SetPosition(vec2(TextBegin, Line.m_TextYOffset));
 		LineCursor.m_FontSize = FontSize;
 		LineCursor.m_LineWidth = LineWidth;
+		if(m_Mode != MODE_NONE && !m_Input.HasSelection() && (m_MouseIsPress || m_HasSelection || m_WantsSelectionCopy))
+		{
+			LineCursor.m_CalculateSelectionMode = TEXT_CURSOR_SELECTION_MODE_CALCULATE;
+			LineCursor.m_PressMouse = m_MousePress;
+			LineCursor.m_ReleaseMouse = m_MouseRelease;
+		}
 
 		// Message is from valid player
 		if(Line.m_ClientId >= 0 && Line.m_aName[0] != '\0')
@@ -1427,7 +4223,7 @@ void CChat::OnPrepareLines(float y, int StartLine)
 			NameColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageSystemColor));
 		else if(Line.m_ClientId == CLIENT_MSG)
 			NameColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageClientColor));
-		else if(Line.m_ClientId >= 0 && g_Config.m_TcWarList && g_Config.m_TcWarListChat && GameClient()->m_WarList.GetAnyWar(Line.m_ClientId)) // TClient
+		else if(Line.m_ClientId >= 0 && g_Config.m_TcWarList && g_Config.m_TcWarListChat && GameClient()->m_WarList.GetAnyWar(Line.m_ClientId)) // BestClient
 			NameColor = GameClient()->m_WarList.GetPriorityColor(Line.m_ClientId);
 		else if(Line.m_Team)
 			NameColor = CalculateNameColor(ColorHSLA(g_Config.m_ClMessageTeamColor));
@@ -1473,70 +4269,89 @@ void CChat::OnPrepareLines(float y, int StartLine)
 			Color = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageColor));
 		TextRender()->TextColor(Color);
 
-		CTextCursor AppendCursor = LineCursor;
-		AppendCursor.m_LongestLineWidth = 0.0f;
+		const float PrefixWidth = LineCursor.m_LongestLineWidth;
+		LineCursor.m_LongestLineWidth = 0.0f;
 		if(!IsScoreBoardOpen && !g_Config.m_ClChatOld)
 		{
-			AppendCursor.m_StartX = LineCursor.m_X;
-			AppendCursor.m_LineWidth -= LineCursor.m_LongestLineWidth;
+			LineCursor.m_StartX = LineCursor.m_X;
+			LineCursor.m_LineWidth -= PrefixWidth;
 		}
 
-		if(pTranslatedText)
+		if(pDisplayedTranslatedText)
 		{
-			TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &AppendCursor, pTranslatedText);
-			if(pTranslatedLanguage)
+			const float TranslateRectX = LineCursor.m_X;
+			const float TranslateRectY = LineCursor.m_Y;
+			const STextBoundingBox TranslatedBoundingBox = TextRender()->TextBoundingBox(FontSize, pDisplayedTranslatedText, -1, maximum(1.0f, LineCursor.m_LineWidth));
+			Line.m_TranslateRect.m_X = TranslateRectX;
+			Line.m_TranslateRect.m_Y = TranslateRectY;
+			Line.m_TranslateRect.m_W = maximum(1.0f, TranslatedBoundingBox.m_W);
+			Line.m_TranslateRect.m_H = maximum(FontSize, TranslatedBoundingBox.m_H);
+			Line.m_TranslateRectValid = true;
+			Line.m_TranslateLanguageRectValid = false;
+			TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &LineCursor, pDisplayedTranslatedText);
+			if(pDisplayedTranslatedLanguage)
 			{
 				ColorRGBA ColorLang = Color;
 				ColorLang.r *= 0.8f;
 				ColorLang.g *= 0.8f;
 				ColorLang.b *= 0.8f;
 				TextRender()->TextColor(ColorLang);
-				TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &AppendCursor, " [");
-				TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &AppendCursor, pTranslatedLanguage);
-				TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &AppendCursor, "]");
+				TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &LineCursor, " [");
+				const float RectX = LineCursor.m_X;
+				const float RectY = LineCursor.m_Y;
+				TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &LineCursor, pDisplayedTranslatedLanguage);
+				Line.m_TranslateLanguageRect.m_X = RectX;
+				Line.m_TranslateLanguageRect.m_Y = RectY;
+				Line.m_TranslateLanguageRect.m_W = maximum(1.0f, LineCursor.m_X - RectX);
+				Line.m_TranslateLanguageRect.m_H = FontSize;
+				Line.m_TranslateLanguageRectValid = true;
+				TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &LineCursor, "]");
 			}
-			ColorRGBA ColorSub = Color;
-			ColorSub.r *= 0.7f;
-			ColorSub.g *= 0.7f;
-			ColorSub.b *= 0.7f;
-			TextRender()->TextColor(ColorSub);
-			TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &AppendCursor, "\n");
-			AppendCursor.m_FontSize *= 0.8f;
-			TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &AppendCursor, pText);
-			AppendCursor.m_FontSize /= 0.8f;
 			TextRender()->TextColor(Color);
 		}
 		else if(pTranslatedError)
 		{
-			TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &AppendCursor, pText);
+			Line.m_TranslateRectValid = false;
+			Line.m_TranslateLanguageRectValid = false;
+			TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &LineCursor, pText);
 			ColorRGBA ColorSub = Color;
 			ColorSub.r = 0.7f;
 			ColorSub.g = 0.6f;
 			ColorSub.b = 0.6f;
 			TextRender()->TextColor(ColorSub);
-			TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &AppendCursor, "\n");
-			AppendCursor.m_FontSize *= 0.8f;
-			TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &AppendCursor, pTranslatedError);
-			AppendCursor.m_FontSize /= 0.8f;
+			TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &LineCursor, "\n");
+			LineCursor.m_FontSize *= 0.8f;
+			TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &LineCursor, pTranslatedError);
+			LineCursor.m_FontSize /= 0.8f;
 			TextRender()->TextColor(Color);
 		}
 		else
 		{
-			ColoredParts.AddSplitsToCursor(AppendCursor);
-			TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &AppendCursor, pText);
-			AppendCursor.m_vColorSplits.clear();
+			Line.m_TranslateRectValid = false;
+			Line.m_TranslateLanguageRectValid = false;
+			ColoredParts.AddSplitsToCursor(LineCursor);
+			TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &LineCursor, pText);
+			LineCursor.m_vColorSplits.clear();
 		}
+
+		Line.m_SelectionStart = LineCursor.m_SelectionStart;
+		Line.m_SelectionEnd = LineCursor.m_SelectionEnd;
 
 		if(!g_Config.m_ClChatOld && (Line.m_aText[0] != '\0' || Line.m_aName[0] != '\0'))
 		{
 			float FullWidth = RealMsgPaddingX * 1.5f;
 			if(!IsScoreBoardOpen && !g_Config.m_ClChatOld)
 			{
-				FullWidth += LineCursor.m_LongestLineWidth + AppendCursor.m_LongestLineWidth;
+				FullWidth += PrefixWidth + LineCursor.m_LongestLineWidth;
 			}
 			else
 			{
-				FullWidth += maximum(LineCursor.m_LongestLineWidth, AppendCursor.m_LongestLineWidth);
+				FullWidth += maximum(PrefixWidth, LineCursor.m_LongestLineWidth);
+			}
+			if(Line.m_aMediaPreviewWidth[OffsetType] > 0.0f)
+			{
+				const float PreviewWidth = Line.m_aMediaPreviewWidth[OffsetType] + (TextBegin - Begin) + RealMsgPaddingX;
+				FullWidth = maximum(FullWidth, PreviewWidth);
 			}
 			Graphics()->SetColor(1, 1, 1, 1);
 			Line.m_QuadContainerIndex = Graphics()->CreateRectQuadContainer(Begin, y, FullWidth, Line.m_aYOffset[OffsetType], MessageRounding(), IGraphics::CORNER_ALL);
@@ -1556,35 +4371,59 @@ void CChat::OnRender()
 		return;
 
 	// send pending chat messages
-	if(m_PendingChatCounter > 0 && m_LastChatSend + time_freq() < time())
+	if(!m_vPendingChatQueue.empty() && m_LastChatSend + time_freq() < time())
 	{
-		CHistoryEntry *pEntry = m_History.Last();
-		for(int i = m_PendingChatCounter - 1; pEntry; --i, pEntry = m_History.Prev(pEntry))
-		{
-			if(i == 0)
-			{
-				SendChat(pEntry->m_Team, pEntry->m_aText);
-				break;
-			}
-		}
-		--m_PendingChatCounter;
+		const CPendingChatEntry Entry = m_vPendingChatQueue.front();
+		m_vPendingChatQueue.erase(m_vPendingChatQueue.begin());
+		SendChat(Entry.m_Team, Entry.m_aText);
 	}
+
+	UpdateMediaDownloads();
+	if(m_MediaViewerOpen && (!g_Config.m_BcChatMediaPreview || !g_Config.m_BcChatMediaViewer))
+		CloseMediaViewer();
 
 	const float Height = 300.0f;
 	const float Width = Height * Graphics()->ScreenAspect();
 	Graphics()->MapScreen(0.0f, 0.0f, Width, Height);
 
+	const bool BcChatMessageAnimEnabled = BCUiAnimations::Enabled() && g_Config.m_BcChatAnimation != 0;
 	float x = 5.0f;
 	const vec2 WindowSize(maximum(1.0f, (float)Graphics()->WindowWidth()), maximum(1.0f, (float)Graphics()->WindowHeight()));
 	const vec2 UiMousePos = Ui()->UpdatedMousePos() * vec2(Ui()->Screen()->w, Ui()->Screen()->h) / WindowSize;
 	const vec2 UiToChatScale(Width / Ui()->Screen()->w, Height / Ui()->Screen()->h);
 	const vec2 MousePos = UiMousePos * UiToChatScale;
 	const bool MouseDown = Input()->KeyIsPressed(KEY_MOUSE_1);
-
-	// TClient
+	int HoveredTranslateLineIndex = -1;
+	for(int LineIndex = 0; LineIndex < MAX_LINES; ++LineIndex)
+	{
+		const CLine &Line = m_aLines[LineIndex];
+		if(!Line.m_TranslateRectValid && !Line.m_TranslateLanguageRectValid)
+			continue;
+		const bool HoveredTranslatedText = Line.m_TranslateRectValid &&
+			MousePos.x >= Line.m_TranslateRect.m_X && MousePos.x <= Line.m_TranslateRect.m_X + Line.m_TranslateRect.m_W &&
+			MousePos.y >= Line.m_TranslateRect.m_Y && MousePos.y <= Line.m_TranslateRect.m_Y + Line.m_TranslateRect.m_H;
+		const bool HoveredLanguage = Line.m_TranslateLanguageRectValid &&
+			MousePos.x >= Line.m_TranslateLanguageRect.m_X && MousePos.x <= Line.m_TranslateLanguageRect.m_X + Line.m_TranslateLanguageRect.m_W &&
+			MousePos.y >= Line.m_TranslateLanguageRect.m_Y && MousePos.y <= Line.m_TranslateLanguageRect.m_Y + Line.m_TranslateLanguageRect.m_H;
+		if(HoveredTranslatedText || HoveredLanguage)
+		{
+			HoveredTranslateLineIndex = LineIndex;
+			break;
+		}
+	}
+	for(auto &Line : m_aLines)
+	{
+		Line.m_NameRectValid = false;
+		Line.m_TranslateRectValid = false;
+		Line.m_TranslateLanguageRectValid = false;
+		Line.m_MediaPreviewRectValid = false;
+		Line.m_MediaRetryRectValid = false;
+	}
+	m_TranslateButtonRectValid = false;
+	// BestClient
 	float y = 300.0f - (20.0f * FontSize() / 6.0f + (g_Config.m_TcStatusBar ? g_Config.m_TcStatusBarHeight : 0.0f));
 	// float y = 300.0f - 20.0f * FontSize() / 6.0f;
-	const bool BcChatMessageAnimEnabled = BCUiAnimations::Enabled() && g_Config.m_BcChatAnimation != 0;
+	float ScaledFontSize = FontSize() * (8.0f / 6.0f);
 	const bool BcChatOpenAnimEnabled = BcChatMessageAnimEnabled && g_Config.m_BcChatOpenAnimation != 0 && g_Config.m_BcChatOpenAnimationMs > 0;
 	const bool BcChatTypingAnimEnabled = BcChatMessageAnimEnabled && g_Config.m_BcChatTypingAnimation != 0 && g_Config.m_BcChatTypingAnimationMs > 0;
 	float ChatOpenOffsetX = 0.0f;
@@ -1596,31 +4435,36 @@ void CChat::OnRender()
 		const float ChatOpenEase = BCUiAnimations::EaseInOutQuart(Progress);
 		ChatOpenOffsetX = -(x + maximum(Width - 190.0f, 190.0f) + 24.0f) * (1.0f - ChatOpenEase);
 	}
-
-	float ScaledFontSize = FontSize() * (8.0f / 6.0f);
-	const bool ChatCursorUiActive = m_Mode != MODE_NONE && !GameClient()->m_Menus.IsActive() && !GameClient()->m_GameConsole.IsActive();
-	if(ChatCursorUiActive)
-	{
-		Ui()->StartCheck();
-		Ui()->Update();
-	}
-	auto FinishChatCursorUi = [&]() {
-		if(!ChatCursorUiActive)
-			return;
-		Ui()->MapScreen();
-		RenderTools()->RenderCursor(Ui()->MousePos(), 24.0f);
-		Ui()->FinishCheck();
-	};
-
 	if(m_Mode != MODE_NONE)
 	{
-		// render chat input
-		CTextCursor InputCursor;
-		InputCursor.SetPosition(vec2(x + ChatOpenOffsetX, y));
-		InputCursor.m_FontSize = ScaledFontSize;
-		InputCursor.m_LineWidth = Width - 190.0f;
+		if(!m_MediaViewerOpen && !m_ScrollbarDragging)
+		{
+			if(!m_MouseIsPress && MouseDown)
+			{
+				m_MouseIsPress = true;
+				m_MousePress = MousePos;
+				m_MouseRelease = MousePos;
+				m_HasSelection = false;
+			}
+			else if(m_MouseIsPress && !MouseDown)
+			{
+				m_MouseIsPress = false;
+			}
+			if(m_MouseIsPress)
+				m_MouseRelease = MousePos;
+		}
+		else
+		{
+			m_MouseIsPress = false;
+		}
 
-		// TClient
+			// render chat input
+			CTextCursor InputCursor;
+			InputCursor.SetPosition(vec2(x + ChatOpenOffsetX, y));
+			InputCursor.m_FontSize = ScaledFontSize;
+			InputCursor.m_LineWidth = Width - 190.0f;
+
+		// BestClient
 		InputCursor.m_LineWidth = std::max(Width - 190.0f, 190.0f);
 
 		if(m_Mode == MODE_ALL)
@@ -1632,7 +4476,9 @@ void CChat::OnRender()
 
 		TextRender()->TextEx(&InputCursor, ": ");
 
-		const float MessageMaxWidth = InputCursor.m_LineWidth - (InputCursor.m_X - InputCursor.m_StartX);
+		const float TranslateButtonSize = maximum(16.0f, ScaledFontSize * 1.35f);
+		const float TranslateButtonGap = 4.0f;
+		const float MessageMaxWidth = maximum(40.0f, InputCursor.m_LineWidth - (InputCursor.m_X - InputCursor.m_StartX) - TranslateButtonSize - TranslateButtonGap);
 		const CUIRect ClippingRect = {InputCursor.m_X, InputCursor.m_Y, MessageMaxWidth, 2.25f * InputCursor.m_FontSize};
 		const float TypingTravel = 30.0f;
 		const CUIRect ChatInputClipRect = {0.0f, ClippingRect.y - TypingTravel, Width, ClippingRect.h + TypingTravel};
@@ -1642,83 +4488,114 @@ void CChat::OnRender()
 
 		float ScrollOffset = m_Input.GetScrollOffset();
 		float ScrollOffsetChange = m_Input.GetScrollOffsetChange();
-
-		m_Input.Activate(EInputPriority::CHAT); // Ensure that the input is active
-		const CUIRect InputCursorRect = {InputCursor.m_X, InputCursor.m_Y - ScrollOffset, 0.0f, 0.0f};
-		const bool WasChanged = m_Input.WasChanged();
-		const bool WasCursorChanged = m_Input.WasCursorChanged();
-		const bool Changed = WasChanged || WasCursorChanged;
-		char aDisplayedInputText[MAX_LINE_LENGTH];
-		str_copy(aDisplayedInputText, m_Input.GetDisplayedString(), sizeof(aDisplayedInputText));
-		const float TypingAnimDuration = BCUiAnimations::MsToSeconds(g_Config.m_BcChatTypingAnimationMs);
-		std::vector<STextColorSplit> vTypingColorSplits;
-		std::vector<CChat::STypingGlyphAnim> vActiveTypingGlyphAnims;
-		if(BcChatTypingAnimEnabled && TypingAnimDuration > 0.0f && aDisplayedInputText[0] != '\0' && ChatTypingAnimSupportsText(aDisplayedInputText))
+		CLineInput::SMouseSelection *pMouseSelection = m_Input.GetMouseSelection();
+		const bool InputInside = MousePos.x >= ClippingRect.x && MousePos.x <= ClippingRect.x + ClippingRect.w &&
+			MousePos.y >= ClippingRect.y && MousePos.y <= ClippingRect.y + ClippingRect.h;
+		if(InputInside && m_MouseIsPress)
 		{
-			for(auto It = m_vTypingGlyphAnims.begin(); It != m_vTypingGlyphAnims.end();)
-			{
-				const float TypingAnimAge = (time_get() - It->m_StartTime) / (float)time_freq();
-				const int StartByte = It->m_ByteIndex;
-				const int GlyphBytes = It->m_ByteLength;
-				const int StoredGlyphBytes = str_length(It->m_aText);
-				const bool Valid =
-					TypingAnimAge < TypingAnimDuration &&
-					It->m_ByteIndex >= 0 &&
-					GlyphBytes > 0 &&
-					StartByte + GlyphBytes <= str_length(aDisplayedInputText) &&
-					StoredGlyphBytes == GlyphBytes &&
-					str_comp_num(It->m_aText, aDisplayedInputText + StartByte, GlyphBytes) == 0;
-				if(!Valid)
-				{
-					It = m_vTypingGlyphAnims.erase(It);
-					continue;
-				}
-
-				vActiveTypingGlyphAnims.push_back(*It);
-				vTypingColorSplits.emplace_back(It->m_ByteIndex, It->m_ByteLength, ColorRGBA(1.0f, 1.0f, 1.0f, 0.0f));
-				++It;
-			}
+			pMouseSelection->m_Selecting = true;
+			pMouseSelection->m_PressMouse = m_MousePress;
+			pMouseSelection->m_ReleaseMouse = m_MouseRelease;
+			pMouseSelection->m_Offset.y = ScrollOffset;
+			m_HasSelection = false;
+		}
+		else if(!m_MouseIsPress)
+		{
+			pMouseSelection->m_Selecting = false;
+		}
+		if(ScrollOffset != pMouseSelection->m_Offset.y)
+		{
+			pMouseSelection->m_PressMouse.y -= ScrollOffset - pMouseSelection->m_Offset.y;
+			pMouseSelection->m_Offset.y = ScrollOffset;
 		}
 
-		const bool DisableBaseOutline = !vTypingColorSplits.empty();
-		if(DisableBaseOutline)
-			TextRender()->TextOutlineColor(ColorRGBA(0.0f, 0.0f, 0.0f, 0.0f));
-		const STextBoundingBox BoundingBox = m_Input.Render(&InputCursorRect, InputCursor.m_FontSize, TEXTALIGN_TL, Changed, MessageMaxWidth, 0.0f, vTypingColorSplits);
-		if(DisableBaseOutline)
+			m_Input.Activate(EInputPriority::CHAT); // Ensure that the input is active
+			const CUIRect InputCursorRect = {InputCursor.m_X, InputCursor.m_Y - ScrollOffset, 0.0f, 0.0f};
+			const bool WasChanged = m_Input.WasChanged();
+			const bool WasCursorChanged = m_Input.WasCursorChanged();
+			const bool Changed = WasChanged || WasCursorChanged;
+
+			char aDisplayedInputText[MAX_LINE_LENGTH];
+			str_copy(aDisplayedInputText, m_Input.GetDisplayedString(), sizeof(aDisplayedInputText));
+			const float TypingAnimDuration = BCUiAnimations::MsToSeconds(g_Config.m_BcChatTypingAnimationMs);
+			std::vector<STextColorSplit> vTypingColorSplits;
+			std::vector<CChat::STypingGlyphAnim> vActiveTypingGlyphAnims;
+			if(BcChatTypingAnimEnabled && TypingAnimDuration > 0.0f && aDisplayedInputText[0] != '\0' && ChatTypingAnimSupportsText(aDisplayedInputText))
+			{
+				for(auto It = m_vTypingGlyphAnims.begin(); It != m_vTypingGlyphAnims.end();)
+				{
+					const float TypingAnimAge = (time_get() - It->m_StartTime) / (float)time_freq();
+					const int StartByte = It->m_ByteIndex;
+					const int GlyphBytes = It->m_ByteLength;
+					const int StoredGlyphBytes = str_length(It->m_aText);
+					const bool Valid =
+						TypingAnimAge < TypingAnimDuration &&
+						It->m_ByteIndex >= 0 &&
+						GlyphBytes > 0 &&
+						StartByte + GlyphBytes <= str_length(aDisplayedInputText) &&
+						StoredGlyphBytes == GlyphBytes &&
+						str_comp_num(It->m_aText, aDisplayedInputText + StartByte, GlyphBytes) == 0;
+					if(!Valid)
+					{
+						It = m_vTypingGlyphAnims.erase(It);
+						continue;
+					}
+
+					vActiveTypingGlyphAnims.push_back(*It);
+					vTypingColorSplits.emplace_back(It->m_ByteIndex, It->m_ByteLength, ColorRGBA(1.0f, 1.0f, 1.0f, 0.0f));
+					++It;
+				}
+			}
+
+			// Color splits can hide the fill color, but the outline would still be drawn for hidden glyphs.
+			// Temporarily disable outline for the base pass so the animated overlay is the only visible glyph.
+			const bool DisableBaseOutline = !vTypingColorSplits.empty();
+			if(DisableBaseOutline)
+				TextRender()->TextOutlineColor(ColorRGBA(0.0f, 0.0f, 0.0f, 0.0f));
+			const STextBoundingBox BoundingBox = m_Input.Render(&InputCursorRect, InputCursor.m_FontSize, TEXTALIGN_TL, Changed, MessageMaxWidth, 0.0f, vTypingColorSplits);
+			if(DisableBaseOutline)
+				TextRender()->TextOutlineColor(TextRender()->DefaultTextOutlineColor());
+
+			for(const auto &TypingGlyphAnim : vActiveTypingGlyphAnims)
+			{
+				const float TypingAnimAge = (time_get() - TypingGlyphAnim.m_StartTime) / (float)time_freq();
+				const float Progress = std::clamp(TypingAnimAge / TypingAnimDuration, 0.0f, 1.0f);
+				const float Ease = BCUiAnimations::EaseInOutQuart(Progress);
+				const float OverlayYOffset = -4.5f * (1.0f - Ease);
+				const int PrefixBytes = TypingGlyphAnim.m_ByteIndex;
+				char aPrefixText[MAX_LINE_LENGTH] = "";
+				if(PrefixBytes < 0 || PrefixBytes > str_length(aDisplayedInputText))
+					continue;
+				str_truncate(aPrefixText, sizeof(aPrefixText), aDisplayedInputText, PrefixBytes);
+
+				CTextCursor MeasureCursor;
+				MeasureCursor.SetPosition(vec2(InputCursorRect.x, InputCursorRect.y));
+				MeasureCursor.m_FontSize = InputCursor.m_FontSize;
+				MeasureCursor.m_LineWidth = MessageMaxWidth;
+				TextRender()->TextColor(ColorRGBA(1.0f, 1.0f, 1.0f, 0.0f));
+				TextRender()->TextOutlineColor(ColorRGBA(0.0f, 0.0f, 0.0f, 0.0f));
+				TextRender()->TextEx(&MeasureCursor, aPrefixText);
+
+				CTextCursor OverlayCursor;
+				OverlayCursor.SetPosition(vec2(MeasureCursor.m_X, MeasureCursor.m_Y + OverlayYOffset));
+				OverlayCursor.m_FontSize = InputCursor.m_FontSize;
+				OverlayCursor.m_LineWidth = MessageMaxWidth;
+				TextRender()->TextColor(ColorRGBA(1.0f, 1.0f, 1.0f, 0.75f + 0.25f * Ease));
+				TextRender()->TextOutlineColor(TextRender()->DefaultTextOutlineColor().WithMultipliedAlpha(0.75f + 0.25f * Ease));
+				TextRender()->TextEx(&OverlayCursor, TypingGlyphAnim.m_aText);
+				TextRender()->TextColor(TextRender()->DefaultTextColor());
+			}
 			TextRender()->TextOutlineColor(TextRender()->DefaultTextOutlineColor());
 
-		for(const auto &TypingGlyphAnim : vActiveTypingGlyphAnims)
-		{
-			const float TypingAnimAge = (time_get() - TypingGlyphAnim.m_StartTime) / (float)time_freq();
-			const float Progress = std::clamp(TypingAnimAge / TypingAnimDuration, 0.0f, 1.0f);
-			const float Ease = BCUiAnimations::EaseInOutQuart(Progress);
-			const float OverlayYOffset = -4.5f * (1.0f - Ease);
-			const int PrefixBytes = TypingGlyphAnim.m_ByteIndex;
-			char aPrefixText[MAX_LINE_LENGTH] = "";
-			if(PrefixBytes < 0 || PrefixBytes > str_length(aDisplayedInputText))
-				continue;
-			str_truncate(aPrefixText, sizeof(aPrefixText), aDisplayedInputText, PrefixBytes);
-
-			CTextCursor MeasureCursor;
-			MeasureCursor.SetPosition(vec2(InputCursorRect.x, InputCursorRect.y));
-			MeasureCursor.m_FontSize = InputCursor.m_FontSize;
-			MeasureCursor.m_LineWidth = MessageMaxWidth;
-			TextRender()->TextColor(ColorRGBA(1.0f, 1.0f, 1.0f, 0.0f));
-			TextRender()->TextOutlineColor(ColorRGBA(0.0f, 0.0f, 0.0f, 0.0f));
-			TextRender()->TextEx(&MeasureCursor, aPrefixText);
-
-			CTextCursor OverlayCursor;
-			OverlayCursor.SetPosition(vec2(MeasureCursor.m_X, MeasureCursor.m_Y + OverlayYOffset));
-			OverlayCursor.m_FontSize = InputCursor.m_FontSize;
-			OverlayCursor.m_LineWidth = MessageMaxWidth;
-			TextRender()->TextColor(ColorRGBA(1.0f, 1.0f, 1.0f, 0.75f + 0.25f * Ease));
-			TextRender()->TextOutlineColor(TextRender()->DefaultTextOutlineColor().WithMultipliedAlpha(0.75f + 0.25f * Ease));
-			TextRender()->TextEx(&OverlayCursor, TypingGlyphAnim.m_aText);
-			TextRender()->TextColor(TextRender()->DefaultTextColor());
-		}
-		TextRender()->TextOutlineColor(TextRender()->DefaultTextOutlineColor());
-
 		Graphics()->ClipDisable();
+
+		CUIRect TranslateButtonRect = {ClippingRect.x + ClippingRect.w + TranslateButtonGap, ClippingRect.y, TranslateButtonSize, maximum(InputCursor.m_FontSize + 4.0f, 16.0f)};
+		RenderTranslateSettingsButton(TranslateButtonRect);
+		if(Ui()->HotItem() == &m_TranslateSettingsButton || m_TranslateButtonPressed)
+		{
+			m_MouseIsPress = false;
+			m_HasSelection = false;
+		}
 
 		// Scroll up or down to keep the caret inside the clipping rect
 		const float CaretPositionY = m_Input.GetCaretPosition().y - ScrollOffsetChange;
@@ -1731,6 +4608,8 @@ void CChat::OnRender()
 
 		m_Input.SetScrollOffset(ScrollOffset);
 		m_Input.SetScrollOffsetChange(ScrollOffsetChange);
+		if(m_Input.HasSelection())
+			m_HasSelection = false;
 
 		// Autocompletion hint
 		if(m_Input.GetString()[0] == '/' && m_Input.GetString()[1] != '\0' && !m_vServerCommands.empty())
@@ -1748,6 +4627,40 @@ void CChat::OnRender()
 				}
 			}
 		}
+		else if(m_Input.GetString()[0] == '!' && m_Input.GetString()[1] != '\0')
+		{
+			const char *pIn = m_Input.GetString();
+			bool HasSpace = false;
+			for(const char *pScan = pIn; *pScan; ++pScan)
+			{
+				if(std::isspace((unsigned char)*pScan))
+				{
+					HasSpace = true;
+					break;
+				}
+			}
+			if(!HasSpace)
+			{
+				const char *apCmds[] = {"!voice", "!voicegroup"};
+				const char *pCandidate = nullptr;
+				for(const char *pCmd : apCmds)
+				{
+					if(str_startswith_nocase(pCmd, pIn))
+					{
+						pCandidate = pCmd;
+						break;
+					}
+				}
+				if(pCandidate && str_length(pCandidate) > str_length(pIn))
+				{
+					InputCursor.m_X = InputCursor.m_X + TextRender()->TextWidth(InputCursor.m_FontSize, pIn, -1, InputCursor.m_LineWidth);
+					InputCursor.m_Y = m_Input.GetCaretPosition().y;
+					TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.5f);
+					TextRender()->TextEx(&InputCursor, pCandidate + str_length(pIn));
+					TextRender()->TextColor(TextRender()->DefaultTextColor());
+				}
+			}
+		}
 	}
 
 #if defined(CONF_VIDEORECORDER)
@@ -1755,21 +4668,16 @@ void CChat::OnRender()
 #else
 	if(!g_Config.m_ClShowChat)
 #endif
-	{
-		FinishChatCursorUi();
 		return;
-	}
 
 	// Check focus mode settings
 	if(g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideChat)
-	{
-		FinishChatCursorUi();
 		return;
-	}
 
 	y -= ScaledFontSize;
 	bool IsScoreBoardOpen = GameClient()->m_Scoreboard.IsActive() && (Graphics()->ScreenAspect() > 1.7f); // only assume scoreboard when screen ratio is widescreen(something around 16:9)
 	const bool ShowLargeArea = m_Show || (m_Mode != MODE_NONE && g_Config.m_ClShowChat == 1) || g_Config.m_ClShowChat == 2;
+	const bool KeepLinesAlive = m_MediaViewerOpen && ValidateMediaViewerLine();
 
 	int64_t Now = time();
 	float HeightLimit = IsScoreBoardOpen ? 180.0f : (ShowLargeArea ? 50.0f : 200.0f);
@@ -1777,11 +4685,13 @@ void CChat::OnRender()
 
 	float RealMsgPaddingX = MessagePaddingX();
 	float RealMsgPaddingY = MessagePaddingY();
+	float RealMsgPaddingTee = MessageTeeSize() + MESSAGE_TEE_PADDING_RIGHT;
 
 	if(g_Config.m_ClChatOld)
 	{
 		RealMsgPaddingX = 0;
 		RealMsgPaddingY = 0;
+		RealMsgPaddingTee = 0;
 	}
 
 	int TotalLines = 0;
@@ -1790,7 +4700,7 @@ void CChat::OnRender()
 		CLine &Line = m_aLines[((m_CurrentLine - i) + MAX_LINES) % MAX_LINES];
 		if(!Line.m_Initialized)
 			break;
-		if(Now > Line.m_Time + 16 * time_freq() && !ShowLargeArea)
+		if(Now > Line.m_Time + 16 * time_freq() && !ShowLargeArea && !KeepLinesAlive)
 			break;
 		++TotalLines;
 	}
@@ -1859,6 +4769,8 @@ void CChat::OnRender()
 				else
 					m_ScrollbarDragOffset = Handle.h / 2.0f;
 				m_ScrollbarDragging = true;
+				m_MouseIsPress = false;
+				m_HasSelection = false;
 			}
 
 			float NewValue = Current;
@@ -1885,14 +4797,17 @@ void CChat::OnRender()
 		m_ScrollbarDragging = false;
 	}
 
-	OnPrepareLines(y, m_BacklogCurLine);
+	OnPrepareLines(y, m_BacklogCurLine, HoveredTranslateLineIndex);
+	std::string SelectionString;
+	bool HasChatSelection = false;
 
 	for(int i = m_BacklogCurLine; i < MAX_LINES; i++)
 	{
-		CLine &Line = m_aLines[((m_CurrentLine - i) + MAX_LINES) % MAX_LINES];
+		const int LineIndex = ((m_CurrentLine - i) + MAX_LINES) % MAX_LINES;
+		CLine &Line = m_aLines[LineIndex];
 		if(!Line.m_Initialized)
 			break;
-		if(Now > Line.m_Time + 16 * time_freq() && !m_PrevShowChat)
+		if(Now > Line.m_Time + 16 * time_freq() && !m_PrevShowChat && !KeepLinesAlive)
 			break;
 
 		y -= Line.m_aYOffset[OffsetType];
@@ -1902,6 +4817,10 @@ void CChat::OnRender()
 			break;
 
 		float Blend = Now > Line.m_Time + 14 * time_freq() && !m_PrevShowChat ? 1.0f - (Now - Line.m_Time - 14 * time_freq()) / (2.0f * time_freq()) : 1.0f;
+		if(KeepLinesAlive && LineIndex == m_MediaViewerLineIndex)
+			Blend = 1.0f;
+
+		// BestClient: lift newly received messages from the bottom.
 		float BcLineXOffset = 0.0f;
 		float BcLineYOffset = 0.0f;
 		if(BcChatMessageAnimEnabled && g_Config.m_BcChatAnimationMs > 0 && Line.m_Time > 0)
@@ -1912,7 +4831,8 @@ void CChat::OnRender()
 			const float Ease = BCUiAnimations::EaseInOutQuad(Progress);
 			BcLineYOffset = 42.0f * (1.0f - Ease);
 		}
-		const float LineRenderX = ChatOpenOffsetX + BcLineXOffset;
+
+		const float LineRenderX = x + ChatOpenOffsetX + BcLineXOffset;
 		const float LineRenderY = y + BcLineYOffset;
 
 		// Draw backgrounds for messages in one batch
@@ -1922,7 +4842,7 @@ void CChat::OnRender()
 			if(Line.m_QuadContainerIndex != -1)
 			{
 				Graphics()->SetColor(color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClChatBackgroundColor, true)).WithMultipliedAlpha(Blend));
-				Graphics()->RenderQuadContainerEx(Line.m_QuadContainerIndex, 0, -1, LineRenderX, ((LineRenderY + RealMsgPaddingY / 2.0f) - Line.m_TextYOffset));
+				Graphics()->RenderQuadContainerEx(Line.m_QuadContainerIndex, 0, -1, ChatOpenOffsetX + BcLineXOffset, ((LineRenderY + RealMsgPaddingY / 2.0f) - Line.m_TextYOffset));
 			}
 		}
 
@@ -1941,17 +4861,306 @@ void CChat::OnRender()
 				const CAnimState *pIdleState = CAnimState::GetIdle();
 				vec2 OffsetToMid;
 				CRenderTools::GetRenderTeeOffsetToRenderedTee(pIdleState, &TeeRenderInfo, OffsetToMid);
-				vec2 TeeRenderPos(x + LineRenderX + (RealMsgPaddingX + TeeSize) / 2.0f, LineRenderY + OffsetTeeY + FullHeightMinusTee / 2.0f + OffsetToMid.y);
+				vec2 TeeRenderPos(LineRenderX + (RealMsgPaddingX + TeeSize) / 2.0f, LineRenderY + OffsetTeeY + FullHeightMinusTee / 2.0f + OffsetToMid.y);
 				RenderTools()->RenderTee(pIdleState, &TeeRenderInfo, EMOTE_NORMAL, vec2(1, 0.1f), TeeRenderPos, Blend);
 			}
 
 			const ColorRGBA TextColor = TextRender()->DefaultTextColor().WithMultipliedAlpha(Blend);
 			const ColorRGBA TextOutlineColor = TextRender()->DefaultTextOutlineColor().WithMultipliedAlpha(Blend);
-			TextRender()->RenderTextContainer(Line.m_TextContainerIndex, TextColor, TextOutlineColor, LineRenderX, (LineRenderY + RealMsgPaddingY / 2.0f) - Line.m_TextYOffset);
+			const float TextOffsetY = (LineRenderY + RealMsgPaddingY / 2.0f) - Line.m_TextYOffset;
+			if(Line.m_ClientId >= 0 && Line.m_aName[0] != '\0')
+			{
+				char aClientId[16] = "";
+				if(g_Config.m_ClShowIds)
+					GameClient()->FormatClientId(Line.m_ClientId, aClientId, EClientIdFormat::INDENT_AUTO);
+
+				float NameRectX = LineRenderX + RealMsgPaddingX / 2.0f + RealMsgPaddingTee;
+				if(Line.m_Friend && g_Config.m_ClMessageFriend)
+					NameRectX += TextRender()->TextWidth(FontSize(), "♥ ");
+				NameRectX += TextRender()->TextWidth(FontSize(), aClientId);
+				Line.m_NameRect.m_X = NameRectX;
+				Line.m_NameRect.m_Y = Line.m_TextYOffset + TextOffsetY;
+				Line.m_NameRect.m_W = maximum(1.0f, TextRender()->TextWidth(FontSize(), Line.m_aName));
+				Line.m_NameRect.m_H = FontSize();
+				Line.m_NameRectValid = true;
+			}
+			TextRender()->RenderTextContainer(Line.m_TextContainerIndex, TextColor, TextOutlineColor, ChatOpenOffsetX + BcLineXOffset, TextOffsetY);
+
+			if(Line.m_TranslateRectValid || Line.m_TranslateLanguageRectValid)
+			{
+				const SRenderRect ActualTranslateRect = {
+					Line.m_TranslateRect.m_X + ChatOpenOffsetX + BcLineXOffset,
+					Line.m_TranslateRect.m_Y + TextOffsetY,
+					Line.m_TranslateRect.m_W,
+					Line.m_TranslateRect.m_H};
+				Line.m_TranslateRect = ActualTranslateRect;
+				CUIRect TranslateRectUi = {
+					ActualTranslateRect.m_X / UiToChatScale.x,
+					ActualTranslateRect.m_Y / UiToChatScale.y,
+					ActualTranslateRect.m_W / UiToChatScale.x,
+					ActualTranslateRect.m_H / UiToChatScale.y};
+				CUIRect LanguageRectUi = {0.0f, 0.0f, 0.0f, 0.0f};
+				const bool HoveredTranslatedMessage = Line.m_TranslateRectValid &&
+					(Ui()->MouseHovered(&TranslateRectUi) ||
+						(MousePos.x >= ActualTranslateRect.m_X && MousePos.x <= ActualTranslateRect.m_X + ActualTranslateRect.m_W &&
+							MousePos.y >= ActualTranslateRect.m_Y && MousePos.y <= ActualTranslateRect.m_Y + ActualTranslateRect.m_H));
+
+				bool HoveredLanguageTag = false;
+				if(Line.m_TranslateLanguageRectValid)
+				{
+					const SRenderRect ActualLanguageRect = {
+						Line.m_TranslateLanguageRect.m_X + ChatOpenOffsetX + BcLineXOffset,
+						Line.m_TranslateLanguageRect.m_Y + TextOffsetY,
+						Line.m_TranslateLanguageRect.m_W,
+						Line.m_TranslateLanguageRect.m_H};
+					Line.m_TranslateLanguageRect = ActualLanguageRect;
+					LanguageRectUi = {
+						ActualLanguageRect.m_X / UiToChatScale.x,
+						ActualLanguageRect.m_Y / UiToChatScale.y,
+						ActualLanguageRect.m_W / UiToChatScale.x,
+						ActualLanguageRect.m_H / UiToChatScale.y};
+					HoveredLanguageTag = Ui()->MouseHovered(&LanguageRectUi) ||
+						(MousePos.x >= ActualLanguageRect.m_X && MousePos.x <= ActualLanguageRect.m_X + ActualLanguageRect.m_W &&
+							MousePos.y >= ActualLanguageRect.m_Y && MousePos.y <= ActualLanguageRect.m_Y + ActualLanguageRect.m_H);
+				}
+
+				if(HoveredTranslatedMessage || HoveredLanguageTag)
+					Ui()->SetHotItem(Line.m_TranslateLanguageRectValid ? (const void *)&Line.m_TranslateLanguageRect : (const void *)&Line.m_TranslateRect);
+
+				if(HoveredTranslatedMessage || HoveredLanguageTag)
+					HoveredTranslateLineIndex = LineIndex;
+			}
+
+			if(Line.m_SelectionStart >= 0 && Line.m_SelectionEnd >= 0 && Line.m_SelectionStart != Line.m_SelectionEnd)
+			{
+				HasChatSelection = true;
+				if(m_WantsSelectionCopy)
+				{
+					const std::string PlainText = BuildPlainTextLine(Line);
+					const int SelectionMin = minimum(Line.m_SelectionStart, Line.m_SelectionEnd);
+					const int SelectionMax = maximum(Line.m_SelectionStart, Line.m_SelectionEnd);
+					const size_t OffUTF8Start = str_utf8_offset_chars_to_bytes(PlainText.c_str(), SelectionMin);
+					const size_t OffUTF8End = str_utf8_offset_chars_to_bytes(PlainText.c_str(), SelectionMax);
+					const bool HasNewLine = !SelectionString.empty();
+					SelectionString.insert(0, PlainText.substr(OffUTF8Start, OffUTF8End - OffUTF8Start) + (HasNewLine ? "\n" : ""));
+				}
+			}
+
+				const bool ShowMediaSlot = ShouldDisplayMediaSlot(Line);
+				const bool HideMediaPreview = ShouldHideMediaPreview(Line);
+				Line.m_MediaPreviewRectValid = false;
+				if(ShowMediaSlot && HideMediaPreview &&
+					Line.m_aMediaPreviewWidth[OffsetType] > 0.0f && Line.m_aMediaPreviewHeight[OffsetType] > 0.0f)
+				{
+					const float PreviewX = LineRenderX + RealMsgPaddingX / 2.0f;
+					const float PreviewY = Line.m_TextYOffset + TextOffsetY + Line.m_aTextHeight[OffsetType] + FontSize() * 0.4f;
+					const float PreviewW = Line.m_aMediaPreviewWidth[OffsetType];
+					const float PreviewH = Line.m_aMediaPreviewHeight[OffsetType];
+
+					Graphics()->TextureClear();
+					Graphics()->QuadsBegin();
+					Graphics()->SetColor(0.10f, 0.10f, 0.10f, 0.82f * Blend);
+					const IGraphics::CQuadItem HiddenQuad(PreviewX, PreviewY, PreviewW, PreviewH);
+					Graphics()->QuadsDrawTL(&HiddenQuad, 1);
+					Graphics()->QuadsEnd();
+
+					CTextCursor HiddenCursor;
+					const float HiddenFontSize = FontSize() * 0.72f;
+					const float HiddenLabelWidth = TextRender()->TextWidth(HiddenFontSize, "hidden media");
+					HiddenCursor.SetPosition(vec2(PreviewX + maximum(FontSize() * 0.35f, (PreviewW - HiddenLabelWidth) / 2.0f), PreviewY + maximum(FontSize() * 0.25f, (PreviewH - HiddenFontSize) / 2.0f)));
+					HiddenCursor.m_FontSize = HiddenFontSize;
+					TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.9f * Blend);
+					TextRender()->TextEx(&HiddenCursor, "hidden media");
+					TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+					Line.m_MediaRetryRectValid = false;
+					if(m_Mode != MODE_NONE)
+					{
+						Line.m_MediaPreviewRect.m_X = PreviewX;
+						Line.m_MediaPreviewRect.m_Y = PreviewY;
+						Line.m_MediaPreviewRect.m_W = PreviewW;
+						Line.m_MediaPreviewRect.m_H = PreviewH;
+						Line.m_MediaPreviewRectValid = true;
+					}
+				}
+				else if(ShowMediaSlot && Line.m_MediaState == EMediaState::READY &&
+					Line.m_aMediaPreviewWidth[OffsetType] > 0.0f && Line.m_aMediaPreviewHeight[OffsetType] > 0.0f)
+				{
+					IGraphics::CTextureHandle MediaTexture;
+					if(GetCurrentFrameTexture(Line, MediaTexture))
+					{
+						const float PreviewX = LineRenderX + RealMsgPaddingX / 2.0f;
+						const float PreviewY = Line.m_TextYOffset + TextOffsetY + Line.m_aTextHeight[OffsetType] + FontSize() * 0.4f;
+						const float PreviewW = Line.m_aMediaPreviewWidth[OffsetType];
+						const float PreviewH = Line.m_aMediaPreviewHeight[OffsetType];
+
+						Graphics()->WrapClamp();
+						Graphics()->TextureSet(MediaTexture);
+						Graphics()->QuadsBegin();
+						Graphics()->QuadsSetSubset(0.0f, 0.0f, 1.0f, 1.0f);
+						Graphics()->SetColor(1.0f, 1.0f, 1.0f, Blend);
+						const IGraphics::CQuadItem QuadItem(PreviewX, PreviewY, PreviewW, PreviewH);
+						Graphics()->QuadsDrawTL(&QuadItem, 1);
+						Graphics()->QuadsEnd();
+						Graphics()->WrapNormal();
+						Graphics()->TextureClear();
+
+						Line.m_MediaRetryRectValid = false;
+						if(m_Mode != MODE_NONE && g_Config.m_BcChatMediaViewer)
+						{
+							Line.m_MediaPreviewRect.m_X = PreviewX;
+							Line.m_MediaPreviewRect.m_Y = PreviewY;
+							Line.m_MediaPreviewRect.m_W = PreviewW;
+							Line.m_MediaPreviewRect.m_H = PreviewH;
+							Line.m_MediaPreviewRectValid = true;
+						}
+					}
+				}
+				else if(ShowMediaSlot &&
+					(Line.m_MediaState == EMediaState::QUEUED || Line.m_MediaState == EMediaState::LOADING || Line.m_MediaState == EMediaState::DECODING) &&
+					Line.m_aMediaPreviewWidth[OffsetType] > 0.0f && Line.m_aMediaPreviewHeight[OffsetType] > 0.0f)
+				{
+					const float PreviewX = LineRenderX + RealMsgPaddingX / 2.0f;
+					const float PreviewY = Line.m_TextYOffset + TextOffsetY + Line.m_aTextHeight[OffsetType] + FontSize() * 0.4f;
+					const float PreviewW = Line.m_aMediaPreviewWidth[OffsetType];
+					const float PreviewH = Line.m_aMediaPreviewHeight[OffsetType];
+
+					Graphics()->TextureClear();
+					Graphics()->QuadsBegin();
+					Graphics()->SetColor(0.12f, 0.12f, 0.12f, 0.75f * Blend);
+					const IGraphics::CQuadItem LoadingQuad(PreviewX, PreviewY, PreviewW, PreviewH);
+					Graphics()->QuadsDrawTL(&LoadingQuad, 1);
+					Graphics()->QuadsEnd();
+
+					CTextCursor LoadingCursor;
+					LoadingCursor.SetPosition(vec2(PreviewX + FontSize() * 0.35f, PreviewY + PreviewH * 0.15f));
+					LoadingCursor.m_FontSize = FontSize() * 0.75f;
+					TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.8f * Blend);
+					TextRender()->TextEx(&LoadingCursor, "Loading media...");
+					TextRender()->TextColor(TextRender()->DefaultTextColor());
+					Line.m_MediaRetryRectValid = false;
+				}
+				else if(ShowMediaSlot &&
+					Line.m_MediaState == EMediaState::FAILED &&
+					Line.m_aMediaPreviewWidth[OffsetType] > 0.0f && Line.m_aMediaPreviewHeight[OffsetType] > 0.0f)
+				{
+					const float PreviewX = LineRenderX + RealMsgPaddingX / 2.0f;
+					const float PreviewY = Line.m_TextYOffset + TextOffsetY + Line.m_aTextHeight[OffsetType] + FontSize() * 0.4f;
+					const float PreviewW = Line.m_aMediaPreviewWidth[OffsetType];
+					const float PreviewH = Line.m_aMediaPreviewHeight[OffsetType];
+					const bool CanRetry = Line.m_MediaRetryCount < CHAT_MEDIA_MAX_RETRIES && !Line.m_vMediaCandidates.empty();
+
+					Graphics()->TextureClear();
+					Graphics()->QuadsBegin();
+					Graphics()->SetColor(0.23f, 0.10f, 0.10f, 0.82f * Blend);
+					const IGraphics::CQuadItem FailedQuad(PreviewX, PreviewY, PreviewW, PreviewH);
+					Graphics()->QuadsDrawTL(&FailedQuad, 1);
+					Graphics()->QuadsEnd();
+
+					CTextCursor FailedCursor;
+					FailedCursor.SetPosition(vec2(PreviewX + FontSize() * 0.35f, PreviewY + FontSize() * 0.25f));
+					FailedCursor.m_FontSize = FontSize() * 0.70f;
+					TextRender()->TextColor(1.0f, 0.85f, 0.85f, 0.95f * Blend);
+					TextRender()->TextEx(&FailedCursor, CanRetry ? "Media preview unavailable" : "Media preview unavailable (retry limit reached)");
+
+					const char *pRetryLabel = CanRetry ? "Retry" : "Retry limit reached";
+					const float RetryFont = FontSize() * 0.66f;
+					const float RetryLabelWidth = TextRender()->TextWidth(RetryFont, pRetryLabel);
+					const float RetryW = maximum(FontSize() * 4.2f, RetryLabelWidth + FontSize() * 0.8f);
+					const float RetryH = maximum(FontSize() * 0.95f, 12.0f);
+					const float RetryX = PreviewX + PreviewW - RetryW - FontSize() * 0.25f;
+					const float RetryY = PreviewY + PreviewH - RetryH - FontSize() * 0.25f;
+
+					Graphics()->TextureClear();
+					Graphics()->QuadsBegin();
+					if(CanRetry)
+						Graphics()->SetColor(0.86f, 0.28f, 0.28f, 0.95f * Blend);
+					else
+						Graphics()->SetColor(0.35f, 0.35f, 0.35f, 0.75f * Blend);
+					const IGraphics::CQuadItem RetryQuad(RetryX, RetryY, RetryW, RetryH);
+					Graphics()->QuadsDrawTL(&RetryQuad, 1);
+					Graphics()->QuadsEnd();
+
+					CTextCursor RetryCursor;
+					RetryCursor.SetPosition(vec2(RetryX + (RetryW - RetryLabelWidth) / 2.0f, RetryY + (RetryH - RetryFont) / 2.0f));
+					RetryCursor.m_FontSize = RetryFont;
+					TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.95f * Blend);
+					TextRender()->TextEx(&RetryCursor, pRetryLabel);
+					TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+					Line.m_MediaRetryRectValid = CanRetry;
+					if(CanRetry)
+					{
+						Line.m_MediaRetryRect.m_X = RetryX;
+						Line.m_MediaRetryRect.m_Y = RetryY;
+						Line.m_MediaRetryRect.m_W = RetryW;
+						Line.m_MediaRetryRect.m_H = RetryH;
+					}
+				}
 		}
 	}
 
-	FinishChatCursorUi();
+	m_HasSelection = HasChatSelection;
+	if(m_Input.HasSelection())
+		m_HasSelection = false;
+
+	if(m_WantsSelectionCopy)
+	{
+		if(!SelectionString.empty())
+			Input()->SetClipboardText(SelectionString.c_str());
+		m_WantsSelectionCopy = false;
+	}
+
+	if(m_MediaViewerOpen && ValidateMediaViewerLine() && g_Config.m_BcChatMediaViewer)
+	{
+		CLine &ViewerLine = m_aLines[m_MediaViewerLineIndex];
+		IGraphics::CTextureHandle MediaTexture;
+		float ViewerX = 0.0f;
+		float ViewerY = 0.0f;
+		float ViewerW = 0.0f;
+		float ViewerH = 0.0f;
+		if(GetCurrentFrameTexture(ViewerLine, MediaTexture) && GetMediaViewerRect(ViewerLine, Width, Height, ViewerX, ViewerY, ViewerW, ViewerH))
+		{
+			Graphics()->TextureClear();
+			Graphics()->QuadsBegin();
+			Graphics()->SetColor(0.0f, 0.0f, 0.0f, 0.82f);
+			const IGraphics::CQuadItem Backdrop(0.0f, 0.0f, Width, Height);
+			Graphics()->QuadsDrawTL(&Backdrop, 1);
+			Graphics()->QuadsEnd();
+
+			Graphics()->WrapClamp();
+			Graphics()->TextureSet(MediaTexture);
+			Graphics()->QuadsBegin();
+			Graphics()->QuadsSetSubset(0.0f, 0.0f, 1.0f, 1.0f);
+			Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
+			const IGraphics::CQuadItem ViewerQuad(ViewerX, ViewerY, ViewerW, ViewerH);
+			Graphics()->QuadsDrawTL(&ViewerQuad, 1);
+			Graphics()->QuadsEnd();
+			Graphics()->WrapNormal();
+			Graphics()->TextureClear();
+
+			CTextCursor HintCursor;
+			HintCursor.SetPosition(vec2(10.0f, Height - FontSize() * 1.8f));
+			HintCursor.m_FontSize = FontSize() * 0.75f;
+			TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.9f);
+			TextRender()->TextEx(&HintCursor, "Esc - close, Wheel - zoom, Drag - move, Double click - reset");
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+		}
+	}
+
+	if(m_Mode != MODE_NONE && Ui()->IsPopupOpen())
+	{
+		Ui()->StartCheck();
+		Ui()->Update();
+		Ui()->MapScreen();
+		Ui()->RenderPopupMenus();
+		Ui()->FinishCheck();
+		Ui()->ClearHotkeys();
+		Graphics()->MapScreen(0.0f, 0.0f, Width, Height);
+	}
+
+	if(m_Mode != MODE_NONE)
+		RenderTools()->RenderCursor(UiMousePos * UiToChatScale, 12.0f);
 }
 
 void CChat::EnsureCoherentFontSize() const
@@ -2001,29 +5210,70 @@ void CChat::SendChat(int Team, const char *pLine)
 	Client()->SendPackMsgActive(&Msg, MSGFLAG_VITAL);
 }
 
-void CChat::SendChatQueued(const char *pLine)
+void CChat::AddHistoryEntry(int Team, const char *pLine)
 {
 	if(!pLine || str_length(pLine) < 1)
 		return;
 
-	bool AddEntry = false;
+	const int Length = str_length(pLine);
+	CHistoryEntry *pEntry = m_History.Allocate(sizeof(CHistoryEntry) + Length);
+	pEntry->m_Team = Team;
+	str_copy(pEntry->m_aText, pLine, Length + 1);
+}
+
+void CChat::SendChatPayloadQueued(int Team, const char *pLine)
+{
+	if(!pLine || str_length(pLine) < 1)
+		return;
 
 	if(m_LastChatSend + time_freq() < time())
 	{
-		SendChat(m_Mode == MODE_ALL ? 0 : 1, pLine);
-		AddEntry = true;
+		SendChat(Team, pLine);
 	}
-	else if(m_PendingChatCounter < 3)
+	else if(m_vPendingChatQueue.size() < 3)
 	{
-		++m_PendingChatCounter;
-		AddEntry = true;
+		CPendingChatEntry Entry;
+		Entry.m_Team = Team;
+		str_copy(Entry.m_aText, pLine, sizeof(Entry.m_aText));
+		m_vPendingChatQueue.emplace_back(Entry);
+	}
+}
+
+void CChat::SendChatQueued(const char *pLine)
+{
+	if(!pLine || *str_utf8_skip_whitespaces(pLine) == '\0')
+		return;
+
+	const int Team = m_Mode == MODE_ALL ? 0 : 1;
+	AddHistoryEntry(Team, pLine);
+	SendChatPayloadQueued(Team, pLine);
+}
+
+void CChat::SendTranslatedChatQueued(int Team, const char *pLine)
+{
+	SendChatPayloadQueued(Team, pLine);
+}
+
+bool CChat::LineHighlighted(int ClientId, const char *pLine)
+{
+	bool Highlighted = false;
+
+	if(Client()->State() != IClient::STATE_DEMOPLAYBACK)
+	{
+		if(ClientId >= 0 && ClientId != GameClient()->m_aLocalIds[0] && ClientId != GameClient()->m_aLocalIds[1])
+		{
+			for(int LocalId : GameClient()->m_aLocalIds)
+			{
+				Highlighted |= LocalId >= 0 && LineShouldHighlight(pLine, GameClient()->m_aClients[LocalId].m_aName);
+			}
+		}
+	}
+	else
+	{
+		// on demo playback use local id from snap directly,
+		// since m_aLocalIds isn't valid there
+		Highlighted |= GameClient()->m_Snap.m_LocalClientId >= 0 && LineShouldHighlight(pLine, GameClient()->m_aClients[GameClient()->m_Snap.m_LocalClientId].m_aName);
 	}
 
-	if(AddEntry)
-	{
-		const int Length = str_length(pLine);
-		CHistoryEntry *pEntry = m_History.Allocate(sizeof(CHistoryEntry) + Length);
-		pEntry->m_Team = m_Mode == MODE_ALL ? 0 : 1;
-		str_copy(pEntry->m_aText, pLine, Length + 1);
-	}
+	return Highlighted;
 }
