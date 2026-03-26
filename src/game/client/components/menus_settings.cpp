@@ -1797,14 +1797,10 @@ void CMenus::RenderSettings(CUIRect MainView)
 				CUIRect SubButton;
 				SubTabs.VSplitLeft(SubTabWidth, &SubButton, &SubTabs);
 				const int Corners = i == 0 ? (IGraphics::CORNER_TL | IGraphics::CORNER_BL) : (i == NumSubTabs - 1 ? (IGraphics::CORNER_TR | IGraphics::CORNER_BR) : IGraphics::CORNER_NONE);
-				if(DoButton_MenuTab(&pSubButtons[i], apSubTabs[i], g_Config.m_UiSettingsPage == aSubTabPages[i], &SubButton, Corners, &m_aAnimatorsSettingsTab[aSubTabPages[i]], nullptr, nullptr, nullptr, 4.0f))
+				if(DoButton_MenuTab(&pSubButtons[i], apSubTabs[i], g_Config.m_UiSettingsPage == aSubTabPages[i], &SubButton, Corners, nullptr, nullptr, nullptr, nullptr, 4.0f))
 					g_Config.m_UiSettingsPage = aSubTabPages[i];
 			}
 
-			ContentView.HSplitTop(10.0f, nullptr, &ContentView);
-		}
-		else
-		{
 			ContentView.HSplitTop(10.0f, nullptr, &ContentView);
 		}
 
@@ -3349,7 +3345,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 	static CButtonContainer s_aPageTabs[NUM_BESTCLIENT_TABS] = {};
 
 	CUIRect TabBar, Button;
-	MainView.HSplitTop(20.0f, &TabBar, &MainView);
+	MainView.HSplitTop(24.0f, &TabBar, &MainView);
 	const float TabWidth = TabBar.w / (float)NUM_BESTCLIENT_TABS;
 	const char *apTabNames[NUM_BESTCLIENT_TABS] = {
 		Localize("Visuals"),
