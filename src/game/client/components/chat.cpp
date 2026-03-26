@@ -1714,6 +1714,13 @@ void CChat::OnRender()
 		return;
 	}
 
+	// Check focus mode settings
+	if(g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideChat)
+	{
+		FinishChatCursorUi();
+		return;
+	}
+
 	y -= ScaledFontSize;
 	bool IsScoreBoardOpen = GameClient()->m_Scoreboard.IsActive() && (Graphics()->ScreenAspect() > 1.7f); // only assume scoreboard when screen ratio is widescreen(something around 16:9)
 	const bool ShowLargeArea = m_Show || (m_Mode != MODE_NONE && g_Config.m_ClShowChat == 1) || g_Config.m_ClShowChat == 2;

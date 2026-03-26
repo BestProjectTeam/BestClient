@@ -49,6 +49,8 @@ float COrbitAura::GetIdleVisibility(const vec2 &BasePos, float Delta, float Curr
 
 bool COrbitAura::CanRenderAura(int &ClientId, vec2 &BasePos, ColorRGBA &BaseColor, float &Alpha)
 {
+	if(g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideEffects)
+		return false;
 	if(!g_Config.m_BcOrbitAura)
 		return false;
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
@@ -103,7 +105,12 @@ void COrbitAura::OnRender()
 	float Alpha = 0.0f;
 	if(!CanRenderAura(ClientId, BasePos, BaseColor, Alpha))
 	{
-		if(!g_Config.m_BcOrbitAura || Client()->State() == IClient::STATE_OFFLINE || GameClient()->m_Snap.m_LocalClientId < 0)
+		const bool AuraUnavailable = (g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideEffects) ||
+			!g_Config.m_BcOrbitAura ||
+			Client()->State() == IClient::STATE_OFFLINE ||
+			GameClient()->m_Snap.m_LocalClientId < 0 ||
+			!GameClient()->m_Snap.m_aCharacters[GameClient()->m_Snap.m_LocalClientId].m_Active;
+		if(AuraUnavailable)
 			ResetState();
 		else
 			m_SpawnAccumulator = 0.0f;

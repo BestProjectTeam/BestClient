@@ -153,7 +153,7 @@ void C3DParticles::ResetParticles()
 
 bool C3DParticles::ShouldRender() const
 {
-	return true;
+	return !(g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideEffects);
 }
 
 void C3DParticles::OnRender()

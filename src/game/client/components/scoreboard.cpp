@@ -869,6 +869,10 @@ void CScoreboard::OnRender()
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return;
 
+	// Check focus mode settings
+	if(g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideScoreboard)
+		return;
+
 	if(!IsActive())
 	{
 		// lock mouse if scoreboard was opened by being dead or game pause

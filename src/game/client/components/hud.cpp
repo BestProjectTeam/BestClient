@@ -136,7 +136,8 @@ void CHud::OnInit()
 
 void CHud::RenderGameTimer()
 {
-	if(g_Config.m_BcMusicPlayer != 0)
+	const bool MusicPlayerOccupiesTimerSlot = g_Config.m_BcMusicPlayer != 0 && !(g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideSongPlayer);
+	if(MusicPlayerOccupiesTimerSlot)
 		return;
 
 	float Half = m_Width / 2.0f;
@@ -2015,6 +2016,17 @@ void CHud::OnRender()
 	if(g_Config.m_ClShowhud)
 #endif
 	{
+		// Check focus mode settings for UI elements
+		const bool FocusModeActive = g_Config.m_ClFocusMode;
+		const bool HideHudInFocusMode = g_Config.m_ClFocusModeHideHud;
+		const bool HideUIInFocusMode = g_Config.m_ClFocusModeHideUI;
+
+		if(FocusModeActive && HideHudInFocusMode)
+		{
+			RenderCursor();
+			return;
+		}
+
 		if(GameClient()->m_Snap.m_pLocalCharacter && !GameClient()->m_Snap.m_SpecInfo.m_Active && !(GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_GAMEOVER))
 		{
 			if(g_Config.m_ClShowhudHealthAmmo)
@@ -2025,7 +2037,9 @@ void CHud::OnRender()
 			{
 				RenderPlayerState(GameClient()->m_Snap.m_LocalClientId);
 			}
-			RenderSpectatorCount();
+			// Hide spectator count in focus mode
+			if(!(FocusModeActive && HideUIInFocusMode))
+				RenderSpectatorCount();
 			RenderMovementInformation();
 			RenderDDRaceEffects();
 		}
@@ -2056,11 +2070,15 @@ void CHud::OnRender()
 		RenderSuddenDeath();
 		if(g_Config.m_ClShowhudScore)
 			RenderScoreHud();
-		RenderDummyActions();
+		// Hide dummy actions in focus mode
+		if(!(FocusModeActive && HideUIInFocusMode))
+			RenderDummyActions();
 		RenderWarmupTimer();
 		RenderTextInfo();
 		GameClient()->m_TClient.RenderCenterLines();
-		RenderLocalTime((m_Width / 7) * 3);
+		// Hide local time in focus mode
+		if(!(FocusModeActive && HideUIInFocusMode))
+			RenderLocalTime((m_Width / 7) * 3);
 		if(Client()->State() != IClient::STATE_DEMOPLAYBACK)
 			RenderConnectionWarning();
 		RenderTeambalanceWarning();

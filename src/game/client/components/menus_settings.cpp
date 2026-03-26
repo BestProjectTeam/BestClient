@@ -4059,6 +4059,46 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		}
 		Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
 
+		// Focus mode (right column block)
+		{
+			static float s_FocusModePhase = 0.0f;
+			const bool Enabled = g_Config.m_ClFocusMode != 0;
+			UpdateRevealPhase(s_FocusModePhase, Enabled);
+
+			const float TargetHeight = 7.0f * LineSize;
+			const float ContentHeight = LineSize + MarginSmall + LineSize + TargetHeight * s_FocusModePhase;
+			CUIRect Content, Label, Visible;
+			BeginBlock(Column, ContentHeight, Content);
+
+			Content.HSplitTop(LineSize, &Label, &Content);
+			Ui()->DoLabel(&Label, Localize("Focus Mode"), HeadlineFontSize, TEXTALIGN_ML);
+			Content.HSplitTop(MarginSmall, nullptr, &Content);
+
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClFocusMode, Localize("Enable Focus Mode"), &g_Config.m_ClFocusMode, &Content, LineSize);
+
+			const float CurHeight = TargetHeight * s_FocusModePhase;
+			if(CurHeight > 0.0f)
+			{
+				Content.HSplitTop(CurHeight, &Visible, &Content);
+				Ui()->ClipEnable(&Visible);
+				struct SScopedClip
+				{
+					CUi *m_pUi;
+					~SScopedClip() { m_pUi->ClipDisable(); }
+				} ClipGuard{Ui()};
+
+				CUIRect Expand = {Visible.x, Visible.y, Visible.w, TargetHeight};
+				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClFocusModeHideNames, Localize("Hide Player Names"), &g_Config.m_ClFocusModeHideNames, &Expand, LineSize);
+				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClFocusModeHideEffects, Localize("Hide Visual Effects"), &g_Config.m_ClFocusModeHideEffects, &Expand, LineSize);
+				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClFocusModeHideHud, Localize("Hide HUD"), &g_Config.m_ClFocusModeHideHud, &Expand, LineSize);
+				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClFocusModeHideSongPlayer, Localize("Hide Song Player"), &g_Config.m_ClFocusModeHideSongPlayer, &Expand, LineSize);
+				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClFocusModeHideUI, Localize("Hide Unnecessary UI"), &g_Config.m_ClFocusModeHideUI, &Expand, LineSize);
+				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClFocusModeHideChat, Localize("Hide Chat"), &g_Config.m_ClFocusModeHideChat, &Expand, LineSize);
+				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClFocusModeHideScoreboard, Localize("Hide Scoreboard"), &g_Config.m_ClFocusModeHideScoreboard, &Expand, LineSize);
+			}
+		}
+		Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
+
 		// Animations (right column block)
 		{
 			static float s_AnimationsBlockPhase = 0.0f;

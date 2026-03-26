@@ -2214,6 +2214,12 @@ public:
 
 	void UpdateHudReservation(CMusicPlayer *pOwner)
 	{
+		if(g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideSongPlayer)
+		{
+			ResetHudState();
+			return;
+		}
+
 		const float Height = HudLayout::CANVAS_HEIGHT;
 		const float Width = Height * pOwner->Graphics()->ScreenAspect();
 		const auto Layout = HudLayout::Get(HudLayout::MODULE_MUSIC_PLAYER, Width, Height);
@@ -2420,6 +2426,8 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	if(!m_pImpl)
 		return;
 	if(g_Config.m_BcMusicPlayer == 0)
+		return;
+	if(!ForcePreview && g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideSongPlayer)
 		return;
 
 	SNowPlayingSnapshot Snapshot = m_pImpl->m_Snapshot;
