@@ -678,6 +678,7 @@ public:
 	const IGraphics::CTextureHandle &MainMenuLogoTexture() const { return m_MainMenuLogoTexture; }
 
 	bool IsActive() const { return m_MenuActive; }
+	bool IsIngameGamePage() const { return m_MenuActive && Client()->State() == IClient::STATE_ONLINE && m_GamePage == PAGE_GAME; }
 	void SetActive(bool Active);
 
 	void OnInterfacesInit(CGameClient *pClient) override;

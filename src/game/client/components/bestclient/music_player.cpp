@@ -2417,6 +2417,8 @@ void CMusicPlayer::OnRender()
 		return;
 	if(!m_pImpl)
 		return;
+	if(GameClient()->m_Menus.IsActive() && !GameClient()->m_Menus.IsIngameGamePage())
+		return;
 
 	RenderMusicPlayer(false);
 }
