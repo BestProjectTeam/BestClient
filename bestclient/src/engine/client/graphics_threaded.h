@@ -1,7 +1,8 @@
 #ifndef ENGINE_CLIENT_GRAPHICS_THREADED_H
 #define ENGINE_CLIENT_GRAPHICS_THREADED_H
 
-#include <base/system.h>
+#include <base/dbg.h>
+#include <base/sphore.h>
 
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
@@ -813,7 +814,6 @@ class CGraphics_Threaded : public IEngineGraphics
 
 	//
 	class IStorage *m_pStorage;
-	class IConsole *m_pConsole;
 	class IEngine *m_pEngine;
 
 	int m_CurIndex;

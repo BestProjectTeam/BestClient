@@ -355,12 +355,6 @@ void CVoting::Render(bool ForcePreview)
 	const bool BackgroundEnabled = Layout.m_BackgroundEnabled;
 	const unsigned BackgroundColor = Layout.m_BackgroundColor;
 
-	if(g_Config.m_TcMiniVoteHud > 0)
-	{
-		GameClient()->m_BestClient.RenderMiniVoteHud(ForcePreview);
-		return;
-	}
-
 	CUIRect View = {PosX, PosY, 120.0f * Scale, 38.0f * Scale};
 	if(BackgroundEnabled)
 	{

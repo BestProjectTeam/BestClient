@@ -50,8 +50,6 @@ class CBestClient : public CComponent
 	bool m_OptimizerDiscordPriorityBelowNormalActive = false;
 	float m_OptimizerDiscordPriorityLastUpdateTime = -1.0f;
 
-	float m_FinishTextTimeout = 0.0f;
-	void DoFinishCheck();
 	void UpdateAutoTeamLock();
 	void UpdateAutoDummyJoin();
 	void SendChatCommandToConn(int Conn, const char *pLine);
@@ -123,21 +121,8 @@ public:
 		COMPONENT_RACE_SPEEDRUN_TIMER,
 		COMPONENT_RACE_AUTO_TEAM_LOCK,
 		COMPONENT_GORES_INPUT,
-		COMPONENT_GORES_ANTI_PING_SMOOTHING,
-		COMPONENT_GORES_AUTO_EXECUTE,
-		COMPONENT_GORES_VOTING,
-		COMPONENT_GORES_HUD,
-		COMPONENT_GORES_TILE_OUTLINES,
-		COMPONENT_GORES_BACKGROUND_DRAW,
 		COMPONENT_GORES_GORES_MODE,
 		COMPONENT_GORES_HOOK_COMBO,
-		COMPONENT_GORES_ANTI_LATENCY_TOOLS,
-		COMPONENT_GORES_AUTO_REPLY,
-		COMPONENT_GORES_PLAYER_INDICATOR,
-		COMPONENT_GORES_FROZEN_TEE_DISPLAY,
-		COMPONENT_GORES_GHOST_TOOLS,
-		COMPONENT_GORES_RAINBOW,
-		COMPONENT_GORES_FINISH_NAME,
 		NUM_COMPONENTS_EDITOR_COMPONENTS,
 	};
 
@@ -170,10 +155,7 @@ public:
 	void ResetBestClientInfoTask();
 	bool NeedUpdate();
 
-	void RenderMiniVoteHud(bool ForcePreview = false);
 	void RenderHookCombo(bool ForcePreview = false);
-	void RenderCenterLines();
-	void RenderCtfFlag(vec2 Pos, float Alpha);
 
 	bool ChatDoSpecId(const char *pInput);
 	bool InfoTaskDone() { return m_pBestClientInfoTask && m_pBestClientInfoTask->State() == EHttpState::DONE; }

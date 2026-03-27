@@ -73,6 +73,8 @@ static const SSettingsSearchEntry gs_aSettingsSearchEntries[] = {
 	{"\u043E\u0441\u043D\u043E\u0432", "main_general_tab", CMenus::SETTINGS_GENERAL_TAB, -1, -1, -1, -1, -1},
 	{"appearance", "main_appearance_tab", CMenus::SETTINGS_APPEARANCE_TAB, -1, -1, -1, -1, -1},
 	{"\u043E\u0442\u043E\u0431\u0440\u0430\u0436", "main_appearance_tab", CMenus::SETTINGS_APPEARANCE_TAB, -1, -1, -1, -1, -1},
+	{"tclient", "main_tclient_tab", CMenus::SETTINGS_TCLIENT, -1, -1, -1, -1, -1},
+	{"\u0442\u043A\u043B\u0438", "main_tclient_tab", CMenus::SETTINGS_TCLIENT, -1, -1, -1, -1, -1},
 	{"bestclient", "main_bestclient_tab", CMenus::SETTINGS_BESTCLIENT, -1, -1, -1, -1, -1},
 	{"\u0431\u0435\u0441\u0442", "main_bestclient_tab", CMenus::SETTINGS_BESTCLIENT, -1, -1, -1, -1, -1},
 	{"controls", "general_controls_tab", CMenus::SETTINGS_GENERAL_TAB, CMenus::GENERAL_SUBTAB_CONTROLS, -1, -1, -1, -1},
@@ -108,21 +110,11 @@ static const SSettingsSearchEntry gs_aSettingsSearchEntries[] = {
 	{"hook combo", "Hook Combo", CMenus::SETTINGS_BESTCLIENT, -1, -1, SEARCH_BESTCLIENT_TAB_GORESFEATURES, -1, 0},
 	{"hookcombo", "Hook Combo", CMenus::SETTINGS_BESTCLIENT, -1, -1, SEARCH_BESTCLIENT_TAB_GORESFEATURES, -1, 0},
 	{"\u0445\u0443\u043A \u043A\u043E\u043C\u0431\u043E", "Hook Combo", CMenus::SETTINGS_BESTCLIENT, -1, -1, SEARCH_BESTCLIENT_TAB_GORESFEATURES, -1, 0},
-	{"tile outlines", "Tile Outlines", CMenus::SETTINGS_BESTCLIENT, -1, -1, SEARCH_BESTCLIENT_TAB_GORESFEATURES, -1, 0},
-	{"width", "Tile Outlines", CMenus::SETTINGS_BESTCLIENT, -1, -1, SEARCH_BESTCLIENT_TAB_GORESFEATURES, -1, 0},
-	{"\u0448\u0438\u0440\u0438\u043D", "Tile Outlines", CMenus::SETTINGS_BESTCLIENT, -1, -1, SEARCH_BESTCLIENT_TAB_GORESFEATURES, -1, 0},
-	{"auto", "Auto Reply", CMenus::SETTINGS_BESTCLIENT, -1, -1, SEARCH_BESTCLIENT_TAB_GORESFEATURES, -1, 0},
-	{"\u0430\u0432\u0442\u043E", "Auto Reply", CMenus::SETTINGS_BESTCLIENT, -1, -1, SEARCH_BESTCLIENT_TAB_GORESFEATURES, -1, 0},
-	{"auto reply", "Auto Reply", CMenus::SETTINGS_BESTCLIENT, -1, -1, SEARCH_BESTCLIENT_TAB_GORESFEATURES, -1, 0},
-	{"autoreply", "Auto Reply", CMenus::SETTINGS_BESTCLIENT, -1, -1, SEARCH_BESTCLIENT_TAB_GORESFEATURES, -1, 0},
-	{"\u0430\u0432\u0442\u043E\u043E\u0442\u0432\u0435\u0442", "Auto Reply", CMenus::SETTINGS_BESTCLIENT, -1, -1, SEARCH_BESTCLIENT_TAB_GORESFEATURES, -1, 0},
 	{"auto team lock", "Auto Team Lock", CMenus::SETTINGS_BESTCLIENT, -1, -1, SEARCH_BESTCLIENT_TAB_RACEFEATURES, -1, -1},
 	{"autolock", "Auto Team Lock", CMenus::SETTINGS_BESTCLIENT, -1, -1, SEARCH_BESTCLIENT_TAB_RACEFEATURES, -1, -1},
 	{"\u0430\u0432\u0442\u043E\u043B\u043E\u043A", "Auto Team Lock", CMenus::SETTINGS_BESTCLIENT, -1, -1, SEARCH_BESTCLIENT_TAB_RACEFEATURES, -1, -1},
 	{"autoswitch", "general_autoswitch", CMenus::SETTINGS_GENERAL_TAB, CMenus::GENERAL_SUBTAB_GENERAL, -1, -1, -1, -1},
 	{"switch weapon", "general_autoswitch", CMenus::SETTINGS_GENERAL_TAB, CMenus::GENERAL_SUBTAB_GENERAL, -1, -1, -1, -1},
-	{"status bar", "Status Bar", CMenus::SETTINGS_BESTCLIENT, -1, -1, SEARCH_BESTCLIENT_TAB_GORESFEATURES, -1, 1},
-	{"\u0441\u0442\u0430\u0442\u0443\u0441", "Status Bar", CMenus::SETTINGS_BESTCLIENT, -1, -1, SEARCH_BESTCLIENT_TAB_GORESFEATURES, -1, 1},
 	{"bindsystem", "BindSystem", CMenus::SETTINGS_BESTCLIENT, -1, -1, SEARCH_BESTCLIENT_TAB_RACEFEATURES, -1, -1},
 	{"speedrun", "Speedrun Timer", CMenus::SETTINGS_BESTCLIENT, -1, -1, SEARCH_BESTCLIENT_TAB_RACEFEATURES, -1, -1},
 	{"\u0442\u0430\u0439\u043C\u0435\u0440", "Speedrun Timer", CMenus::SETTINGS_BESTCLIENT, -1, -1, SEARCH_BESTCLIENT_TAB_RACEFEATURES, -1, -1},
@@ -1628,7 +1620,7 @@ float CMenus::RenderSettingsGraphics(CUIRect MainView)
 		char aTmpBackendName[256];
 
 		auto IsInfoDefault = [](const SMenuBackendInfo &CheckInfo) {
-			return str_comp_nocase(CheckInfo.m_pBackendName, CConfig::ms_pGfxBackend) == 0 && CheckInfo.m_Major == CConfig::ms_GfxGLMajor && CheckInfo.m_Minor == CConfig::ms_GfxGLMinor && CheckInfo.m_Patch == CConfig::ms_GfxGLPatch;
+			return str_comp_nocase(CheckInfo.m_pBackendName, DefaultConfig::GfxBackend) == 0 && CheckInfo.m_Major == DefaultConfig::GfxGLMajor && CheckInfo.m_Minor == DefaultConfig::GfxGLMinor && CheckInfo.m_Patch == DefaultConfig::GfxGLPatch;
 		};
 
 		int SelectedOldBackend = -1;
@@ -1987,6 +1979,10 @@ void CMenus::SyncOldSettingsPageFromCurrent()
 		else
 			m_OldSettingsPage = OLD_SETTINGS_APPEARANCE;
 	}
+	else if(g_Config.m_UiSettingsPage == SETTINGS_TCLIENT)
+	{
+		m_OldSettingsPage = OLD_SETTINGS_TCLIENT;
+	}
 	else
 	{
 		m_OldSettingsPage = OLD_SETTINGS_BESTCLIENT;
@@ -2029,6 +2025,9 @@ void CMenus::SyncCurrentSettingsPageFromOld()
 		break;
 	case OLD_SETTINGS_BESTCLIENT:
 		g_Config.m_UiSettingsPage = SETTINGS_BESTCLIENT;
+		break;
+	case OLD_SETTINGS_TCLIENT:
+		g_Config.m_UiSettingsPage = SETTINGS_TCLIENT;
 		break;
 	case OLD_SETTINGS_GENERAL:
 	default:
@@ -2159,7 +2158,7 @@ void CMenus::RenderSettingsNew(CUIRect MainView, bool NeedRestart)
 	g_Config.m_UiSettingsPage = minimum(maximum(g_Config.m_UiSettingsPage, 0), SETTINGS_LENGTH - 1);
 
 	// Main tabs at top
-	const char *apTabs[] = {Localize("General"), Localize("Appearance"), TCLocalize("BestClient")};
+	const char *apTabs[] = {Localize("General"), Localize("Appearance"), TCLocalize("TClient"), TCLocalize("BestClient")};
 	static CButtonContainer saTabButtons[SETTINGS_LENGTH];
 
 	CUIRect TabsBar = TabBar;
@@ -2192,6 +2191,7 @@ void CMenus::RenderSettingsNew(CUIRect MainView, bool NeedRestart)
 
 		if((i == SETTINGS_GENERAL_TAB && SettingsSearchIsHighlight("main_general_tab")) ||
 			(i == SETTINGS_APPEARANCE_TAB && SettingsSearchIsHighlight("main_appearance_tab")) ||
+			(i == SETTINGS_TCLIENT && SettingsSearchIsHighlight("main_tclient_tab")) ||
 			(i == SETTINGS_BESTCLIENT && SettingsSearchIsHighlight("main_bestclient_tab")))
 		{
 			Button.Draw(ColorRGBA(1.0f, 0.9f, 0.25f, 0.2f), Corners, 4.0f);
@@ -2205,6 +2205,8 @@ void CMenus::RenderSettingsNew(CUIRect MainView, bool NeedRestart)
 		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_LANGUAGE);
 	else if(g_Config.m_UiSettingsPage == SETTINGS_APPEARANCE_TAB)
 		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_CONTROLS);
+	else if(g_Config.m_UiSettingsPage == SETTINGS_TCLIENT)
+		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_RESERVED1);
 	else if(g_Config.m_UiSettingsPage == SETTINGS_BESTCLIENT)
 		GameClient()->m_MenuBackground.ChangePosition(gs_BestClientSettingsBackgroundPosition);
 
@@ -2390,6 +2392,11 @@ void CMenus::RenderSettingsNew(CUIRect MainView, bool NeedRestart)
 			RenderGeneralPage(View);
 		else if(Page == SETTINGS_APPEARANCE_TAB)
 			RenderAppearancePage(View);
+		else if(Page == SETTINGS_TCLIENT)
+		{
+			View.HSplitTop(10.0f, nullptr, &View);
+			RenderSettingsTClient(View);
+		}
 		else if(Page == SETTINGS_BESTCLIENT)
 		{
 			View.HSplitTop(10.0f, nullptr, &View);
@@ -2466,6 +2473,7 @@ void CMenus::RenderSettingsOld(CUIRect MainView, bool NeedRestart)
 		Localize("Sound"),
 		Localize("DDNet"),
 		Localize("Assets"),
+		TCLocalize("TClient"),
 		TCLocalize("BestClient")};
 
 	static CButtonContainer s_aTabButtons[OLD_SETTINGS_LENGTH];
@@ -2529,6 +2537,10 @@ void CMenus::RenderSettingsOld(CUIRect MainView, bool NeedRestart)
 	case OLD_SETTINGS_ASSETS:
 		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_ASSETS);
 		RenderSettingsCustom(PageView);
+		break;
+	case OLD_SETTINGS_TCLIENT:
+		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_RESERVED1);
+		RenderSettingsTClient(PageView);
 		break;
 	case OLD_SETTINGS_BESTCLIENT:
 	default:
@@ -3043,7 +3055,7 @@ float CMenus::RenderSettingsAppearance(CUIRect MainView)
 		}
 
 		static CButtonContainer s_BackgroundColor;
-		DoLine_ColorPicker(&s_BackgroundColor, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &LeftView, Localize("Chat background color"), &g_Config.m_ClChatBackgroundColor, color_cast<ColorRGBA>(ColorHSLA(CConfig::ms_ClChatBackgroundColor, true)), false, nullptr, true);
+		DoLine_ColorPicker(&s_BackgroundColor, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &LeftView, Localize("Chat background color"), &g_Config.m_ClChatBackgroundColor, color_cast<ColorRGBA>(ColorHSLA(DefaultConfig::ClChatBackgroundColor, true)), false, nullptr, true);
 
 		// ***** Messages ***** //
 		Ui()->DoLabel_AutoLineSize(Localize("Messages"), HeadlineFontSize,

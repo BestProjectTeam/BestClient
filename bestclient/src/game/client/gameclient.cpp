@@ -213,6 +213,7 @@ void CGameClient::OnConsoleInit()
 					      &m_3DParticles,
 					      &m_Translate,
 					      &m_Ghost,
+					      &m_TClient, // Must be before chat and players
 					      &m_BestClient, // Must be before chat and players
 					      &m_Afterimage,
 					      &m_Players,
@@ -221,6 +222,7 @@ void CGameClient::OnConsoleInit()
 					      &m_MapLayersForeground,
 					      &m_MovingTilesForeground,
 					      &m_Outlines,
+					      &m_Mumble,
 					      &m_Pet,
 					      &m_Particles.m_RenderExplosions,
 					      &m_NamePlates,
@@ -236,6 +238,7 @@ void CGameClient::OnConsoleInit()
 					      &m_Spectator,
 					      &m_Emoticon,
 					      &m_BindChat,
+					      &m_BindWheel,
 					      &m_BindSystem,
 					      &m_WarList,
 					      &m_StatusBar,
@@ -276,6 +279,7 @@ void CGameClient::OnConsoleInit()
 						  &m_Scoreboard,
 						  &m_Motd, // for pressing esc to remove it
 						  &m_Spectator,
+						  &m_BindWheel,
 						  &m_BindSystem,
 						  &m_Emoticon,
 						  &m_ImportantAlert,
@@ -403,6 +407,11 @@ void CGameClient::InitializeLanguage()
 	if(g_Config.m_ClShowWelcome)
 		g_Localization.SelectDefaultLanguage(Console(), g_Config.m_ClLanguagefile, sizeof(g_Config.m_ClLanguagefile));
 	g_Localization.Load(g_Config.m_ClLanguagefile, Storage(), Console());
+
+	// TClient
+	char aBufTClient[512];
+	str_format(aBufTClient, sizeof(aBufTClient), "tclient/%s", g_Config.m_ClLanguagefile);
+	g_Localization.Load(aBufTClient, Storage(), Console(), false);
 
 	// BestClient
 	char aBuf[512];
@@ -800,6 +809,11 @@ void CGameClient::OnReset()
 	m_HammerInput = {};
 	m_DummyFire = 0;
 	m_ReceivedDDNetPlayer = false;
+	m_ReceivedDDNetPlayerFinishTimes = false;
+	m_ReceivedDDNetPlayerFinishTimesMillis = false;
+	m_MapBestTimeSeconds = FinishTime::UNSET;
+	m_MapBestTimeMillis = 0;
+	m_aMapDescription[0] = '\0';
 
 	m_Teams.Reset();
 	m_GameWorld.Clear();
@@ -958,22 +972,17 @@ void CGameClient::OnRender()
 	const auto IsWorldRenderComponent = [&](CComponent *pComponent) {
 		return pComponent == &m_Background ||
 			pComponent == &m_MapLayersBackground ||
-			pComponent == &m_BgDraw ||
 			pComponent == &m_Particles.m_RenderTrail ||
 			pComponent == &m_Particles.m_RenderTrailExtra ||
 			pComponent == &m_Items ||
-			pComponent == &m_Trails ||
 			pComponent == &m_3DParticles ||
 			pComponent == &m_Translate ||
 			pComponent == &m_Ghost ||
 			pComponent == &m_BestClient ||
 			pComponent == &m_Afterimage ||
 			pComponent == &m_Players ||
-			pComponent == &m_MovingTilesBackground ||
 			pComponent == &m_FastPractice ||
 			pComponent == &m_MapLayersForeground ||
-			pComponent == &m_MovingTilesForeground ||
-			pComponent == &m_Outlines ||
 			pComponent == &m_Pet ||
 			pComponent == &m_Particles.m_RenderExplosions ||
 			pComponent == &m_NamePlates ||
@@ -981,7 +990,6 @@ void CGameClient::OnRender()
 			pComponent == &m_Particles.m_RenderGeneral ||
 			pComponent == &m_FreezeBars ||
 			pComponent == &m_DamageInd ||
-			pComponent == &m_PlayerIndicator ||
 			pComponent == &m_Mod;
 	};
 
@@ -1393,6 +1401,24 @@ void CGameClient::OnMessage(int MsgId, CUnpacker *pUnpacker, int Conn, bool Dumm
 	{
 		const CNetMsg_Sv_SaveCode *pMsg = (CNetMsg_Sv_SaveCode *)pRawMsg;
 		OnSaveCodeNetMessage(pMsg);
+	}
+	else if(MsgId == NETMSGTYPE_SV_RECORD || MsgId == NETMSGTYPE_SV_RECORDLEGACY)
+	{
+		CNetMsg_Sv_Record *pMsg = static_cast<CNetMsg_Sv_Record *>(pRawMsg);
+		if(pMsg->m_ServerTimeBest > 0)
+		{
+			m_MapBestTimeSeconds = pMsg->m_ServerTimeBest / 100;
+			m_MapBestTimeMillis = (pMsg->m_ServerTimeBest % 100) * 10;
+		}
+		else if(m_MapBestTimeSeconds == FinishTime::UNSET)
+		{
+			// some PvP mods based on DDNet accidentally send a best time of 0, despite having no finished races
+		}
+	}
+	else if(MsgId == NETMSGTYPE_SV_MAPINFO)
+	{
+		CNetMsg_Sv_MapInfo *pMsg = static_cast<CNetMsg_Sv_MapInfo *>(pRawMsg);
+		str_copy(m_aMapDescription, pMsg->m_pDescription);
 	}
 }
 
@@ -1865,6 +1891,8 @@ void CGameClient::OnNewSnapshot()
 
 	bool FoundGameInfoEx = false;
 	bool GotSwitchStateTeam = false;
+	bool HasUnsetDDNetFinishTimes = false;
+	bool HasTrueMillisecondFinishTimes = false;
 	m_aSwitchStateTeam[g_Config.m_ClDummy] = -1;
 
 	for(auto &Client : m_aClients)
@@ -1954,6 +1982,13 @@ void CGameClient::OnNewSnapshot()
 					m_aClients[Item.m_Id].m_Afk = pInfo->m_Flags & EXPLAYERFLAG_AFK;
 					m_aClients[Item.m_Id].m_Paused = pInfo->m_Flags & EXPLAYERFLAG_PAUSED;
 					m_aClients[Item.m_Id].m_Spec = pInfo->m_Flags & EXPLAYERFLAG_SPEC;
+					m_aClients[Item.m_Id].m_FinishTimeSeconds = pInfo->m_FinishTimeSeconds;
+					m_aClients[Item.m_Id].m_FinishTimeMillis = pInfo->m_FinishTimeMillis;
+
+					if(m_aClients[Item.m_Id].m_FinishTimeSeconds == FinishTime::UNSET)
+						HasUnsetDDNetFinishTimes = true;
+					else if(m_aClients[Item.m_Id].m_FinishTimeMillis % 10 != 0)
+						HasTrueMillisecondFinishTimes = true;
 
 					if(Item.m_Id == m_Snap.m_LocalClientId && (m_aClients[Item.m_Id].m_Paused || m_aClients[Item.m_Id].m_Spec))
 					{
@@ -2041,6 +2076,7 @@ void CGameClient::OnNewSnapshot()
 					pClient->m_HasTelegunLaser = pCharacterData->m_Flags & CHARACTERFLAG_TELEGUN_LASER;
 
 					pClient->m_Predicted.ReadDDNet(pCharacterData);
+					pClient->m_RegularPredicted.ReadDDNet(pCharacterData);
 
 					m_Teams.SetSolo(Item.m_Id, pClient->m_Solo);
 				}
@@ -2095,6 +2131,12 @@ void CGameClient::OnNewSnapshot()
 					if(!m_Snap.m_pSpectatorCount)
 						m_Snap.m_pSpectatorCount = pSpectatorCount;
 				}
+			}
+			else if(Item.m_Type == NETOBJTYPE_MAPBESTTIME)
+			{
+				const CNetObj_MapBestTime *pMapBestTimeData = (const CNetObj_MapBestTime *)Item.m_pData;
+				m_MapBestTimeSeconds = pMapBestTimeData->m_MapBestTimeSeconds;
+				m_MapBestTimeMillis = pMapBestTimeData->m_MapBestTimeMillis;
 			}
 			else if(Item.m_Type == NETOBJTYPE_GAMEINFO)
 			{
@@ -2283,6 +2325,10 @@ void CGameClient::OnNewSnapshot()
 		// update foe state
 		m_aClients[i].m_Foe = !(i == m_Snap.m_LocalClientId || !m_Snap.m_apPlayerInfos[i] || !Foes()->IsFriend(m_aClients[i].m_aName, m_aClients[i].m_aClan, true));
 	}
+
+	// check if we received all finish times
+	m_ReceivedDDNetPlayerFinishTimes = m_ReceivedDDNetPlayer && !HasUnsetDDNetFinishTimes;
+	m_ReceivedDDNetPlayerFinishTimesMillis = m_ReceivedDDNetPlayer && HasTrueMillisecondFinishTimes;
 
 	// sort player infos by name
 	mem_copy(m_Snap.m_apInfoByName, m_Snap.m_apPlayerInfos, sizeof(m_Snap.m_apInfoByName));
@@ -2534,33 +2580,6 @@ void CGameClient::OnNewSnapshot()
 				m_Effects.AirJump(Pos, Alpha, Volume);
 			}
 	}
-	if(g_Config.m_ClFreezeStars && !m_SuppressEvents)
-	{
-		for(auto &Character : m_Snap.m_aCharacters)
-		{
-			if(Character.m_Active && Character.m_HasExtendedData && Character.m_pPrevExtendedData)
-			{
-				int FreezeTimeNow = Character.m_ExtendedData.m_FreezeEnd - Client()->GameTick(g_Config.m_ClDummy);
-				int FreezeTimePrev = Character.m_pPrevExtendedData->m_FreezeEnd - Client()->PrevGameTick(g_Config.m_ClDummy);
-				vec2 Pos = vec2(Character.m_Cur.m_X, Character.m_Cur.m_Y);
-				int StarsNow = (FreezeTimeNow + 1) / Client()->GameTickSpeed();
-				int StarsPrev = (FreezeTimePrev + 1) / Client()->GameTickSpeed();
-				if(StarsNow < StarsPrev || (StarsPrev == 0 && StarsNow > 0))
-				{
-					int Amount = StarsNow + 1;
-					float Mid = 3 * pi / 2;
-					float Min = Mid - pi / 3;
-					float Max = Mid + pi / 3;
-					for(int j = 0; j < Amount; j++)
-					{
-						float Angle = mix(Min, Max, (j + 1) / (float)(Amount + 2));
-						m_Effects.DamageIndicator(Pos, direction(Angle), 1.0f);
-					}
-				}
-			}
-		}
-	}
-
 	// Record m_LastRaceTick for g_Config.m_ClConfirmDisconnect/QuitTime
 	if(m_GameInfo.m_Race &&
 		Client()->State() == IClient::STATE_ONLINE &&
@@ -2860,46 +2879,6 @@ void CGameClient::OnPredict()
 	if(FastInputTicks > 0)
 		m_PredictedWorld.CopyWorld(&m_PrevPredictedWorld);
 
-	if(g_Config.m_TcRemoveAnti)
-	{
-		m_ExtraPredictedWorld.CopyWorldClean(&m_PredictedWorld);
-
-		// Remove other tees to reduce lag and because they aren't really important in this case
-		for(int i = 0; i < MAX_CLIENTS; i++)
-			if(i != m_Snap.m_LocalClientId)
-				if(CCharacter *pDelChar = m_ExtraPredictedWorld.GetCharacterById(i))
-					pDelChar->Destroy();
-
-		CCharacter *pExtraChar = m_ExtraPredictedWorld.GetCharacterById(m_Snap.m_LocalClientId);
-		if(pExtraChar)
-		{
-			bool Unfrozen = false;
-			bool Frozen = false;
-			for(int i = 0; i < g_Config.m_TcUnfreezeLagDelayTicks; i++)
-			{
-				if(!pExtraChar)
-					continue;
-
-				if(Frozen && pExtraChar->m_AliveAccumulation > 0)
-					Unfrozen = true;
-
-				if(pExtraChar->m_AliveAccumulation < 0)
-					Frozen = true;
-
-				if(!Unfrozen)
-				{
-					m_ExtraPredictedWorld.m_GameTick++;
-					m_ExtraPredictedWorld.Tick();
-				}
-				else
-				{
-					pExtraChar->m_AliveAccumulation = std::max(pExtraChar->m_AliveAccumulation, 1);
-					pExtraChar->m_AliveAccumulation = std::min(pExtraChar->m_AliveAccumulation + 1, g_Config.m_TcUnfreezeLagDelayTicks);
-				}
-			}
-		}
-	}
-
 	// detect mispredictions of other players and make corrections smoother when possible
 	if(g_Config.m_ClAntiPingSmooth &&
 		Predict() && AntiPingPlayers() &&
@@ -2960,209 +2939,6 @@ void CGameClient::OnPredict()
 			}
 		}
 	}
-
-	// BestClient
-	// New antiping smoothing
-	CCharacter *pSmoothLocalChar = m_PredSmoothingWorld.GetCharacterById(m_Snap.m_LocalClientId);
-	if(g_Config.m_TcAntiPingImproved &&
-		Predict() && AntiPingPlayers() &&
-		pSmoothLocalChar &&
-		RealPredTick && m_PredictedTick >= MIN_TICK)
-	{
-		int PredTime = std::clamp(Client()->GetPredictionTime(), 0, 8000); // Milliseconds for some reason?? TODO: Use more precision
-
-		// Nightmare: in order to get 100% accurate comparison to detect mispredictions we must
-		// tick the PREVIOUS predicted world with our CURRENT predicted inputs
-		CCharacter *pSmoothDummyChar = 0;
-		CCharacter *pPredDummyChar = 0;
-		if(PredictDummy())
-		{
-			pSmoothDummyChar = m_PredSmoothingWorld.GetCharacterById(m_PredictedDummyId);
-			pPredDummyChar = m_PredictedWorld.GetCharacterById(m_PredictedDummyId);
-		}
-		CNetObj_PlayerInput *pInputData = m_PredictedWorld.GetCharacterById(m_Snap.m_LocalClientId)->LatestInput();
-		CNetObj_PlayerInput *pDummyInputData = !pPredDummyChar ? 0 : m_PredictedWorld.GetCharacterById(m_PredictedDummyId)->LatestInput();
-		bool DummyFirst = pSmoothLocalChar && pSmoothDummyChar && pSmoothDummyChar->GetCid() < pSmoothLocalChar->GetCid();
-
-		if(DummyFirst && pSmoothDummyChar && pDummyInputData)
-			pSmoothDummyChar->OnDirectInput(pDummyInputData);
-
-		if(pInputData && pSmoothLocalChar)
-			pSmoothLocalChar->OnDirectInput(pInputData);
-
-		if(!DummyFirst && pSmoothDummyChar && pDummyInputData)
-			pSmoothDummyChar->OnDirectInput(pDummyInputData);
-
-		m_PredSmoothingWorld.m_GameTick++;
-
-		if(pInputData && pSmoothLocalChar)
-			pSmoothLocalChar->OnPredictedInput(pInputData);
-
-		if(pDummyInputData && pSmoothDummyChar)
-			pSmoothDummyChar->OnPredictedInput(pDummyInputData);
-		m_PredSmoothingWorld.Tick();
-
-		for(int i = 0; i < MAX_CLIENTS; i++)
-		{
-			if(!m_Snap.m_aCharacters[i].m_Active || !m_aLastActive[i])
-				continue;
-
-			if(i == m_PredictedDummyId || i == m_Snap.m_LocalClientId)
-			{
-				m_aClients[i].m_PrevImprovedPredPos = m_aClients[i].m_PrevPredicted.m_Pos;
-				m_aClients[i].m_ImprovedPredPos = m_aClients[i].m_Predicted.m_Pos;
-				continue;
-			}
-
-			CCharacter *pChar = m_PredSmoothingWorld.GetCharacterById(i);
-			if(!pChar)
-				continue;
-
-			vec2 PredPos = m_aClients[i].m_Predicted.m_Pos;
-			// NOTE: In improved anti-ping mode, fast-input for others can push other tees ahead.
-			// For the classic ms-based fast input (mode 0) we keep using the previous predicted
-			// position to avoid overly aggressive smoothing artifacts. In low-delta mode (mode 1)
-			// users expect `tc_fast_input_others` to actually reduce the perceived delay, so we
-			// keep the real predicted position.
-			if(g_Config.m_BcFastInputMode == 0 && EffectiveFastInputOthers() && FastInputTicks > 0)
-				PredPos = m_aClients[i].m_PrevPredicted.m_Pos;
-
-			vec2 PrevPredPos = pChar->GetCore().m_Pos;
-
-			// Cursed hack to get the game tick consistently
-			int GameTick = Client()->GameTick(g_Config.m_ClDummy) + (int)Client()->IntraGameTick(g_Config.m_ClDummy);
-			static int s_PrevGameTick = 0;
-			if(s_PrevGameTick == GameTick)
-				GameTick++;
-			s_PrevGameTick = Client()->GameTick(g_Config.m_ClDummy) + (int)Client()->IntraGameTick(g_Config.m_ClDummy);
-
-			vec2 ServerPos = m_aClients[i].m_aPredPos[GameTick % 200];
-			vec2 PrevServerPos = m_aClients[i].m_aPredPos[(GameTick - 1) % 200];
-
-			vec2 PredDir = normalize(PredPos - ServerPos);
-			vec2 LastDir = normalize(PrevPredPos - ServerPos);
-
-			vec2 MaxPos = vec2(0, 0);
-			vec2 MinPos = vec2(0, 0);
-			// Get a bounding box for our final prediction position to minimize going through walls
-			for(int Tick = GameTick - 1; Tick <= FinalTickOthers; Tick++)
-			{
-				if(m_aClients[i].m_aPredTick[Tick % 200] == 0)
-					continue;
-				vec2 Pos = m_aClients[i].m_aPredPos[Tick % 200];
-				if(Tick == GameTick - 1)
-				{
-					MaxPos = Pos;
-					MinPos = Pos;
-				}
-				else
-				{
-					MaxPos.x = std::max(Pos.x, MaxPos.x);
-					MaxPos.y = std::max(Pos.y, MaxPos.y);
-					MinPos.x = std::min(Pos.x, MinPos.x);
-					MinPos.y = std::min(Pos.y, MinPos.y);
-				}
-			}
-			int PredStartTick = GameTick;
-			int HistoryStartTick = PredStartTick - (FinalTickOthers - PredStartTick);
-			HistoryStartTick = std::max(0, HistoryStartTick);
-			vec2 HistoryVector = vec2(0, 0);
-			float HistoryDistance = 0.0f;
-			// Find the average history vector
-			for(int Tick = HistoryStartTick; Tick <= PredStartTick; Tick++)
-			{
-				if(m_aClients[i].m_aPredTick[Tick % 200] == 0 || m_aClients[i].m_aPredTick[(Tick - 1) % 200] == 0)
-					continue;
-				vec2 DirVector = m_aClients[i].m_aPredPos[Tick % 200] - m_aClients[i].m_aPredPos[(Tick - 1) % 200];
-				HistoryVector += DirVector;
-				HistoryDistance += length(DirVector);
-			}
-
-			int HistoryCount = (PredStartTick - HistoryStartTick + 1);
-			HistoryVector = HistoryVector / HistoryCount;
-			HistoryVector = normalize(HistoryVector);
-			float Variance = 0.0f;
-			// Find the variance over the history window
-			if(length(HistoryVector) > 0.0f)
-			{
-				for(int Tick = HistoryStartTick; Tick <= PredStartTick; Tick++)
-				{
-					if(m_aClients[i].m_aPredTick[Tick % 200] == 0 || m_aClients[i].m_aPredTick[(Tick - 1) % 200] == 0)
-						continue;
-					vec2 DirVector = m_aClients[i].m_aPredPos[Tick % 200] - m_aClients[i].m_aPredPos[(Tick - 1) % 200];
-					vec2 Diff = normalize(DirVector) - HistoryVector;
-					Variance += dot(Diff, Diff);
-				}
-				Variance /= HistoryCount;
-			}
-			else
-			{
-				Variance = 0.0f;
-			}
-			float Sigma = 1.5f; // Can be adjusted
-			float SigmaScale = length(PredPos - ServerPos) / HistoryDistance;
-			if(SigmaScale > 0)
-				Sigma /= SigmaScale;
-			float TrustFactor = std::max(0.0f, 1.0f - (std::sqrt(Variance) / Sigma));
-			vec2 TrustedVector = HistoryVector;
-
-			// Detect mispredictions
-			float Confidence = 1.0f;
-			if(PredDir == vec2(0, 0))
-				Confidence = 1.0f;
-			else
-			{
-				Confidence = std::max(0.0f, dot(LastDir, PredDir));
-				Confidence = std::pow(Confidence, 4.0f); // Can be adjusted
-			}
-			float Uncertainty = 1.0f - Confidence;
-			float TickDuration = (float)1000 / (float)Client()->GameTickSpeed();
-
-			// Manage uncertainty value
-			float PredTimeScale = (float)g_Config.m_TcAntiPingUncertaintyScale / 100.0f;
-			float TickSize = TickDuration / ((float)PredTime * PredTimeScale); // 20ms / PredTime
-			float PrevConfidence = 1.0f - m_aClients[i].m_Uncertainty;
-			float NewConfidence = PrevConfidence - Uncertainty + TickSize;
-			float MinConfidence = g_Config.m_TcAntiPingNegativeBuffer ? -1.0f : 0.0f;
-			NewConfidence = std::clamp(NewConfidence, MinConfidence, 1.0f); // A certain about of "negative buffer" is allowed
-			m_aClients[i].m_Uncertainty = 1.0f - NewConfidence;
-			NewConfidence = std::max(0.0f, NewConfidence);
-
-			// Decompose prediction vector into 2 components based on the trusted vector
-			vec2 PredVector = PredPos - ServerPos;
-			vec2 Forward = normalize(TrustedVector);
-			float DotPf = std::max(0.0f, dot(normalize(PredVector), Forward));
-			vec2 ConfidenceParallel = Forward * DotPf * length(PredVector);
-			if(DotPf == 0.0f)
-				ConfidenceParallel = vec2(0, 0);
-			vec2 ConfidencePerp = PredVector - ConfidenceParallel;
-
-			if(!g_Config.m_TcAntiPingStableDirection)
-				TrustFactor = 0.0f;
-
-			vec2 ConfidenceVector = ConfidenceParallel * std::max(TrustFactor, NewConfidence) + ConfidencePerp * NewConfidence;
-
-			// Minor safe guard against insane predictions
-			if(length(ConfidenceVector) > HistoryDistance)
-				ConfidenceVector = mix(normalize(ConfidenceVector) * HistoryDistance, ConfidenceVector, NewConfidence);
-
-			vec2 ConfidencePos = ServerPos + ConfidenceVector;
-
-			// Clamp final position to bounding box
-			ConfidencePos.x = std::clamp(ConfidencePos.x, MinPos.x, MaxPos.x);
-			ConfidencePos.y = std::clamp(ConfidencePos.y, MinPos.y, MaxPos.y);
-
-			m_aClients[i].m_PrevImprovedPredPos = m_aClients[i].m_ImprovedPredPos;
-			m_aClients[i].m_ImprovedPredPos = ConfidencePos;
-			if(distance(ServerPos, PrevServerPos) > 600.0f || distance(m_aClients[i].m_PrevImprovedPredPos, m_aClients[i].m_ImprovedPredPos) > 600.0f)
-			{
-				m_aClients[i].m_PrevImprovedPredPos = m_aClients[i].m_ImprovedPredPos;
-			}
-		}
-	}
-	// Copy the current pred world so on the next tick we have the "previous" pred world to advance and test against
-	if(m_NewPredictedTick && g_Config.m_TcAntiPingImproved)
-		m_PredSmoothingWorld.CopyWorldClean(&m_PredictedWorld);
 
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
@@ -3375,6 +3151,7 @@ void CGameClient::CClientData::Reset()
 
 	m_Predicted.Reset();
 	m_PrevPredicted.Reset();
+	m_RegularPredicted.Reset();
 
 	if(m_pSkinInfo != nullptr)
 	{
@@ -3395,6 +3172,9 @@ void CGameClient::CClientData::Reset()
 	m_Afk = false;
 	m_Paused = false;
 	m_Spec = false;
+	m_FinishTimeSeconds = FinishTime::UNSET;
+	m_FinishTimeMillis = 0;
+	m_ValidAntipingSmooth = false;
 
 	std::fill(std::begin(m_aSwitchStates), std::end(m_aSwitchStates), 0);
 
@@ -4152,9 +3932,7 @@ void CGameClient::UpdateRenderedCharacters()
 			}
 			else
 			{
-				if(g_Config.m_TcRemoveAnti)
-					Pos = GetFreezePos(i);
-				else if(HasFastInput && i == m_Snap.m_LocalClientId)
+				if(HasFastInput && i == m_Snap.m_LocalClientId)
 					Pos = GetFastInputPos(i);
 			}
 
@@ -4177,19 +3955,8 @@ void CGameClient::UpdateRenderedCharacters()
 				if(g_Config.m_ClAntiPingSmooth)
 					Pos = GetSmoothPos(i);
 
-				if(g_Config.m_TcAntiPingImproved)
-					Pos = mix(m_aClients[i].m_PrevImprovedPredPos, m_aClients[i].m_ImprovedPredPos, Client()->PredIntraGameTick(g_Config.m_ClDummy));
-
-				if(g_Config.m_TcRemoveAnti && m_pClient->m_IsLocalFrozen)
-					Pos = GetFreezePos(i);
-				else if(HasFastInput && FastInputOthers && !g_Config.m_TcAntiPingImproved)
+				if(HasFastInput && FastInputOthers)
 					Pos = GetFastInputPos(i);
-
-				if(g_Config.m_TcShowOthersGhosts && g_Config.m_TcSwapGhosts && !(m_aClients[i].m_FreezeEnd > 0 && g_Config.m_TcHideFrozenGhosts))
-					Pos = UnpredPos;
-
-				if(g_Config.m_TcUnpredOthersInFreeze && Client()->m_IsLocalFrozen)
-					Pos = UnpredPos;
 			}
 		}
 		m_aClients[i].m_RenderPos = Pos;
@@ -4350,26 +4117,7 @@ vec2 CGameClient::GetFreezePos(int ClientId)
 		int SmoothTick;
 		float SmoothIntra;
 
-		int AdjustTicks = 0;
-		int DelayTicks = g_Config.m_TcUnfreezeLagDelayTicks;
-		int FreezeTime = 0;
-		if(pExtraChar && pChar)
-		{
-			AdjustTicks = pChar->m_FreezeAccumulation;
-			if(pExtraChar->m_AliveAccumulation > 0)
-				AdjustTicks -= pExtraChar->m_AliveAccumulation;
-
-			AdjustTicks = std::max(AdjustTicks, 0);
-			FreezeTime = pChar->m_FreezeTime;
-
-			AdjustTicks = std::min(FreezeTime, AdjustTicks);
-		}
-		if(g_Config.m_TcRemoveAnti && pChar && AdjustTicks > 0 && FreezeTime > 0)
-			MixAmount = mix(0.0f, 1.0f, 1.0f - AdjustTicks / (float)DelayTicks);
-		// else if(AdjustTicks == 0 && ClientId != m_Snap.m_LocalClientId)
-		//	MixAmount = 1.f - std::pow(1.f - TimePassed / (float)Len, 1.2f);
-		else // our tee when not frozen
-			MixAmount = 1.f;
+		MixAmount = 1.f;
 
 		Client()->GetSmoothFreezeTick(&SmoothTick, &SmoothIntra, MixAmount);
 
@@ -5226,7 +4974,7 @@ void CGameClient::LoadMapSettings()
 	m_MapBugs = CMapBugs::Create(Client()->GetCurrentMap(), pMap->MapSize(), pMap->Sha256());
 
 	// Reset Tunezones
-	for(int TuneZone = 0; TuneZone < NUM_TUNEZONES; TuneZone++)
+	for(int TuneZone = 0; TuneZone < TuneZone::NUM; TuneZone++)
 	{
 		TuningList()[TuneZone] = CTuningParams::DEFAULT;
 		TuningList()[TuneZone].Set("gun_curvature", 0);
@@ -5286,7 +5034,7 @@ void CGameClient::ConTuneZone(IConsole::IResult *pResult, void *pUserData)
 	const char *pParamName = pResult->GetString(1);
 	float NewValue = pResult->GetFloat(2);
 
-	if(List >= 0 && List < NUM_TUNEZONES)
+	if(List >= 0 && List < TuneZone::NUM)
 		pSelf->TuningList()[List].Set(pParamName, NewValue);
 }
 

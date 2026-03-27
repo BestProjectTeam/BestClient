@@ -1,5 +1,7 @@
 #include "tooltips.h"
 
+#include <base/time.h>
+
 #include <game/client/ui.h>
 
 CTooltips::CTooltips()
@@ -29,10 +31,10 @@ inline void CTooltips::ClearActiveTooltip()
 void CTooltips::SetFadeTime(const void *pId, float Time)
 {
 	uintptr_t Id = reinterpret_cast<uintptr_t>(pId);
-	const auto it = m_Tooltips.find(Id);
-	if(it != m_Tooltips.end())
+	const auto It = m_Tooltips.find(Id);
+	if(It != m_Tooltips.end())
 	{
-		it->second.m_FadeTime = Time;
+		It->second.m_FadeTime = Time;
 	}
 }
 
@@ -67,13 +69,12 @@ void CTooltips::OnRender()
 	{
 		CTooltip &Tooltip = m_ActiveTooltip.value();
 
-		if(Ui()->HotItem() != Tooltip.m_pId)
+		if(Ui()->HotItem() != Tooltip.m_pId || !Tooltip.m_Rect.Inside(Ui()->MousePos()))
 		{
 			Tooltip.m_OnScreen = false;
 			ClearActiveTooltip();
 			return;
 		}
-
 		if(!Tooltip.m_OnScreen)
 			return;
 

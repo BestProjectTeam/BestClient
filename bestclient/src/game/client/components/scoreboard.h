@@ -22,7 +22,9 @@ class CScoreboard : public CComponent
 			m_TeamStartX(0), m_TeamStartY(0), m_CurrentDDTeamSize(0) {}
 	};
 
-	void RenderTitle(CUIRect TitleBar, int Team, const char *pTitle);
+	void RenderTitleScore(CUIRect ScoreLabel, int Team, float TitleFontSize);
+	void RenderTitle(CUIRect TitleLabel, int Team, const char *pTitle, float TitleFontSize);
+	void RenderTitleBar(CUIRect TitleBar, int Team, const char *pTitle);
 	void RenderGoals(CUIRect Goals);
 	void RenderSpectators(CUIRect Spectators);
 	void RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart, int CountEnd, CScoreboardRenderState &State);
@@ -35,7 +37,6 @@ class CScoreboard : public CComponent
 	const char *GetTeamName(int Team) const;
 
 	bool m_Active;
-	float m_ServerRecord;
 
 	// BestClient UI animations (open/close + row stagger)
 	float m_BcOpenPhase = 0.0f; // 0..1
@@ -46,6 +47,7 @@ class CScoreboard : public CComponent
 	bool m_MouseUnlocked = false;
 
 	void SetUiMousePos(vec2 Pos);
+	void LockMouse();
 
 	class CScoreboardPopupContext : public SPopupMenuId
 	{
@@ -70,9 +72,29 @@ class CScoreboard : public CComponent
 
 		int m_ClientId;
 		bool m_IsLocal;
+		bool m_IsSpectating;
+
+		static CUi::EPopupMenuFunctionResult Render(void *pContext, CUIRect View, bool Active);
 	} m_ScoreboardPopupContext;
 
-	static CUi::EPopupMenuFunctionResult PopupScoreboard(void *pContext, CUIRect View, bool Active);
+	class CMapTitlePopupContext : public SPopupMenuId
+	{
+	public:
+		CScoreboard *m_pScoreboard = nullptr;
+
+		float m_FontSize;
+
+		static CUi::EPopupMenuFunctionResult Render(void *pContext, CUIRect View, bool Active);
+	} m_MapTitlePopupContext;
+	char m_MapTitleButtonId;
+
+	class CPlayerElement
+	{
+	public:
+		char m_PlayerButtonId;
+		char m_SpectatorSecondLineButtonId;
+	};
+	CPlayerElement m_aPlayers[MAX_CLIENTS];
 
 public:
 	CScoreboard();
@@ -82,7 +104,6 @@ public:
 	void OnReset() override;
 	void OnRender() override;
 	void OnRelease() override;
-	void OnMessage(int MsgType, void *pRawMsg) override;
 	bool OnCursorMove(float x, float y, IInput::ECursorType CursorType) override;
 	bool OnInput(const IInput::CEvent &Event) override;
 

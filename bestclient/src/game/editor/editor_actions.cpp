@@ -1,6 +1,16 @@
 #include "editor_actions.h"
 
+#include <base/log.h>
+
+#include <game/editor/editor.h>
+#include <game/editor/mapitems.h>
 #include <game/editor/mapitems/image.h>
+#include <game/editor/mapitems/layer.h>
+#include <game/editor/mapitems/layer_front.h>
+#include <game/editor/mapitems/layer_group.h>
+#include <game/editor/mapitems/layer_quads.h>
+#include <game/editor/mapitems/layer_sounds.h>
+#include <game/editor/mapitems/map.h>
 
 CEditorBrushDrawAction::CEditorBrushDrawAction(CEditorMap *pMap, int Group) :
 	IEditorAction(pMap), m_Group(Group)
@@ -323,18 +333,44 @@ CEditorActionEditQuadPoint::CEditorActionEditQuadPoint(CEditorMap *pMap, int Gro
 
 void CEditorActionEditQuadPoint::Undo()
 {
-	std::shared_ptr<CLayerQuads> pLayerQuads = std::static_pointer_cast<CLayerQuads>(m_pLayer);
-	CQuad &Quad = pLayerQuads->m_vQuads[m_QuadIndex];
-	for(int k = 0; k < 5; k++)
-		Quad.m_aPoints[k] = m_vPreviousPoints[k];
+	Apply(m_vPreviousPoints);
 }
 
 void CEditorActionEditQuadPoint::Redo()
 {
+	Apply(m_vCurrentPoints);
+}
+
+void CEditorActionEditQuadPoint::Apply(const std::vector<CPoint> &vValue)
+{
 	std::shared_ptr<CLayerQuads> pLayerQuads = std::static_pointer_cast<CLayerQuads>(m_pLayer);
 	CQuad &Quad = pLayerQuads->m_vQuads[m_QuadIndex];
-	for(int k = 0; k < 5; k++)
-		Quad.m_aPoints[k] = m_vCurrentPoints[k];
+	dbg_assert(std::size(Quad.m_aPoints) == vValue.size(), "Expected %d values, got %d", (int)std::size(Quad.m_aPoints), (int)vValue.size());
+	std::copy_n(vValue.begin(), std::size(Quad.m_aPoints), Quad.m_aPoints);
+}
+
+CEditorActionEditQuadColor::CEditorActionEditQuadColor(CEditorMap *pMap, int GroupIndex, int LayerIndex, int QuadIndex, std::vector<CColor> const &vPreviousColors, std::vector<CColor> const &vCurrentColors) :
+	CEditorActionLayerBase(pMap, GroupIndex, LayerIndex), m_QuadIndex(QuadIndex), m_vPreviousColors(vPreviousColors), m_vCurrentColors(vCurrentColors)
+{
+	str_copy(m_aDisplayText, "Edit quad point colors");
+}
+
+void CEditorActionEditQuadColor::Undo()
+{
+	Apply(m_vPreviousColors);
+}
+
+void CEditorActionEditQuadColor::Redo()
+{
+	Apply(m_vCurrentColors);
+}
+
+void CEditorActionEditQuadColor::Apply(std::vector<CColor> &vValue)
+{
+	std::shared_ptr<CLayerQuads> pLayerQuads = std::static_pointer_cast<CLayerQuads>(m_pLayer);
+	CQuad &Quad = pLayerQuads->m_vQuads[m_QuadIndex];
+	dbg_assert(std::size(Quad.m_aColors) == vValue.size(), "Expected %d values, got %d", (int)std::size(Quad.m_aColors), (int)vValue.size());
+	std::copy_n(vValue.begin(), std::size(Quad.m_aColors), Quad.m_aColors);
 }
 
 CEditorActionEditQuadProp::CEditorActionEditQuadProp(CEditorMap *pMap, int GroupIndex, int LayerIndex, int QuadIndex, EQuadProp Prop, int Previous, int Current) :
@@ -346,9 +382,11 @@ CEditorActionEditQuadProp::CEditorActionEditQuadProp(CEditorMap *pMap, int Group
 		"pos Y",
 		"pos env",
 		"pos env offset",
+		nullptr, // color
 		"color env",
 		"color env offset"};
 	static_assert(std::size(s_apNames) == (size_t)EQuadProp::NUM_PROPS);
+	dbg_assert(Prop != EQuadProp::COLOR, "Color prop implemented by CEditorActionEditQuadPointProp");
 	str_format(m_aDisplayText, sizeof(m_aDisplayText), "Edit quad %s property in layer %d of group %d", s_apNames[(int)m_Prop], m_LayerIndex, m_GroupIndex);
 }
 
@@ -366,13 +404,13 @@ void CEditorActionEditQuadProp::Apply(int Value)
 {
 	std::shared_ptr<CLayerQuads> pLayerQuads = std::static_pointer_cast<CLayerQuads>(m_pLayer);
 	CQuad &Quad = pLayerQuads->m_vQuads[m_QuadIndex];
-	if(m_Prop == EQuadProp::PROP_POS_ENV)
+	if(m_Prop == EQuadProp::POS_ENV)
 		Quad.m_PosEnv = Value;
-	else if(m_Prop == EQuadProp::PROP_POS_ENV_OFFSET)
+	else if(m_Prop == EQuadProp::POS_ENV_OFFSET)
 		Quad.m_PosEnvOffset = Value;
-	else if(m_Prop == EQuadProp::PROP_COLOR_ENV)
+	else if(m_Prop == EQuadProp::COLOR_ENV)
 		Quad.m_ColorEnv = Value;
-	else if(m_Prop == EQuadProp::PROP_COLOR_ENV_OFFSET)
+	else if(m_Prop == EQuadProp::COLOR_ENV_OFFSET)
 		Quad.m_ColorEnvOffset = Value;
 }
 
@@ -404,7 +442,7 @@ void CEditorActionEditQuadPointProp::Apply(int Value)
 	std::shared_ptr<CLayerQuads> pLayerQuads = std::static_pointer_cast<CLayerQuads>(m_pLayer);
 	CQuad &Quad = pLayerQuads->m_vQuads[m_QuadIndex];
 
-	if(m_Prop == EQuadPointProp::PROP_COLOR)
+	if(m_Prop == EQuadPointProp::COLOR)
 	{
 		const ColorRGBA ColorPick = ColorRGBA::UnpackAlphaLast<ColorRGBA>(Value);
 
@@ -417,11 +455,11 @@ void CEditorActionEditQuadPointProp::Apply(int Value)
 		Editor()->m_ColorPickerPopupContext.m_HslaColor = color_cast<ColorHSLA>(ColorPick);
 		Editor()->m_ColorPickerPopupContext.m_HsvaColor = color_cast<ColorHSVA>(Editor()->m_ColorPickerPopupContext.m_HslaColor);
 	}
-	else if(m_Prop == EQuadPointProp::PROP_TEX_U)
+	else if(m_Prop == EQuadPointProp::TEX_U)
 	{
 		Quad.m_aTexcoords[m_PointIndex].x = Value;
 	}
-	else if(m_Prop == EQuadPointProp::PROP_TEX_V)
+	else if(m_Prop == EQuadPointProp::TEX_V)
 	{
 		Quad.m_aTexcoords[m_PointIndex].y = Value;
 	}
@@ -559,7 +597,7 @@ void CEditorActionAddLayer::Undo()
 
 	Map()->m_vpGroups[m_GroupIndex]->m_Collapse = false;
 	if(m_LayerIndex >= (int)vLayers.size())
-		Editor()->SelectLayer(vLayers.size() - 1, m_GroupIndex);
+		Map()->SelectLayer(vLayers.size() - 1, m_GroupIndex);
 
 	Map()->OnModify();
 }
@@ -587,7 +625,7 @@ void CEditorActionAddLayer::Redo()
 	vLayers.insert(vLayers.begin() + m_LayerIndex, m_pLayer);
 
 	Map()->m_vpGroups[m_GroupIndex]->m_Collapse = false;
-	Editor()->SelectLayer(m_LayerIndex, m_GroupIndex);
+	Map()->SelectLayer(m_LayerIndex, m_GroupIndex);
 	Map()->OnModify();
 }
 
@@ -621,7 +659,7 @@ void CEditorActionDeleteLayer::Redo()
 
 	Map()->m_vpGroups[m_GroupIndex]->m_Collapse = false;
 	if(m_LayerIndex >= (int)vLayers.size())
-		Editor()->SelectLayer(vLayers.size() - 1, m_GroupIndex);
+		Map()->SelectLayer(vLayers.size() - 1, m_GroupIndex);
 
 	Map()->OnModify();
 }
@@ -649,7 +687,7 @@ void CEditorActionDeleteLayer::Undo()
 	vLayers.insert(vLayers.begin() + m_LayerIndex, m_pLayer);
 
 	Map()->m_vpGroups[m_GroupIndex]->m_Collapse = false;
-	Editor()->SelectLayer(m_LayerIndex, m_GroupIndex);
+	Map()->SelectLayer(m_LayerIndex, m_GroupIndex);
 	Map()->OnModify();
 }
 
@@ -669,14 +707,14 @@ void CEditorActionGroup::Undo()
 	{
 		// Undo: add back the group
 		Map()->m_vpGroups.insert(Map()->m_vpGroups.begin() + m_GroupIndex, m_pGroup);
-		Editor()->m_SelectedGroup = m_GroupIndex;
+		Map()->m_SelectedGroup = m_GroupIndex;
 		Map()->OnModify();
 	}
 	else
 	{
 		// Undo: delete the group
 		Map()->DeleteGroup(m_GroupIndex);
-		Editor()->m_SelectedGroup = maximum(0, m_GroupIndex - 1);
+		Map()->m_SelectedGroup = maximum(0, m_GroupIndex - 1);
 	}
 
 	Map()->OnModify();
@@ -688,13 +726,13 @@ void CEditorActionGroup::Redo()
 	{
 		// Redo: add back the group
 		Map()->m_vpGroups.insert(Map()->m_vpGroups.begin() + m_GroupIndex, m_pGroup);
-		Editor()->m_SelectedGroup = m_GroupIndex;
+		Map()->m_SelectedGroup = m_GroupIndex;
 	}
 	else
 	{
 		// Redo: delete the group
 		Map()->DeleteGroup(m_GroupIndex);
-		Editor()->m_SelectedGroup = maximum(0, m_GroupIndex - 1);
+		Map()->m_SelectedGroup = maximum(0, m_GroupIndex - 1);
 	}
 
 	Map()->OnModify();
@@ -723,9 +761,9 @@ void CEditorActionEditGroupProp::Undo()
 {
 	auto pGroup = Map()->m_vpGroups[m_GroupIndex];
 
-	if(m_Prop == EGroupProp::PROP_ORDER)
+	if(m_Prop == EGroupProp::ORDER)
 	{
-		Editor()->m_SelectedGroup = Map()->MoveGroup(m_Current, m_Previous);
+		Map()->m_SelectedGroup = Map()->MoveGroup(m_Current, m_Previous);
 	}
 	else
 		Apply(m_Previous);
@@ -735,9 +773,9 @@ void CEditorActionEditGroupProp::Redo()
 {
 	auto pGroup = Map()->m_vpGroups[m_GroupIndex];
 
-	if(m_Prop == EGroupProp::PROP_ORDER)
+	if(m_Prop == EGroupProp::ORDER)
 	{
-		Editor()->m_SelectedGroup = Map()->MoveGroup(m_Previous, m_Current);
+		Map()->m_SelectedGroup = Map()->MoveGroup(m_Previous, m_Current);
 	}
 	else
 		Apply(m_Current);
@@ -747,23 +785,23 @@ void CEditorActionEditGroupProp::Apply(int Value)
 {
 	auto pGroup = Map()->m_vpGroups[m_GroupIndex];
 
-	if(m_Prop == EGroupProp::PROP_POS_X)
+	if(m_Prop == EGroupProp::POS_X)
 		pGroup->m_OffsetX = Value;
-	if(m_Prop == EGroupProp::PROP_POS_Y)
+	if(m_Prop == EGroupProp::POS_Y)
 		pGroup->m_OffsetY = Value;
-	if(m_Prop == EGroupProp::PROP_PARA_X)
+	if(m_Prop == EGroupProp::PARA_X)
 		pGroup->m_ParallaxX = Value;
-	if(m_Prop == EGroupProp::PROP_PARA_Y)
+	if(m_Prop == EGroupProp::PARA_Y)
 		pGroup->m_ParallaxY = Value;
-	if(m_Prop == EGroupProp::PROP_USE_CLIPPING)
+	if(m_Prop == EGroupProp::USE_CLIPPING)
 		pGroup->m_UseClipping = Value;
-	if(m_Prop == EGroupProp::PROP_CLIP_X)
+	if(m_Prop == EGroupProp::CLIP_X)
 		pGroup->m_ClipX = Value;
-	if(m_Prop == EGroupProp::PROP_CLIP_Y)
+	if(m_Prop == EGroupProp::CLIP_Y)
 		pGroup->m_ClipY = Value;
-	if(m_Prop == EGroupProp::PROP_CLIP_W)
+	if(m_Prop == EGroupProp::CLIP_W)
 		pGroup->m_ClipW = Value;
-	if(m_Prop == EGroupProp::PROP_CLIP_H)
+	if(m_Prop == EGroupProp::CLIP_H)
 		pGroup->m_ClipH = Value;
 
 	Map()->OnModify();
@@ -791,9 +829,9 @@ void CEditorActionEditLayerProp::Undo()
 {
 	auto pCurrentGroup = Map()->m_vpGroups[m_GroupIndex];
 
-	if(m_Prop == ELayerProp::PROP_ORDER)
+	if(m_Prop == ELayerProp::ORDER)
 	{
-		Editor()->SelectLayer(pCurrentGroup->MoveLayer(m_Current, m_Previous));
+		Map()->SelectLayer(pCurrentGroup->MoveLayer(m_Current, m_Previous));
 	}
 	else
 		Apply(m_Previous);
@@ -803,9 +841,9 @@ void CEditorActionEditLayerProp::Redo()
 {
 	auto pCurrentGroup = Map()->m_vpGroups[m_GroupIndex];
 
-	if(m_Prop == ELayerProp::PROP_ORDER)
+	if(m_Prop == ELayerProp::ORDER)
 	{
-		Editor()->SelectLayer(pCurrentGroup->MoveLayer(m_Previous, m_Current));
+		Map()->SelectLayer(pCurrentGroup->MoveLayer(m_Previous, m_Current));
 	}
 	else
 		Apply(m_Current);
@@ -813,7 +851,7 @@ void CEditorActionEditLayerProp::Redo()
 
 void CEditorActionEditLayerProp::Apply(int Value)
 {
-	if(m_Prop == ELayerProp::PROP_GROUP)
+	if(m_Prop == ELayerProp::GROUP)
 	{
 		auto pCurrentGroup = Map()->m_vpGroups[Value == m_Previous ? m_Current : m_Previous];
 		auto pPreviousGroup = Map()->m_vpGroups[Value];
@@ -822,10 +860,10 @@ void CEditorActionEditLayerProp::Apply(int Value)
 			pPreviousGroup->m_vpLayers.insert(pPreviousGroup->m_vpLayers.begin() + m_LayerIndex, m_pLayer);
 		else
 			pPreviousGroup->m_vpLayers.push_back(m_pLayer);
-		Editor()->m_SelectedGroup = Value;
-		Editor()->SelectLayer(m_LayerIndex);
+		Map()->m_SelectedGroup = Value;
+		Map()->SelectLayer(m_LayerIndex);
 	}
-	else if(m_Prop == ELayerProp::PROP_HQ)
+	else if(m_Prop == ELayerProp::HQ)
 	{
 		m_pLayer->m_Flags = Value;
 	}
@@ -864,11 +902,11 @@ void CEditorActionEditLayerTilesProp::Undo()
 	std::shared_ptr<CLayerTiles> pLayerTiles = std::static_pointer_cast<CLayerTiles>(m_pLayer);
 	std::shared_ptr<CLayerTiles> pSavedLayerTiles = nullptr;
 
-	if(m_Prop == ETilesProp::PROP_WIDTH || m_Prop == ETilesProp::PROP_HEIGHT)
+	if(m_Prop == ETilesProp::WIDTH || m_Prop == ETilesProp::HEIGHT)
 	{
-		if(m_Prop == ETilesProp::PROP_HEIGHT)
+		if(m_Prop == ETilesProp::HEIGHT)
 			pLayerTiles->Resize(pLayerTiles->m_Width, m_Previous);
-		else if(m_Prop == ETilesProp::PROP_WIDTH)
+		else if(m_Prop == ETilesProp::WIDTH)
 			pLayerTiles->Resize(m_Previous, pLayerTiles->m_Height);
 
 		RestoreLayer(LAYERTYPE_TILES, pLayerTiles);
@@ -888,15 +926,15 @@ void CEditorActionEditLayerTilesProp::Undo()
 				RestoreLayer(LAYERTYPE_GAME, Map()->m_pGameLayer);
 		}
 	}
-	else if(m_Prop == ETilesProp::PROP_SHIFT)
+	else if(m_Prop == ETilesProp::SHIFT)
 	{
 		RestoreLayer(LAYERTYPE_TILES, pLayerTiles);
 	}
-	else if(m_Prop == ETilesProp::PROP_SHIFT_BY)
+	else if(m_Prop == ETilesProp::SHIFT_BY)
 	{
-		Editor()->m_ShiftBy = m_Previous;
+		Map()->m_ShiftBy = m_Previous;
 	}
-	else if(m_Prop == ETilesProp::PROP_IMAGE)
+	else if(m_Prop == ETilesProp::IMAGE)
 	{
 		if(m_Previous == -1 || Map()->m_vpImages.empty())
 		{
@@ -908,7 +946,7 @@ void CEditorActionEditLayerTilesProp::Undo()
 			pLayerTiles->m_AutoMapperConfig = -1;
 		}
 	}
-	else if(m_Prop == ETilesProp::PROP_COLOR)
+	else if(m_Prop == ETilesProp::COLOR)
 	{
 		const ColorRGBA ColorPick = ColorRGBA::UnpackAlphaLast<ColorRGBA>(m_Previous);
 
@@ -921,23 +959,23 @@ void CEditorActionEditLayerTilesProp::Undo()
 		Editor()->m_ColorPickerPopupContext.m_HslaColor = color_cast<ColorHSLA>(ColorPick);
 		Editor()->m_ColorPickerPopupContext.m_HsvaColor = color_cast<ColorHSVA>(Editor()->m_ColorPickerPopupContext.m_HslaColor);
 	}
-	else if(m_Prop == ETilesProp::PROP_COLOR_ENV)
+	else if(m_Prop == ETilesProp::COLOR_ENV)
 	{
 		pLayerTiles->m_ColorEnv = m_Previous;
 	}
-	else if(m_Prop == ETilesProp::PROP_COLOR_ENV_OFFSET)
+	else if(m_Prop == ETilesProp::COLOR_ENV_OFFSET)
 	{
 		pLayerTiles->m_ColorEnvOffset = m_Previous;
 	}
-	else if(m_Prop == ETilesProp::PROP_AUTOMAPPER)
+	else if(m_Prop == ETilesProp::AUTOMAPPER)
 	{
 		pLayerTiles->m_AutoMapperConfig = m_Previous;
 	}
-	else if(m_Prop == ETilesProp::PROP_LIVE_GAMETILES)
+	else if(m_Prop == ETilesProp::LIVE_GAMETILES)
 	{
 		pLayerTiles->m_LiveGameTiles = m_Previous;
 	}
-	else if(m_Prop == ETilesProp::PROP_SEED)
+	else if(m_Prop == ETilesProp::SEED)
 	{
 		pLayerTiles->m_Seed = m_Previous;
 	}
@@ -949,11 +987,11 @@ void CEditorActionEditLayerTilesProp::Redo()
 {
 	std::shared_ptr<CLayerTiles> pLayerTiles = std::static_pointer_cast<CLayerTiles>(m_pLayer);
 
-	if(m_Prop == ETilesProp::PROP_WIDTH || m_Prop == ETilesProp::PROP_HEIGHT)
+	if(m_Prop == ETilesProp::WIDTH || m_Prop == ETilesProp::HEIGHT)
 	{
-		if(m_Prop == ETilesProp::PROP_HEIGHT)
+		if(m_Prop == ETilesProp::HEIGHT)
 			pLayerTiles->Resize(pLayerTiles->m_Width, m_Current);
-		else if(m_Prop == ETilesProp::PROP_WIDTH)
+		else if(m_Prop == ETilesProp::WIDTH)
 			pLayerTiles->Resize(m_Current, pLayerTiles->m_Height);
 
 		if(pLayerTiles->m_HasGame || pLayerTiles->m_HasFront || pLayerTiles->m_HasSwitch || pLayerTiles->m_HasSpeedup || pLayerTiles->m_HasTune)
@@ -972,15 +1010,15 @@ void CEditorActionEditLayerTilesProp::Redo()
 				Map()->m_pGameLayer->Resize(pLayerTiles->m_Width, pLayerTiles->m_Height);
 		}
 	}
-	else if(m_Prop == ETilesProp::PROP_SHIFT)
+	else if(m_Prop == ETilesProp::SHIFT)
 	{
 		pLayerTiles->Shift((EShiftDirection)m_Current);
 	}
-	else if(m_Prop == ETilesProp::PROP_SHIFT_BY)
+	else if(m_Prop == ETilesProp::SHIFT_BY)
 	{
-		Editor()->m_ShiftBy = m_Current;
+		Map()->m_ShiftBy = m_Current;
 	}
-	else if(m_Prop == ETilesProp::PROP_IMAGE)
+	else if(m_Prop == ETilesProp::IMAGE)
 	{
 		if(m_Current == -1 || Map()->m_vpImages.empty())
 		{
@@ -992,7 +1030,7 @@ void CEditorActionEditLayerTilesProp::Redo()
 			pLayerTiles->m_AutoMapperConfig = -1;
 		}
 	}
-	else if(m_Prop == ETilesProp::PROP_COLOR)
+	else if(m_Prop == ETilesProp::COLOR)
 	{
 		const ColorRGBA ColorPick = ColorRGBA::UnpackAlphaLast<ColorRGBA>(m_Current);
 
@@ -1005,23 +1043,23 @@ void CEditorActionEditLayerTilesProp::Redo()
 		Editor()->m_ColorPickerPopupContext.m_HslaColor = color_cast<ColorHSLA>(ColorPick);
 		Editor()->m_ColorPickerPopupContext.m_HsvaColor = color_cast<ColorHSVA>(Editor()->m_ColorPickerPopupContext.m_HslaColor);
 	}
-	else if(m_Prop == ETilesProp::PROP_COLOR_ENV)
+	else if(m_Prop == ETilesProp::COLOR_ENV)
 	{
 		pLayerTiles->m_ColorEnv = m_Current;
 	}
-	else if(m_Prop == ETilesProp::PROP_COLOR_ENV_OFFSET)
+	else if(m_Prop == ETilesProp::COLOR_ENV_OFFSET)
 	{
 		pLayerTiles->m_ColorEnvOffset = m_Current;
 	}
-	else if(m_Prop == ETilesProp::PROP_AUTOMAPPER)
+	else if(m_Prop == ETilesProp::AUTOMAPPER)
 	{
 		pLayerTiles->m_AutoMapperConfig = m_Current;
 	}
-	else if(m_Prop == ETilesProp::PROP_LIVE_GAMETILES)
+	else if(m_Prop == ETilesProp::LIVE_GAMETILES)
 	{
 		pLayerTiles->m_LiveGameTiles = m_Current;
 	}
-	else if(m_Prop == ETilesProp::PROP_SEED)
+	else if(m_Prop == ETilesProp::SEED)
 	{
 		pLayerTiles->m_Seed = m_Current;
 	}
@@ -1085,7 +1123,7 @@ void CEditorActionEditLayerQuadsProp::Redo()
 void CEditorActionEditLayerQuadsProp::Apply(int Value)
 {
 	std::shared_ptr<CLayerQuads> pLayerQuads = std::static_pointer_cast<CLayerQuads>(m_pLayer);
-	if(m_Prop == ELayerQuadsProp::PROP_IMAGE)
+	if(m_Prop == ELayerQuadsProp::IMAGE)
 	{
 		if(Value >= 0 && !Map()->m_vpImages.empty())
 			pLayerQuads->m_Image = Value % Map()->m_vpImages.size();
@@ -1124,8 +1162,8 @@ void CEditorActionEditLayersGroupAndOrder::Undo()
 		pPreviousGroup->m_vpLayers.insert(pPreviousGroup->m_vpLayers.begin() + m_LayerIndices[k++], pLayer);
 	}
 
-	Editor()->m_vSelectedLayers = m_LayerIndices;
-	Editor()->m_SelectedGroup = m_GroupIndex;
+	Map()->m_vSelectedLayers = m_LayerIndices;
+	Map()->m_SelectedGroup = m_GroupIndex;
 }
 
 void CEditorActionEditLayersGroupAndOrder::Redo()
@@ -1145,8 +1183,8 @@ void CEditorActionEditLayersGroupAndOrder::Redo()
 		pPreviousGroup->m_vpLayers.insert(pPreviousGroup->m_vpLayers.begin() + m_NewLayerIndices[k++], pLayer);
 	}
 
-	Editor()->m_vSelectedLayers = m_NewLayerIndices;
-	Editor()->m_SelectedGroup = m_NewGroupIndex;
+	Map()->m_vSelectedLayers = m_NewLayerIndices;
+	Map()->m_SelectedGroup = m_NewGroupIndex;
 }
 
 // -----------------------------------
@@ -1219,8 +1257,12 @@ void CEditorActionAppendMap::Undo()
 
 void CEditorActionAppendMap::Redo()
 {
+	const auto &&ErrorHandler = [this](const char *pErrorMessage) {
+		Editor()->ShowFileDialogError("%s", pErrorMessage);
+		log_error("editor/append", "%s", pErrorMessage);
+	};
 	// Redo is just re-appending the same map
-	Editor()->Append(m_aMapName, IStorage::TYPE_ALL, true);
+	Map()->Append(m_aMapName, IStorage::TYPE_ALL, true, ErrorHandler);
 }
 
 // ---------------------------
@@ -1272,14 +1314,14 @@ void CEditorActionTileArt::Undo()
 
 void CEditorActionTileArt::Redo()
 {
-	if(!Graphics()->LoadPng(Editor()->m_TileartImageInfo, m_aTileArtFile, IStorage::TYPE_ALL))
+	if(!Graphics()->LoadPng(Editor()->m_TileArtImageInfo, m_aTileArtFile, IStorage::TYPE_ALL))
 	{
 		Editor()->ShowFileDialogError("Failed to load image from file '%s'.", m_aTileArtFile);
 		return;
 	}
 
-	IStorage::StripPathAndExtension(m_aTileArtFile, Editor()->m_aTileartFilename, sizeof(Editor()->m_aTileartFilename));
-	Editor()->AddTileart(true);
+	IStorage::StripPathAndExtension(m_aTileArtFile, Editor()->m_aTileArtFilename, sizeof(Editor()->m_aTileArtFilename));
+	Editor()->AddTileArt(true);
 }
 
 // ---------------------------
@@ -1287,7 +1329,7 @@ void CEditorActionTileArt::Redo()
 CEditorActionQuadArt::CEditorActionQuadArt(CEditorMap *pMap, CQuadArtParameters Parameters) :
 	IEditorAction(pMap), m_Parameters(Parameters)
 {
-	str_copy(m_aDisplayText, "Create Quadart");
+	str_copy(m_aDisplayText, "Create quad art");
 }
 
 void CEditorActionQuadArt::Undo()
@@ -1423,7 +1465,7 @@ CEditorActionEnvelopeAdd::CEditorActionEnvelopeAdd(CEditorMap *pMap, CEnvelope::
 	m_EnvelopeType(EnvelopeType)
 {
 	str_format(m_aDisplayText, sizeof(m_aDisplayText), "Add new %s envelope", EnvelopeType == CEnvelope::EType::COLOR ? "color" : (EnvelopeType == CEnvelope::EType::POSITION ? "position" : "sound"));
-	m_PreviousSelectedEnvelope = Editor()->m_SelectedEnvelope;
+	m_PreviousSelectedEnvelope = Map()->m_SelectedEnvelope;
 }
 
 void CEditorActionEnvelopeAdd::Undo()
@@ -1431,14 +1473,14 @@ void CEditorActionEnvelopeAdd::Undo()
 	// Undo is removing the envelope, which was added at the back of the list
 	Map()->m_vpEnvelopes.pop_back();
 	Map()->OnModify();
-	Editor()->m_SelectedEnvelope = m_PreviousSelectedEnvelope;
+	Map()->m_SelectedEnvelope = m_PreviousSelectedEnvelope;
 }
 
 void CEditorActionEnvelopeAdd::Redo()
 {
 	// Redo is adding a new envelope at the back of the list
 	Map()->NewEnvelope(m_EnvelopeType);
-	Editor()->m_SelectedEnvelope = Map()->m_vpEnvelopes.size() - 1;
+	Map()->m_SelectedEnvelope = Map()->m_vpEnvelopes.size() - 1;
 }
 
 CEditorActionEnvelopeDelete::CEditorActionEnvelopeDelete(CEditorMap *pMap, int EnvelopeIndex, std::vector<std::shared_ptr<IEditorEnvelopeReference>> &vpObjectReferences, std::shared_ptr<CEnvelope> &pEnvelope) :
@@ -1461,7 +1503,7 @@ void CEditorActionEnvelopeDelete::Redo()
 }
 
 CEditorActionEnvelopeEdit::CEditorActionEnvelopeEdit(CEditorMap *pMap, int EnvelopeIndex, EEditType EditType, int Previous, int Current) :
-	IEditorAction(pMap), m_EnvelopeIndex(EnvelopeIndex), m_EditType(EditType), m_Previous(Previous), m_Current(Current), m_pEnv(Map()->m_vpEnvelopes[EnvelopeIndex])
+	IEditorAction(pMap), m_EnvelopeIndex(EnvelopeIndex), m_EditType(EditType), m_Previous(Previous), m_Current(Current)
 {
 	static const char *s_apNames[] = {
 		"sync",
@@ -1480,12 +1522,12 @@ void CEditorActionEnvelopeEdit::Undo()
 	}
 	case EEditType::SYNC:
 	{
-		m_pEnv->m_Synchronized = m_Previous;
+		Map()->m_vpEnvelopes[m_EnvelopeIndex]->m_Synchronized = m_Previous;
 		break;
 	}
 	}
 	Map()->OnModify();
-	Editor()->m_SelectedEnvelope = m_EnvelopeIndex;
+	Map()->m_SelectedEnvelope = m_EnvelopeIndex;
 }
 
 void CEditorActionEnvelopeEdit::Redo()
@@ -1499,16 +1541,16 @@ void CEditorActionEnvelopeEdit::Redo()
 	}
 	case EEditType::SYNC:
 	{
-		m_pEnv->m_Synchronized = m_Current;
+		Map()->m_vpEnvelopes[m_EnvelopeIndex]->m_Synchronized = m_Current;
 		break;
 	}
 	}
 	Map()->OnModify();
-	Editor()->m_SelectedEnvelope = m_EnvelopeIndex;
+	Map()->m_SelectedEnvelope = m_EnvelopeIndex;
 }
 
 CEditorActionEnvelopeEditPointTime::CEditorActionEnvelopeEditPointTime(CEditorMap *pMap, int EnvelopeIndex, int PointIndex, CFixedTime Previous, CFixedTime Current) :
-	IEditorAction(pMap), m_EnvelopeIndex(EnvelopeIndex), m_PointIndex(PointIndex), m_Previous(Previous), m_Current(Current), m_pEnv(Map()->m_vpEnvelopes[EnvelopeIndex])
+	IEditorAction(pMap), m_EnvelopeIndex(EnvelopeIndex), m_PointIndex(PointIndex), m_Previous(Previous), m_Current(Current)
 {
 	str_format(m_aDisplayText, sizeof(m_aDisplayText), "Edit time of point %d of env %d", m_PointIndex, m_EnvelopeIndex);
 }
@@ -1525,12 +1567,12 @@ void CEditorActionEnvelopeEditPointTime::Redo()
 
 void CEditorActionEnvelopeEditPointTime::Apply(CFixedTime Value)
 {
-	m_pEnv->m_vPoints[m_PointIndex].m_Time = Value;
+	Map()->m_vpEnvelopes[m_EnvelopeIndex]->m_vPoints[m_PointIndex].m_Time = Value;
 	Map()->OnModify();
 }
 
 CEditorActionEnvelopeEditPoint::CEditorActionEnvelopeEditPoint(CEditorMap *pMap, int EnvelopeIndex, int PointIndex, int Channel, EEditType EditType, int Previous, int Current) :
-	IEditorAction(pMap), m_EnvelopeIndex(EnvelopeIndex), m_PointIndex(PointIndex), m_Channel(Channel), m_EditType(EditType), m_Previous(Previous), m_Current(Current), m_pEnv(Map()->m_vpEnvelopes[EnvelopeIndex])
+	IEditorAction(pMap), m_EnvelopeIndex(EnvelopeIndex), m_PointIndex(PointIndex), m_Channel(Channel), m_EditType(EditType), m_Previous(Previous), m_Current(Current)
 {
 	static const char *s_apNames[] = {
 		"value",
@@ -1550,20 +1592,22 @@ void CEditorActionEnvelopeEditPoint::Redo()
 
 void CEditorActionEnvelopeEditPoint::Apply(int Value)
 {
+	auto pEnvelope = Map()->m_vpEnvelopes[m_EnvelopeIndex];
+
 	if(m_EditType == EEditType::VALUE)
 	{
-		m_pEnv->m_vPoints[m_PointIndex].m_aValues[m_Channel] = Value;
+		pEnvelope->m_vPoints[m_PointIndex].m_aValues[m_Channel] = Value;
 
-		if(m_pEnv->GetChannels() == 4)
+		if(pEnvelope->GetChannels() == 4)
 		{
-			Editor()->m_ColorPickerPopupContext.m_RgbaColor = m_pEnv->m_vPoints[m_PointIndex].ColorValue();
+			Editor()->m_ColorPickerPopupContext.m_RgbaColor = pEnvelope->m_vPoints[m_PointIndex].ColorValue();
 			Editor()->m_ColorPickerPopupContext.m_HslaColor = color_cast<ColorHSLA>(Editor()->m_ColorPickerPopupContext.m_RgbaColor);
 			Editor()->m_ColorPickerPopupContext.m_HsvaColor = color_cast<ColorHSVA>(Editor()->m_ColorPickerPopupContext.m_HslaColor);
 		}
 	}
 	else if(m_EditType == EEditType::CURVE_TYPE)
 	{
-		m_pEnv->m_vPoints[m_PointIndex].m_Curvetype = Value;
+		pEnvelope->m_vPoints[m_PointIndex].m_Curvetype = Value;
 	}
 
 	Map()->OnModify();
@@ -1571,10 +1615,10 @@ void CEditorActionEnvelopeEditPoint::Apply(int Value)
 
 // ----
 
-CEditorActionEditEnvelopePointValue::CEditorActionEditEnvelopePointValue(CEditorMap *pMap, int EnvIndex, int PointIndex, int Channel, EType Type, CFixedTime OldTime, int OldValue, CFixedTime NewTime, int NewValue) :
-	IEditorAction(pMap), m_EnvIndex(EnvIndex), m_PtIndex(PointIndex), m_Channel(Channel), m_Type(Type), m_OldTime(OldTime), m_OldValue(OldValue), m_NewTime(NewTime), m_NewValue(NewValue)
+CEditorActionEditEnvelopePointValue::CEditorActionEditEnvelopePointValue(CEditorMap *pMap, int EnvelopeIndex, int PointIndex, int Channel, EType Type, CFixedTime OldTime, int OldValue, CFixedTime NewTime, int NewValue) :
+	IEditorAction(pMap), m_EnvelopeIndex(EnvelopeIndex), m_PointIndex(PointIndex), m_Channel(Channel), m_Type(Type), m_OldTime(OldTime), m_OldValue(OldValue), m_NewTime(NewTime), m_NewValue(NewValue)
 {
-	str_format(m_aDisplayText, sizeof(m_aDisplayText), "Edit point %d%s value (envelope %d, channel %d)", PointIndex, m_Type == EType::TANGENT_IN ? "tangent in" : (m_Type == EType::TANGENT_OUT ? "tangent out" : ""), m_EnvIndex, m_Channel);
+	str_format(m_aDisplayText, sizeof(m_aDisplayText), "Edit point %d%s value (envelope %d, channel %d)", PointIndex, m_Type == EType::TANGENT_IN ? "tangent in" : (m_Type == EType::TANGENT_OUT ? "tangent out" : ""), m_EnvelopeIndex, m_Channel);
 }
 
 void CEditorActionEditEnvelopePointValue::Undo()
@@ -1592,106 +1636,62 @@ void CEditorActionEditEnvelopePointValue::Apply(bool Undo)
 	float CurrentValue = fx2f(Undo ? m_OldValue : m_NewValue);
 	CFixedTime CurrentTime = (Undo ? m_OldTime : m_NewTime);
 
-	std::shared_ptr<CEnvelope> pEnvelope = Map()->m_vpEnvelopes[m_EnvIndex];
+	std::shared_ptr<CEnvelope> pEnvelope = Map()->m_vpEnvelopes[m_EnvelopeIndex];
 	if(m_Type == EType::TANGENT_IN)
 	{
-		pEnvelope->m_vPoints[m_PtIndex].m_Bezier.m_aInTangentDeltaX[m_Channel] = std::min(CurrentTime - pEnvelope->m_vPoints[m_PtIndex].m_Time, CFixedTime(0));
-		pEnvelope->m_vPoints[m_PtIndex].m_Bezier.m_aInTangentDeltaY[m_Channel] = f2fx(CurrentValue) - pEnvelope->m_vPoints[m_PtIndex].m_aValues[m_Channel];
+		pEnvelope->m_vPoints[m_PointIndex].m_Bezier.m_aInTangentDeltaX[m_Channel] = std::min(CurrentTime - pEnvelope->m_vPoints[m_PointIndex].m_Time, CFixedTime(0));
+		pEnvelope->m_vPoints[m_PointIndex].m_Bezier.m_aInTangentDeltaY[m_Channel] = f2fx(CurrentValue) - pEnvelope->m_vPoints[m_PointIndex].m_aValues[m_Channel];
 	}
 	else if(m_Type == EType::TANGENT_OUT)
 	{
-		pEnvelope->m_vPoints[m_PtIndex].m_Bezier.m_aOutTangentDeltaX[m_Channel] = std::max(CurrentTime - pEnvelope->m_vPoints[m_PtIndex].m_Time, CFixedTime(0));
-		pEnvelope->m_vPoints[m_PtIndex].m_Bezier.m_aOutTangentDeltaY[m_Channel] = f2fx(CurrentValue) - pEnvelope->m_vPoints[m_PtIndex].m_aValues[m_Channel];
+		pEnvelope->m_vPoints[m_PointIndex].m_Bezier.m_aOutTangentDeltaX[m_Channel] = std::max(CurrentTime - pEnvelope->m_vPoints[m_PointIndex].m_Time, CFixedTime(0));
+		pEnvelope->m_vPoints[m_PointIndex].m_Bezier.m_aOutTangentDeltaY[m_Channel] = f2fx(CurrentValue) - pEnvelope->m_vPoints[m_PointIndex].m_aValues[m_Channel];
 	}
 	else
 	{
 		if(pEnvelope->GetChannels() == 1 || pEnvelope->GetChannels() == 4)
 			CurrentValue = std::clamp(CurrentValue, 0.0f, 1.0f);
-		pEnvelope->m_vPoints[m_PtIndex].m_aValues[m_Channel] = f2fx(CurrentValue);
+		pEnvelope->m_vPoints[m_PointIndex].m_aValues[m_Channel] = f2fx(CurrentValue);
 
-		if(m_PtIndex != 0)
+		if(m_PointIndex != 0)
 		{
-			pEnvelope->m_vPoints[m_PtIndex].m_Time = CurrentTime;
+			pEnvelope->m_vPoints[m_PointIndex].m_Time = CurrentTime;
 
-			if(pEnvelope->m_vPoints[m_PtIndex].m_Time < pEnvelope->m_vPoints[m_PtIndex - 1].m_Time)
-				pEnvelope->m_vPoints[m_PtIndex].m_Time = pEnvelope->m_vPoints[m_PtIndex - 1].m_Time + CFixedTime(1);
-			if(static_cast<size_t>(m_PtIndex) + 1 != pEnvelope->m_vPoints.size() && pEnvelope->m_vPoints[m_PtIndex].m_Time > pEnvelope->m_vPoints[m_PtIndex + 1].m_Time)
-				pEnvelope->m_vPoints[m_PtIndex].m_Time = pEnvelope->m_vPoints[m_PtIndex + 1].m_Time - CFixedTime(1);
+			if(pEnvelope->m_vPoints[m_PointIndex].m_Time < pEnvelope->m_vPoints[m_PointIndex - 1].m_Time)
+				pEnvelope->m_vPoints[m_PointIndex].m_Time = pEnvelope->m_vPoints[m_PointIndex - 1].m_Time + CFixedTime(1);
+			if(static_cast<size_t>(m_PointIndex) + 1 != pEnvelope->m_vPoints.size() && pEnvelope->m_vPoints[m_PointIndex].m_Time > pEnvelope->m_vPoints[m_PointIndex + 1].m_Time)
+				pEnvelope->m_vPoints[m_PointIndex].m_Time = pEnvelope->m_vPoints[m_PointIndex + 1].m_Time - CFixedTime(1);
 		}
 		else
 		{
-			pEnvelope->m_vPoints[m_PtIndex].m_Time = CFixedTime(0);
+			pEnvelope->m_vPoints[m_PointIndex].m_Time = CFixedTime(0);
 		}
 	}
 
 	Map()->OnModify();
-	Editor()->m_UpdateEnvPointInfo = true;
+	Map()->m_UpdateEnvPointInfo = true;
 }
 
 // ---------------------
 
-CEditorActionResetEnvelopePointTangent::CEditorActionResetEnvelopePointTangent(CEditorMap *pMap, int EnvIndex, int PointIndex, int Channel, bool In) :
-	IEditorAction(pMap), m_EnvIndex(EnvIndex), m_PointIndex(PointIndex), m_Channel(Channel), m_In(In)
+CEditorActionResetEnvelopePointTangent::CEditorActionResetEnvelopePointTangent(CEditorMap *pMap, int EnvelopeIndex, int PointIndex, int Channel, bool In, CFixedTime OldTime, int OldValue) :
+	CEditorActionEditEnvelopePointValue(pMap, EnvelopeIndex, PointIndex, Channel, In ? EType::TANGENT_IN : EType::TANGENT_OUT, OldTime, OldValue, CFixedTime(0), 0)
 {
-	std::shared_ptr<CEnvelope> pEnvelope = Map()->m_vpEnvelopes[EnvIndex];
-	if(In)
-	{
-		m_OldTime = pEnvelope->m_vPoints[PointIndex].m_Bezier.m_aInTangentDeltaX[Channel];
-		m_OldValue = pEnvelope->m_vPoints[PointIndex].m_Bezier.m_aInTangentDeltaY[Channel];
-	}
-	else
-	{
-		m_OldTime = pEnvelope->m_vPoints[PointIndex].m_Bezier.m_aOutTangentDeltaX[Channel];
-		m_OldValue = pEnvelope->m_vPoints[PointIndex].m_Bezier.m_aOutTangentDeltaY[Channel];
-	}
-
-	str_format(m_aDisplayText, sizeof(m_aDisplayText), "Reset point %d of env %d tangent %s", m_PointIndex, m_EnvIndex, m_In ? "in" : "out");
-}
-
-void CEditorActionResetEnvelopePointTangent::Undo()
-{
-	std::shared_ptr<CEnvelope> pEnvelope = Map()->m_vpEnvelopes[m_EnvIndex];
-	if(m_In)
-	{
-		pEnvelope->m_vPoints[m_PointIndex].m_Bezier.m_aInTangentDeltaX[m_Channel] = m_OldTime;
-		pEnvelope->m_vPoints[m_PointIndex].m_Bezier.m_aInTangentDeltaY[m_Channel] = m_OldValue;
-	}
-	else
-	{
-		pEnvelope->m_vPoints[m_PointIndex].m_Bezier.m_aOutTangentDeltaX[m_Channel] = m_OldTime;
-		pEnvelope->m_vPoints[m_PointIndex].m_Bezier.m_aOutTangentDeltaY[m_Channel] = m_OldValue;
-	}
-	Map()->OnModify();
-}
-
-void CEditorActionResetEnvelopePointTangent::Redo()
-{
-	std::shared_ptr<CEnvelope> pEnvelope = Map()->m_vpEnvelopes[m_EnvIndex];
-	if(m_In)
-	{
-		pEnvelope->m_vPoints[m_PointIndex].m_Bezier.m_aInTangentDeltaX[m_Channel] = CFixedTime(0);
-		pEnvelope->m_vPoints[m_PointIndex].m_Bezier.m_aInTangentDeltaY[m_Channel] = 0.0f;
-	}
-	else
-	{
-		pEnvelope->m_vPoints[m_PointIndex].m_Bezier.m_aOutTangentDeltaX[m_Channel] = CFixedTime(0);
-		pEnvelope->m_vPoints[m_PointIndex].m_Bezier.m_aOutTangentDeltaY[m_Channel] = 0.0f;
-	}
-	Map()->OnModify();
+	str_format(m_aDisplayText, sizeof(m_aDisplayText), "Reset point %d of env %d tangent %s", PointIndex, EnvelopeIndex, In ? "in" : "out");
 }
 
 // ------------------
 
-CEditorActionAddEnvelopePoint::CEditorActionAddEnvelopePoint(CEditorMap *pMap, int EnvIndex, CFixedTime Time, ColorRGBA Channels) :
-	IEditorAction(pMap), m_EnvIndex(EnvIndex), m_Time(Time), m_Channels(Channels)
+CEditorActionAddEnvelopePoint::CEditorActionAddEnvelopePoint(CEditorMap *pMap, int EnvelopeIndex, CFixedTime Time, ColorRGBA Channels) :
+	IEditorAction(pMap), m_EnvelopeIndex(EnvelopeIndex), m_Time(Time), m_Channels(Channels)
 {
-	str_format(m_aDisplayText, sizeof(m_aDisplayText), "Add new point in envelope %d at time %f", m_EnvIndex, Time.AsSeconds());
+	str_format(m_aDisplayText, sizeof(m_aDisplayText), "Add new point in envelope %d at time %f", m_EnvelopeIndex, Time.AsSeconds());
 }
 
 void CEditorActionAddEnvelopePoint::Undo()
 {
 	// Delete added point
-	auto pEnvelope = Map()->m_vpEnvelopes[m_EnvIndex];
+	auto pEnvelope = Map()->m_vpEnvelopes[m_EnvelopeIndex];
 	auto pIt = std::find_if(pEnvelope->m_vPoints.begin(), pEnvelope->m_vPoints.end(), [this](const CEnvPoint_runtime &Point) {
 		return Point.m_Time == m_Time;
 	});
@@ -1705,21 +1705,21 @@ void CEditorActionAddEnvelopePoint::Undo()
 
 void CEditorActionAddEnvelopePoint::Redo()
 {
-	auto pEnvelope = Map()->m_vpEnvelopes[m_EnvIndex];
+	auto pEnvelope = Map()->m_vpEnvelopes[m_EnvelopeIndex];
 	pEnvelope->AddPoint(m_Time, {f2fx(m_Channels.r), f2fx(m_Channels.g), f2fx(m_Channels.b), f2fx(m_Channels.a)});
 
 	Map()->OnModify();
 }
 
-CEditorActionDeleteEnvelopePoint::CEditorActionDeleteEnvelopePoint(CEditorMap *pMap, int EnvIndex, int PointIndex) :
-	IEditorAction(pMap), m_EnvIndex(EnvIndex), m_PointIndex(PointIndex), m_Point(Map()->m_vpEnvelopes[EnvIndex]->m_vPoints[PointIndex])
+CEditorActionDeleteEnvelopePoint::CEditorActionDeleteEnvelopePoint(CEditorMap *pMap, int EnvelopeIndex, int PointIndex) :
+	IEditorAction(pMap), m_EnvelopeIndex(EnvelopeIndex), m_PointIndex(PointIndex), m_Point(Map()->m_vpEnvelopes[EnvelopeIndex]->m_vPoints[PointIndex])
 {
-	str_format(m_aDisplayText, sizeof(m_aDisplayText), "Delete point %d of envelope %d", m_PointIndex, m_EnvIndex);
+	str_format(m_aDisplayText, sizeof(m_aDisplayText), "Delete point %d of envelope %d", m_PointIndex, m_EnvelopeIndex);
 }
 
 void CEditorActionDeleteEnvelopePoint::Undo()
 {
-	std::shared_ptr<CEnvelope> pEnvelope = Map()->m_vpEnvelopes[m_EnvIndex];
+	std::shared_ptr<CEnvelope> pEnvelope = Map()->m_vpEnvelopes[m_EnvelopeIndex];
 	pEnvelope->m_vPoints.insert(pEnvelope->m_vPoints.begin() + m_PointIndex, m_Point);
 
 	Map()->OnModify();
@@ -1727,15 +1727,15 @@ void CEditorActionDeleteEnvelopePoint::Undo()
 
 void CEditorActionDeleteEnvelopePoint::Redo()
 {
-	std::shared_ptr<CEnvelope> pEnvelope = Map()->m_vpEnvelopes[m_EnvIndex];
+	std::shared_ptr<CEnvelope> pEnvelope = Map()->m_vpEnvelopes[m_EnvelopeIndex];
 	pEnvelope->m_vPoints.erase(pEnvelope->m_vPoints.begin() + m_PointIndex);
 
-	auto pSelectedPointIt = std::find_if(Editor()->m_vSelectedEnvelopePoints.begin(), Editor()->m_vSelectedEnvelopePoints.end(), [this](const std::pair<int, int> Pair) {
+	auto pSelectedPointIt = std::find_if(Map()->m_vSelectedEnvelopePoints.begin(), Map()->m_vSelectedEnvelopePoints.end(), [this](const std::pair<int, int> Pair) {
 		return Pair.first == m_PointIndex;
 	});
 
-	if(pSelectedPointIt != Editor()->m_vSelectedEnvelopePoints.end())
-		Editor()->m_vSelectedEnvelopePoints.erase(pSelectedPointIt);
+	if(pSelectedPointIt != Map()->m_vSelectedEnvelopePoints.end())
+		Map()->m_vSelectedEnvelopePoints.erase(pSelectedPointIt);
 
 	Map()->OnModify();
 }
@@ -1764,7 +1764,7 @@ void CEditorActionEditLayerSoundsProp::Redo()
 void CEditorActionEditLayerSoundsProp::Apply(int Value)
 {
 	std::shared_ptr<CLayerSounds> pLayerSounds = std::static_pointer_cast<CLayerSounds>(m_pLayer);
-	if(m_Prop == ELayerSoundsProp::PROP_SOUND)
+	if(m_Prop == ELayerSoundsProp::SOUND)
 	{
 		if(Value >= 0 && !Map()->m_vpSounds.empty())
 			pLayerSounds->m_Sound = Value % Map()->m_vpSounds.size();
@@ -1790,7 +1790,7 @@ void CEditorActionDeleteSoundSource::Undo()
 {
 	std::shared_ptr<CLayerSounds> pLayerSounds = std::static_pointer_cast<CLayerSounds>(m_pLayer);
 	pLayerSounds->m_vSources.insert(pLayerSounds->m_vSources.begin() + m_SourceIndex, m_Source);
-	Editor()->m_SelectedSource = m_SourceIndex;
+	Map()->m_SelectedSoundSource = m_SourceIndex;
 	Map()->OnModify();
 }
 
@@ -1798,7 +1798,7 @@ void CEditorActionDeleteSoundSource::Redo()
 {
 	std::shared_ptr<CLayerSounds> pLayerSounds = std::static_pointer_cast<CLayerSounds>(m_pLayer);
 	pLayerSounds->m_vSources.erase(pLayerSounds->m_vSources.begin() + m_SourceIndex);
-	Editor()->m_SelectedSource--;
+	Map()->m_SelectedSoundSource--;
 	Map()->OnModify();
 }
 
@@ -1896,43 +1896,43 @@ void CEditorActionEditSoundSourceProp::Apply(int Value)
 	std::shared_ptr<CLayerSounds> pLayerSounds = std::static_pointer_cast<CLayerSounds>(m_pLayer);
 	CSoundSource *pSource = &pLayerSounds->m_vSources[m_SourceIndex];
 
-	if(m_Prop == ESoundProp::PROP_POS_X)
+	if(m_Prop == ESoundProp::POS_X)
 	{
 		pSource->m_Position.x = Value;
 	}
-	else if(m_Prop == ESoundProp::PROP_POS_Y)
+	else if(m_Prop == ESoundProp::POS_Y)
 	{
 		pSource->m_Position.y = Value;
 	}
-	else if(m_Prop == ESoundProp::PROP_LOOP)
+	else if(m_Prop == ESoundProp::LOOP)
 	{
 		pSource->m_Loop = Value;
 	}
-	else if(m_Prop == ESoundProp::PROP_PAN)
+	else if(m_Prop == ESoundProp::PAN)
 	{
 		pSource->m_Pan = Value;
 	}
-	else if(m_Prop == ESoundProp::PROP_TIME_DELAY)
+	else if(m_Prop == ESoundProp::TIME_DELAY)
 	{
 		pSource->m_TimeDelay = Value;
 	}
-	else if(m_Prop == ESoundProp::PROP_FALLOFF)
+	else if(m_Prop == ESoundProp::FALLOFF)
 	{
 		pSource->m_Falloff = Value;
 	}
-	else if(m_Prop == ESoundProp::PROP_POS_ENV)
+	else if(m_Prop == ESoundProp::POS_ENV)
 	{
 		pSource->m_PosEnv = Value;
 	}
-	else if(m_Prop == ESoundProp::PROP_POS_ENV_OFFSET)
+	else if(m_Prop == ESoundProp::POS_ENV_OFFSET)
 	{
 		pSource->m_PosEnvOffset = Value;
 	}
-	else if(m_Prop == ESoundProp::PROP_SOUND_ENV)
+	else if(m_Prop == ESoundProp::SOUND_ENV)
 	{
 		pSource->m_SoundEnv = Value;
 	}
-	else if(m_Prop == ESoundProp::PROP_SOUND_ENV_OFFSET)
+	else if(m_Prop == ESoundProp::SOUND_ENV_OFFSET)
 	{
 		pSource->m_SoundEnvOffset = Value;
 	}
@@ -1965,11 +1965,11 @@ void CEditorActionEditRectSoundSourceShapeProp::Apply(int Value)
 	std::shared_ptr<CLayerSounds> pLayerSounds = std::static_pointer_cast<CLayerSounds>(m_pLayer);
 	CSoundSource *pSource = &pLayerSounds->m_vSources[m_SourceIndex];
 
-	if(m_Prop == ERectangleShapeProp::PROP_RECTANGLE_WIDTH)
+	if(m_Prop == ERectangleShapeProp::RECTANGLE_WIDTH)
 	{
 		pSource->m_Shape.m_Rectangle.m_Width = Value;
 	}
-	else if(m_Prop == ERectangleShapeProp::PROP_RECTANGLE_HEIGHT)
+	else if(m_Prop == ERectangleShapeProp::RECTANGLE_HEIGHT)
 	{
 		pSource->m_Shape.m_Rectangle.m_Height = Value;
 	}
@@ -2001,7 +2001,7 @@ void CEditorActionEditCircleSoundSourceShapeProp::Apply(int Value)
 	std::shared_ptr<CLayerSounds> pLayerSounds = std::static_pointer_cast<CLayerSounds>(m_pLayer);
 	CSoundSource *pSource = &pLayerSounds->m_vSources[m_SourceIndex];
 
-	if(m_Prop == ECircleShapeProp::PROP_CIRCLE_RADIUS)
+	if(m_Prop == ECircleShapeProp::CIRCLE_RADIUS)
 	{
 		pSource->m_Shape.m_Circle.m_Radius = Value;
 	}

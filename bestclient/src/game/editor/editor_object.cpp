@@ -9,14 +9,14 @@ void CEditorObject::OnInit(CEditor *pEditor)
 
 CEditor *CEditorObject::Editor() { return m_pEditor; }
 const CEditor *CEditorObject::Editor() const { return m_pEditor; }
+CEditorMap *CEditorObject::Map() { return m_pEditor->Map(); }
+const CEditorMap *CEditorObject::Map() const { return m_pEditor->Map(); }
 IInput *CEditorObject::Input() { return m_pEditor->Input(); }
 const IInput *CEditorObject::Input() const { return m_pEditor->Input(); }
 IClient *CEditorObject::Client() { return m_pEditor->Client(); }
 const IClient *CEditorObject::Client() const { return m_pEditor->Client(); }
 CConfig *CEditorObject::Config() { return m_pEditor->Config(); }
 const CConfig *CEditorObject::Config() const { return m_pEditor->Config(); }
-IConsole *CEditorObject::Console() { return m_pEditor->Console(); }
-const IConsole *CEditorObject::Console() const { return m_pEditor->Console(); }
 IEngine *CEditorObject::Engine() { return m_pEditor->Engine(); }
 const IEngine *CEditorObject::Engine() const { return m_pEditor->Engine(); }
 IGraphics *CEditorObject::Graphics() { return m_pEditor->Graphics(); }

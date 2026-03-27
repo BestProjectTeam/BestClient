@@ -4,7 +4,7 @@
 #define ENGINE_CLIENT_SERVERBROWSER_H
 
 #include <base/hash.h>
-#include <base/system.h>
+#include <base/str.h>
 
 #include <engine/console.h>
 #include <engine/serverbrowser.h>
@@ -12,6 +12,7 @@
 
 #include <functional>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -223,7 +224,7 @@ private:
 class CCommunityCache : public ICommunityCache
 {
 	IServerBrowser *m_pServerBrowser;
-	SHA256_DIGEST m_InfoSha256 = SHA256_ZEROED;
+	std::optional<SHA256_DIGEST> m_InfoSha256;
 	int m_LastType = IServerBrowser::NUM_TYPES; // initial value does not appear normally, marking uninitialized cache
 	unsigned m_SelectedCommunitiesHash = 0;
 	std::vector<const CCommunity *> m_vpSelectedCommunities;
@@ -262,10 +263,11 @@ public:
 	int LoadingProgression() const override;
 	void RequestResort() { m_NeedResort = true; }
 
-	int NumServers() const override { return m_NumServers; }
+	int NumServers() const override { return m_vpServerlist.size(); }
+	const CServerInfo *Get(int Index) const override;
 	int Players(const CServerInfo &Item) const override;
 	int Max(const CServerInfo &Item) const override;
-	int NumSortedServers() const override { return m_NumSortedServers; }
+	int NumSortedServers() const override { return m_vSortedServerlist.size(); }
 	int NumSortedPlayers() const override { return m_NumSortedPlayers; }
 	const CServerInfo *SortedGet(int Index) const override;
 
@@ -289,7 +291,7 @@ public:
 	unsigned CurrentCommunitiesHash() const override;
 
 	bool DDNetInfoAvailable() const override { return m_pDDNetInfo != nullptr; }
-	SHA256_DIGEST DDNetInfoSha256() const override { return m_DDNetInfoSha256; }
+	std::optional<SHA256_DIGEST> DDNetInfoSha256() const override { return m_DDNetInfoSha256; }
 
 	ICommunityCache &CommunityCache() override { return m_CommunityCache; }
 	const ICommunityCache &CommunityCache() const override { return m_CommunityCache; }
@@ -337,8 +339,8 @@ private:
 	const char *m_pHttpPrevBestUrl = nullptr;
 
 	CHeap m_ServerlistHeap;
-	CServerEntry **m_ppServerlist;
-	int *m_pSortedServerlist;
+	std::vector<CServerEntry *> m_vpServerlist;
+	std::vector<int> m_vSortedServerlist;
 	std::unordered_map<NETADDR, int> m_ByAddr;
 
 	std::vector<CCommunity> m_vCommunities;
@@ -354,7 +356,7 @@ private:
 	CExcludedCommunityTypeFilterList m_TypesFilter;
 
 	json_value *m_pDDNetInfo = nullptr;
-	SHA256_DIGEST m_DDNetInfoSha256 = SHA256_ZEROED;
+	std::optional<SHA256_DIGEST> m_DDNetInfoSha256;
 
 	CServerEntry *m_pFirstReqServer; // request list
 	CServerEntry *m_pLastReqServer;
@@ -366,11 +368,7 @@ private:
 	// used instead of g_Config.br_max_requests to get more servers
 	int m_CurrentMaxRequests;
 
-	int m_NumSortedServers;
-	int m_NumSortedServersCapacity;
 	int m_NumSortedPlayers;
-	int m_NumServers;
-	int m_NumServerCapacity;
 
 	int m_ServerlistType;
 	int64_t m_BroadcastTime;

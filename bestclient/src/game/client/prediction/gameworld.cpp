@@ -341,10 +341,16 @@ CEntity *CGameWorld::GetEntity(int Id, int EntityType)
 	return nullptr;
 }
 
-void CGameWorld::CreateExplosion(vec2 Pos, int Owner, int Weapon, bool NoDamage, int ActivatedTeam, CClientMask Mask)
+void CGameWorld::CreateExplosion(vec2 Pos, int Owner, int Weapon, bool NoDamage, int ActivatedTeam, CClientMask Mask, int Id)
 {
 	if(Owner < 0 && m_WorldConfig.m_IsSolo && !(Weapon == WEAPON_SHOTGUN && m_WorldConfig.m_IsDDRace))
 		return;
+
+	if(m_WorldConfig.m_IsDDRace && m_WorldConfig.m_PredictDDRace)
+	{
+		// vanilla has different projectile physics
+		CreatePredictedExplosionEvent(Pos, Id);
+	}
 
 	// deal damage
 	CEntity *apEnts[MAX_CLIENTS];
@@ -630,8 +636,10 @@ void CGameWorld::CopyWorldClean(CGameWorld *pFrom)
 	m_pCollision = pFrom->m_pCollision;
 	m_WorldConfig = pFrom->m_WorldConfig;
 	m_pTuningList = pFrom->m_pTuningList;
+	m_pMapBugs = pFrom->m_pMapBugs;
 	m_Teams = pFrom->m_Teams;
 	m_Core.m_vSwitchers = pFrom->m_Core.m_vSwitchers;
+	m_PredictedEvents = pFrom->m_PredictedEvents;
 	// delete the previous entities
 	Clear();
 	for(int i = 0; i < MAX_CLIENTS; i++)
@@ -644,7 +652,7 @@ void CGameWorld::CopyWorldClean(CGameWorld *pFrom)
 	{
 		for(CEntity *pEnt = pFrom->FindLast(Type); pEnt; pEnt = pEnt->TypePrev())
 		{
-			CEntity *pCopy = 0;
+			CEntity *pCopy = nullptr;
 			if(Type == ENTTYPE_PROJECTILE)
 				pCopy = new CProjectile(*((CProjectile *)pEnt));
 			else if(Type == ENTTYPE_LASER)
@@ -655,6 +663,8 @@ void CGameWorld::CopyWorldClean(CGameWorld *pFrom)
 				pCopy = new CCharacter(*((CCharacter *)pEnt));
 			else if(Type == ENTTYPE_PICKUP)
 				pCopy = new CPickup(*((CPickup *)pEnt));
+			else if(Type == ENTTYPE_PLASMA)
+				pCopy = new CPlasma(*((CPlasma *)pEnt));
 			if(pCopy)
 			{
 				pCopy->m_pParent = nullptr;
@@ -682,6 +692,7 @@ void CGameWorld::CopyWorld(CGameWorld *pFrom)
 	m_pMapBugs = pFrom->m_pMapBugs;
 	m_Teams = pFrom->m_Teams;
 	m_Core.m_vSwitchers = pFrom->m_Core.m_vSwitchers;
+	m_PredictedEvents = pFrom->m_PredictedEvents;
 	// delete the previous entities
 	Clear();
 	for(int i = 0; i < MAX_CLIENTS; i++)
@@ -813,4 +824,81 @@ void CGameWorld::Clear()
 bool CGameWorld::EmulateBug(int Bug) const
 {
 	return m_pMapBugs->Contains(Bug);
+}
+
+void CGameWorld::CreatePredictedEvent(const CPredictedEvent &NewEvent)
+{
+	if(!g_Config.m_ClPredictEvents || !m_WorldConfig.m_PredictEvents)
+		return;
+
+	// prediction is ran multiple times per tick, check if event already exists
+	const auto It = std::find_if(
+		m_PredictedEvents.begin(),
+		m_PredictedEvents.end(),
+		[NewEvent](const CPredictedEvent &Event) {
+			return Event.m_EventId == NewEvent.m_EventId && Event.m_ExtraInfo == NewEvent.m_ExtraInfo &&
+			       Event.m_Pos == NewEvent.m_Pos && Event.m_Id == NewEvent.m_Id && Event.m_Tick == NewEvent.m_Tick;
+		});
+
+	if(It == m_PredictedEvents.end())
+	{
+		m_PredictedEvents.push_back(NewEvent);
+	}
+}
+
+bool CGameWorld::CheckPredictedEventHandled(const CPredictedEvent &CheckEvent)
+{
+	// events could be delayed by ping, so don't check for exact tick match
+	// also received events don't have Id
+	auto It = std::find_if(
+		m_PredictedEvents.begin(),
+		m_PredictedEvents.end(),
+		[CheckEvent](const CPredictedEvent &Event) {
+			return Event.m_Handled == true && Event.m_EventId == CheckEvent.m_EventId &&
+			       Event.m_Pos == CheckEvent.m_Pos && Event.m_Tick <= CheckEvent.m_Tick && Event.m_ExtraInfo == CheckEvent.m_ExtraInfo;
+		});
+
+	if(It == m_PredictedEvents.end())
+	{
+		return false;
+	}
+
+	// remove the event after it has been confirmed played
+	m_PredictedEvents.erase(It);
+	return true;
+}
+
+void CGameWorld::CreatePredictedSound(vec2 Pos, int SoundId, int Id)
+{
+	if(!g_Config.m_SndEnable)
+		return;
+
+	CPredictedEvent Event(NETEVENTTYPE_SOUNDWORLD, Pos, Id, GameTick(), SoundId);
+	CreatePredictedEvent(Event);
+}
+
+void CGameWorld::CreatePredictedExplosionEvent(vec2 Pos, int Id)
+{
+	CPredictedEvent Event(NETEVENTTYPE_EXPLOSION, Pos, Id, GameTick());
+	CreatePredictedEvent(Event);
+}
+
+void CGameWorld::CreatePredictedHammerHitEvent(vec2 Pos, int Id)
+{
+	CPredictedEvent Event(NETEVENTTYPE_HAMMERHIT, Pos, Id, GameTick());
+	CreatePredictedEvent(Event);
+}
+
+void CGameWorld::CreatePredictedDamageIndEvent(vec2 Pos, float Angle, int Amount, int Id)
+{
+	float a = 3 * pi / 2 + Angle;
+	float s = a - pi / 3;
+	float e = a + pi / 3;
+	for(int i = 0; i < Amount; i++)
+	{
+		float f = mix(s, e, (i + 1) / (float)(Amount + 1));
+
+		CPredictedEvent Event(NETEVENTTYPE_DAMAGEIND, Pos, Id, GameTick(), (int)(f * 256.0f));
+		CreatePredictedEvent(Event);
+	}
 }

@@ -8,6 +8,7 @@
 #include <game/client/component.h>
 #include <game/client/ui.h>
 
+#include <base/net.h>
 #include <base/system.h>
 
 #include <engine/console.h>

@@ -28,35 +28,23 @@ CBackground::~CBackground()
 	delete m_pBackgroundImages;
 }
 
-CBackgroundEngineMap *CBackground::CreateBGMap()
-{
-	return new CBackgroundEngineMap;
-}
-
 void CBackground::OnInit()
 {
-	m_pBackgroundMap = CreateBGMap();
-	m_pMap = m_pBackgroundMap;
-	m_MediaBackground.Init(Graphics(), Storage());
+	m_pBackgroundMap = CreateMap();
+	m_pMap = m_pBackgroundMap.get();
 
 	m_pImages->OnInterfacesInit(GameClient());
-	Kernel()->RegisterInterface(m_pBackgroundMap);
-		if(g_Config.m_ClBackgroundEntities[0] != '\0' && str_comp(g_Config.m_ClBackgroundEntities, CURRENT_MAP))
-			LoadBackground();
-}
-
-void CBackground::OnShutdown()
-{
-	m_MediaBackground.Shutdown();
+	if(g_Config.m_ClBackgroundEntities[0] != '\0' && str_comp(g_Config.m_ClBackgroundEntities, CURRENT_MAP))
+		LoadBackground();
 }
 
 void CBackground::LoadBackground()
 {
-	if(m_Loaded && m_pMap == m_pBackgroundMap)
+	if(m_Loaded && m_pMap == m_pBackgroundMap.get())
 		m_pMap->Unload();
 
 	m_Loaded = false;
-	m_pMap = m_pBackgroundMap;
+	m_pMap = m_pBackgroundMap.get();
 	m_pLayers = m_pBackgroundLayers;
 	m_pImages = m_pBackgroundImages;
 
@@ -69,7 +57,7 @@ void CBackground::LoadBackground()
 		str_format(aBuf, sizeof(aBuf), "maps/%s%s", g_Config.m_ClBackgroundEntities, str_endswith(g_Config.m_ClBackgroundEntities, ".map") ? "" : ".map");
 		if(str_comp(g_Config.m_ClBackgroundEntities, CURRENT_MAP) == 0)
 		{
-			m_pMap = Kernel()->RequestInterface<IEngineMap>();
+			m_pMap = GameClient()->Map();
 			if(m_pMap->IsLoaded())
 			{
 				m_pLayers = GameClient()->Layers();
@@ -77,7 +65,7 @@ void CBackground::LoadBackground()
 				m_Loaded = true;
 			}
 		}
-		else if(m_pMap->Load(aBuf))
+		else if(m_pMap->Load(g_Config.m_ClBackgroundEntities, Storage(), aBuf, IStorage::TYPE_ALL))
 		{
 			m_pLayers->Init(m_pMap, true);
 			NeedImageLoading = true;
@@ -105,45 +93,13 @@ void CBackground::OnMapLoad()
 
 void CBackground::OnRender()
 {
-	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
-	{
-		m_MediaBackground.Unload();
+	if(!m_Loaded)
 		return;
-	}
 
-	const bool MediaBackgroundDisabled = GameClient()->m_BestClient.IsComponentDisabled(CBestClient::COMPONENT_VISUALS_MEDIA_BACKGROUND);
-	if(MediaBackgroundDisabled)
-		m_MediaBackground.Unload();
-	else
-	{
-		m_MediaBackground.SyncFromConfig(g_Config.m_BcGameMediaBackground, g_Config.m_BcMenuMediaBackgroundPath);
-		m_MediaBackground.Update();
-	}
-	if(!MediaBackgroundDisabled && g_Config.m_BcGameMediaBackground)
-	{
-		float ViewWidth = 0.0f;
-		float ViewHeight = 0.0f;
-		Graphics()->CalcScreenParams(Graphics()->ScreenAspect(), GetCurCamera()->m_Zoom, &ViewWidth, &ViewHeight);
-
-		CMenuMediaBackground::SRenderContext RenderContext;
-		RenderContext.m_CameraCenterX = GetCurCamera()->m_Center.x;
-		RenderContext.m_CameraCenterY = GetCurCamera()->m_Center.y;
-		RenderContext.m_ViewWidth = ViewWidth;
-		RenderContext.m_ViewHeight = ViewHeight;
-		RenderContext.m_WorldOffset = (float)g_Config.m_BcGameMediaBackgroundOffset / 100.0f;
-		if(GameClient()->Layers() != nullptr && GameClient()->Layers()->GameLayer() != nullptr)
-		{
-			RenderContext.m_MapWidth = GameClient()->Layers()->GameLayer()->m_Width * 32.0f;
-			RenderContext.m_MapHeight = GameClient()->Layers()->GameLayer()->m_Height * 32.0f;
-		}
-
-		m_MediaBackground.Render(ViewWidth, ViewHeight, &RenderContext);
-	}
+	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
+		return;
 
 	if(g_Config.m_ClOverlayEntities != 100)
-		return;
-
-	if(!m_Loaded)
 		return;
 
 	CMapLayers::OnRender();

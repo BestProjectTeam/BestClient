@@ -1,9 +1,8 @@
 #include "hash.h"
 
 #include "hash_ctxt.h"
-#include "system.h"
-
-const SHA256_DIGEST SHA256_ZEROED = {{0}};
+#include "mem.h"
+#include "str.h"
 
 static void digest_str(const unsigned char *digest, size_t digest_len, char *str, size_t max_len)
 {

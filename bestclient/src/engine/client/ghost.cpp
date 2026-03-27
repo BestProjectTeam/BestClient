@@ -1,7 +1,11 @@
 #include "ghost.h"
 
+#include <base/bytes.h>
+#include <base/dbg.h>
+#include <base/io.h>
 #include <base/log.h>
-#include <base/system.h>
+#include <base/mem.h>
+#include <base/str.h>
 
 #include <engine/shared/compression.h>
 #include <engine/shared/config.h>

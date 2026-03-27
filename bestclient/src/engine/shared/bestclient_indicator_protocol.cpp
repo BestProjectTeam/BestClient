@@ -1,6 +1,7 @@
 #include "bestclient_indicator_protocol.h"
 
 #include <base/hash_ctxt.h>
+#include <base/net.h>
 
 namespace BestClientIndicator
 {
@@ -152,7 +153,7 @@ bool ValidateProof(const char *pSharedToken, const uint8_t *pPacketData, int Pac
 
 	const int PayloadSize = PacketDataSize - CLIENT_PACKET_PROOF_SIZE;
 	const SHA256_DIGEST Expected = ComputeProof(pSharedToken, pPacketData, PayloadSize);
-	SHA256_DIGEST Actual = SHA256_ZEROED;
+	SHA256_DIGEST Actual{};
 	mem_copy(Actual.data, pPacketData + PayloadSize, sizeof(Actual.data));
 	return Actual == Expected;
 }

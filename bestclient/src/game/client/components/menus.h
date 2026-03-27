@@ -3,6 +3,7 @@
 #ifndef GAME_CLIENT_COMPONENTS_MENUS_H
 #define GAME_CLIENT_COMPONENTS_MENUS_H
 
+#include <base/bytes.h>
 #include <base/types.h>
 #include <base/vmath.h>
 
@@ -21,7 +22,7 @@
 #include <game/client/components/menus_settings_controls.h>
 #include <game/client/components/menus_start.h>
 #include <game/client/components/skins7.h>
-#include <game/client/components/bestclient/warlist.h>
+#include <game/client/components/tclient/warlist.h>
 #include <game/client/lineinput.h>
 #include <game/client/ui.h>
 #include <game/voting.h>
@@ -366,7 +367,30 @@ protected:
 
 	bool m_DummyNamePlatePreview = false;
 
-	bool m_JoinTutorial = false;
+	class CJoinTutorial
+	{
+	public:
+		bool m_Queued = false;
+		enum class EStatus
+		{
+			REFRESHING,
+			SERVER_LIST_ERROR,
+			NO_TUTORIAL_AVAILABLE,
+		};
+		EStatus m_Status = EStatus::REFRESHING;
+		bool m_TryRefresh = false;
+		bool m_TriedRefresh = false;
+		enum class ELocalServerState
+		{
+			NOT_TRIED,
+			TRY,
+			WAITING_STOP,
+			WAITING_START,
+		};
+		ELocalServerState m_LocalServerState = ELocalServerState::NOT_TRIED;
+		std::chrono::nanoseconds m_StateChange = std::chrono::nanoseconds(0);
+	};
+	CJoinTutorial m_JoinTutorial;
 	bool m_CreateDefaultFavoriteCommunities = false;
 	bool m_ForceRefreshLanPage = false;
 
@@ -677,6 +701,8 @@ protected:
 
 	// found in menus_demo.cpp
 	vec2 m_DemoControlsPositionOffset = vec2(0.0f, 0.0f);
+	bool m_PausedBeforeSeeking;
+	float m_PrevSeekAmount;
 	float m_LastPauseChange = -1.0f;
 	float m_LastSpeedChange = -1.0f;
 	static constexpr int DEFAULT_SKIP_DURATION_INDEX = 3;
@@ -702,6 +728,7 @@ protected:
 	STextContainerIndex m_MotdTextContainerIndex;
 	void RenderGame(CUIRect MainView);
 	void PopupConfirmDisconnect();
+	void PopupConfirmOpenWiki();
 	void PopupConfirmDisconnectDummy();
 	void PopupConfirmDiscardTouchControlsChanges();
 	void PopupConfirmResetTouchControls();
@@ -791,6 +818,16 @@ protected:
 	void RenderSettingsNew(CUIRect MainView, bool NeedRestart);
 	void RenderSettingsOld(CUIRect MainView, bool NeedRestart);
 	void RenderSettingsCustom(CUIRect MainView);
+	// found in menus_tclient.cpp
+	void RenderSettingsTClient(CUIRect MainView);
+	void RenderSettingsTClientSettings(CUIRect MainView);
+	void RenderSettingsTClientBindWheel(CUIRect MainView);
+	void RenderSettingsTClientChatBinds(CUIRect MainView);
+	void RenderSettingsTClientWarList(CUIRect MainView);
+	void RenderSettingsTClientStatusBar(CUIRect MainView);
+	void RenderSettingsTClientInfo(CUIRect MainView);
+	void RenderSettingsTClientProfiles(CUIRect MainView);
+	void RenderSettingsTClientConfigs(CUIRect MainView);
 	void RenderSettingsSearchRow(CUIRect &ContentView);
 	void UpdateSettingsSearchNavigation();
 	void RenderSettingsRestartWarning(CUIRect RestartBar);
@@ -923,6 +960,7 @@ public:
 	{
 		SETTINGS_GENERAL_TAB = 0,
 		SETTINGS_APPEARANCE_TAB,
+		SETTINGS_TCLIENT,
 		SETTINGS_BESTCLIENT,
 		SETTINGS_LENGTH,
 	};
@@ -937,6 +975,7 @@ public:
 		OLD_SETTINGS_SOUND,
 		OLD_SETTINGS_DDNET,
 		OLD_SETTINGS_ASSETS,
+		OLD_SETTINGS_TCLIENT,
 		OLD_SETTINGS_BESTCLIENT,
 		OLD_SETTINGS_LENGTH,
 	};
@@ -1074,6 +1113,7 @@ public:
 		POPUP_MESSAGE, // generic message popup (one button)
 		POPUP_CONFIRM, // generic confirmation popup (two buttons)
 		POPUP_FIRST_LAUNCH,
+		POPUP_JOIN_TUTORIAL,
 		POPUP_POINTS,
 		POPUP_DISCONNECTED,
 		POPUP_LANGUAGE,
@@ -1110,7 +1150,7 @@ private:
 	friend CMenusIngameTouchControls;
 	CMenusSettingsControls m_MenusSettingsControls;
 	friend CMenusSettingsControls;
-	CMenusStart *m_pMenusStart = nullptr;
+	CMenusStart m_MenusStart;
 
 	static int GhostlistFetchCallback(const CFsFileInfo *pInfo, int IsDir, int StorageType, void *pUser);
 

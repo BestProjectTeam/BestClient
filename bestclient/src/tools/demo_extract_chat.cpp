@@ -1,4 +1,5 @@
 #include <base/logger.h>
+#include <base/os.h>
 #include <base/system.h>
 
 #include <engine/client.h>
@@ -155,7 +156,7 @@ public:
 
 			const IDemoPlayer::CInfo &Info = m_pDemoPlayer->Info()->m_Info;
 			char aTime[20];
-			str_time((int64_t)(Info.m_CurrentTick - Info.m_FirstTick) / SERVER_TICK_SPEED * 100, TIME_HOURS, aTime, sizeof(aTime));
+			str_time((int64_t)(Info.m_CurrentTick - Info.m_FirstTick) / SERVER_TICK_SPEED * 100, ETimeFormat::HOURS, aTime, sizeof(aTime));
 
 			if(Msg == NETMSGTYPE_SV_CHAT)
 			{

@@ -2,6 +2,7 @@
 #ifndef GAME_CLIENT_COMPONENTS_BESTCLIENT_VOICE_PROTOCOL_H
 #define GAME_CLIENT_COMPONENTS_BESTCLIENT_VOICE_PROTOCOL_H
 
+#include <base/net.h>
 #include <base/system.h>
 
 #include <cstdint>

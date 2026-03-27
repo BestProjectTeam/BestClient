@@ -1,6 +1,8 @@
 #ifndef GAME_SERVER_SCOREWORKER_H
 #define GAME_SERVER_SCOREWORKER_H
 
+#include <base/str.h>
+
 #include <engine/map.h>
 #include <engine/server/databases/connection_pool.h>
 #include <engine/shared/protocol.h>
@@ -234,7 +236,7 @@ public:
 
 	void Reset()
 	{
-		m_BestTime = 0;
+		m_BestTime.reset();
 		for(float &BestTimeCp : m_aBestTimeCp)
 			BestTimeCp = 0;
 
@@ -254,7 +256,7 @@ public:
 			m_aBestTimeCp[i] = aTimeCp[i];
 	}
 
-	float m_BestTime;
+	std::optional<float> m_BestTime;
 	float m_aBestTimeCp[NUM_CHECKPOINTS];
 
 	int m_RecordStopTick;

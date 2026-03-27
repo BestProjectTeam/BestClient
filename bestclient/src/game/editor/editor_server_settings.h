@@ -4,6 +4,8 @@
 #include "component.h"
 #include "editor_ui.h"
 
+#include <base/str.h>
+
 #include <map>
 #include <string>
 #include <vector>
@@ -188,7 +190,7 @@ enum class ECollisionCheckResult
 {
 	ERROR,
 	REPLACE,
-	ADD
+	ADD,
 };
 
 class CMapSettingsBackend : public CEditorComponent

@@ -1,9 +1,13 @@
 /* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
+#include <base/dbg.h>
+#include <base/fs.h>
 #include <base/hash_ctxt.h>
+#include <base/io.h>
 #include <base/log.h>
 #include <base/math.h>
-#include <base/system.h>
+#include <base/process.h>
+#include <base/str.h>
 
 #include <engine/client/updater.h>
 #include <engine/shared/linereader.h>
@@ -362,6 +366,12 @@ public:
 		return;
 #endif
 
+		if(fs_executable_path(m_aBinarydir, sizeof(m_aBinarydir)) == 0)
+		{
+			fs_parent_dir(m_aBinarydir);
+			return;
+		}
+
 		// check for usable path in argv[0]
 		{
 			unsigned int Pos = ~0U;
@@ -378,14 +388,12 @@ public:
 				{
 					return;
 				}
-#if defined(CONF_PLATFORM_MACOS)
-				str_append(m_aBinarydir, "/../../../DDNet-Server.app/Contents/MacOS");
-				str_format(aBuf, sizeof(aBuf), "%s/" PLAT_SERVER_EXEC, m_aBinarydir);
+				// Also look for client binary. (see https://github.com/ddnet/ddnet/issues/11418)
+				str_format(aBuf, sizeof(aBuf), "%s/" PLAT_CLIENT_EXEC, m_aBinarydir);
 				if(fs_is_file(aBuf))
 				{
 					return;
 				}
-#endif
 			}
 		}
 
@@ -927,7 +935,7 @@ void IStorage::StripPathAndExtension(const char *pFilename, char *pBuffer, int B
 
 const char *IStorage::FormatTmpPath(char *aBuf, unsigned BufSize, const char *pPath)
 {
-	str_format(aBuf, BufSize, "%s.%d.tmp", pPath, pid());
+	str_format(aBuf, BufSize, "%s.%d.tmp", pPath, process_id());
 	return aBuf;
 }
 

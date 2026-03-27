@@ -56,7 +56,7 @@ void CChatBubbles::RefreshBubbleTextContainer(CBubbles &Bubble, int FontSize)
 	Cursor.m_Flags = TEXTFLAG_RENDER;
 	Cursor.m_LineWidth = 500.0f - FontSize * 2.0f;
 	Bubble.m_Cursor.m_FontSize = FontSize;
-	TextRender()->ColorParsing(Bubble.m_aText, &Cursor, ColorRGBA(1.0f, 1.0f, 1.0f), &Bubble.m_TextContainerIndex);
+	TextRender()->CreateOrAppendTextContainer(Bubble.m_TextContainerIndex, &Cursor, Bubble.m_aText);
 
 	if(Bubble.m_TextContainerIndex.Valid())
 	{
@@ -166,7 +166,7 @@ void CChatBubbles::AddBubble(int ClientId, int Team, const char *pText)
 
 	TextRender()->TextColor(Color);
 
-	TextRender()->ColorParsing(pText, &pCursor, Color, &bubble.m_TextContainerIndex);
+	TextRender()->CreateOrAppendTextContainer(bubble.m_TextContainerIndex, &pCursor, pText);
 
 	m_ChatBubbles[ClientId].insert(m_ChatBubbles[ClientId].begin(), bubble);
 

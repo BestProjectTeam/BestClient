@@ -73,6 +73,7 @@ class CConsole : public IConsole
 	static void Con_Exec(IResult *pResult, void *pUserData);
 	static void ConCommandAccess(IResult *pResult, void *pUser);
 	static void ConCommandStatus(IConsole::IResult *pResult, void *pUser);
+	void PrintCommandList(EAccessLevel MinAccessLevel, int ExcludeFlagMask);
 
 	void ExecuteLineStroked(int Stroke, const char *pStr, int ClientId = IConsole::CLIENT_ID_UNSPECIFIED, bool InterpretSemicolons = true) override;
 
@@ -141,7 +142,7 @@ class CConsole : public IConsole
 		PARSEARGS_INVALID_FLOAT,
 	};
 
-	int ParseArgs(CResult *pResult, const char *pFormat, bool IsColor = false);
+	int ParseArgs(CResult *pResult, const char *pFormat);
 
 	/*
 	this function will set pFormat to the next parameter (i,s,r,v,?) it contains and
@@ -190,7 +191,7 @@ public:
 	void ExecuteLineFlag(const char *pStr, int FlagMask, int ClientId = IConsole::CLIENT_ID_UNSPECIFIED, bool InterpretSemicolons = true) override;
 	bool ExecuteFile(const char *pFilename, int ClientId = IConsole::CLIENT_ID_UNSPECIFIED, bool LogFailure = false, int StorageType = IStorage::TYPE_ALL) override;
 
-	void Print(int Level, const char *pFrom, const char *pStr, ColorRGBA PrintColor = gs_ConsoleDefaultColor) const override;
+	void Print(int Level, const char *pFrom, const char *pStr, ColorRGBA PrintColor = CONSOLE_DEFAULT_COLOR) const override;
 	void SetTeeHistorianCommandCallback(FTeeHistorianCommandCallback pfnCallback, void *pUser) override;
 	void SetUnknownCommandCallback(FUnknownCommandCallback pfnCallback, void *pUser) override;
 	void SetCanUseCommandCallback(FCanUseCommandCallback pfnCallback, void *pUser) override;

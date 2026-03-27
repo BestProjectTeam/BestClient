@@ -6,6 +6,8 @@
 #include "browser_cache.h"
 #include "presence_cache.h"
 
+#include <base/net.h>
+
 #include <game/client/component.h>
 
 #include <engine/shared/http.h>

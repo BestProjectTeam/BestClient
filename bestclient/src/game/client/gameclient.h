@@ -12,6 +12,7 @@
 #include <engine/client/enums.h>
 #include <engine/console.h>
 #include <engine/shared/config.h>
+#include <engine/shared/protocol.h>
 #include <engine/shared/snapshot.h>
 
 #include <generated/protocol7.h>
@@ -66,22 +67,26 @@
 #include "components/spectator.h"
 #include "components/statboard.h"
 #include "components/bestclient/admin_panel.h"
-#include "components/bestclient/bg_draw.h"
-#include "components/bestclient/bindchat.h"
 #include "components/bestclient/bindsystem.h"
-#include "components/bestclient/custom_communities.h"
-#include "components/bestclient/mod.h"
-#include "components/bestclient/outlines.h"
-#include "components/bestclient/pet.h"
-#include "components/bestclient/player_indicator.h"
-#include "components/bestclient/rainbow.h"
-#include "components/bestclient/scripting.h"
-#include "components/bestclient/skinprofiles.h"
-#include "components/bestclient/statusbar.h"
+#include "components/tclient/bg_draw.h"
+#include "components/tclient/bindchat.h"
+#include "components/tclient/bindwheel.h"
+#include "components/tclient/custom_communities.h"
+#include "components/tclient/mod.h"
+#include "components/tclient/moving_tiles.h"
+#include "components/tclient/mumble.h"
+#include "components/tclient/outlines.h"
+#include "components/tclient/pet.h"
+#include "components/tclient/player_indicator.h"
+#include "components/tclient/rainbow.h"
+#include "components/tclient/scripting.h"
+#include "components/tclient/skinprofiles.h"
+#include "components/tclient/statusbar.h"
+#include "components/tclient/tclient.h"
+#include "components/tclient/trails.h"
+#include "components/tclient/translate.h"
+#include "components/tclient/warlist.h"
 #include "components/bestclient/bestclient.h"
-#include "components/bestclient/trails.h"
-#include "components/bestclient/translate.h"
-#include "components/bestclient/warlist.h"
 #include "components/bestclient/magic_particles.h"
 #include "components/bestclient/3d_particles.h"
 #include "components/bestclient/orbit_aura.h"
@@ -89,7 +94,6 @@
 #include "components/bestclient/clientindicator/client_indicator.h"
 #include "components/bestclient/fast_practice.h"
 #include "components/bestclient/afterimage.h"
-#include "components/bestclient/moving_tiles.h"
 #include "components/bestclient/music_player.h"
 #include "components/bestclient/audio_visualizer.h"
 #include "components/bestclient/world_editor.h"
@@ -170,6 +174,7 @@ enum class EClientIdFormat
 class CGameClient : public IGameClient
 {
 public:
+	friend class CTClient;
 	friend class CBestClient;
 	friend class CFastPractice;
 
@@ -205,7 +210,6 @@ public:
 	CSpectator m_Spectator;
 
 	CPlayers m_Players;
-	CMovingTiles m_MovingTilesBackground = CMovingTiles{false};
 	CNamePlates m_NamePlates;
 	CFreezeBars m_FreezeBars;
 	CItems m_Items;
@@ -213,7 +217,6 @@ public:
 
 	CMapLayers m_MapLayersBackground = CMapLayers{ERenderType::RENDERTYPE_BACKGROUND};
 	CMapLayers m_MapLayersForeground = CMapLayers{ERenderType::RENDERTYPE_FOREGROUND};
-	CMovingTiles m_MovingTilesForeground = CMovingTiles{true};
 	CBackground m_Background;
 	CMenuBackground m_MenuBackground;
 
@@ -226,25 +229,32 @@ public:
 
 	CLocalServer m_LocalServer;
 
-	// BestClient Components
-	CAdminPanel m_AdminPanel;
+	// TClient Components
 	CSkinProfiles m_SkinProfiles;
 	CStatusBar m_StatusBar;
 	CBindChat m_BindChat;
-	CBindSystem m_BindSystem;
+	CBindWheel m_BindWheel;
 	CBgDraw m_BgDraw;
-	CBestClient m_BestClient;
+	CTClient m_TClient;
 	CTrails m_Trails;
 	CTranslate m_Translate;
 	CPet m_Pet;
 	CPlayerIndicator m_PlayerIndicator;
 	COutlines m_Outlines;
+	CMumble m_Mumble;
 	CRainbow m_Rainbow;
 	CWarList m_WarList;
 	CScripting m_Scripting;
 	CMod m_Mod;
 	CCustomCommunities m_CustomCommunities;
-	
+	CMovingTiles m_MovingTilesBackground = CMovingTiles{false};
+	CMovingTiles m_MovingTilesForeground = CMovingTiles{true};
+
+	// BestClient Components
+	CAdminPanel m_AdminPanel;
+	CBindSystem m_BindSystem;
+	CBestClient m_BestClient;
+
 	// BestClient
 	CMagicParticles m_MagicParticles;
 	CChatBubbles m_ChatBubbles;
@@ -547,9 +557,13 @@ public:
 		CCharacterCore m_Predicted;
 		CCharacterCore m_PrevPredicted;
 
+		// TClient
+		CCharacterCore m_RegularPredicted;
+
 		// BestClient
 		vec2 m_ImprovedPredPos = vec2(0, 0);
 		vec2 m_PrevImprovedPredPos = vec2(0, 0);
+		bool m_ValidAntipingSmooth = false;
 		//vec2 m_DebugVector = vec2(0, 0);
 		//vec2 m_DebugVector2 = vec2(0, 0);
 		//vec2 m_DebugVector3 = vec2(0, 0);
@@ -571,6 +585,9 @@ public:
 		bool m_Afk;
 		bool m_Paused;
 		bool m_Spec;
+
+		int m_FinishTimeSeconds;
+		int m_FinishTimeMillis;
 
 		// Editor allows 256 switches for now.
 		bool m_aSwitchStates[256];
@@ -745,6 +762,8 @@ public:
 	CNetObj_PlayerInput m_HammerInput;
 	unsigned int m_DummyFire;
 	bool m_ReceivedDDNetPlayer;
+	bool m_ReceivedDDNetPlayerFinishTimes;
+	bool m_ReceivedDDNetPlayerFinishTimesMillis;
 
 	class CTeamsCore m_Teams;
 
@@ -772,6 +791,7 @@ public:
 	const CTuningParams *GetTuning(int i) const { return &m_aTuningList[i]; }
 	ColorRGBA GetDDTeamColor(int DDTeam, float Lightness = 0.5f) const;
 	void FormaBestClientId(int ClientId, char (&aClientId)[16], EClientIdFormat Format) const;
+	void FormatClientId(int ClientId, char (&aClientId)[16], EClientIdFormat Format) const { FormaBestClientId(ClientId, aClientId, Format); }
 
 	CGameWorld m_GameWorld;
 	CGameWorld m_PredictedWorld;
@@ -983,6 +1003,9 @@ public:
 	bool m_MultiViewActivated;
 	bool m_aMultiViewId[MAX_CLIENTS];
 	int m_LockCamClientId;
+	int m_MapBestTimeSeconds;
+	int m_MapBestTimeMillis;
+	char m_aMapDescription[512];
 
 	void ResetMultiView();
 	int FindFirstMultiViewId();
@@ -1016,7 +1039,7 @@ private:
 	CMapBugs m_MapBugs;
 
 	// tunings for every zone on the map, 0 is a global tune
-	CTuningParams m_aTuningList[NUM_TUNEZONES];
+	CTuningParams m_aTuningList[TuneZone::NUM];
 	CTuningParams *TuningList() { return m_aTuningList; }
 
 	float m_LastShowDistanceZoom;

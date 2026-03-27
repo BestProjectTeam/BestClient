@@ -67,7 +67,7 @@ class CHud : public CComponent
 
 	void RenderCursor();
 
-	void RenderTextInfo(bool ForcePreview = false);
+	void RenderTextInfo();
 	void RenderConnectionWarning();
 	void RenderTeambalanceWarning();
 
@@ -78,10 +78,9 @@ class CHud : public CComponent
 	void RenderPlayerState(int ClientId);
 
 	int m_LastSpectatorCountTick;
-	int m_SpeedrunTimerExpiredTick;
-	void RenderSpectatorCount(bool ForcePreview = false);
+	void RenderSpectatorCount();
 	void RenderDummyActions();
-	void RenderMovementInformation(bool ForcePreview = false);
+	void RenderMovementInformation();
 
 	void UpdateMovementInformationTextContainer(STextContainerIndex &TextContainer, float FontSize, float Value, float &PrevValue);
 	void RenderMovementInformationTextContainer(STextContainerIndex &TextContainer, const ColorRGBA &Color, float X, float Y);
@@ -94,28 +93,17 @@ class CHud : public CComponent
 		float m_Angle = 0.0f;
 	};
 	class CMovementInformation GetMovementInformation(int ClientId, int Conn) const;
-	bool CanRenderCoordIndicator(int ClientId, bool ForcePreview = false) const;
-	bool HasPlayerBelowOnSameX(int ClientId, const CMovementInformation &Info) const;
 
-	void RenderGameTimer(bool ForcePreview = false);
-	void RenderPracticeModeBanner();
-	void RenderSpeedrunTimer();
+	void RenderGameTimer();
 	void RenderPauseNotification();
 	void RenderSuddenDeath();
 
-	void RenderScoreHud(bool ForcePreview = false);
+	void RenderScoreHud();
 	int m_LastLocalClientId = -1;
 
 	void RenderSpectatorHud();
 	void RenderWarmupTimer();
-	void RenderLocalTime(float x, bool ForcePreview = false);
-	void RenderLockCam(bool ForcePreview = false);
-
-	float HudAlpha() const;
-	ColorRGBA ApplyHudAlpha(ColorRGBA Color) const;
-	void SetHudColor(float r, float g, float b, float a);
-	void SetHudTextColor(float r, float g, float b, float a);
-	void SetHudTextColor(ColorRGBA Color);
+	void RenderLocalTime(float x);
 
 	static constexpr float MOVEMENT_INFORMATION_LINE_HEIGHT = 8.0f;
 
@@ -139,7 +127,6 @@ private:
 	void RenderRecord();
 	void RenderDDRaceEffects();
 	float m_TimeCpDiff;
-	float m_ServerRecord;
 	float m_aPlayerRecord[NUM_DUMMIES];
 	float m_FinishTimeDiff;
 	int m_DDRaceTime;
@@ -147,7 +134,7 @@ private:
 	int m_TimeCpLastReceivedTick;
 	bool m_ShowFinishTime;
 
-	inline float GetMovementInformationBoxHeight(bool ForcePreview = false);
+	inline float GetMovementInformationBoxHeight();
 	inline int GetDigitsIndex(int Value, int Max);
 
 	// Quad Offsets
@@ -185,3 +172,4 @@ private:
 };
 
 #endif
+

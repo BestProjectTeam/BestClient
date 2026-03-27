@@ -55,7 +55,7 @@ void CLayerTune::Resize(int NewW, int NewH)
 void CLayerTune::Shift(EShiftDirection Direction)
 {
 	CLayerTiles::Shift(Direction);
-	ShiftImpl(m_pTuneTile, Direction, Editor()->m_ShiftBy);
+	ShiftImpl(m_pTuneTile, Direction, Map()->m_ShiftBy);
 }
 
 bool CLayerTune::IsEmpty() const
@@ -86,7 +86,7 @@ void CLayerTune::BrushDraw(CLayer *pBrush, vec2 WorldPos)
 	CLayerTune *pTuneLayer = static_cast<CLayerTune *>(pBrush);
 	int sx = ConvertX(WorldPos.x);
 	int sy = ConvertY(WorldPos.y);
-	if(str_comp(pTuneLayer->m_aFilename, Editor()->m_aFilename))
+	if(str_comp(pTuneLayer->m_aFilename, pTuneLayer->Map()->m_aFilename))
 	{
 		Editor()->m_TuningNumber = pTuneLayer->m_TuningNumber;
 	}

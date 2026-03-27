@@ -1,0 +1,158 @@
+name: Check style
+
+on:
+  push:
+    branches-ignore:
+      - gh-readonly-queue/**
+      - master
+  pull_request:
+  merge_group:
+
+jobs:
+  check-style:
+    runs-on: ubuntu-latest
+    env:
+      CARGO_HTTP_MULTIPLEXING: false
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Prepare Linux
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install ddnet-tools shellcheck tidy pkg-config cmake graphviz ninja-build python3-clang -y
+        rustup default stable
+        pip3 install ruff
+
+    - name: Cache dependencies
+      id: cache-dependencies
+      uses: actions/cache@v4
+      with:
+        path: /home/runner/style-tools
+        key: style-${{ hashFiles('.github/style-tools.sha256') }}
+
+    - name: Install dependencies
+      if: steps.cache-dependencies.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p /home/runner/style-tools
+        cp .github/style-tools.sha256 /home/runner/style-tools
+        cd /home/runner/style-tools
+        wget -O clang-format https://github.com/muttleyxd/clang-tools-static-binaries/releases/download/master-796e77c/clang-format-20_linux-amd64
+        wget -O doxygen.tar.gz https://www.doxygen.nl/files/doxygen-1.16.1.linux.bin.tar.gz
+        wget -O shfmt https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64
+        sha256sum -c style-tools.sha256
+        chmod +x clang-format
+        chmod +x shfmt
+        tar xf doxygen.tar.gz
+        mv doxygen-1.16.1/bin/doxygen .
+        rm -f doxygen.tar.gz
+        rm -rf doxygen-1.16.1
+
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Check code style (ClangFormat)
+      run: |
+        export PATH=/home/runner/style-tools:$PATH
+        clang-format -version
+        scripts/fix_style.py --dry-run
+
+    - name: Check documentation style (Doxygen)
+      run: |
+        export PATH=/home/runner/style-tools:$PATH
+        doxygen --version
+        doxygen -q
+        if [ -s docs/warn.log ]; then
+          echo "--------------------------------------------------"
+          echo "Doxygen warnings:"
+          cat docs/warn.log
+          exit 1
+        fi
+
+    - name: Shellcheck
+      run: |
+        shellcheck --version
+        find . -type f -name '*.sh' -print0 | xargs -0 shellcheck
+
+    - name: Shell format (shfmt)
+      run: |
+        export PATH=/home/runner/style-tools:$PATH
+        shfmt --version
+        find . -type f -name '*.sh' -print0 | xargs -0 shfmt -d
+
+    - name: Check Python code style (ruff format)
+      run: |
+        ruff --version
+        ruff format
+
+    - name: Check Python code style (ruff check)
+      run: |
+        ruff --version
+        ruff check
+
+    - name: Check header guards
+      run: scripts/check_header_guards.py
+
+    - name: Unused header files
+      run: scripts/check_unused_header_files.py
+
+    - name: Check standard header includes
+      run: scripts/check_standard_headers.py
+
+    - name: Check absolute includes
+      run: "! grep --exclude-dir rust-bridge -rE '^#include \"(antibot|base|engine|game|steam|test)/' src/"
+
+    - name: Check config variables
+      run: scripts/check_config_variables.py
+
+    - name: Check commands & settings export
+      run: |
+        echo "<!DOCTYPE html><html><head><title></title></head><body>" > settingscommands.html
+        scripts/export_settings_commands_table.py >> settingscommands.html
+        echo "</body></html>" >> settingscommands.html
+        tidy -errors --drop-empty-elements false settingscommands.html
+
+    - name: Check log error format
+      run: |
+        if grep -Eqr '(msg|Print).*\(.*"[Ee]rror:' src/;
+        then
+          echo "Expected log errors to be in this format 'ERROR: error message'"
+          echo "Found these non uppercased log errors:"
+          grep -Er '(msg|Print).*\(.*"[Ee]rror:' src/
+          exit 1
+        fi
+
+    - name: Validate languages
+      run: scripts/languages/validate.py
+
+    - name: Check languages
+      run: scripts/languages/update_all.py
+
+    - name: Build dilate tool
+      run: |
+        mkdir release
+        cd release
+        cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DCLIENT=OFF -DDOWNLOAD_GTEST=OFF ..
+        cmake --build . --config Release --target dilate
+
+    - name: Check dilated images
+      run: scripts/check_dilate.py release data
+
+    - name: Build twmap tool
+      run: |
+        cargo install twmap-tools --git https://gitlab.com/Patiga/twmap.git/ --rev 1f192def57429a1f64ddb3ac8580744476cfdf1c --locked
+
+    - name: Check maps
+      run: |
+        findings=$(find data -type f -name '*.map' ! -wholename 'data/maps/coverage.map' -print0 | xargs -0 ~/.cargo/bin/twmap-check-ddnet 2>&1 | \
+          grep -v -E "\"data/maps/(ctf|dm).*\.map\": Time cps are missing on the map" | \
+          grep -v -E "\"data/themes/.*\.map\": Time cps are missing on the map" | \
+          grep -v -E "\"data/maps/ctf4\.map\": Map - In Image at index 3 -> Image 'jungle_doodads_old' is not a valid external image for DDNet06" | \
+          grep -v -E "\"data/themes/autumn_night\.map\": Map - In Image at index 3 -> Image 'generic_lamps' is not a valid external image for DDNet06" | \
+          grep -v -E "\"data/maps7?/Tutorial\.map\": Map setting - Unusual: 'sv_show_others_default'" || true)
+        if [ -n "$findings" ]; then
+          echo "$findings"
+          exit 1
+        fi

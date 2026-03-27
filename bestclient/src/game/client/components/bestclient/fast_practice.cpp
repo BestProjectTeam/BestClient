@@ -511,8 +511,8 @@ void CFastPractice::ReleaseBufferedInputState()
 		GameClient()->m_Controls.m_aInputData[Conn].m_Fire = ReleasedFireState(GameClient()->m_Controls.m_aInputData[Conn].m_Fire);
 		GameClient()->m_Controls.m_aLastData[Conn].m_Fire = ReleasedFireState(GameClient()->m_Controls.m_aLastData[Conn].m_Fire);
 	}
-	NeutralizeInput(GameClient()->m_Controls.m_FastInput);
-	GameClient()->m_Controls.m_FastInput.m_Fire = ReleasedFireState(GameClient()->m_Controls.m_FastInput.m_Fire);
+	NeutralizeInput(GameClient()->m_Controls.m_aFastInput[g_Config.m_ClDummy]);
+	GameClient()->m_Controls.m_aFastInput[g_Config.m_ClDummy].m_Fire = ReleasedFireState(GameClient()->m_Controls.m_aFastInput[g_Config.m_ClDummy].m_Fire);
 
 	NeutralizeInput(GameClient()->m_DummyInput);
 	GameClient()->m_DummyInput.m_Fire = ReleasedFireState(GameClient()->m_DummyInput.m_Fire);
@@ -1053,7 +1053,7 @@ bool CFastPractice::OverridePredict()
 				continue;
 
 			const int TickSpeed = Client()->GameTickSpeed();
-			const int TuneZone = std::clamp(TrackedProj.m_TuneZone, 0, NUM_TUNEZONES - 1);
+			const int TuneZone = std::clamp(TrackedProj.m_TuneZone, 0, TuneZone::NUM - 1);
 			const CTuningParams *pTuning = &GameClient()->m_aTuning[TuneZone];
 			vec2 PrevPos = CalcTrackedProjectilePos(TrackedProj, Tick - 1, TickSpeed, pTuning);
 			vec2 CurPos = CalcTrackedProjectilePos(TrackedProj, Tick, TickSpeed, pTuning);
@@ -1197,7 +1197,7 @@ int CFastPractice::ApplyVisualFastInputPrediction(int FinalTickRegular, int Loca
 		CNetObj_PlayerInput *pDummyInputData = pDummyChar ? (CNetObj_PlayerInput *)Client()->GetInput(Tick, DummyInputConn) : nullptr;
 		const bool DummyFirst = pInputData && pDummyInputData && pDummyChar->GetCid() < pLocalChar->GetCid();
 
-		pInputData = &GameClient()->m_Controls.m_FastInput;
+		pInputData = &GameClient()->m_Controls.m_aFastInput[g_Config.m_ClDummy];
 		pLocalChar->m_CanMoveInFreeze = false;
 		if(pDummyChar)
 			pDummyChar->m_CanMoveInFreeze = false;
@@ -1459,7 +1459,7 @@ void CFastPractice::NormalizeCharacterAfterReset(CCharacter *pChar, bool KeepFre
 	pChar->ResetVelocity();
 	if(!KeepFreezeFlags)
 	{
-		pChar->UnFreeze();
+		pChar->Unfreeze();
 		pChar->m_FreezeTime = 0;
 	}
 	pChar->m_CanMoveInFreeze = false;
@@ -1885,7 +1885,7 @@ bool CFastPractice::ExecutePracticeCommand(int Team, int LocalClientId, CCharact
 		{
 			Core.m_DeepFrozen = false;
 			pChar->SetCore(Core);
-			pChar->UnFreeze();
+			pChar->Unfreeze();
 		}
 		NormalizeCharacterAfterReset(pChar, Cmd == "deep");
 		return true;
@@ -1897,7 +1897,7 @@ bool CFastPractice::ExecutePracticeCommand(int Team, int LocalClientId, CCharact
 		Core.m_LiveFrozen = Cmd == "livefreeze";
 		pChar->SetCore(Core);
 		if(Cmd == "unlivefreeze")
-			pChar->UnFreeze();
+			pChar->Unfreeze();
 		NormalizeCharacterAfterReset(pChar, Cmd == "livefreeze");
 		return true;
 	}
@@ -2032,7 +2032,7 @@ bool CFastPractice::ExecutePracticeCommand(int Team, int LocalClientId, CCharact
 				State.m_InvincibleAddedEndlessJump = false;
 			}
 			pChar->SetCore(Core);
-			pChar->UnFreeze();
+			pChar->Unfreeze();
 			pChar->m_FreezeTime = 0;
 		}
 

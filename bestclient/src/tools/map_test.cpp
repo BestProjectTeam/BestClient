@@ -1,5 +1,6 @@
 #include <base/hash.h>
 #include <base/logger.h>
+#include <base/os.h>
 #include <base/system.h>
 
 #include <engine/shared/datafile.h>
@@ -20,7 +21,7 @@ static int TestMap(const char *pMap, bool CalcHashes, IStorage *pStorage)
 
 	char aSha256Str[SHA256_MAXSTRSIZE];
 	sha256_str(Reader.Sha256(), aSha256Str, sizeof(aSha256Str));
-	log_info(TOOL_NAME, "File size: %d", Reader.MapSize());
+	log_info(TOOL_NAME, "File size: %d", Reader.Size());
 	log_info(TOOL_NAME, "File SHA256: %s", aSha256Str);
 	log_info(TOOL_NAME, "File CRC32: %08x", Reader.Crc());
 	log_info(TOOL_NAME, "Num items: %d", Reader.NumItems());

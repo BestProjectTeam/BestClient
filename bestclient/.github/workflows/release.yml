@@ -1,0 +1,155 @@
+# .github/workflows/release.yml
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag for the release (e.g., v1.0.0). Did you remember to bump the version.h?'
+        required: true
+      release_name:
+        description: 'Name of the release'
+        required: true
+      body:
+        description: 'Release description'
+        required: false
+      run_id:
+        description: 'Run ID of the build workflow to download artifacts from'
+        required: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    env:
+      BUILD_PREFIX: ddnet
+      CLIENT_NAME: BestClient
+      TARGET_REPOSITORY: ${{ github.repository }} 
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download Ubuntu artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.BUILD_PREFIX }}-ubuntu-22.04
+          path: ./artifacts/ubuntu
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ env.TARGET_REPOSITORY }}
+          run-id: ${{ github.event.inputs.run_id }}
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.BUILD_PREFIX }}-windows-latest
+          path: ./artifacts/windows
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ env.TARGET_REPOSITORY }}
+          run-id: ${{ github.event.inputs.run_id }}
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.BUILD_PREFIX }}-macOS-latest
+          path: ./artifacts/macOS
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ env.TARGET_REPOSITORY }}
+          run-id: ${{ github.event.inputs.run_id }}
+
+      - name: Download Android artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.BUILD_PREFIX }}-android
+          path: ./artifacts/android
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ env.TARGET_REPOSITORY }}
+          run-id: ${{ github.event.inputs.run_id }}
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.event.inputs.tag_name }}
+          release_name: ${{ github.event.inputs.release_name }}
+          body: ${{ github.event.inputs.body }}
+          draft: false
+          prerelease: false
+
+      - name: Rename and Move Artifacts
+        run: |
+          declare -a multi_ext=("tar.gz" "tar.bz2" "tar.xz" "tar.Z")
+
+          for dir in ./artifacts/*/ ; do
+            os=$(basename "$dir")
+            # Find the single file in the OS directory
+            file=$(find "$dir" -type f | head -n 1)
+
+            if [ -z "$file" ]; then
+              echo "No artifact found in directory $dir. Skipping."
+              continue
+            fi
+            filename=$(basename "$file")
+            extension=""
+            for ext in "${multi_ext[@]}"; do
+              if [[ "$filename" == *.$ext ]]; then
+                extension="$ext"
+                break
+              fi
+            done
+            if [ -z "$extension" ]; then
+              extension="${filename##*.}"
+            fi
+            new_name="${CLIENT_NAME}-${os}.${extension}"
+            echo "Renaming $file to $new_name"
+            mv "$file" "./artifacts/$new_name"
+            echo "Moved $new_name to ./artifacts/"
+          done
+
+      - name: List artifacts directory
+        run: |
+          echo "Listing ./artifacts directory:"
+          ls -R ./artifacts
+
+      - name: Upload Ubuntu
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/${{ env.CLIENT_NAME }}-ubuntu.tar.xz
+          asset_name: ${{ env.CLIENT_NAME }}-ubuntu.tar.xz
+          asset_content_type: application/tar.xz
+          
+
+      - name: Upload Windows
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/${{ env.CLIENT_NAME }}-windows.zip
+          asset_name: ${{ env.CLIENT_NAME }}-windows.zip
+          asset_content_type: application/zip
+
+      - name: Upload macOS
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/${{ env.CLIENT_NAME }}-macOS.dmg
+          asset_name: ${{ env.CLIENT_NAME }}-macOS.dmg
+          asset_content_type: application/dmg
+
+      - name: Upload Android
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/${{ env.CLIENT_NAME }}-android.apk
+          asset_name: ${{ env.CLIENT_NAME }}-android.apk
+          asset_content_type: application/apk

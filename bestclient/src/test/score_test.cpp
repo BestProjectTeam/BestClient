@@ -1,4 +1,6 @@
 #include <base/detect.h>
+#include <base/str.h>
+#include <base/time.h>
 
 #include <engine/server/databases/connection.h>
 #include <engine/server/databases/connection_pool.h>
@@ -61,7 +63,7 @@ struct Score : public testing::TestWithParam<IDbConnection *>
 	void InsertMap(const char *pName, const char *pMapper, const char *pServer, int Points, int Stars)
 	{
 		char aTimestamp[32];
-		str_timestamp_format(aTimestamp, sizeof(aTimestamp), FORMAT_SPACE);
+		str_timestamp_format(aTimestamp, sizeof(aTimestamp), TimestampFormat::SPACE);
 		char aBuf[512];
 		str_format(aBuf, sizeof(aBuf),
 			"%s into %s_maps(Map, Server, Mapper, Points, Stars, Timestamp) "

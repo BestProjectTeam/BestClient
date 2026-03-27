@@ -191,7 +191,7 @@ void CMod::ModWeapon(int Id)
 	GameClient()->Echo(aBuf);
 
 	str_format(aBuf, sizeof(aBuf), "%s %d", g_Config.m_TcModWeaponCommand, Id);
-	Console()->ExecuteLine(aBuf);
+	Console()->ExecuteLine(aBuf, IConsole::CLIENT_ID_UNSPECIFIED);
 }
 
 void CMod::OnFire(bool Pressed)

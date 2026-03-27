@@ -5,6 +5,7 @@
 #include "animstate.h"
 
 #include <base/math.h>
+#include <base/str.h>
 
 #include <engine/graphics.h>
 #include <engine/map.h>
@@ -491,13 +492,6 @@ void CRenderTools::RenderTee6(const CAnimState *pAnim, const CTeeRenderInfo *pIn
 	vec2 Direction = Dir;
 	vec2 Position = Pos;
 
-	const float TinyBodyScale = 0.7f;
-	const float TinyFeetScale = 0.85f;
-	float SizeMultiplier = (g_Config.m_TcTinyTeeSize / 100.0f);
-	bool TinyTee = g_Config.m_TcTinyTees;
-	if(!m_LocalTeeRender && !g_Config.m_TcTinyTeesOthers)
-		TinyTee = false;
-
 	const CSkin::CSkinTextures *pSkinTextures = pInfo->m_CustomColoredSkin ? &pInfo->m_ColorableRenderSkin : &pInfo->m_OriginalRenderSkin;
 
 	// first pass we draw the outline
@@ -510,12 +504,6 @@ void CRenderTools::RenderTee6(const CAnimState *pAnim, const CTeeRenderInfo *pIn
 		{
 			float AnimScale, BaseSize;
 			GetRenderTeeAnimScaleAndBaseSize(pInfo, AnimScale, BaseSize);
-
-			if(TinyTee)
-			{
-				BaseSize *= TinyBodyScale * SizeMultiplier;
-				AnimScale *= TinyBodyScale * SizeMultiplier;
-			}
 
 			if(Filling == 1)
 			{
@@ -570,23 +558,11 @@ void CRenderTools::RenderTee6(const CAnimState *pAnim, const CTeeRenderInfo *pIn
 				}
 			}
 
-			if(TinyTee)
-			{
-				BaseSize /= TinyBodyScale * SizeMultiplier;
-				AnimScale /= TinyBodyScale * SizeMultiplier;
-			}
-
 			// draw feet
 			const CAnimKeyframe *pFoot = Filling ? pAnim->GetFrontFoot() : pAnim->GetBackFoot();
 
 			float w = BaseSize;
 			float h = BaseSize / 2;
-
-			if(TinyTee)
-			{
-				w *= TinyFeetScale * SizeMultiplier;
-				h *= TinyFeetScale * SizeMultiplier;
-			}
 
 			int QuadOffset = 7;
 			if(Dir.x < 0 && pInfo->m_FeetFlipped)
@@ -607,20 +583,7 @@ void CRenderTools::RenderTee6(const CAnimState *pAnim, const CTeeRenderInfo *pIn
 			}
 
 			Graphics()->SetColor(pInfo->m_ColorFeet.r * ColorScale, pInfo->m_ColorFeet.g * ColorScale, pInfo->m_ColorFeet.b * ColorScale, Alpha);
-
-			if(g_Config.m_TcWhiteFeet && pInfo->m_CustomColoredSkin)
-			{
-				CTeeRenderInfo WhiteFeetInfo;
-				const CSkin *pSkin = GameClient()->m_Skins.Find(g_Config.m_TcWhiteFeetSkin);
-				WhiteFeetInfo.m_OriginalRenderSkin = pSkin->m_OriginalSkin;
-				WhiteFeetInfo.m_ColorFeet = ColorRGBA(1, 1, 1);
-				const CSkin::CSkinTextures *pWhiteFeetTextures = &WhiteFeetInfo.m_OriginalRenderSkin;
-				Graphics()->TextureSet(OutLine == 1 ? pWhiteFeetTextures->m_FeetOutline : pWhiteFeetTextures->m_Feet);
-			}
-			else
-			{
-				Graphics()->TextureSet(OutLine == 1 ? pSkinTextures->m_FeetOutline : pSkinTextures->m_Feet);
-			}
+			Graphics()->TextureSet(OutLine == 1 ? pSkinTextures->m_FeetOutline : pSkinTextures->m_Feet);
 
 			Graphics()->RenderQuadContainerAsSprite(m_TeeQuadContainerIndex, QuadOffset, Position.x + pFoot->m_X * AnimScale, Position.y + pFoot->m_Y * AnimScale, w / 64.f, h / 32.f);
 		}

@@ -3,10 +3,13 @@
 #ifndef GAME_SERVER_GAMECONTROLLER_H
 #define GAME_SERVER_GAMECONTROLLER_H
 
+#include <base/dbg.h>
 #include <base/vmath.h>
 
 #include <engine/map.h>
 #include <engine/shared/protocol.h>
+
+#include <generated/protocol.h>
 
 #include <game/server/teams.h>
 
@@ -130,6 +133,8 @@ public:
 	// game
 	virtual void DoWarmup(int Seconds);
 
+	void SetGamePaused(bool Paused);
+	bool IsGamePaused() const;
 	void StartRound();
 	void EndRound();
 	void ChangeMap(const char *pToMap);
@@ -141,7 +146,60 @@ public:
 
 	virtual void Snap(int SnappingClient);
 
-	//spawn
+	/**
+	 * Sets the score value that will be shown in the scoreboard.
+	 *
+	 * @param SnappingClient Client ID of the player that will receive the snapshot.
+	 * @param pPlayer Player that is being snapped.
+	 *
+	 * @return the score value that will be included in the snapshot.
+	 */
+	virtual int SnapPlayerScore(int SnappingClient, CPlayer *pPlayer) { return 0; }
+
+	class CFinishTime
+	{
+	public:
+		CFinishTime(int Seconds, int Milliseconds) :
+			m_Seconds(Seconds), m_Milliseconds(Milliseconds)
+		{
+			dbg_assert(Seconds >= 0, "Invalid Seconds: %d", Seconds);
+			dbg_assert(Milliseconds >= 0 && Milliseconds < 1000, "Invalid Milliseconds: %d", Milliseconds);
+		}
+
+		int m_Seconds;
+		int m_Milliseconds;
+
+		static CFinishTime Unset() { return CFinishTime(FinishTime::UNSET); }
+		static CFinishTime NotFinished() { return CFinishTime(FinishTime::NOT_FINISHED_MILLIS); }
+
+	private:
+		CFinishTime(int Type)
+		{
+			m_Seconds = Type;
+			m_Milliseconds = 0;
+		}
+	};
+
+	/**
+	 * Returns the finish time value that will be shown in the scoreboard.
+	 *
+	 * @param SnappingClient Client ID of the player that will receive the snapshot.
+	 * @param pPlayer Player that is being snapped.
+	 *
+	 * @return The time split into seconds and the milliseconds remainder, use CFinishTime::Unset if you want the server to prefer scores.
+	 */
+	virtual CFinishTime SnapPlayerTime(int SnappingClient, CPlayer *pPlayer) { return CFinishTime::Unset(); }
+
+	/**
+	 * Snaps the current server record / best time of the current map.
+	 *
+	 * @param SnappingClient Client ID of the player that will receive the snapshot.
+	 *
+	 * @return The the map best time split into seconds and the milliseconds remainder, use CFinishTime::Unset if you want the server to prefer scores.
+	 */
+	virtual CFinishTime SnapMapBestTime(int SnappingClient) { return CFinishTime::Unset(); }
+
+	// spawn
 	virtual bool CanSpawn(int Team, vec2 *pOutPos, int ClientId);
 
 	virtual void DoTeamChange(class CPlayer *pPlayer, int Team, bool DoChatMsg = true);

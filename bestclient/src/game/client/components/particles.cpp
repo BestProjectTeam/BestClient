@@ -3,6 +3,7 @@
 #include "particles.h"
 
 #include <base/math.h>
+#include <base/time.h>
 
 #include <engine/demo.h>
 #include <engine/graphics.h>
@@ -279,8 +280,9 @@ void CParticles::RenderGroup(int Group)
 			// the current position, respecting the size, is inside the viewport, render it, else ignore
 			if(ParticleIsVisibleOnScreen(p, Size))
 			{
-				if((size_t)CurParticleRenderCount == gs_GraphicsMaxParticlesRenderCount || LastColor.r != m_aParticles[i].m_Color.r || LastColor.g != m_aParticles[i].m_Color.g || LastColor.b != m_aParticles[i].m_Color.b || LastColor.a != Alpha || LastQuadOffset != QuadOffset)
+				if((size_t)CurParticleRenderCount == GRAPHICS_MAX_PARTICLES_RENDER_COUNT || LastColor.r != m_aParticles[i].m_Color.r || LastColor.g != m_aParticles[i].m_Color.g || LastColor.b != m_aParticles[i].m_Color.b || LastColor.a != Alpha || LastQuadOffset != QuadOffset)
 				{
+					dbg_assert(LastQuadOffset >= FirstParticleOffset, "Invalid particle offsets: %d < %d", LastQuadOffset, FirstParticleOffset);
 					Graphics()->TextureSet(aParticles[LastQuadOffset - FirstParticleOffset]);
 					Graphics()->RenderQuadContainerAsSpriteMultiple(ParticleQuadContainerIndex, LastQuadOffset - FirstParticleOffset, CurParticleRenderCount, s_aParticleRenderInfo);
 					CurParticleRenderCount = 0;
@@ -309,8 +311,12 @@ void CParticles::RenderGroup(int Group)
 			i = m_aParticles[i].m_NextPart;
 		}
 
-		Graphics()->TextureSet(aParticles[LastQuadOffset - FirstParticleOffset]);
-		Graphics()->RenderQuadContainerAsSpriteMultiple(ParticleQuadContainerIndex, LastQuadOffset - FirstParticleOffset, CurParticleRenderCount, s_aParticleRenderInfo);
+		if(CurParticleRenderCount > 0)
+		{
+			dbg_assert(LastQuadOffset >= FirstParticleOffset, "Invalid particle offsets: %d < %d", LastQuadOffset, FirstParticleOffset);
+			Graphics()->TextureSet(aParticles[LastQuadOffset - FirstParticleOffset]);
+			Graphics()->RenderQuadContainerAsSpriteMultiple(ParticleQuadContainerIndex, LastQuadOffset - FirstParticleOffset, CurParticleRenderCount, s_aParticleRenderInfo);
+		}
 	}
 	else
 	{

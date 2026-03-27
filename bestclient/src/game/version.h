@@ -3,14 +3,12 @@
 #ifndef GAME_VERSION_H
 #define GAME_VERSION_H
 
-#include <game/client/components/bestclient/version.h>
-
 // ddnet
 #define GAME_NAME "DDNet"
-#define DDNET_VERSION_NUMBER 19060
+#define DDNET_VERSION_NUMBER 19080
 extern const char *GIT_SHORTREV_HASH;
 #ifndef GAME_RELEASE_VERSION_INTERNAL
-#define GAME_RELEASE_VERSION_INTERNAL 19.6
+#define GAME_RELEASE_VERSION_INTERNAL 19.8
 #endif
 #define GAME_RELEASE_VERSION STRINGIFY(GAME_RELEASE_VERSION_INTERNAL)
 
@@ -20,13 +18,13 @@ extern const char *GIT_SHORTREV_HASH;
 #define GAME_NETVERSION "0.6 626fce9a778df4d4"
 #define GAME_NETVERSION7 "0.7 802f1be60a05665f"
 
-// BestClient
-#ifndef BestClient_VERSION
-#define BestClient_VERSION BESTCLIENT_VERSION
+// TClient
+#ifndef TCLIENT_VERSION
+#define TCLIENT_VERSION "10.8.7"
 #endif
 
 // custom
-#define CLIENT_NAME "BestClient"
-#define CLIENT_RELEASE_VERSION BESTCLIENT_VERSION
+#define CLIENT_NAME "TClient"
+#define CLIENT_RELEASE_VERSION TCLIENT_VERSION
 
 #endif

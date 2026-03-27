@@ -228,7 +228,7 @@ public:
 		OnInterfacesInit(pClient);
 		m_ScriptingCtx.AddFunction("exec", [this](const std::string &Str) {
 			log_info(SCRIPTING_IMPL "/exec", "%s", Str.c_str());
-			Console()->ExecuteLine(Str.c_str());
+			Console()->ExecuteLine(Str.c_str(), IConsole::CLIENT_ID_UNSPECIFIED);
 		});
 		m_ScriptingCtx.AddFunction("echo", [this](const std::string &Str) {
 			GameClient()->Echo(Str.c_str());

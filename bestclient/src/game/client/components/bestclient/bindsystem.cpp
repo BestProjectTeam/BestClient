@@ -292,7 +292,7 @@ void CBindSystem::OnRender()
 
 	static const float s_FontSize = 16.0f;
 
-	const float AnimationTime = (float)g_Config.m_TcAnimateWheelTime / 1000.0f;
+	constexpr float AnimationTime = 0.150f;
 	const bool SelectedBindValid = m_SelectedBind >= 0 && m_SelectedBind < BINDSYSTEM_FIXED_SLOTS;
 	const bool ShouldBeVisible = m_Active && SelectedBindValid;
 	std::array<float, 2> aAnimationPhase;
@@ -384,11 +384,11 @@ void CBindSystem::ExecuteBind(int Bind)
 			pDst = aBuf + str_length(aBuf);
 			str_escape(&pDst, pCommand, pEnd);
 			str_append(aBuf, "\"");
-			Console()->ExecuteLine(aBuf);
+				Console()->ExecuteLine(aBuf, IConsole::CLIENT_ID_UNSPECIFIED);
 		}
 		else
 		{
-			Console()->ExecuteLine(pCommand);
+				Console()->ExecuteLine(pCommand, IConsole::CLIENT_ID_UNSPECIFIED);
 		}
 	}
 }
@@ -396,7 +396,7 @@ void CBindSystem::ExecuteBind(int Bind)
 void CBindSystem::ExecuteHoveredBind()
 {
 	if(m_SelectedBind >= 0)
-		Console()->ExecuteLine(m_vBinds[m_SelectedBind].m_aCommand);
+			Console()->ExecuteLine(m_vBinds[m_SelectedBind].m_aCommand, IConsole::CLIENT_ID_UNSPECIFIED);
 }
 
 void CBindSystem::ConfigSaveCallback(IConfigManager *pConfigManager, void *pUserData)

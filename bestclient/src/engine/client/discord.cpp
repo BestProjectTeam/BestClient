@@ -1,19 +1,16 @@
+#include <base/net.h>
 #include <base/system.h>
 
 #include <engine/client.h>
 #include <engine/discord.h>
 
-
 #if defined(CONF_DISCORD)
-
 #include <discord_game_sdk.h>
 
 typedef enum EDiscordResult(DISCORD_API *FDiscordCreate)(DiscordVersion, struct DiscordCreateParams *, struct IDiscordCore **);
 
 #if defined(CONF_DISCORD_DYNAMIC)
-
 #include <dlfcn.h>
-
 FDiscordCreate GetDiscordCreate()
 {
 	void *pSdk = dlopen("discord_game_sdk.so", RTLD_NOW);
@@ -23,7 +20,6 @@ FDiscordCreate GetDiscordCreate()
 	}
 	return (FDiscordCreate)dlsym(pSdk, "DiscordCreate");
 }
-
 #else
 FDiscordCreate GetDiscordCreate()
 {
@@ -35,23 +31,22 @@ class CDiscord : public IDiscord
 {
 	DiscordActivity m_Activity;
 	bool m_UpdateActivity = false;
+	int64_t m_LastActivityUpdate = 0;
+
 	IDiscordCore *m_pCore;
 	IDiscordActivityEvents m_ActivityEvents;
 	IDiscordActivityManager *m_pActivityManager;
+
 	FDiscordCreate m_pfnDiscordCreate;
 	bool m_Enabled;
-	bool m_ShowMap;
 
 public:
-	int64_t m_TimeStamp = time_timestamp();
-
 	bool Init(FDiscordCreate pfnDiscordCreate)
 	{
 		m_pfnDiscordCreate = pfnDiscordCreate;
 		m_Enabled = false;
 		return InitDiscord();
 	}
-
 	bool InitDiscord()
 	{
 		if(m_pCore)
@@ -60,23 +55,25 @@ public:
 			m_pCore = 0;
 			m_pActivityManager = 0;
 		}
-
 		if(!m_Enabled)
 			return false;
 
 		mem_zero(&m_ActivityEvents, sizeof(m_ActivityEvents));
+
 		m_ActivityEvents.on_activity_join = &CDiscord::OnActivityJoin;
 		m_pActivityManager = 0;
 
 		DiscordCreateParams Params;
 		DiscordCreateParamsSetDefault(&Params);
+
 		// Params.client_id = 752165779117441075; // DDNet
-		Params.client_id = 1444576875774083133; // BestClient
+		Params.client_id = 1325361453988970527; // TClient
 		Params.flags = EDiscordCreateFlags::DiscordCreateFlags_NoRequireDiscord;
 		Params.event_data = this;
 		Params.activity_events = &m_ActivityEvents;
 
 		int Error = m_pfnDiscordCreate(DISCORD_VERSION, &Params, &m_pCore);
+
 		if(Error != DiscordResult_Ok)
 		{
 			dbg_msg("discord", "error initializing discord instance, error=%d", Error);
@@ -89,7 +86,7 @@ public:
 		m_pActivityManager->register_command(m_pActivityManager, CONNECTLINK_DOUBLE_SLASH);
 		m_pActivityManager->register_steam(m_pActivityManager, 412220); // steam id
 
-		str_copy(m_Activity.details, "Just joined", sizeof(m_Activity.details));
+		ClearGameInfo();
 
 		return false;
 	}
@@ -104,100 +101,72 @@ public:
 
 		if(m_pCore && m_Enabled)
 		{
+			// update every 5 seconds, rate limit is 5 updates per 20 seconds
+			if(m_UpdateActivity && time_get() > m_LastActivityUpdate + time_freq() * 5)
+			{
+				m_UpdateActivity = false;
+				m_LastActivityUpdate = time_get();
+
+				m_pActivityManager->update_activity(m_pActivityManager, &m_Activity, 0, 0);
+			}
+
 			m_pCore->run_callbacks(m_pCore);
-			m_pActivityManager->update_activity(m_pActivityManager, &m_Activity, 0, 0);
 		}
 	}
 
 	void ClearGameInfo() override
 	{
-		if(!m_Enabled || !m_pActivityManager)
-			return;
-
 		mem_zero(&m_Activity, sizeof(DiscordActivity));
-		str_copy(m_Activity.assets.large_image, "bestclientlogo", sizeof(m_Activity.assets.large_image));
-		str_copy(m_Activity.assets.large_text, "t.me/bestddnet", sizeof(m_Activity.assets.large_text));
-		str_copy(m_Activity.details, "t.me/bestddnet", sizeof(m_Activity.details));
 
-		m_Activity.timestamps.start = m_TimeStamp;
+		str_copy(m_Activity.assets.large_image, "tclient_logo", sizeof(m_Activity.assets.large_image));
+		str_copy(m_Activity.assets.large_text, "TClient logo", sizeof(m_Activity.assets.large_text));
+		m_Activity.timestamps.start = time_timestamp();
+		str_copy(m_Activity.details, "Offline", sizeof(m_Activity.details));
 		m_Activity.instance = false;
+
 		m_UpdateActivity = true;
 	}
 
-	void SetGameInfo(const class CServerInfo *pServerInfo,
-		const char *pMapName,
-		const char *pPlayerName,
-		const char *pSkinName,
-		bool ShowMap,
-		bool Registered) override
+	void SetGameInfo(const CServerInfo &ServerInfo, bool Registered) override
 	{
-		if(!m_Enabled || !m_pActivityManager)
-			return;
-
 		mem_zero(&m_Activity, sizeof(DiscordActivity));
 
-		// big icon
-		str_copy(m_Activity.assets.large_image, "bestclientlogo", sizeof(m_Activity.assets.large_image));
-		str_copy(m_Activity.assets.large_text, "t.me/bestddnet", sizeof(m_Activity.assets.large_text));
-
-		// small icon from BestClient API, using current skin
-		if(pSkinName && pSkinName[0] != '\0')
-		{
-			char aSkinUrl[256];
-			str_format(aSkinUrl, sizeof(aSkinUrl),
-				"https://best-client-api.vercel.app/api/assemble-foot/%s.png",
-				pSkinName);
-			str_copy(m_Activity.assets.small_image, aSkinUrl, sizeof(m_Activity.assets.small_image));
-		}
-		else
-		{
-			// fallback: no skin, keep empty or some default
-			m_Activity.assets.small_image[0] = '\0';
-		}
-
-		// hover text over small image = player name
-		if(pPlayerName && pPlayerName[0] != '\0')
-			str_copy(m_Activity.assets.small_text, pPlayerName, sizeof(m_Activity.assets.small_text));
-		else
-			str_copy(m_Activity.assets.small_text, "BestClient player", sizeof(m_Activity.assets.small_text));
-
-		m_ShowMap = ShowMap;
+		str_copy(m_Activity.assets.large_image, "tclient_logo", sizeof(m_Activity.assets.large_image));
+		str_copy(m_Activity.assets.large_text, "TClient logo", sizeof(m_Activity.assets.large_text));
+		m_Activity.timestamps.start = time_timestamp();
+		str_copy(m_Activity.name, "Online", sizeof(m_Activity.name));
 		m_Activity.instance = true;
-		m_Activity.timestamps.start = m_TimeStamp;
 
-		if(m_ShowMap)
-		{
-			str_copy(m_Activity.state, pMapName, sizeof(m_Activity.state));
-			str_copy(m_Activity.details, "t.me/bestddnet", sizeof(m_Activity.details));
-		}
-
-		m_Activity.party.size.current_size = pServerInfo->m_NumClients;
-		m_Activity.party.size.max_size = pServerInfo->m_MaxClients;
+		str_copy(m_Activity.details, ServerInfo.m_aName, sizeof(m_Activity.details));
+		str_copy(m_Activity.state, ServerInfo.m_aMap, sizeof(m_Activity.state));
+		m_Activity.party.size.current_size = ServerInfo.m_NumClients;
+		m_Activity.party.size.max_size = ServerInfo.m_MaxClients;
+		// private makes it so the game isn't public to join, but there's 'Ask to Join' button instead
 		m_Activity.party.privacy = Registered ? DiscordActivityPartyPrivacy_Public : DiscordActivityPartyPrivacy_Private;
 
 		if(!Registered)
 		{
+			// private parties have random id to not leak the server ip
 			char aPartyId[sizeof(m_Activity.party.id)];
 			secure_random_password(aPartyId, sizeof(aPartyId), 64);
 			str_copy(m_Activity.party.id, aPartyId, sizeof(m_Activity.party.id));
 		}
+		UpdateServerIp(ServerInfo);
 
-		UpdateServerIp(pServerInfo);
 		m_UpdateActivity = true;
 	}
 
-	void UpdateServerInfo(const class CServerInfo *pServerInfo, const char *pMapName) override
+	void UpdateServerInfo(const CServerInfo &ServerInfo) override
 	{
 		if(!m_Activity.instance)
 			return;
 
-		m_UpdateActivity = true;
-		m_Activity.party.size.max_size = pServerInfo->m_MaxClients;
-		UpdateServerIp(pServerInfo);
+		UpdateServerIp(ServerInfo);
 
-		// E-Client
-		if(m_ShowMap)
-			str_copy(m_Activity.state, pMapName, sizeof(m_Activity.state));
+		str_copy(m_Activity.details, ServerInfo.m_aName, sizeof(m_Activity.details));
+		str_copy(m_Activity.state, ServerInfo.m_aMap, sizeof(m_Activity.state));
+		m_Activity.party.size.max_size = ServerInfo.m_MaxClients;
+		m_UpdateActivity = true;
 	}
 
 	void UpdatePlayerCount(int Count) override
@@ -212,20 +181,20 @@ public:
 		m_UpdateActivity = true;
 	}
 
-	void UpdateServerIp(const class CServerInfo *pServerInfo)
+	void UpdateServerIp(const CServerInfo &ServerInfo)
 	{
 		if(!m_Activity.instance)
 			return;
 
-		// secret is only shared when player is joining the game, or when he's invited for private games
-		if(str_length(pServerInfo->m_aAddress) < (int)sizeof(m_Activity.secrets.join))
+		// secret is only shared when player is joining the game, or when they are invited for private games
+		if(str_length(ServerInfo.m_aAddress) < (int)sizeof(m_Activity.secrets.join))
 		{
-			str_copy(m_Activity.secrets.join, pServerInfo->m_aAddress, sizeof(m_Activity.secrets.join));
+			str_copy(m_Activity.secrets.join, ServerInfo.m_aAddress, sizeof(m_Activity.secrets.join));
 		}
 		else
 		{
 			char aAddr[NETADDR_MAXSTRSIZE];
-			net_addr_str(&pServerInfo->m_aAddresses[0], aAddr, sizeof(aAddr), true);
+			net_addr_str(&ServerInfo.m_aAddresses[0], aAddr, sizeof(aAddr), true);
 			str_copy(m_Activity.secrets.join, aAddr, sizeof(m_Activity.secrets.join));
 		}
 
@@ -260,39 +229,28 @@ static IDiscord *CreateDiscordImpl()
 	{
 		return 0;
 	}
-
 	CDiscord *pDiscord = new CDiscord();
 	if(pDiscord->Init(pfnDiscordCreate))
 	{
 		delete pDiscord;
 		return 0;
 	}
-
 	return pDiscord;
 }
-
 #else
-
 static IDiscord *CreateDiscordImpl()
 {
 	return nullptr;
 }
-
 #endif
 
 class CDiscordStub : public IDiscord
 {
-public:
+	void Update(bool Enabled) override {}
 	void ClearGameInfo() override {}
-	void SetGameInfo(const class CServerInfo *pServerInfo,
-		const char *pMapName,
-		const char *pPlayerName,
-		const char *pSkinName,
-		bool ShowMap,
-		bool Registered) override {}
-	void Update(bool IsEnabled) override {}
-	void UpdateServerInfo(const class CServerInfo *pServerInfo, const char *pMapName) override {}
-	void UpdatePlayerCount(int PlayerCount) override {}
+	void SetGameInfo(const CServerInfo &ServerInfo, bool Registered) override {}
+	void UpdateServerInfo(const CServerInfo &ServerInfo) override {}
+	void UpdatePlayerCount(int Count) override {}
 };
 
 IDiscord *CreateDiscord()
@@ -302,6 +260,5 @@ IDiscord *CreateDiscord()
 	{
 		return pDiscord;
 	}
-
 	return new CDiscordStub();
 }

@@ -1,5 +1,7 @@
 #include "connection.h"
 
+#include <base/str.h>
+
 IDbConnection::IDbConnection(const char *pPrefix)
 {
 	str_copy(m_aPrefix, pPrefix);

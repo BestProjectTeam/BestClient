@@ -9,7 +9,7 @@ void CFreezeBars::RenderFreezeBar(const int ClientId)
 	const float FreezeBarHeight = 16.0f;
 
 	// pCharacter contains the predicted character for local players or the last snap for players who are spectated
-	CCharacterCore *pCharacter = &GameClient()->m_aClients[ClientId].m_Predicted;
+	CCharacterCore *pCharacter = &GameClient()->m_aClients[ClientId].m_RegularPredicted; // TClient
 
 	if(pCharacter->m_FreezeEnd <= 0 || pCharacter->m_FreezeStart == 0 || pCharacter->m_FreezeEnd <= pCharacter->m_FreezeStart || !GameClient()->m_Snap.m_aCharacters[ClientId].m_HasExtendedDisplayInfo || (pCharacter->m_IsInFreeze && g_Config.m_ClFreezeBarsAlphaInsideFreeze == 0))
 	{

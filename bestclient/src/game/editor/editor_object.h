@@ -2,10 +2,10 @@
 #define GAME_EDITOR_EDITOR_OBJECT_H
 
 class CEditor;
+class CEditorMap;
 class IInput;
 class IClient;
 class CConfig;
-class IConsole;
 class IEngine;
 class IGraphics;
 class ISound;
@@ -28,14 +28,14 @@ public:
 
 	CEditor *Editor();
 	const CEditor *Editor() const;
+	CEditorMap *Map();
+	const CEditorMap *Map() const;
 	IInput *Input();
 	const IInput *Input() const;
 	IClient *Client();
 	const IClient *Client() const;
 	CConfig *Config();
 	const CConfig *Config() const;
-	IConsole *Console();
-	const IConsole *Console() const;
 	IEngine *Engine();
 	const IEngine *Engine() const;
 	IGraphics *Graphics();

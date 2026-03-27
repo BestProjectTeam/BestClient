@@ -175,7 +175,7 @@ void CBindChat::ExecuteBind(const CBindChat::CBind &Bind, const char *pArgs)
 		if(aBuf[str_length(aBuf) - 1] == ' ')
 			aBuf[str_length(aBuf) - 1] = '\0';
 	}
-	Console()->ExecuteLine(aBuf);
+	Console()->ExecuteLine(aBuf, IConsole::CLIENT_ID_UNSPECIFIED);
 }
 
 bool CBindChat::CheckBindChat(const char *pText)

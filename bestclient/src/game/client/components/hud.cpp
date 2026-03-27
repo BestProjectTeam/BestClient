@@ -5,11 +5,12 @@
 #include "binds.h"
 #include "camera.h"
 #include "controls.h"
-#include "speedrun.h"
 #include "voting.h"
 
 #include <base/color.h>
+#include <base/time.h>
 
+#include <engine/font_icons.h>
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
 #include <engine/textrender.h>
@@ -18,8 +19,6 @@
 #include <generated/protocol.h>
 
 #include <game/client/animstate.h>
-#include <game/client/bc_ui_animations.h>
-#include <game/client/components/hud_layout.h>
 #include <game/client/components/scoreboard.h>
 #include <game/client/gameclient.h>
 #include <game/client/prediction/entities/character.h>
@@ -28,7 +27,7 @@
 
 #include <cmath>
 
-CHud::CHud() : m_SpeedrunTimerExpiredTick(0)
+CHud::CHud()
 {
 	m_FPSTextContainerIndex.Reset();
 	m_DDRaceEffectsTextContainerIndex.Reset();
@@ -42,43 +41,6 @@ CHud::CHud() : m_SpeedrunTimerExpiredTick(0)
 		m_aPlayerPositionContainers[i].Reset();
 		m_aPlayerPrevPosition[i] = -INFINITY;
 	}
-}
-
-static ColorRGBA HudModuleBackgroundColor(unsigned PackedColor)
-{
-	return color_cast<ColorRGBA>(ColorHSLA(PackedColor, true));
-}
-
-static int HudModuleBackgroundCorners(int DefaultCorners, float RectX, float RectY, float RectW, float RectH, float CanvasWidth, float CanvasHeight)
-{
-	return HudLayout::BackgroundCorners(DefaultCorners, RectX, RectY, RectW, RectH, CanvasWidth, CanvasHeight);
-}
-
-float CHud::HudAlpha() const
-{
-	return 1.0f;
-}
-
-ColorRGBA CHud::ApplyHudAlpha(ColorRGBA Color) const
-{
-	Color.a *= HudAlpha();
-	return Color;
-}
-
-void CHud::SetHudColor(float r, float g, float b, float a)
-{
-	Graphics()->SetColor(r, g, b, a * HudAlpha());
-}
-
-void CHud::SetHudTextColor(float r, float g, float b, float a)
-{
-	TextRender()->TextColor(r, g, b, a * HudAlpha());
-}
-
-void CHud::SetHudTextColor(ColorRGBA Color)
-{
-	Color.a *= HudAlpha();
-	TextRender()->TextColor(Color);
 }
 
 void CHud::ResetHudContainers()
@@ -118,7 +80,6 @@ void CHud::OnReset()
 	m_FinishTimeLastReceivedTick = 0;
 	m_TimeCpLastReceivedTick = 0;
 	m_ShowFinishTime = false;
-	m_ServerRecord = -1.0f;
 	m_aPlayerRecord[0] = -1.0f;
 	m_aPlayerRecord[1] = -1.0f;
 	m_aPlayerSpeed[0] = 0;
@@ -126,7 +87,6 @@ void CHud::OnReset()
 	m_aLastPlayerSpeedChange[0] = ESpeedChange::NONE;
 	m_aLastPlayerSpeedChange[1] = ESpeedChange::NONE;
 	m_LastSpectatorCountTick = 0;
-	m_SpeedrunTimerExpiredTick = 0;
 
 	ResetHudContainers();
 }
@@ -135,7 +95,7 @@ void CHud::OnInit()
 {
 	OnReset();
 
-	SetHudColor(1.0, 1.0, 1.0, 1.0);
+	Graphics()->SetColor(1.0, 1.0, 1.0, 1.0);
 
 	m_HudQuadContainerIndex = Graphics()->CreateQuadContainer(false);
 	Graphics()->QuadsSetSubset(0, 0, 1, 1);
@@ -157,176 +117,79 @@ void CHud::OnInit()
 	Graphics()->QuadContainerUpload(m_HudQuadContainerIndex);
 }
 
-void CHud::RenderGameTimer(bool ForcePreview)
+void CHud::RenderGameTimer()
 {
-	const bool MusicPlayerOccupiesTimerSlot = !GameClient()->m_BestClient.IsComponentDisabled(CBestClient::COMPONENT_VISUALS_MUSIC_PLAYER) && g_Config.m_BcMusicPlayer != 0 && !(g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideSongPlayer);
-	if(!ForcePreview && MusicPlayerOccupiesTimerSlot)
-		return;
+	float Half = m_Width / 2.0f;
 
-	const auto Layout = HudLayout::Get(HudLayout::MODULE_GAME_TIMER, m_Width, m_Height);
-	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
-	const float FontSize = 10.0f * Scale;
-	const bool BackgroundEnabled = Layout.m_BackgroundEnabled;
-	const unsigned BackgroundColor = Layout.m_BackgroundColor;
-	const bool HasGameInfo = GameClient()->m_Snap.m_pGameInfoObj != nullptr;
-	if(!HasGameInfo && !ForcePreview)
-		return;
-
-	if(ForcePreview || !HasGameInfo || !(GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_SUDDENDEATH))
+	if(!(GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_SUDDENDEATH))
 	{
 		char aBuf[32];
 		int Time = 0;
-		bool WarningTime = false;
-		if(HasGameInfo && GameClient()->m_Snap.m_pGameInfoObj->m_TimeLimit && (GameClient()->m_Snap.m_pGameInfoObj->m_WarmupTimer <= 0))
+		if(GameClient()->m_Snap.m_pGameInfoObj->m_TimeLimit && (GameClient()->m_Snap.m_pGameInfoObj->m_WarmupTimer <= 0))
 		{
 			Time = GameClient()->m_Snap.m_pGameInfoObj->m_TimeLimit * 60 - ((Client()->GameTick(g_Config.m_ClDummy) - GameClient()->m_Snap.m_pGameInfoObj->m_RoundStartTick) / Client()->GameTickSpeed());
 
 			if(GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_GAMEOVER)
 				Time = 0;
-			WarningTime = Time <= 60;
 		}
-		else if(HasGameInfo && (GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_RACETIME))
+		else if(GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_RACETIME)
 		{
 			// The Warmup timer is negative in this case to make sure that incompatible clients will not see a warmup timer
 			Time = (Client()->GameTick(g_Config.m_ClDummy) + GameClient()->m_Snap.m_pGameInfoObj->m_WarmupTimer) / Client()->GameTickSpeed();
 		}
-		else if(HasGameInfo)
-			Time = (Client()->GameTick(g_Config.m_ClDummy) - GameClient()->m_Snap.m_pGameInfoObj->m_RoundStartTick) / Client()->GameTickSpeed();
 		else
-			Time = 12 * 60 + 34;
+			Time = (Client()->GameTick(g_Config.m_ClDummy) - GameClient()->m_Snap.m_pGameInfoObj->m_RoundStartTick) / Client()->GameTickSpeed();
 
-		str_time((int64_t)Time * 100, TIME_DAYS, aBuf, sizeof(aBuf));
-		static float s_FontSize = -1.0f;
-		static float s_TextWidthM = 0.0f;
-		static float s_TextWidthH = 0.0f;
-		static float s_TextWidth0D = 0.0f;
-		static float s_TextWidth00D = 0.0f;
-		static float s_TextWidth000D = 0.0f;
-		if(s_FontSize != FontSize)
-		{
-			s_FontSize = FontSize;
-			s_TextWidthM = TextRender()->TextWidth(FontSize, "00:00", -1, -1.0f);
-			s_TextWidthH = TextRender()->TextWidth(FontSize, "00:00:00", -1, -1.0f);
-			s_TextWidth0D = TextRender()->TextWidth(FontSize, "0d 00:00:00", -1, -1.0f);
-			s_TextWidth00D = TextRender()->TextWidth(FontSize, "00d 00:00:00", -1, -1.0f);
-			s_TextWidth000D = TextRender()->TextWidth(FontSize, "000d 00:00:00", -1, -1.0f);
-		}
+		str_time((int64_t)Time * 100, ETimeFormat::DAYS, aBuf, sizeof(aBuf));
+		float FontSize = 10.0f;
+		static float s_TextWidthM = TextRender()->TextWidth(FontSize, "00:00", -1, -1.0f);
+		static float s_TextWidthH = TextRender()->TextWidth(FontSize, "00:00:00", -1, -1.0f);
+		static float s_TextWidth0D = TextRender()->TextWidth(FontSize, "0d 00:00:00", -1, -1.0f);
+		static float s_TextWidth00D = TextRender()->TextWidth(FontSize, "00d 00:00:00", -1, -1.0f);
+		static float s_TextWidth000D = TextRender()->TextWidth(FontSize, "000d 00:00:00", -1, -1.0f);
 		float w = Time >= 3600 * 24 * 100 ? s_TextWidth000D : (Time >= 3600 * 24 * 10 ? s_TextWidth00D : (Time >= 3600 * 24 ? s_TextWidth0D : (Time >= 3600 ? s_TextWidthH : s_TextWidthM)));
-		float DrawX = std::clamp(m_Width / 2.0f - w / 2.0f, 0.0f, maximum(0.0f, m_Width - w));
-		float DrawY = std::clamp(2.0f, 0.0f, maximum(0.0f, m_Height - FontSize));
-		const CUIRect PushRect = {DrawX - 2.0f * Scale, DrawY - 1.0f * Scale, w + 4.0f * Scale, FontSize + 2.0f * Scale};
-		const float PushDownOffset = GameClient()->m_MusicPlayer.GetHudPushDownOffsetForRect(PushRect, m_Height, 4.0f * Scale);
-		DrawY = std::clamp(DrawY + maximum(0.0f, PushDownOffset), 0.0f, maximum(0.0f, m_Height - FontSize));
-		if(BackgroundEnabled)
-		{
-			const float RectX = DrawX - 2.0f * Scale;
-			const float RectY = DrawY - 1.0f * Scale;
-			const float RectW = w + 4.0f * Scale;
-			const float RectH = FontSize + 2.0f * Scale;
-			const int Corners = HudModuleBackgroundCorners(IGraphics::CORNER_ALL, RectX, RectY, RectW, RectH, m_Width, m_Height);
-			Graphics()->DrawRect(RectX, RectY, RectW, RectH, ApplyHudAlpha(HudModuleBackgroundColor(BackgroundColor)), Corners, 2.0f * Scale);
-		}
 		// last 60 sec red, last 10 sec blink
-		if(HasGameInfo && WarningTime && (GameClient()->m_Snap.m_pGameInfoObj->m_WarmupTimer <= 0))
+		if(GameClient()->m_Snap.m_pGameInfoObj->m_TimeLimit && Time <= 60 && (GameClient()->m_Snap.m_pGameInfoObj->m_WarmupTimer <= 0))
 		{
 			float Alpha = Time <= 10 && (2 * time() / time_freq()) % 2 ? 0.5f : 1.0f;
-			SetHudTextColor(1.0f, 0.25f, 0.25f, Alpha);
+			TextRender()->TextColor(1.0f, 0.25f, 0.25f, Alpha);
 		}
-		TextRender()->Text(DrawX, DrawY, FontSize, aBuf, -1.0f);
-		SetHudTextColor(1.0f, 1.0f, 1.0f, 1.0f);
+		TextRender()->Text(Half - w / 2, 2, FontSize, aBuf, -1.0f);
+		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
 	}
-}
-
-void CHud::RenderPracticeModeBanner()
-{
-	const bool Visible = GameClient()->m_FastPractice.Enabled();
-	static float s_Phase = 0.0f;
-	const float Dt = Client()->RenderFrameTime();
-	if(BCUiAnimations::Enabled())
-		BCUiAnimations::UpdatePhase(s_Phase, Visible ? 1.0f : 0.0f, Dt, 0.22f);
-	else
-		s_Phase = Visible ? 1.0f : 0.0f;
-	if(s_Phase <= 0.0f)
-		return;
-
-	const float Ease = BCUiAnimations::EaseInOutQuad(s_Phase);
-	const float Alpha = Ease;
-	const float YOff = -10.0f * (1.0f - Ease);
-
-	const char *pText = Localize("Practice mode");
-	const char *pSubText = Localize("you can use practice commands (/tc /invincible)");
-	const float FontSize = 10.0f;
-	const float SubFontSize = 8.0f;
-	const float BannerTitleY = 22.0f;
-	const float BannerSubTitleY = 38.0f;
-	const float TextWidth = TextRender()->TextWidth(FontSize, pText, -1, -1.0f);
-	const float SubTextWidth = TextRender()->TextWidth(SubFontSize, pSubText, -1, -1.0f);
-	SetHudTextColor(1.0f, 1.0f, 1.0f, Alpha);
-	TextRender()->Text(m_Width / 2.0f - TextWidth / 2.0f, BannerTitleY + YOff, FontSize, pText, -1.0f);
-	TextRender()->Text(m_Width / 2.0f - SubTextWidth / 2.0f, BannerSubTitleY + YOff, SubFontSize, pSubText, -1.0f);
-	SetHudTextColor(TextRender()->DefaultTextColor());
 }
 
 void CHud::RenderPauseNotification()
 {
-	const bool Visible = (GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_PAUSED) != 0 &&
-		(GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_GAMEOVER) == 0;
-	static float s_Phase = 0.0f;
-	const float Dt = Client()->RenderFrameTime();
-	if(BCUiAnimations::Enabled())
-		BCUiAnimations::UpdatePhase(s_Phase, Visible ? 1.0f : 0.0f, Dt, 0.22f);
-	else
-		s_Phase = Visible ? 1.0f : 0.0f;
-	if(s_Phase <= 0.0f)
-		return;
-
-	const float Ease = BCUiAnimations::EaseInOutQuad(s_Phase);
-	const float Alpha = Ease;
-	const float YOff = -10.0f * (1.0f - Ease);
-
-	const char *pText = Localize("Game paused");
-	float FontSize = 20.0f;
-	float w = TextRender()->TextWidth(FontSize, pText, -1, -1.0f);
-	SetHudTextColor(1.0f, 1.0f, 1.0f, Alpha);
-	TextRender()->Text(150.0f * Graphics()->ScreenAspect() + -w / 2.0f, 50.0f + YOff, FontSize, pText, -1.0f);
-	SetHudTextColor(TextRender()->DefaultTextColor());
+	if(GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_PAUSED &&
+		!(GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_GAMEOVER))
+	{
+		const char *pText = Localize("Game paused");
+		float FontSize = 20.0f;
+		float w = TextRender()->TextWidth(FontSize, pText, -1, -1.0f);
+		TextRender()->Text(150.0f * Graphics()->ScreenAspect() + -w / 2.0f, 50.0f, FontSize, pText, -1.0f);
+	}
 }
 
 void CHud::RenderSuddenDeath()
 {
-	const bool Visible = (GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_SUDDENDEATH) != 0;
-	static float s_Phase = 0.0f;
-	const float Dt = Client()->RenderFrameTime();
-	if(BCUiAnimations::Enabled())
-		BCUiAnimations::UpdatePhase(s_Phase, Visible ? 1.0f : 0.0f, Dt, 0.22f);
-	else
-		s_Phase = Visible ? 1.0f : 0.0f;
-	if(s_Phase <= 0.0f)
-		return;
-
-	const float Ease = BCUiAnimations::EaseInOutQuad(s_Phase);
-	const float Alpha = Ease;
-	const float YOff = -8.0f * (1.0f - Ease);
-
-	float Half = m_Width / 2.0f;
-	const char *pText = Localize("Sudden Death");
-	float FontSize = 12.0f;
-	float w = TextRender()->TextWidth(FontSize, pText, -1, -1.0f);
-	SetHudTextColor(1.0f, 1.0f, 1.0f, Alpha);
-	TextRender()->Text(Half - w / 2, 2 + YOff, FontSize, pText, -1.0f);
-	SetHudTextColor(TextRender()->DefaultTextColor());
+	if(GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_SUDDENDEATH)
+	{
+		float Half = m_Width / 2.0f;
+		const char *pText = Localize("Sudden Death");
+		float FontSize = 12.0f;
+		float w = TextRender()->TextWidth(FontSize, pText, -1, -1.0f);
+		TextRender()->Text(Half - w / 2, 2, FontSize, pText, -1.0f);
+	}
 }
 
-void CHud::RenderScoreHud(bool ForcePreview)
+void CHud::RenderScoreHud()
 {
-	(void)ForcePreview;
-	if(!GameClient()->m_Snap.m_pGameInfoObj)
-		return;
-
-	// Match def-ddnet score HUD layout and geometry.
+	// render small score hud
 	if(!(GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_GAMEOVER))
 	{
-		float StartY = 229.0f;
+		float StartY = 229.0f; // the height of this display is 56, so EndY is 285
+
 		const float ScoreSingleBoxHeight = 18.0f;
 
 		bool ForceScoreInfoInit = !m_aScoreInfo[0].m_Initialized || !m_aScoreInfo[1].m_Initialized;
@@ -339,6 +202,7 @@ void CHud::RenderScoreHud(bool ForcePreview)
 			str_format(aScoreTeam[TEAM_BLUE], sizeof(aScoreTeam[TEAM_BLUE]), "%d", GameClient()->m_Snap.m_pGameDataObj->m_TeamscoreBlue);
 
 			bool aRecreateTeamScore[2] = {str_comp(aScoreTeam[0], m_aScoreInfo[0].m_aScoreText) != 0, str_comp(aScoreTeam[1], m_aScoreInfo[1].m_aScoreText) != 0};
+
 			const int aFlagCarrier[2] = {
 				GameClient()->m_Snap.m_pGameDataObj->m_FlagCarrierRed,
 				GameClient()->m_Snap.m_pGameDataObj->m_FlagCarrierBlue};
@@ -360,21 +224,23 @@ void CHud::RenderScoreHud(bool ForcePreview)
 			float ImageSize = (GameClient()->m_Snap.m_pGameInfoObj->m_GameFlags & GAMEFLAG_FLAGS) ? 16.0f : Split;
 			for(int t = 0; t < 2; t++)
 			{
+				// draw box
 				if(RecreateRect)
 				{
 					Graphics()->DeleteQuadContainer(m_aScoreInfo[t].m_RoundRectQuadContainerIndex);
 
 					if(t == 0)
-						SetHudColor(0.975f, 0.17f, 0.17f, 0.3f);
+						Graphics()->SetColor(0.975f, 0.17f, 0.17f, 0.3f);
 					else
-						SetHudColor(0.17f, 0.46f, 0.975f, 0.3f);
+						Graphics()->SetColor(0.17f, 0.46f, 0.975f, 0.3f);
 					m_aScoreInfo[t].m_RoundRectQuadContainerIndex = Graphics()->CreateRectQuadContainer(m_Width - ScoreWidthMax - ImageSize - 2 * Split, StartY + t * 20, ScoreWidthMax + ImageSize + 2 * Split, ScoreSingleBoxHeight, 5.0f, IGraphics::CORNER_L);
 				}
 				Graphics()->TextureClear();
-				SetHudColor(1.0f, 1.0f, 1.0f, 1.0f);
+				Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
 				if(m_aScoreInfo[t].m_RoundRectQuadContainerIndex != -1)
 					Graphics()->RenderQuadContainer(m_aScoreInfo[t].m_RoundRectQuadContainerIndex, -1);
 
+				// draw score
 				if(aRecreateTeamScore[t])
 				{
 					CTextCursor Cursor;
@@ -386,7 +252,7 @@ void CHud::RenderScoreHud(bool ForcePreview)
 				{
 					ColorRGBA TColor(1.f, 1.f, 1.f, 1.f);
 					ColorRGBA TOutlineColor(0.f, 0.f, 0.f, 0.3f);
-					TextRender()->RenderTextContainer(m_aScoreInfo[t].m_TextScoreContainerIndex, ApplyHudAlpha(TColor), ApplyHudAlpha(TOutlineColor));
+					TextRender()->RenderTextContainer(m_aScoreInfo[t].m_TextScoreContainerIndex, TColor, TOutlineColor);
 				}
 
 				if(GameClient()->m_Snap.m_pGameInfoObj->m_GameFlags & GAMEFLAG_FLAGS)
@@ -397,12 +263,14 @@ void CHud::RenderScoreHud(bool ForcePreview)
 								 20;
 					if(aFlagCarrier[t] == FLAG_ATSTAND || (aFlagCarrier[t] == FLAG_TAKEN && ((Client()->GameTick(g_Config.m_ClDummy) / BlinkTimer) & 1)))
 					{
+						// draw flag
 						Graphics()->TextureSet(t == 0 ? GameClient()->m_GameSkin.m_SpriteFlagRed : GameClient()->m_GameSkin.m_SpriteFlagBlue);
-						SetHudColor(1.f, 1.f, 1.f, 1.f);
+						Graphics()->SetColor(1.f, 1.f, 1.f, 1.f);
 						Graphics()->RenderQuadContainerAsSprite(m_HudQuadContainerIndex, m_FlagOffset, m_Width - ScoreWidthMax - ImageSize, StartY + 1.0f + t * 20);
 					}
 					else if(aFlagCarrier[t] >= 0)
 					{
+						// draw name of the flag holder
 						int Id = aFlagCarrier[t] % MAX_CLIENTS;
 						const char *pName = GameClient()->m_aClients[Id].m_aName;
 						if(str_comp(pName, m_aScoreInfo[t].m_aPlayerNameText) != 0 || RecreateRect)
@@ -421,9 +289,10 @@ void CHud::RenderScoreHud(bool ForcePreview)
 						{
 							ColorRGBA TColor(1.f, 1.f, 1.f, 1.f);
 							ColorRGBA TOutlineColor(0.f, 0.f, 0.f, 0.3f);
-							TextRender()->RenderTextContainer(m_aScoreInfo[t].m_OptionalNameTextContainerIndex, ApplyHudAlpha(TColor), ApplyHudAlpha(TOutlineColor));
+							TextRender()->RenderTextContainer(m_aScoreInfo[t].m_OptionalNameTextContainerIndex, TColor, TOutlineColor);
 						}
 
+						// draw tee of the flag holder
 						CTeeRenderInfo TeeInfo = GameClient()->m_aClients[Id].m_RenderInfo;
 						TeeInfo.m_Size = ScoreSingleBoxHeight;
 
@@ -454,6 +323,7 @@ void CHud::RenderScoreHud(bool ForcePreview)
 					++t;
 				}
 			}
+			// search local player info if not a spectator, nor within top2 scores
 			if(Local == -1 && GameClient()->m_Snap.m_pLocalInfo && GameClient()->m_Snap.m_pLocalInfo->m_Team != TEAM_SPECTATORS)
 			{
 				for(; i < MAX_CLIENTS && GameClient()->m_Snap.m_apInfoByScore[i]; ++i)
@@ -474,11 +344,21 @@ void CHud::RenderScoreHud(bool ForcePreview)
 				if(apPlayerInfo[t])
 				{
 					if(Client()->IsSixup() && GameClient()->m_Snap.m_pGameInfoObj->m_GameFlags & protocol7::GAMEFLAG_RACE)
-						str_time((int64_t)absolute(apPlayerInfo[t]->m_Score) / 10, TIME_MINS_CENTISECS, aScore[t], sizeof(aScore[t]));
+						str_time((int64_t)absolute(apPlayerInfo[t]->m_Score) / 10, ETimeFormat::MINS_CENTISECS, aScore[t], sizeof(aScore[t]));
 					else if(GameClient()->m_GameInfo.m_TimeScore)
 					{
-						if(apPlayerInfo[t]->m_Score != -9999)
-							str_time((int64_t)absolute(apPlayerInfo[t]->m_Score) * 100, TIME_HOURS, aScore[t], sizeof(aScore[t]));
+						CGameClient::CClientData &ClientData = GameClient()->m_aClients[apPlayerInfo[t]->m_ClientId];
+						if(GameClient()->m_ReceivedDDNetPlayerFinishTimes && ClientData.m_FinishTimeSeconds != FinishTime::NOT_FINISHED_MILLIS)
+						{
+							int64_t TimeSeconds = static_cast<int64_t>(absolute(ClientData.m_FinishTimeSeconds));
+							int64_t TimeMillis = TimeSeconds * 1000 + (absolute(ClientData.m_FinishTimeMillis) % 1000);
+
+							str_time(TimeMillis / 10, ETimeFormat::HOURS, aScore[t], sizeof(aScore[t]));
+						}
+						else if(apPlayerInfo[t]->m_Score != FinishTime::NOT_FINISHED_TIMESCORE)
+						{
+							str_time((int64_t)absolute(apPlayerInfo[t]->m_Score) * 100, ETimeFormat::HOURS, aScore[t], sizeof(aScore[t]));
+						}
 						else
 							aScore[t][0] = 0;
 					}
@@ -530,18 +410,19 @@ void CHud::RenderScoreHud(bool ForcePreview)
 
 			for(int t = 0; t < 2; t++)
 			{
+				// draw box
 				if(RecreateRect)
 				{
 					Graphics()->DeleteQuadContainer(m_aScoreInfo[t].m_RoundRectQuadContainerIndex);
 
 					if(t == Local)
-						SetHudColor(1.0f, 1.0f, 1.0f, 0.25f);
+						Graphics()->SetColor(1.0f, 1.0f, 1.0f, 0.25f);
 					else
-						SetHudColor(0.0f, 0.0f, 0.0f, 0.25f);
+						Graphics()->SetColor(0.0f, 0.0f, 0.0f, 0.25f);
 					m_aScoreInfo[t].m_RoundRectQuadContainerIndex = Graphics()->CreateRectQuadContainer(m_Width - ScoreWidthMax - ImageSize - 2 * Split - PosSize, StartY + t * 20, ScoreWidthMax + ImageSize + 2 * Split + PosSize, ScoreSingleBoxHeight, 5.0f, IGraphics::CORNER_L);
 				}
 				Graphics()->TextureClear();
-				SetHudColor(1.0f, 1.0f, 1.0f, 1.0f);
+				Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
 				if(m_aScoreInfo[t].m_RoundRectQuadContainerIndex != -1)
 					Graphics()->RenderQuadContainer(m_aScoreInfo[t].m_RoundRectQuadContainerIndex, -1);
 
@@ -552,15 +433,17 @@ void CHud::RenderScoreHud(bool ForcePreview)
 					Cursor.m_FontSize = 14.0f;
 					TextRender()->RecreateTextContainer(m_aScoreInfo[t].m_TextScoreContainerIndex, &Cursor, aScore[t]);
 				}
+				// draw score
 				if(m_aScoreInfo[t].m_TextScoreContainerIndex.Valid())
 				{
 					ColorRGBA TColor(1.f, 1.f, 1.f, 1.f);
 					ColorRGBA TOutlineColor(0.f, 0.f, 0.f, 0.3f);
-					TextRender()->RenderTextContainer(m_aScoreInfo[t].m_TextScoreContainerIndex, ApplyHudAlpha(TColor), ApplyHudAlpha(TOutlineColor));
+					TextRender()->RenderTextContainer(m_aScoreInfo[t].m_TextScoreContainerIndex, TColor, TOutlineColor);
 				}
 
 				if(apPlayerInfo[t])
 				{
+					// draw name
 					int Id = apPlayerInfo[t]->m_ClientId;
 					if(Id >= 0 && Id < MAX_CLIENTS)
 					{
@@ -579,9 +462,10 @@ void CHud::RenderScoreHud(bool ForcePreview)
 						{
 							ColorRGBA TColor(1.f, 1.f, 1.f, 1.f);
 							ColorRGBA TOutlineColor(0.f, 0.f, 0.f, 0.3f);
-							TextRender()->RenderTextContainer(m_aScoreInfo[t].m_OptionalNameTextContainerIndex, ApplyHudAlpha(TColor), ApplyHudAlpha(TOutlineColor));
+							TextRender()->RenderTextContainer(m_aScoreInfo[t].m_OptionalNameTextContainerIndex, TColor, TOutlineColor);
 						}
 
+						// draw tee
 						CTeeRenderInfo TeeInfo = GameClient()->m_aClients[Id].m_RenderInfo;
 						TeeInfo.m_Size = ScoreSingleBoxHeight;
 
@@ -598,6 +482,7 @@ void CHud::RenderScoreHud(bool ForcePreview)
 					m_aScoreInfo[t].m_aPlayerNameText[0] = 0;
 				}
 
+				// draw position
 				char aBuf[16];
 				str_format(aBuf, sizeof(aBuf), "%d.", aPos[t]);
 				if(RecreateRect)
@@ -613,7 +498,7 @@ void CHud::RenderScoreHud(bool ForcePreview)
 				{
 					ColorRGBA TColor(1.f, 1.f, 1.f, 1.f);
 					ColorRGBA TOutlineColor(0.f, 0.f, 0.f, 0.3f);
-					TextRender()->RenderTextContainer(m_aScoreInfo[t].m_TextRankContainerIndex, ApplyHudAlpha(TColor), ApplyHudAlpha(TOutlineColor));
+					TextRender()->RenderTextContainer(m_aScoreInfo[t].m_TextRankContainerIndex, TColor, TOutlineColor);
 				}
 
 				StartY += 8.0f;
@@ -625,87 +510,48 @@ void CHud::RenderScoreHud(bool ForcePreview)
 void CHud::RenderWarmupTimer()
 {
 	// render warmup timer
-	const bool Visible = GameClient()->m_Snap.m_pGameInfoObj->m_WarmupTimer > 0 &&
-		(GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_RACETIME) == 0;
-	static float s_Phase = 0.0f;
-	const float Dt = Client()->RenderFrameTime();
-	if(BCUiAnimations::Enabled())
-		BCUiAnimations::UpdatePhase(s_Phase, Visible ? 1.0f : 0.0f, Dt, 0.22f);
-	else
-		s_Phase = Visible ? 1.0f : 0.0f;
-	if(s_Phase <= 0.0f)
-		return;
+	if(GameClient()->m_Snap.m_pGameInfoObj->m_WarmupTimer > 0 && !(GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_RACETIME))
+	{
+		char aBuf[256];
+		float FontSize = 20.0f;
+		float w = TextRender()->TextWidth(FontSize, Localize("Warmup"), -1, -1.0f);
+		TextRender()->Text(150 * Graphics()->ScreenAspect() + -w / 2, 50, FontSize, Localize("Warmup"), -1.0f);
 
-	const float Ease = BCUiAnimations::EaseInOutQuad(s_Phase);
-	const float Alpha = Ease;
-	const float YOff = -10.0f * (1.0f - Ease);
-
-	char aBuf[256];
-	float FontSize = 20.0f;
-	float w = TextRender()->TextWidth(FontSize, Localize("Warmup"), -1, -1.0f);
-	SetHudTextColor(1.0f, 1.0f, 1.0f, Alpha);
-	TextRender()->Text(150 * Graphics()->ScreenAspect() + -w / 2, 50 + YOff, FontSize, Localize("Warmup"), -1.0f);
-
-	int Seconds = GameClient()->m_Snap.m_pGameInfoObj->m_WarmupTimer / Client()->GameTickSpeed();
-	if(Seconds < 5)
-		str_format(aBuf, sizeof(aBuf), "%d.%d", Seconds, (GameClient()->m_Snap.m_pGameInfoObj->m_WarmupTimer * 10 / Client()->GameTickSpeed()) % 10);
-	else
-		str_format(aBuf, sizeof(aBuf), "%d", Seconds);
-	w = TextRender()->TextWidth(FontSize, aBuf, -1, -1.0f);
-	TextRender()->Text(150 * Graphics()->ScreenAspect() + -w / 2, 75 + YOff, FontSize, aBuf, -1.0f);
-	SetHudTextColor(TextRender()->DefaultTextColor());
+		int Seconds = GameClient()->m_Snap.m_pGameInfoObj->m_WarmupTimer / Client()->GameTickSpeed();
+		if(Seconds < 5)
+			str_format(aBuf, sizeof(aBuf), "%d.%d", Seconds, (GameClient()->m_Snap.m_pGameInfoObj->m_WarmupTimer * 10 / Client()->GameTickSpeed()) % 10);
+		else
+			str_format(aBuf, sizeof(aBuf), "%d", Seconds);
+		w = TextRender()->TextWidth(FontSize, aBuf, -1, -1.0f);
+		TextRender()->Text(150 * Graphics()->ScreenAspect() + -w / 2, 75, FontSize, aBuf, -1.0f);
+	}
 }
 
-void CHud::RenderTextInfo(bool ForcePreview)
+void CHud::RenderTextInfo()
 {
-	int Showfps = g_Config.m_ClShowfps || ForcePreview;
+	int Showfps = g_Config.m_ClShowfps;
 #if defined(CONF_VIDEORECORDER)
 	if(IVideo::Current())
 		Showfps = 0;
 #endif
 	if(Showfps)
 	{
-		const auto Layout = HudLayout::Get(HudLayout::MODULE_FPS, m_Width, m_Height);
-		const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
-		const float FontSize = 12.0f * Scale;
-		const float PosX = Layout.m_X;
-		const float PosY = Layout.m_Y;
-		const bool BackgroundEnabled = Layout.m_BackgroundEnabled;
-		const unsigned BackgroundColor = Layout.m_BackgroundColor;
 		char aBuf[16];
 		const int FramesPerSecond = round_to_int(1.0f / Client()->FrameTimeAverage());
 		str_format(aBuf, sizeof(aBuf), "%d", FramesPerSecond);
 
-		static float s_FontSize = -1.0f;
-		static float s_aTextWidth[5] = {};
-		if(s_FontSize != FontSize)
-		{
-			s_FontSize = FontSize;
-			s_aTextWidth[0] = TextRender()->TextWidth(FontSize, "0", -1, -1.0f);
-			s_aTextWidth[1] = TextRender()->TextWidth(FontSize, "00", -1, -1.0f);
-			s_aTextWidth[2] = TextRender()->TextWidth(FontSize, "000", -1, -1.0f);
-			s_aTextWidth[3] = TextRender()->TextWidth(FontSize, "0000", -1, -1.0f);
-			s_aTextWidth[4] = TextRender()->TextWidth(FontSize, "00000", -1, -1.0f);
-		}
+		static float s_TextWidth0 = TextRender()->TextWidth(12.f, "0", -1, -1.0f);
+		static float s_TextWidth00 = TextRender()->TextWidth(12.f, "00", -1, -1.0f);
+		static float s_TextWidth000 = TextRender()->TextWidth(12.f, "000", -1, -1.0f);
+		static float s_TextWidth0000 = TextRender()->TextWidth(12.f, "0000", -1, -1.0f);
+		static float s_TextWidth00000 = TextRender()->TextWidth(12.f, "00000", -1, -1.0f);
+		static const float s_aTextWidth[5] = {s_TextWidth0, s_TextWidth00, s_TextWidth000, s_TextWidth0000, s_TextWidth00000};
 
 		int DigitIndex = GetDigitsIndex(FramesPerSecond, 4);
-		float DrawX = std::clamp(PosX, 0.0f, maximum(0.0f, m_Width - s_aTextWidth[DigitIndex]));
-		const float DrawY = std::clamp(PosY, 0.0f, maximum(0.0f, m_Height - FontSize));
-		const CUIRect PushRect = {DrawX - 2.0f * Scale, DrawY - 1.0f * Scale, s_aTextWidth[DigitIndex] + 4.0f * Scale, FontSize + 2.0f * Scale};
-		DrawX = std::clamp(DrawX + GameClient()->m_MusicPlayer.GetHudPushOffsetForRect(PushRect, m_Width, 4.0f * Scale), 0.0f, maximum(0.0f, m_Width - s_aTextWidth[DigitIndex]));
-		if(BackgroundEnabled)
-		{
-			const float RectX = DrawX - 2.0f * Scale;
-			const float RectY = DrawY - 1.0f * Scale;
-			const float RectW = s_aTextWidth[DigitIndex] + 4.0f * Scale;
-			const float RectH = FontSize + 2.0f * Scale;
-			const int Corners = HudModuleBackgroundCorners(IGraphics::CORNER_ALL, RectX, RectY, RectW, RectH, m_Width, m_Height);
-			Graphics()->DrawRect(RectX, RectY, RectW, RectH, ApplyHudAlpha(HudModuleBackgroundColor(BackgroundColor)), Corners, 2.0f * Scale);
-		}
 
 		CTextCursor Cursor;
-		Cursor.SetPosition(vec2(DrawX, DrawY));
-		Cursor.m_FontSize = FontSize;
+		Cursor.SetPosition(vec2(m_Width - 10 - s_aTextWidth[DigitIndex], 5));
+		Cursor.m_FontSize = 12.0f;
 		auto OldFlags = TextRender()->GetRenderFlags();
 		TextRender()->SetRenderFlags(OldFlags | TEXT_RENDER_FLAG_ONE_TIME_USE);
 		if(m_FPSTextContainerIndex.Valid())
@@ -715,40 +561,17 @@ void CHud::RenderTextInfo(bool ForcePreview)
 		TextRender()->SetRenderFlags(OldFlags);
 		if(m_FPSTextContainerIndex.Valid())
 		{
-			TextRender()->RenderTextContainer(m_FPSTextContainerIndex, ApplyHudAlpha(TextRender()->DefaultTextColor()), ApplyHudAlpha(TextRender()->DefaultTextOutlineColor()));
+			TextRender()->RenderTextContainer(m_FPSTextContainerIndex, TextRender()->DefaultTextColor(), TextRender()->DefaultTextOutlineColor());
 		}
 	}
-
-	if((g_Config.m_ClShowpred && Client()->State() != IClient::STATE_DEMOPLAYBACK) || ForcePreview)
+	if(g_Config.m_ClShowpred && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 	{
-		const auto Layout = HudLayout::Get(HudLayout::MODULE_PING, m_Width, m_Height);
-		const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
-		const float FontSize = 12.0f * Scale;
-		const float PosX = Layout.m_X;
-		const float PosY = Layout.m_Y;
-		const bool BackgroundEnabled = Layout.m_BackgroundEnabled;
-		const unsigned BackgroundColor = Layout.m_BackgroundColor;
-		char aBuf[16];
-		const int PredictionTime = ForcePreview ? 36 : std::clamp(Client()->GetPredictionTime(), 0, 9999);
-		str_format(aBuf, sizeof(aBuf), "%d", PredictionTime);
-		const float Width = TextRender()->TextWidth(FontSize, aBuf, -1, -1.0f);
-		float DrawX = std::clamp(PosX, 0.0f, maximum(0.0f, m_Width - Width));
-		const float DrawY = std::clamp(PosY, 0.0f, maximum(0.0f, m_Height - FontSize));
-		const CUIRect PushRect = {DrawX - 2.0f * Scale, DrawY - 1.0f * Scale, Width + 4.0f * Scale, FontSize + 2.0f * Scale};
-		DrawX = std::clamp(DrawX + GameClient()->m_MusicPlayer.GetHudPushOffsetForRect(PushRect, m_Width, 4.0f * Scale), 0.0f, maximum(0.0f, m_Width - Width));
-		if(BackgroundEnabled)
-		{
-			const float RectX = DrawX - 2.0f * Scale;
-			const float RectY = DrawY - 1.0f * Scale;
-			const float RectW = Width + 4.0f * Scale;
-			const float RectH = FontSize + 2.0f * Scale;
-			const int Corners = HudModuleBackgroundCorners(IGraphics::CORNER_ALL, RectX, RectY, RectW, RectH, m_Width, m_Height);
-			Graphics()->DrawRect(RectX, RectY, RectW, RectH, ApplyHudAlpha(HudModuleBackgroundColor(BackgroundColor)), Corners, 2.0f * Scale);
-		}
-		TextRender()->Text(DrawX, DrawY, FontSize, aBuf, -1.0f);
+		char aBuf[64];
+		str_format(aBuf, sizeof(aBuf), "%d", Client()->GetPredictionTime());
+		TextRender()->Text(m_Width - 10 - TextRender()->TextWidth(12, aBuf, -1, -1.0f), Showfps ? 20 : 5, 12, aBuf, -1.0f);
 	}
 
-	if(!ForcePreview && g_Config.m_TcMiniDebug)
+	if(g_Config.m_TcMiniDebug)
 	{
 		float FontSize = 8.0f;
 		float TextHeight = 11.0f;
@@ -792,26 +615,20 @@ void CHud::RenderTextInfo(bool ForcePreview)
 			TextRender()->Text(4.0f, OffsetY, FontSize, aBuf, -1.0f);
 		}
 	}
-	if(!ForcePreview && g_Config.m_TcRenderCursorSpec && GameClient()->m_Snap.m_SpecInfo.m_SpectatorId == SPEC_FREEVIEW)
+	if(g_Config.m_TcRenderCursorSpec && GameClient()->m_Snap.m_SpecInfo.m_SpectatorId == SPEC_FREEVIEW)
 	{
 		int CurWeapon = 1;
-		SetHudColor(1.f, 1.f, 1.f, g_Config.m_TcRenderCursorSpecAlpha / 100.0f);
+		Graphics()->SetColor(1.f, 1.f, 1.f, g_Config.m_TcRenderCursorSpecAlpha / 100.0f);
 		Graphics()->TextureSet(GameClient()->m_GameSkin.m_aSpriteWeaponCursors[CurWeapon]);
 		Graphics()->RenderQuadContainerAsSprite(m_HudQuadContainerIndex, m_aCursorOffset[CurWeapon], m_Width / 2.0f, m_Height / 2.0f, 0.36f, 0.36f);
 	}
 	// render team in freeze text and last notify
-	const bool FrozenTeeDisplayDisabled = GameClient()->m_BestClient.IsComponentDisabled(CBestClient::COMPONENT_GORES_FROZEN_TEE_DISPLAY);
-	const bool HudComponentDisabled = GameClient()->m_BestClient.IsComponentDisabled(CBestClient::COMPONENT_GORES_HUD);
-	const bool ShowFrozenText = !FrozenTeeDisplayDisabled && g_Config.m_TcShowFrozenText > 0;
-	const bool ShowFrozenHud = !FrozenTeeDisplayDisabled && g_Config.m_TcShowFrozenHud > 0;
-	const bool ShowLastAliveNotify = !HudComponentDisabled && g_Config.m_TcNotifyWhenLast;
-	if((ShowFrozenText || ShowFrozenHud || ShowLastAliveNotify || ForcePreview) && (GameClient()->m_GameInfo.m_EntitiesDDRace || ForcePreview))
+	if((g_Config.m_TcShowFrozenText > 0 || g_Config.m_TcShowFrozenHud > 0 || g_Config.m_TcNotifyWhenLast) && GameClient()->m_GameInfo.m_EntitiesDDRace)
 	{
 		int NumInTeam = 0;
 		int NumFrozen = 0;
 		int LocalTeamID = 0;
-		bool HasLiveTeamData = false;
-		if(GameClient()->m_GameInfo.m_EntitiesDDRace && GameClient()->m_Snap.m_LocalClientId >= 0 && GameClient()->m_Snap.m_SpecInfo.m_SpectatorId >= 0)
+		if(GameClient()->m_Snap.m_LocalClientId >= 0 && GameClient()->m_Snap.m_SpecInfo.m_SpectatorId >= 0)
 		{
 			if(GameClient()->m_Snap.m_SpecInfo.m_Active == 1 && GameClient()->m_Snap.m_SpecInfo.m_SpectatorId != -1)
 				LocalTeamID = GameClient()->m_Teams.Team(GameClient()->m_Snap.m_SpecInfo.m_SpectatorId);
@@ -830,51 +647,36 @@ void CHud::RenderTextInfo(bool ForcePreview)
 					NumFrozen++;
 			}
 		}
-		HasLiveTeamData = NumInTeam > 0;
-		if(!HasLiveTeamData && ForcePreview)
-		{
-			NumInTeam = 5;
-			NumFrozen = 2;
-		}
 
 		// Notify when last
-		if(ShowLastAliveNotify || ForcePreview)
+		if(g_Config.m_TcNotifyWhenLast)
 		{
-			if((NumInTeam > 1 && NumInTeam - NumFrozen == 1) || ForcePreview)
+			if(NumInTeam > 1 && NumInTeam - NumFrozen == 1)
 			{
-				SetHudTextColor(color_cast<ColorRGBA>(ColorHSLA(g_Config.m_TcNotifyWhenLastColor)));
-				const float FontSize = g_Config.m_TcNotifyWhenLastSize;
-				const char *pNotifyText = g_Config.m_TcNotifyWhenLastText[0] != '\0' ? g_Config.m_TcNotifyWhenLastText : "YOU ARE LAST";
-				float XPos = (g_Config.m_TcNotifyWhenLastX / 100.0f) * m_Width;
-				float YPos = (g_Config.m_TcNotifyWhenLastY / 100.0f) * m_Height;
-				XPos = std::clamp(XPos, 0.0f, maximum(0.0f, m_Width - FontSize));
-				YPos = std::clamp(YPos, 0.0f, maximum(0.0f, m_Height - FontSize));
+				TextRender()->TextColor(color_cast<ColorRGBA>(ColorHSLA(g_Config.m_TcNotifyWhenLastColor)));
+				float FontSize = g_Config.m_TcNotifyWhenLastSize;
+				float XPos = std::clamp((g_Config.m_TcNotifyWhenLastX / 100.0f) * m_Width, 1.0f, m_Width - FontSize);
+				float YPos = std::clamp((g_Config.m_TcNotifyWhenLastY / 100.0f) * m_Height, 1.0f, m_Height - FontSize);
 
-				TextRender()->Text(XPos, YPos, FontSize, pNotifyText, -1.0f);
-				SetHudTextColor(TextRender()->DefaultTextColor());
-
-				if(!ForcePreview && g_Config.m_BcNotifyWhenLastSound){
-					// ВАХВАХВАХВАХ ПИЗДЕЦ ЧТО ЗА ЗВУК
-					GameClient()->m_Sounds.Play(CSounds::CHN_WORLD, SOUND_CTF_DROP, 1.0f);
-				}
+				TextRender()->Text(XPos, YPos, FontSize, g_Config.m_TcNotifyWhenLastText, -1.0f);
+				TextRender()->TextColor(TextRender()->DefaultTextColor());
 			}
 		}
 		// Show freeze text
 		char aBuf[64];
-		if(!ForcePreview && ShowFrozenText && g_Config.m_TcShowFrozenText == 1)
+		if(g_Config.m_TcShowFrozenText == 1)
 			str_format(aBuf, sizeof(aBuf), "%d / %d", NumInTeam - NumFrozen, NumInTeam);
-		else if(!ForcePreview && ShowFrozenText && g_Config.m_TcShowFrozenText == 2)
+		else if(g_Config.m_TcShowFrozenText == 2)
 			str_format(aBuf, sizeof(aBuf), "%d / %d", NumFrozen, NumInTeam);
-		if(!ForcePreview && ShowFrozenText)
+		if(g_Config.m_TcShowFrozenText > 0)
 			TextRender()->Text(m_Width / 2.0f - TextRender()->TextWidth(10.0f, aBuf) / 2.0f, 12.0f, 10.0f, aBuf);
 
 		// str_format(aBuf, sizeof(aBuf), "%d", GameClient()->m_aClients[GameClient()->m_Snap.m_LocalClientId].m_PrevPredicted.m_FreezeEnd);
 		// str_format(aBuf, sizeof(aBuf), "%d", g_Config.m_ClWhatsMyPing);
 		// TextRender()->Text(0, m_Width / 2 - TextRender()->TextWidth(0, 10, aBuf, -1, -1.0f) / 2, 20, 10, aBuf, -1.0f);
 
-		if(ShowFrozenHud && (!GameClient()->m_Scoreboard.IsActive() || ForcePreview) && (!g_Config.m_TcFrozenHudTeamOnly || LocalTeamID != 0 || ForcePreview))
+		if(g_Config.m_TcShowFrozenHud > 0 && !GameClient()->m_Scoreboard.IsActive() && !(LocalTeamID == 0 && g_Config.m_TcFrozenHudTeamOnly))
 		{
-			const auto FrozenLayout = HudLayout::Get(HudLayout::MODULE_FROZEN_HUD, m_Width, m_Height);
 			CTeeRenderInfo FreezeInfo;
 			const CSkin *pSkin = GameClient()->m_Skins.Find("x_ninja");
 			FreezeInfo.m_OriginalRenderSkin = pSkin->m_OriginalSkin;
@@ -885,71 +687,26 @@ void CHud::RenderTextInfo(bool ForcePreview)
 			FreezeInfo.m_ColorFeet = ColorRGBA(1.0f, 1.0f, 1.0f);
 			FreezeInfo.m_CustomColoredSkin = false;
 
-			const float HudScale = std::clamp(FrozenLayout.m_Scale / 100.0f, 0.25f, 3.0f);
-			float progressiveOffset = 0.0f;
-			float TeeSize = g_Config.m_TcFrozenHudTeeSize * HudScale;
+			float ProgressiveOffset = 0.0f;
+			float TeeSize = g_Config.m_TcFrozenHudTeeSize;
 			int MaxTees = (int)(8.3f * (m_Width / m_Height) * 13.0f / TeeSize);
 			if(!g_Config.m_ClShowfps && !g_Config.m_ClShowpred)
 				MaxTees = (int)(9.5f * (m_Width / m_Height) * 13.0f / TeeSize);
 			int MaxRows = g_Config.m_TcFrozenMaxRows;
-			const float StartX = FrozenLayout.m_X;
-			float StartY = FrozenLayout.m_Y;
-			const bool BackgroundEnabled = FrozenLayout.m_BackgroundEnabled;
-			const unsigned BackgroundColor = FrozenLayout.m_BackgroundColor;
+			float StartPos = m_Width / 2.0f + 38.0f * (m_Width / m_Height) / 1.78f;
 
 			int TotalRows = std::min(MaxRows, (NumInTeam + MaxTees - 1) / MaxTees);
-			if(BackgroundEnabled)
-			{
-				Graphics()->TextureClear();
-				Graphics()->QuadsBegin();
-				Graphics()->SetColor(ApplyHudAlpha(HudModuleBackgroundColor(BackgroundColor)));
-				const float RectX = StartX - TeeSize / 2.0f;
-				const float RectY = StartY;
-				const float RectW = TeeSize * std::min(NumInTeam, MaxTees);
-				const float RectH = TeeSize + 3.0f + (TotalRows - 1) * TeeSize;
-				const int Corners = HudModuleBackgroundCorners(IGraphics::CORNER_B, RectX, RectY, RectW, RectH, m_Width, m_Height);
-				Graphics()->DrawRectExt(RectX, RectY, RectW, RectH, 5.0f, Corners);
-				Graphics()->QuadsEnd();
-			}
+			Graphics()->TextureClear();
+			Graphics()->QuadsBegin();
+			Graphics()->SetColor(0.0f, 0.0f, 0.0f, 0.4f);
+			Graphics()->DrawRectExt(StartPos - TeeSize / 2.0f, 0.0f, TeeSize * std::min(NumInTeam, MaxTees), TeeSize + 3.0f + (TotalRows - 1) * TeeSize, 5.0f, IGraphics::CORNER_B);
+			Graphics()->QuadsEnd();
 
 			bool Overflow = NumInTeam > MaxTees * MaxRows;
 
 			int NumDisplayed = 0;
 			int NumInRow = 0;
 			int CurrentRow = 0;
-
-			if(ForcePreview && !HasLiveTeamData)
-			{
-				CTeeRenderInfo PreviewLiveInfo = FreezeInfo;
-				const int PreviewClientId = GameClient()->m_Snap.m_LocalClientId;
-				if(PreviewClientId >= 0 && PreviewClientId < MAX_CLIENTS && GameClient()->m_aClients[PreviewClientId].m_RenderInfo.Valid())
-					PreviewLiveInfo = GameClient()->m_aClients[PreviewClientId].m_RenderInfo;
-				for(int i = 0; i < NumInTeam; ++i)
-				{
-					const bool Frozen = i < NumFrozen;
-					CTeeRenderInfo TeeInfo = Frozen ? FreezeInfo : PreviewLiveInfo;
-					if(!TeeInfo.Valid())
-						TeeInfo = FreezeInfo;
-					TeeInfo.m_Size = TeeSize;
-					const CAnimState *pIdleState = CAnimState::GetIdle();
-					vec2 OffsetToMid;
-					CRenderTools::GetRenderTeeOffsetToRenderedTee(pIdleState, &TeeInfo, OffsetToMid);
-					vec2 TeeRenderPos(StartX + progressiveOffset, StartY + TeeSize * 0.7f + CurrentRow * TeeSize);
-					if(Frozen)
-						RenderTools()->RenderTee(pIdleState, &TeeInfo, EMOTE_PAIN, vec2(1.0f, 0.0f), TeeRenderPos, 0.8f);
-					else
-						RenderTools()->RenderTee(pIdleState, &TeeInfo, EMOTE_NORMAL, vec2(1.0f, 0.0f), TeeRenderPos);
-					progressiveOffset += TeeSize;
-					NumInRow++;
-					if(NumInRow >= MaxTees)
-					{
-						NumInRow = 0;
-						progressiveOffset = 0.0f;
-						CurrentRow++;
-					}
-				}
-				return;
-			}
 
 			for(int OverflowIndex = 0; OverflowIndex < 1 + Overflow; OverflowIndex++)
 			{
@@ -978,7 +735,7 @@ void CHud::RenderTextInfo(bool ForcePreview)
 						if(NumInRow > MaxTees)
 						{
 							NumInRow = 1;
-							progressiveOffset = 0.0f;
+							ProgressiveOffset = 0.0f;
 							CurrentRow++;
 						}
 
@@ -986,7 +743,7 @@ void CHud::RenderTextInfo(bool ForcePreview)
 						const CAnimState *pIdleState = CAnimState::GetIdle();
 						vec2 OffsetToMid;
 						CRenderTools::GetRenderTeeOffsetToRenderedTee(pIdleState, &TeeInfo, OffsetToMid);
-						vec2 TeeRenderPos(StartX + progressiveOffset, StartY + TeeSize * 0.7f + CurrentRow * TeeSize);
+						vec2 TeeRenderPos(StartPos + ProgressiveOffset, TeeSize * (0.7f) + CurrentRow * TeeSize);
 						float Alpha = 1.0f;
 						CNetObj_Character CurChar = GameClient()->m_aClients[i].m_RenderCur;
 						if(g_Config.m_TcShowFrozenHudSkins && Frozen)
@@ -1003,7 +760,7 @@ void CHud::RenderTextInfo(bool ForcePreview)
 							RenderTools()->RenderTee(pIdleState, &TeeInfo, EMOTE_PAIN, vec2(1.0f, 0.0f), TeeRenderPos, Alpha);
 						else
 							RenderTools()->RenderTee(pIdleState, &TeeInfo, CurChar.m_Emote, vec2(1.0f, 0.0f), TeeRenderPos);
-						progressiveOffset += TeeSize;
+						ProgressiveOffset += TeeSize;
 					}
 				}
 			}
@@ -1011,225 +768,34 @@ void CHud::RenderTextInfo(bool ForcePreview)
 	}
 }
 
-void CHud::RenderLockCam(bool ForcePreview)
-{
-	const bool HasWorldSnapshot = Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK;
-	if(!HasWorldSnapshot && !ForcePreview)
-		return;
-	if(GameClient()->m_Menus.IsActive() && !ForcePreview)
-		return;
-
-	const auto Layout = HudLayout::Get(HudLayout::MODULE_LOCK_CAM, m_Width, m_Height);
-
-	int ClientId = GameClient()->m_LockCamClientId;
-	if(ForcePreview && (ClientId < 0 || ClientId >= MAX_CLIENTS || !GameClient()->m_aClients[ClientId].m_Active))
-	{
-		ClientId = GameClient()->m_Snap.m_LocalClientId;
-		if(ClientId < 0 || ClientId >= MAX_CLIENTS || !GameClient()->m_aClients[ClientId].m_Active)
-		{
-			for(int Index = 0; Index < MAX_CLIENTS; ++Index)
-			{
-				if(GameClient()->m_aClients[Index].m_Active)
-				{
-					ClientId = Index;
-					break;
-				}
-			}
-		}
-	}
-	if(ClientId < 0 || ClientId >= MAX_CLIENTS)
-	{
-		if(!ForcePreview)
-			return;
-		ClientId = -1;
-	}
-
-	const CGameClient::CClientData *pClientData = nullptr;
-	if(ClientId >= 0 && ClientId < MAX_CLIENTS)
-	{
-		const CGameClient::CClientData &ClientData = GameClient()->m_aClients[ClientId];
-		if(ClientData.m_Active && ClientData.m_RenderInfo.Valid())
-			pClientData = &ClientData;
-		else if(!ForcePreview)
-		{
-			GameClient()->m_LockCamClientId = -1;
-			return;
-		}
-	}
-
-	vec2 CameraOffset(0.0f, 0.0f);
-	if(ClientId == GameClient()->m_aLocalIds[0])
-		CameraOffset = GameClient()->m_Camera.m_aDyncamCurrentCameraOffset[0];
-	else if(Client()->DummyConnected() && ClientId == GameClient()->m_aLocalIds[1])
-		CameraOffset = GameClient()->m_Camera.m_aDyncamCurrentCameraOffset[1];
-
-	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
-	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
-	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
-	const float ViewHeight = 120.0f * Scale;
-	const float ViewWidth = ViewHeight * Graphics()->ScreenAspect();
-	float DrawX = Layout.m_X - ViewWidth * 0.5f;
-	float DrawY = Layout.m_Y;
-	DrawX = std::clamp(DrawX, 0.0f, maximum(0.0f, m_Width - ViewWidth));
-	DrawY = std::clamp(DrawY, 0.0f, maximum(0.0f, m_Height - ViewHeight));
-
-	CUIRect ViewRect;
-	ViewRect.x = DrawX;
-	ViewRect.y = DrawY;
-	ViewRect.w = ViewWidth;
-	ViewRect.h = ViewHeight;
-
-	const bool BackgroundEnabled = Layout.m_BackgroundEnabled;
-	const unsigned BackgroundColor = Layout.m_BackgroundColor;
-	const float Border = 2.0f * Scale;
-	const ColorRGBA BorderColor = BackgroundEnabled ? ApplyHudAlpha(HudModuleBackgroundColor(BackgroundColor)) : ApplyHudAlpha(ColorRGBA(0.0f, 0.0f, 0.0f, 0.6f));
-	const ColorRGBA InnerColor = BackgroundEnabled ? ApplyHudAlpha(ColorRGBA(0.0f, 0.0f, 0.0f, 0.15f)) : ApplyHudAlpha(ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f));
-	const int OuterCorners = HudModuleBackgroundCorners(IGraphics::CORNER_ALL, ViewRect.x - Border, ViewRect.y - Border, ViewRect.w + Border * 2.0f, ViewRect.h + Border * 2.0f, m_Width, m_Height);
-	const int InnerCorners = HudModuleBackgroundCorners(IGraphics::CORNER_ALL, ViewRect.x, ViewRect.y, ViewRect.w, ViewRect.h, m_Width, m_Height);
-	Graphics()->DrawRect(ViewRect.x - Border, ViewRect.y - Border, ViewRect.w + Border * 2.0f, ViewRect.h + Border * 2.0f,
-		BorderColor, OuterCorners, 4.0f * Scale + Border);
-	Graphics()->DrawRect(ViewRect.x, ViewRect.y, ViewRect.w, ViewRect.h,
-		InnerColor, InnerCorners, 4.0f * Scale);
-
-	const float XScale = Graphics()->ScreenWidth() / m_Width;
-	const float YScale = Graphics()->ScreenHeight() / m_Height;
-	const int ViewX = (int)std::round(ViewRect.x * XScale);
-	const int ViewY = (int)std::round((m_Height - (ViewRect.y + ViewRect.h)) * YScale);
-	const int ViewW = (int)std::round(ViewRect.w * XScale);
-	const int ViewH = (int)std::round(ViewRect.h * YScale);
-	if(ViewW <= 0 || ViewH <= 0)
-	{
-		Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
-		return;
-	}
-
-	if(ForcePreview)
-	{
-		const ColorRGBA PlaceholderColor = ApplyHudAlpha(ColorRGBA(0.05f, 0.08f, 0.10f, 0.82f));
-		Graphics()->DrawRect(ViewRect.x + 3.0f * Scale, ViewRect.y + 3.0f * Scale, ViewRect.w - 6.0f * Scale, ViewRect.h - 6.0f * Scale, PlaceholderColor, IGraphics::CORNER_ALL, 4.0f * Scale);
-
-		Graphics()->LinesBegin();
-		Graphics()->SetColor(0.85f, 0.95f, 1.0f, 0.18f * HudAlpha());
-		IGraphics::CLineItem aGuideLines[4] = {
-			IGraphics::CLineItem(ViewRect.x + ViewRect.w * 0.5f, ViewRect.y + 10.0f * Scale, ViewRect.x + ViewRect.w * 0.5f, ViewRect.y + ViewRect.h - 10.0f * Scale),
-			IGraphics::CLineItem(ViewRect.x + 10.0f * Scale, ViewRect.y + ViewRect.h * 0.5f, ViewRect.x + ViewRect.w - 10.0f * Scale, ViewRect.y + ViewRect.h * 0.5f),
-			IGraphics::CLineItem(ViewRect.x + 12.0f * Scale, ViewRect.y + 12.0f * Scale, ViewRect.x + ViewRect.w - 12.0f * Scale, ViewRect.y + ViewRect.h - 12.0f * Scale),
-			IGraphics::CLineItem(ViewRect.x + ViewRect.w - 12.0f * Scale, ViewRect.y + 12.0f * Scale, ViewRect.x + 12.0f * Scale, ViewRect.y + ViewRect.h - 12.0f * Scale),
-		};
-		Graphics()->LinesDraw(aGuideLines, std::size(aGuideLines));
-		Graphics()->LinesEnd();
-
-		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
-		TextRender()->TextColor(ApplyHudAlpha(ColorRGBA(1.0f, 1.0f, 1.0f, 0.85f)));
-		const float IconSize = 16.0f * Scale;
-		const float IconWidth = TextRender()->TextWidth(IconSize, FontIcons::FONT_ICON_CAMERA, -1, -1.0f);
-		TextRender()->Text(ViewRect.x + (ViewRect.w - IconWidth) * 0.5f, ViewRect.y + (ViewRect.h - IconSize) * 0.5f - 4.0f * Scale, IconSize, FontIcons::FONT_ICON_CAMERA, -1.0f);
-		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
-		TextRender()->TextColor(TextRender()->DefaultTextColor());
-		Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
-		return;
-	}
-
-	if(pClientData && HasWorldSnapshot)
-	{
-		const vec2 LockCenter = pClientData->m_RenderPos + CameraOffset;
-		const float BaseZoom = GameClient()->m_Camera.m_Zoom;
-		const float LockZoom = std::clamp(g_Config.m_BcLockCamUseCustomZoom ? (g_Config.m_BcLockCamZoom / 100.0f) : (BaseZoom * 0.85f), 0.05f, 10.0f);
-
-		const vec2 OldCenter = GameClient()->m_Camera.m_Center;
-		const float OldZoom = GameClient()->m_Camera.m_Zoom;
-
-		Graphics()->UpdateViewport(ViewX, ViewY, ViewW, ViewH, false);
-
-		GameClient()->m_Camera.m_Center = LockCenter;
-		GameClient()->m_Camera.m_Zoom = LockZoom;
-
-		// Ensure world mapping before rendering world components.
-		RenderTools()->MapScreenToGroup(LockCenter.x, LockCenter.y, GameClient()->Layers()->GameGroup(), LockZoom);
-
-		GameClient()->m_MapLayersBackground.OnRender();
-		GameClient()->m_Particles.RenderGroup(CParticles::GROUP_PROJECTILE_TRAIL);
-		GameClient()->m_Particles.RenderGroup(CParticles::GROUP_TRAIL_EXTRA);
-		GameClient()->m_Items.OnRender();
-		GameClient()->m_Trails.OnRender();
-		const vec2 OldLocalPos = GameClient()->m_LocalCharacterPos;
-		GameClient()->m_LocalCharacterPos = pClientData->m_RenderPos;
-		GameClient()->m_3DParticles.RenderSecondary();
-		GameClient()->m_LocalCharacterPos = OldLocalPos;
-		GameClient()->m_Ghost.OnRender();
-		GameClient()->m_Players.OnRender();
-		GameClient()->m_MapLayersForeground.OnRender();
-		GameClient()->m_Outlines.OnRender();
-		GameClient()->m_Pet.OnRender();
-		GameClient()->m_Particles.RenderGroup(CParticles::GROUP_EXPLOSIONS);
-		GameClient()->m_NamePlates.OnRender();
-		GameClient()->m_Particles.RenderGroup(CParticles::GROUP_EXTRA);
-		GameClient()->m_Particles.RenderGroup(CParticles::GROUP_GENERAL);
-		GameClient()->m_FreezeBars.OnRender();
-
-		GameClient()->m_Camera.m_Center = OldCenter;
-		GameClient()->m_Camera.m_Zoom = OldZoom;
-	}
-
-	Graphics()->UpdateViewport(0, 0, Graphics()->ScreenWidth(), Graphics()->ScreenHeight(), false);
-	Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
-}
-
 void CHud::RenderConnectionWarning()
 {
-	const bool Visible = Client()->ConnectionProblems();
-	static float s_Phase = 0.0f;
-	const float Dt = Client()->RenderFrameTime();
-	if(BCUiAnimations::Enabled())
-		BCUiAnimations::UpdatePhase(s_Phase, Visible ? 1.0f : 0.0f, Dt, 0.22f);
-	else
-		s_Phase = Visible ? 1.0f : 0.0f;
-	if(s_Phase <= 0.0f)
-		return;
-
-	const float Ease = BCUiAnimations::EaseInOutQuad(s_Phase);
-	const float Alpha = Ease;
-	const float YOff = -10.0f * (1.0f - Ease);
-
-	const char *pText = Localize("Connection Problems…");
-	float w = TextRender()->TextWidth(24, pText, -1, -1.0f);
-	SetHudTextColor(1.0f, 1.0f, 1.0f, Alpha);
-	TextRender()->Text(150 * Graphics()->ScreenAspect() - w / 2, 50 + YOff, 24, pText, -1.0f);
-	SetHudTextColor(TextRender()->DefaultTextColor());
+	if(Client()->ConnectionProblems())
+	{
+		const char *pText = Localize("Connection Problems…");
+		float w = TextRender()->TextWidth(24, pText, -1, -1.0f);
+		TextRender()->Text(150 * Graphics()->ScreenAspect() - w / 2, 50, 24, pText, -1.0f);
+	}
 }
 
 void CHud::RenderTeambalanceWarning()
 {
 	// render prompt about team-balance
 	bool Flash = time() / (time_freq() / 2) % 2 == 0;
-	int TeamDiff = 0;
-	bool Visible = false;
 	if(GameClient()->IsTeamPlay())
 	{
-		TeamDiff = GameClient()->m_Snap.m_aTeamSize[TEAM_RED] - GameClient()->m_Snap.m_aTeamSize[TEAM_BLUE];
-		Visible = g_Config.m_ClWarningTeambalance && (TeamDiff >= 2 || TeamDiff <= -2);
+		int TeamDiff = GameClient()->m_Snap.m_aTeamSize[TEAM_RED] - GameClient()->m_Snap.m_aTeamSize[TEAM_BLUE];
+		if(g_Config.m_ClWarningTeambalance && (TeamDiff >= 2 || TeamDiff <= -2))
+		{
+			const char *pText = Localize("Please balance teams!");
+			if(Flash)
+				TextRender()->TextColor(1, 1, 0.5f, 1);
+			else
+				TextRender()->TextColor(0.7f, 0.7f, 0.2f, 1.0f);
+			TextRender()->Text(5, 50, 6, pText, -1.0f);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+		}
 	}
-
-	static float s_Phase = 0.0f;
-	const float Dt = Client()->RenderFrameTime();
-	if(BCUiAnimations::Enabled())
-		BCUiAnimations::UpdatePhase(s_Phase, Visible ? 1.0f : 0.0f, Dt, 0.22f);
-	else
-		s_Phase = Visible ? 1.0f : 0.0f;
-	if(s_Phase <= 0.0f)
-		return;
-
-	const float Ease = BCUiAnimations::EaseInOutQuad(s_Phase);
-	const float Alpha = Ease;
-	const float YOff = -8.0f * (1.0f - Ease);
-
-	const char *pText = Localize("Please balance teams!");
-	if(Flash)
-		SetHudTextColor(1.0f, 1.0f, 0.5f, Alpha);
-	else
-		SetHudTextColor(0.7f, 0.7f, 0.2f, Alpha);
-	TextRender()->Text(5, 50 + YOff, 6, pText, -1.0f);
-	SetHudTextColor(TextRender()->DefaultTextColor());
 }
 
 void CHud::RenderCursor()
@@ -1250,14 +816,7 @@ void CHud::RenderCursor()
 	if(Client()->State() != IClient::STATE_DEMOPLAYBACK && GameClient()->m_Snap.m_pLocalCharacter)
 	{
 		// Render local cursor
-		CurWeapon = maximum(0, GameClient()->m_Snap.m_pLocalCharacter->m_Weapon % NUM_WEAPONS);
-		const int LocalClientId = GameClient()->m_Snap.m_LocalClientId;
-		if(GameClient()->m_FastPractice.Enabled() &&
-			LocalClientId >= 0 &&
-			GameClient()->m_FastPractice.IsPracticeParticipant(LocalClientId))
-		{
-			CurWeapon = std::clamp(GameClient()->m_aClients[LocalClientId].m_Predicted.m_ActiveWeapon, 0, NUM_WEAPONS - 1);
-		}
+		CurWeapon = maximum(0, GameClient()->m_aClients[GameClient()->m_Snap.m_LocalClientId].m_Predicted.m_ActiveWeapon);
 		TargetPos = GameClient()->m_Controls.m_aTargetPos[g_Config.m_ClDummy];
 	}
 	else
@@ -1285,7 +844,7 @@ void CHud::RenderCursor()
 			Alpha /= 2.0f;
 	}
 
-	SetHudColor(1.0f, 1.0f, 1.0f, Alpha);
+	Graphics()->SetColor(1.0f, 1.0f, 1.0f, Alpha);
 	Graphics()->TextureSet(GameClient()->m_GameSkin.m_aSpriteWeaponCursors[CurWeapon]);
 	Graphics()->RenderQuadContainerAsSprite(m_HudQuadContainerIndex, m_aCursorOffset[CurWeapon], TargetPos.x, TargetPos.y, Scale, Scale);
 }
@@ -1476,7 +1035,7 @@ void CHud::PreparePlayerStateQuads()
 
 void CHud::RenderPlayerState(const int ClientId)
 {
-	SetHudColor(1.f, 1.f, 1.f, 1.f);
+	Graphics()->SetColor(1.f, 1.f, 1.f, 1.f);
 
 	// pCharacter contains the predicted character for local players or the last snap for players who are spectated
 	CCharacterCore *pCharacter = &GameClient()->m_aClients[ClientId].m_Predicted;
@@ -1561,9 +1120,6 @@ void CHud::RenderPlayerState(const int ClientId)
 	{
 		constexpr float aWeaponWidth[NUM_WEAPONS] = {16, 12, 12, 12, 12, 12};
 		constexpr float aWeaponInitialOffset[NUM_WEAPONS] = {-3, -4, -1, -1, -2, -4};
-		int DisplayWeapon = pPlayer->m_Weapon;
-		if(GameClient()->m_FastPractice.Enabled() && GameClient()->m_FastPractice.IsPracticeParticipant(ClientId))
-			DisplayWeapon = pCharacter->m_ActiveWeapon;
 		bool InitialOffsetAdded = false;
 		for(int Weapon = 0; Weapon < NUM_WEAPONS; ++Weapon)
 		{
@@ -1574,13 +1130,13 @@ void CHud::RenderPlayerState(const int ClientId)
 				x += aWeaponInitialOffset[Weapon];
 				InitialOffsetAdded = true;
 			}
-			if(DisplayWeapon != Weapon)
-				SetHudColor(1.0f, 1.0f, 1.0f, 0.4f);
+			if(pPlayer->m_Weapon != Weapon)
+				Graphics()->SetColor(1.0f, 1.0f, 1.0f, 0.4f);
 			Graphics()->QuadsSetRotation(pi * 7 / 4);
 			Graphics()->TextureSet(GameClient()->m_GameSkin.m_aSpritePickupWeapons[Weapon]);
 			Graphics()->RenderQuadContainerAsSprite(m_HudQuadContainerIndex, m_aWeaponOffset[Weapon], x, y);
 			Graphics()->QuadsSetRotation(0);
-			SetHudColor(1.0f, 1.0f, 1.0f, 1.0f);
+			Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
 			x += aWeaponWidth[Weapon];
 		}
 		if(pCharacter->m_aWeapons[WEAPON_NINJA].m_Got)
@@ -1780,7 +1336,7 @@ void CHud::RenderNinjaBarPos(const float x, float y, const float Width, const fl
 	Graphics()->WrapClamp();
 	Graphics()->TextureSet(GameClient()->m_HudSkin.m_SpriteHudNinjaBarEmptyRight);
 	Graphics()->QuadsBegin();
-	SetHudColor(1.f, 1.f, 1.f, Alpha);
+	Graphics()->SetColor(1.f, 1.f, 1.f, Alpha);
 	// Subset: btm_r, top_r, top_m, btm_m | it is mirrored on the horizontal axe and rotated 90 degrees counterclockwise
 	Graphics()->QuadsSetSubsetFree(1, 1, 1, 0, ProgPct - ProgPct * (1.0f - BeginningPieceProgress), 0, ProgPct - ProgPct * (1.0f - BeginningPieceProgress), 1);
 	IGraphics::CQuadItem QuadEmptyBeginning(x, y, BarWidth, EndRestHeight + EndProgressHeight * (1.0f - BeginningPieceProgress));
@@ -1791,7 +1347,7 @@ void CHud::RenderNinjaBarPos(const float x, float y, const float Width, const fl
 	{
 		Graphics()->TextureSet(GameClient()->m_HudSkin.m_SpriteHudNinjaBarFullLeft);
 		Graphics()->QuadsBegin();
-		SetHudColor(1.f, 1.f, 1.f, Alpha);
+		Graphics()->SetColor(1.f, 1.f, 1.f, Alpha);
 		// Subset: btm_m, top_m, top_r, btm_r | it is rotated 90 degrees clockwise
 		Graphics()->QuadsSetSubsetFree(RestPct + ProgPct * (1.0f - BeginningPieceProgress), 1, RestPct + ProgPct * (1.0f - BeginningPieceProgress), 0, 1, 0, 1, 1);
 		IGraphics::CQuadItem QuadFullBeginning(x, y + (EndRestHeight + EndProgressHeight * (1.0f - BeginningPieceProgress)), BarWidth, EndProgressHeight * BeginningPieceProgress);
@@ -1823,7 +1379,7 @@ void CHud::RenderNinjaBarPos(const float x, float y, const float Width, const fl
 	{
 		Graphics()->TextureSet(GameClient()->m_HudSkin.m_SpriteHudNinjaBarEmpty);
 		Graphics()->QuadsBegin();
-		SetHudColor(1.f, 1.f, 1.f, Alpha);
+		Graphics()->SetColor(1.f, 1.f, 1.f, Alpha);
 		// select the middle portion of the sprite so we don't get edge bleeding
 		if(EmptyMiddleBarHeight <= EndHeight)
 		{
@@ -1844,7 +1400,7 @@ void CHud::RenderNinjaBarPos(const float x, float y, const float Width, const fl
 	// full ninja bar
 	Graphics()->TextureSet(GameClient()->m_HudSkin.m_SpriteHudNinjaBarFull);
 	Graphics()->QuadsBegin();
-	SetHudColor(1.f, 1.f, 1.f, Alpha);
+	Graphics()->SetColor(1.f, 1.f, 1.f, Alpha);
 	// select the middle portion of the sprite so we don't get edge bleeding
 	if(FullMiddleBarHeight <= EndHeight)
 	{
@@ -1873,7 +1429,7 @@ void CHud::RenderNinjaBarPos(const float x, float y, const float Width, const fl
 	{
 		Graphics()->TextureSet(GameClient()->m_HudSkin.m_SpriteHudNinjaBarEmptyRight);
 		Graphics()->QuadsBegin();
-		SetHudColor(1.f, 1.f, 1.f, Alpha);
+		Graphics()->SetColor(1.f, 1.f, 1.f, Alpha);
 		// Subset: btm_l, top_l, top_m, btm_m | it is rotated 90 degrees clockwise
 		Graphics()->QuadsSetSubsetFree(0, 1, 0, 0, ProgPct - ProgPct * EndingPieceProgress, 0, ProgPct - ProgPct * EndingPieceProgress, 1);
 		IGraphics::CQuadItem QuadEmptyEnding(x, y, BarWidth, EndProgressHeight * (1.0f - EndingPieceProgress));
@@ -1883,7 +1439,7 @@ void CHud::RenderNinjaBarPos(const float x, float y, const float Width, const fl
 	// full
 	Graphics()->TextureSet(GameClient()->m_HudSkin.m_SpriteHudNinjaBarFullLeft);
 	Graphics()->QuadsBegin();
-	SetHudColor(1.f, 1.f, 1.f, Alpha);
+	Graphics()->SetColor(1.f, 1.f, 1.f, Alpha);
 	// Subset: btm_m, top_m, top_l, btm_l | it is mirrored on the horizontal axe and rotated 90 degrees counterclockwise
 	Graphics()->QuadsSetSubsetFree(RestPct + ProgPct * EndingPieceProgress, 1, RestPct + ProgPct * EndingPieceProgress, 0, 0, 0, 0, 1);
 	IGraphics::CQuadItem QuadFullEnding(x, y + (EndProgressHeight * (1.0f - EndingPieceProgress)), BarWidth, EndRestHeight + EndProgressHeight * EndingPieceProgress);
@@ -1891,185 +1447,86 @@ void CHud::RenderNinjaBarPos(const float x, float y, const float Width, const fl
 	Graphics()->QuadsEnd();
 
 	Graphics()->QuadsSetSubset(0, 0, 1, 1);
-	SetHudColor(1.f, 1.f, 1.f, 1.f);
+	Graphics()->SetColor(1.f, 1.f, 1.f, 1.f);
 	Graphics()->WrapNormal();
 }
 
-void CHud::RenderSpectatorCount(bool ForcePreview)
+void CHud::RenderSpectatorCount()
 {
-	const auto Layout = HudLayout::Get(HudLayout::MODULE_SPECTATOR_COUNT, m_Width, m_Height);
-	if(!ForcePreview && !g_Config.m_ClShowhudSpectatorCount)
+	if(!g_Config.m_ClShowhudSpectatorCount)
+	{
 		return;
-
-	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
-	const bool BackgroundEnabled = Layout.m_BackgroundEnabled;
-	const unsigned BackgroundColor = Layout.m_BackgroundColor;
-
-	int aSpectatorIds[MAX_CLIENTS];
-	bool aSpectatorAdded[MAX_CLIENTS] = {};
-	int NumSpectatorIds = 0;
-	bool HasExactSpectatorNames = false;
-	bool HasReliableFallbackSpectatorNames = false;
-	auto AddSpectator = [&](int ClientId) {
-		if(ClientId < 0 || ClientId >= MAX_CLIENTS || aSpectatorAdded[ClientId])
-			return;
-		aSpectatorAdded[ClientId] = true;
-		aSpectatorIds[NumSpectatorIds] = ClientId;
-		++NumSpectatorIds;
-	};
+	}
 
 	int Count = 0;
-	if(ForcePreview)
+	if(Client()->IsSixup())
 	{
-		Count = 3;
-		HasExactSpectatorNames = true;
+		for(int i = 0; i < MAX_CLIENTS; i++)
+		{
+			if(i == GameClient()->m_aLocalIds[0] || (GameClient()->Client()->DummyConnected() && i == GameClient()->m_aLocalIds[1]))
+				continue;
+
+			if(Client()->m_TranslationContext.m_aClients[i].m_PlayerFlags7 & protocol7::PLAYERFLAG_WATCHING)
+			{
+				Count++;
+			}
+		}
 	}
 	else
 	{
-		const int LocalId = GameClient()->m_aLocalIds[0];
-		const int DummyId = Client()->DummyConnected() ? GameClient()->m_aLocalIds[1] : -1;
-		if(Client()->IsSixup())
-		{
-			for(int i = 0; i < MAX_CLIENTS; i++)
-			{
-				if(i == LocalId || i == DummyId)
-					continue;
-
-				if(Client()->m_TranslationContext.m_aClients[i].m_PlayerFlags7 & protocol7::PLAYERFLAG_WATCHING)
-					AddSpectator(i);
-			}
-			Count = NumSpectatorIds;
-			HasExactSpectatorNames = true;
-		}
-		else
-		{
-			const CNetObj_SpectatorCount *pSpectatorCount = GameClient()->m_Snap.m_pSpectatorCount;
-			if(!pSpectatorCount)
-			{
-				m_LastSpectatorCountTick = Client()->GameTick(g_Config.m_ClDummy);
-				return;
-			}
-			Count = pSpectatorCount->m_NumSpectators;
-
-			if(GameClient()->m_Snap.m_NumSpectatorWatchers > 0)
-			{
-				for(int i = 0; i < MAX_CLIENTS; i++)
-				{
-					if(GameClient()->m_Snap.m_aSpectatorWatchers[i])
-						AddSpectator(i);
-				}
-				HasExactSpectatorNames = true;
-			}
-			else
-			{
-				for(int i = 0; i < MAX_CLIENTS; i++)
-				{
-					if(i == LocalId || i == DummyId)
-						continue;
-
-					const CNetObj_PlayerInfo *pInfo = GameClient()->m_Snap.m_apPlayerInfos[i];
-					if(!pInfo || !GameClient()->m_aClients[i].m_Active)
-						continue;
-
-					const bool IsLikelySpectator = pInfo->m_Team == TEAM_SPECTATORS || GameClient()->m_aClients[i].m_Spec || GameClient()->m_aClients[i].m_Paused;
-					if(IsLikelySpectator)
-						AddSpectator(i);
-				}
-				HasReliableFallbackSpectatorNames = NumSpectatorIds == Count;
-			}
-		}
-
-		if(Count == 0)
+		const CNetObj_SpectatorCount *pSpectatorCount = GameClient()->m_Snap.m_pSpectatorCount;
+		if(!pSpectatorCount)
 		{
 			m_LastSpectatorCountTick = Client()->GameTick(g_Config.m_ClDummy);
 			return;
 		}
-
-		if(Client()->GameTick(g_Config.m_ClDummy) < m_LastSpectatorCountTick + Client()->GameTickSpeed())
-			return;
+		Count = pSpectatorCount->m_NumSpectators;
 	}
 
-	char aCountBuf[16];
-	str_format(aCountBuf, sizeof(aCountBuf), "%d", Count);
-
-	constexpr int MAX_NAME_LINES = 6;
-	char aaNameLines[MAX_NAME_LINES][MAX_NAME_LENGTH + 8] = {};
-	int NumNameLines = 0;
-	if(ForcePreview)
+	if(Count == 0)
 	{
-		str_copy(aaNameLines[0], "watcher_one");
-		str_copy(aaNameLines[1], "watcher_two");
-		str_copy(aaNameLines[2], "+1");
-		NumNameLines = 3;
-	}
-	else if((HasExactSpectatorNames || HasReliableFallbackSpectatorNames) && NumSpectatorIds > 0)
-	{
-		const int MaxVisibleNames = MAX_NAME_LINES - 1;
-		int VisibleNames = minimum(NumSpectatorIds, MaxVisibleNames);
-
-		int ShownNames = 0;
-		for(int i = 0; i < NumSpectatorIds && ShownNames < VisibleNames; i++)
-		{
-			const char *pName = GameClient()->m_aClients[aSpectatorIds[i]].m_aName;
-			if(pName[0] == '\0')
-				continue;
-			str_copy(aaNameLines[NumNameLines], pName);
-			++NumNameLines;
-			++ShownNames;
-		}
-
-		const int Remaining = maximum(0, Count - ShownNames);
-		if(Remaining > 0 && NumNameLines < MAX_NAME_LINES)
-		{
-			str_format(aaNameLines[NumNameLines], sizeof(aaNameLines[NumNameLines]), "+%d", Remaining);
-			++NumNameLines;
-		}
+		m_LastSpectatorCountTick = Client()->GameTick(g_Config.m_ClDummy);
+		return;
 	}
 
-	const float Fontsize = 6.0f * Scale;
-	const float LineHeight = Fontsize + 2.0f * Scale;
-	const float PaddingX = 2.0f * Scale;
-	const float PaddingY = 2.0f * Scale;
-	const float HeaderWidth = Fontsize + 3.0f * Scale + TextRender()->TextWidth(Fontsize, aCountBuf);
-	float MaxLineWidth = HeaderWidth;
-	for(int i = 0; i < NumNameLines; i++)
-		MaxLineWidth = maximum(MaxLineWidth, TextRender()->TextWidth(Fontsize, aaNameLines[i]));
+	// 1 second delay
+	if(Client()->GameTick(g_Config.m_ClDummy) < m_LastSpectatorCountTick + Client()->GameTickSpeed())
+		return;
 
-	const float BoxHeight = PaddingY * 2.0f + LineHeight * (1 + NumNameLines);
-	const float BoxWidth = PaddingX * 2.0f + MaxLineWidth;
+	char aBuf[16];
+	str_format(aBuf, sizeof(aBuf), "%d", Count);
+
+	const float Fontsize = 6.0f;
+	const float BoxHeight = 14.f;
+	const float BoxWidth = 13.f + TextRender()->TextWidth(Fontsize, aBuf);
+
 	float StartX = m_Width - BoxWidth;
-	float StartY = 285.0f - BoxHeight - 4.0f * Scale;
+	float StartY = 285.0f - BoxHeight - 4; // 4 units distance to the next display;
 	if(g_Config.m_ClShowhudPlayerPosition || g_Config.m_ClShowhudPlayerSpeed || g_Config.m_ClShowhudPlayerAngle)
-		StartY -= 4.0f * Scale;
-	StartY -= GetMovementInformationBoxHeight(ForcePreview);
-	if(g_Config.m_ClShowhudScore)
-		StartY -= 56.0f;
-	const bool DummyActionsVisible = g_Config.m_ClShowhudDummyActions && Client()->DummyConnected() && GameClient()->m_Snap.m_pGameInfoObj && !(GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_GAMEOVER);
-	if(DummyActionsVisible)
-		StartY -= 29.0f + 4.0f * Scale;
-	StartX = std::clamp(StartX, 0.0f, maximum(0.0f, m_Width - BoxWidth));
-	StartY = std::clamp(StartY, 0.0f, maximum(0.0f, m_Height - BoxHeight));
-
-	if(BackgroundEnabled)
 	{
-		const int Corners = HudModuleBackgroundCorners(IGraphics::CORNER_L, StartX, StartY, BoxWidth, BoxHeight, m_Width, m_Height);
-		Graphics()->DrawRect(StartX, StartY, BoxWidth, BoxHeight, ApplyHudAlpha(HudModuleBackgroundColor(BackgroundColor)), Corners, 5.0f * Scale);
+		StartY -= 4;
+	}
+	StartY -= GetMovementInformationBoxHeight();
+
+	if(g_Config.m_ClShowhudScore)
+	{
+		StartY -= 56;
 	}
 
-	float y = StartY + PaddingY;
-	float x = StartX + PaddingX;
+	if(g_Config.m_ClShowhudDummyActions && !(GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_GAMEOVER) && Client()->DummyConnected())
+	{
+		StartY = StartY - 29.0f - 4; // dummy actions height and padding
+	}
+
+	Graphics()->DrawRect(StartX, StartY, BoxWidth, BoxHeight, ColorRGBA(0.0f, 0.0f, 0.0f, 0.4f), IGraphics::CORNER_L, 5.0f);
+
+	float y = StartY + BoxHeight / 3;
+	float x = StartX + 2;
 
 	TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
-	TextRender()->Text(x, y, Fontsize, FontIcons::FONT_ICON_EYE, -1.0f);
+	TextRender()->Text(x, y, Fontsize, FontIcon::EYE, -1.0f);
 	TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
-	TextRender()->Text(x + Fontsize + 3.0f * Scale, y, Fontsize, aCountBuf, -1.0f);
-
-	y += LineHeight;
-	for(int i = 0; i < NumNameLines; i++)
-	{
-		TextRender()->Text(x, y, Fontsize, aaNameLines[i], -1.0f);
-		y += LineHeight;
-	}
+	TextRender()->Text(x + Fontsize + 3.f, y, Fontsize, aBuf, -1.0f);
 }
 
 void CHud::RenderDummyActions()
@@ -2095,22 +1552,22 @@ void CHud::RenderDummyActions()
 		StartY -= 56;
 	}
 
-	Graphics()->DrawRect(StartX, StartY, BoxWidth, BoxHeight, ApplyHudAlpha(ColorRGBA(0.0f, 0.0f, 0.0f, 0.4f)), IGraphics::CORNER_L, 5.0f);
+	Graphics()->DrawRect(StartX, StartY, BoxWidth, BoxHeight, ColorRGBA(0.0f, 0.0f, 0.0f, 0.4f), IGraphics::CORNER_L, 5.0f);
 
 	float y = StartY + 2;
 	float x = StartX + 2;
-	SetHudColor(1.0f, 1.0f, 1.0f, 0.4f);
+	Graphics()->SetColor(1.0f, 1.0f, 1.0f, 0.4f);
 	if(g_Config.m_ClDummyHammer)
 	{
-		SetHudColor(1.0f, 1.0f, 1.0f, 1.0f);
+		Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
 	}
 	Graphics()->TextureSet(GameClient()->m_HudSkin.m_SpriteHudDummyHammer);
 	Graphics()->RenderQuadContainerAsSprite(m_HudQuadContainerIndex, m_DummyHammerOffset, x, y);
 	y += 13;
-	SetHudColor(1.0f, 1.0f, 1.0f, 0.4f);
+	Graphics()->SetColor(1.0f, 1.0f, 1.0f, 0.4f);
 	if(g_Config.m_ClDummyCopyMoves)
 	{
-		SetHudColor(1.0f, 1.0f, 1.0f, 1.0f);
+		Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
 	}
 	Graphics()->TextureSet(GameClient()->m_HudSkin.m_SpriteHudDummyCopy);
 	Graphics()->RenderQuadContainerAsSprite(m_HudQuadContainerIndex, m_DummyCopyOffset, x, y);
@@ -2134,60 +1591,16 @@ inline int CHud::GetDigitsIndex(int Value, int Max)
 	return DigitsIndex;
 }
 
-inline float CHud::GetMovementInformationBoxHeight(bool ForcePreview)
+inline float CHud::GetMovementInformationBoxHeight()
 {
-	const bool ForceFullPreview = ForcePreview && Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK;
-	if(ForceFullPreview)
-		return 3.0f * MOVEMENT_INFORMATION_LINE_HEIGHT * 2.0f + 2.0f * MOVEMENT_INFORMATION_LINE_HEIGHT + MOVEMENT_INFORMATION_LINE_HEIGHT + 2.0f;
-
-	const int ClientId = GameClient()->m_Snap.m_SpecInfo.m_Active ? GameClient()->m_Snap.m_SpecInfo.m_SpectatorId : GameClient()->m_Snap.m_LocalClientId;
-	const bool ShowDummyCoordIndicator = CanRenderCoordIndicator(ClientId, ForcePreview);
 	if(GameClient()->m_Snap.m_SpecInfo.m_Active && (GameClient()->m_Snap.m_SpecInfo.m_SpectatorId == SPEC_FREEVIEW || GameClient()->m_aClients[GameClient()->m_Snap.m_SpecInfo.m_SpectatorId].m_SpecCharPresent))
-	{
-		float BoxHeight = g_Config.m_ClShowhudPlayerPosition ? 3.0f * MOVEMENT_INFORMATION_LINE_HEIGHT + 2.0f : 0.0f;
-		if(ShowDummyCoordIndicator)
-			BoxHeight += MOVEMENT_INFORMATION_LINE_HEIGHT;
-		return BoxHeight;
-	}
+		return g_Config.m_ClShowhudPlayerPosition ? 3.0f * MOVEMENT_INFORMATION_LINE_HEIGHT + 2.0f : 0.0f;
 	float BoxHeight = 3.0f * MOVEMENT_INFORMATION_LINE_HEIGHT * (g_Config.m_ClShowhudPlayerPosition + g_Config.m_ClShowhudPlayerSpeed) + 2.0f * MOVEMENT_INFORMATION_LINE_HEIGHT * g_Config.m_ClShowhudPlayerAngle;
-	if(ShowDummyCoordIndicator)
-		BoxHeight += MOVEMENT_INFORMATION_LINE_HEIGHT;
 	if(g_Config.m_ClShowhudPlayerPosition || g_Config.m_ClShowhudPlayerSpeed || g_Config.m_ClShowhudPlayerAngle)
 	{
 		BoxHeight += 2.0f;
 	}
 	return BoxHeight;
-}
-
-bool CHud::CanRenderCoordIndicator(int ClientId, bool ForcePreview) const
-{
-	if(!g_Config.m_BcShowhudDummyCoordIndicator)
-		return false;
-	if(ForcePreview)
-		return true;
-	return ClientId >= 0 && ClientId < MAX_CLIENTS;
-}
-
-bool CHud::HasPlayerBelowOnSameX(int ClientId, const CMovementInformation &Info) const
-{
-	if(ClientId < 0 || ClientId >= MAX_CLIENTS)
-		return false;
-
-	for(int i = 0; i < MAX_CLIENTS; i++)
-	{
-		if(i == ClientId || !GameClient()->m_aClients[i].m_Active || !GameClient()->m_Snap.m_aCharacters[i].m_Active)
-			continue;
-
-		const CNetObj_PlayerInfo *pInfo = GameClient()->m_Snap.m_apPlayerInfos[i];
-		if(!pInfo || pInfo->m_Team == TEAM_SPECTATORS)
-			continue;
-
-		const CMovementInformation OtherInfo = GetMovementInformation(i, i == GameClient()->m_aLocalIds[1] ? IClient::CONN_DUMMY : IClient::CONN_MAIN);
-		if(std::fabs(Info.m_Pos.x - OtherInfo.m_Pos.x) < 0.01f && OtherInfo.m_Pos.y > Info.m_Pos.y)
-			return true;
-	}
-
-	return false;
 }
 
 void CHud::UpdateMovementInformationTextContainer(STextContainerIndex &TextContainer, float FontSize, float Value, float &PrevValue)
@@ -2209,7 +1622,7 @@ void CHud::RenderMovementInformationTextContainer(STextContainerIndex &TextConta
 {
 	if(TextContainer.Valid())
 	{
-		TextRender()->RenderTextContainer(TextContainer, ApplyHudAlpha(Color), ApplyHudAlpha(TextRender()->DefaultTextOutlineColor()), X - TextRender()->GetBoundingBoxTextContainer(TextContainer).m_W, Y);
+		TextRender()->RenderTextContainer(TextContainer, Color, TextRender()->DefaultTextOutlineColor(), X - TextRender()->GetBoundingBoxTextContainer(TextContainer).m_W, Y);
 	}
 }
 
@@ -2264,15 +1677,20 @@ CHud::CMovementInformation CHud::GetMovementInformation(int ClientId, int Conn) 
 	return Out;
 }
 
-void CHud::RenderMovementInformation(bool ForcePreview)
+void CHud::RenderMovementInformation()
 {
-	const auto Layout = HudLayout::Get(HudLayout::MODULE_MOVEMENT_INFO, m_Width, m_Height);
-
 	const int ClientId = GameClient()->m_Snap.m_SpecInfo.m_Active ? GameClient()->m_Snap.m_SpecInfo.m_SpectatorId : GameClient()->m_Snap.m_LocalClientId;
-	const bool HasValidClientId = ClientId == SPEC_FREEVIEW || (ClientId >= 0 && ClientId < MAX_CLIENTS);
-	if(!HasValidClientId && !ForcePreview)
+	const bool PosOnly = ClientId == SPEC_FREEVIEW || (GameClient()->m_aClients[ClientId].m_SpecCharPresent);
+	// Draw the information depending on settings: Position, speed and target angle
+	// This display is only to present the available information from the last snapshot, not to interpolate or predict
+	if(!g_Config.m_ClShowhudPlayerPosition && (PosOnly || (!g_Config.m_ClShowhudPlayerSpeed && !g_Config.m_ClShowhudPlayerAngle)))
+	{
 		return;
-	const bool PosOnly = HasValidClientId && (ClientId == SPEC_FREEVIEW || (ClientId >= 0 && ClientId < MAX_CLIENTS && GameClient()->m_aClients[ClientId].m_SpecCharPresent));
+	}
+	const float LineSpacer = 1.0f; // above and below each entry
+	const float Fontsize = 6.0f;
+
+	float BoxHeight = GetMovementInformationBoxHeight();
 	bool HasDummyInfo = false;
 	CMovementInformation DummyInfo{};
 
@@ -2311,83 +1729,39 @@ void CHud::RenderMovementInformation(bool ForcePreview)
 			HasDummyInfo = true;
 		}
 	}
-	else if(ForcePreview)
-	{
-		HasDummyInfo = true;
-		DummyInfo.m_Pos = vec2(10.50f, 60.53f);
-		DummyInfo.m_Speed = vec2(0.00f, 0.00f);
-		DummyInfo.m_Angle = 25.36f;
-	}
 
-	const bool ForceFullPreview = ForcePreview && Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK;
-	const bool ShowDummyPos = HasDummyInfo && (ForceFullPreview || (g_Config.m_ClShowhudPlayerPosition && g_Config.m_TcShowhudDummyPosition));
-	const bool ShowDummySpeed = HasDummyInfo && !PosOnly && (ForceFullPreview || (g_Config.m_ClShowhudPlayerSpeed && g_Config.m_TcShowhudDummySpeed));
-	const bool ShowDummyAngle = HasDummyInfo && !PosOnly && (ForceFullPreview || (g_Config.m_ClShowhudPlayerAngle && g_Config.m_TcShowhudDummyAngle));
-	const bool ShowDummyCoordIndicator = ForceFullPreview || CanRenderCoordIndicator(ClientId, ForcePreview);
-	const bool ShowPlayerPos = ForceFullPreview || g_Config.m_ClShowhudPlayerPosition;
-	const bool ShowPlayerSpeed = !PosOnly && (ForceFullPreview || g_Config.m_ClShowhudPlayerSpeed);
-	const bool ShowPlayerAngle = !PosOnly && (ForceFullPreview || g_Config.m_ClShowhudPlayerAngle);
-
-	// Draw the information depending on settings: Position, speed and target angle
-	// This display is only to present the available information from the last snapshot, not to interpolate or predict
-	if(!ShowPlayerPos && !ShowPlayerSpeed && !ShowPlayerAngle && !ShowDummyCoordIndicator)
-	{
-		return;
-	}
-
-	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
-	const float LineSpacer = 1.0f * Scale; // above and below each entry
-	const float Fontsize = 6.0f * Scale;
-	const float LineHeight = MOVEMENT_INFORMATION_LINE_HEIGHT * Scale;
-
-	float BoxHeight = GetMovementInformationBoxHeight(ForcePreview) * Scale;
+	const bool ShowDummyPos = HasDummyInfo && g_Config.m_ClShowhudPlayerPosition && g_Config.m_TcShowhudDummyPosition;
+	const bool ShowDummySpeed = HasDummyInfo && !PosOnly && g_Config.m_ClShowhudPlayerSpeed && g_Config.m_TcShowhudDummySpeed;
+	const bool ShowDummyAngle = HasDummyInfo && !PosOnly && g_Config.m_ClShowhudPlayerAngle && g_Config.m_TcShowhudDummyAngle;
 
 	if(ShowDummyPos)
-		BoxHeight += 2.0f * LineHeight;
+		BoxHeight += 2.0f * MOVEMENT_INFORMATION_LINE_HEIGHT;
 	if(ShowDummySpeed)
-		BoxHeight += 2.0f * LineHeight;
+		BoxHeight += 2.0f * MOVEMENT_INFORMATION_LINE_HEIGHT;
 	if(ShowDummyAngle)
-		BoxHeight += 1.0f * LineHeight;
+		BoxHeight += 1.0f * MOVEMENT_INFORMATION_LINE_HEIGHT;
 
-	const float BoxWidth = 62.0f * Scale;
+	const float BoxWidth = 62.0f;
 
 	float StartX = m_Width - BoxWidth;
-	float StartY = 285.0f - BoxHeight - 4.0f * Scale;
+	float StartY = 285.0f - BoxHeight - 4.0f; // 4 units distance to the next display;
 	if(g_Config.m_ClShowhudScore)
+	{
 		StartY -= 56.0f;
-	StartX = std::clamp(StartX, 0.0f, maximum(0.0f, m_Width - BoxWidth));
-	StartY = std::clamp(StartY, 0.0f, maximum(0.0f, m_Height - BoxHeight));
-	const bool BackgroundEnabled = Layout.m_BackgroundEnabled;
-	const unsigned BackgroundColor = Layout.m_BackgroundColor;
-
-	if(BackgroundEnabled)
-	{
-		const int Corners = HudModuleBackgroundCorners(IGraphics::CORNER_L, StartX, StartY, BoxWidth, BoxHeight, m_Width, m_Height);
-		Graphics()->DrawRect(StartX, StartY, BoxWidth, BoxHeight, ApplyHudAlpha(HudModuleBackgroundColor(BackgroundColor)), Corners, 5.0f);
 	}
 
-	CMovementInformation Info{};
-	if(HasValidClientId && ClientId != SPEC_FREEVIEW)
-		Info = GetMovementInformation(ClientId, g_Config.m_ClDummy);
-	else if(HasValidClientId && ClientId == SPEC_FREEVIEW)
-		Info = GetMovementInformation(ClientId, g_Config.m_ClDummy);
-	else
-	{
-		Info.m_Pos = vec2(12.50f, 60.53f);
-		Info.m_Speed = vec2(0.00f, 0.00f);
-		Info.m_Angle = 25.36f;
-	}
+	Graphics()->DrawRect(StartX, StartY, BoxWidth, BoxHeight, ColorRGBA(0.0f, 0.0f, 0.0f, 0.4f), IGraphics::CORNER_L, 5.0f);
 
-	const bool HasPlayerBelow = !ForcePreview && HasValidClientId && ClientId != SPEC_FREEVIEW && HasPlayerBelowOnSameX(ClientId, Info);
+	const CMovementInformation Info = GetMovementInformation(ClientId, g_Config.m_ClDummy);
 
 	float y = StartY + LineSpacer * 2.0f;
 	const float LeftX = StartX + 2.0f;
-	const float RightX = StartX + BoxWidth - 2.0f;
+	const float RightX = m_Width - 2.0f;
 
-	if(ShowPlayerPos)
+	if(g_Config.m_ClShowhudPlayerPosition)
 	{
 		TextRender()->Text(LeftX, y, Fontsize, Localize("Position:"), -1.0f);
-		y += LineHeight;
+		y += MOVEMENT_INFORMATION_LINE_HEIGHT;
 
 		TextRender()->Text(LeftX, y, Fontsize, "X:", -1.0f);
 		UpdateMovementInformationTextContainer(m_aPlayerPositionContainers[0], Fontsize, Info.m_Pos.x, m_aPlayerPrevPosition[0]);
@@ -2397,12 +1771,12 @@ void CHud::RenderMovementInformation(bool ForcePreview)
 			TextColor = ColorRGBA(0.2f, 1.0f, 0.2f, 1.0f);
 
 		RenderMovementInformationTextContainer(m_aPlayerPositionContainers[0], TextColor, RightX, y);
-		y += LineHeight;
+		y += MOVEMENT_INFORMATION_LINE_HEIGHT;
 
 		TextRender()->Text(LeftX, y, Fontsize, "Y:", -1.0f);
 		UpdateMovementInformationTextContainer(m_aPlayerPositionContainers[1], Fontsize, Info.m_Pos.y, m_aPlayerPrevPosition[1]);
 		RenderMovementInformationTextContainer(m_aPlayerPositionContainers[1], TextRender()->DefaultTextColor(), RightX, y);
-		y += LineHeight;
+		y += MOVEMENT_INFORMATION_LINE_HEIGHT;
 
 		if(ShowDummyPos)
 		{
@@ -2415,22 +1789,25 @@ void CHud::RenderMovementInformation(bool ForcePreview)
 			if(fabsf(Info.m_Pos.x - DummyInfo.m_Pos.x) < 0.01f)
 				DummyTextColor = ColorRGBA(0.2f, 1.0f, 0.2f, 1.0f);
 
-			SetHudTextColor(DummyTextColor);
+			TextRender()->TextColor(DummyTextColor);
 			TextRender()->Text(RightX - TextRender()->TextWidth(Fontsize, aBuf), y, Fontsize, aBuf, -1.0f);
-			SetHudTextColor(1.0f, 1.0f, 1.0f, 1.0f);
-			y += LineHeight;
+			TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
+			y += MOVEMENT_INFORMATION_LINE_HEIGHT;
 
 			TextRender()->Text(LeftX, y, Fontsize, "DY:", -1.0f);
 			str_format(aBuf, sizeof(aBuf), "%.2f", DummyInfo.m_Pos.y);
 			TextRender()->Text(RightX - TextRender()->TextWidth(Fontsize, aBuf), y, Fontsize, aBuf, -1.0f);
-			y += LineHeight;
+			y += MOVEMENT_INFORMATION_LINE_HEIGHT;
 		}
 	}
 
-	if(ShowPlayerSpeed)
+	if(PosOnly)
+		return;
+
+	if(g_Config.m_ClShowhudPlayerSpeed)
 	{
 		TextRender()->Text(LeftX, y, Fontsize, Localize("Speed:"), -1.0f);
-		y += LineHeight;
+		y += MOVEMENT_INFORMATION_LINE_HEIGHT;
 
 		const char aaCoordinates[][4] = {"X:", "Y:"};
 		for(int i = 0; i < 2; i++)
@@ -2443,7 +1820,7 @@ void CHud::RenderMovementInformation(bool ForcePreview)
 			TextRender()->Text(LeftX, y, Fontsize, aaCoordinates[i], -1.0f);
 			UpdateMovementInformationTextContainer(m_aPlayerSpeedTextContainers[i], Fontsize, i == 0 ? Info.m_Speed.x : Info.m_Speed.y, m_aPlayerPrevSpeed[i]);
 			RenderMovementInformationTextContainer(m_aPlayerSpeedTextContainers[i], Color, RightX, y);
-			y += LineHeight;
+			y += MOVEMENT_INFORMATION_LINE_HEIGHT;
 		}
 
 		if(ShowDummySpeed)
@@ -2453,25 +1830,25 @@ void CHud::RenderMovementInformation(bool ForcePreview)
 			TextRender()->Text(LeftX, y, Fontsize, "DX:", -1.0f);
 			str_format(aBuf, sizeof(aBuf), "%.2f", DummyInfo.m_Speed.x);
 			TextRender()->Text(RightX - TextRender()->TextWidth(Fontsize, aBuf), y, Fontsize, aBuf, -1.0f);
-			y += LineHeight;
+			y += MOVEMENT_INFORMATION_LINE_HEIGHT;
 
 			TextRender()->Text(LeftX, y, Fontsize, "DY:", -1.0f);
 			str_format(aBuf, sizeof(aBuf), "%.2f", DummyInfo.m_Speed.y);
 			TextRender()->Text(RightX - TextRender()->TextWidth(Fontsize, aBuf), y, Fontsize, aBuf, -1.0f);
-			y += LineHeight;
+			y += MOVEMENT_INFORMATION_LINE_HEIGHT;
 		}
 
-		SetHudTextColor(1.0f, 1.0f, 1.0f, 1.0f);
+		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
 	}
 
-	if(ShowPlayerAngle)
+	if(g_Config.m_ClShowhudPlayerAngle)
 	{
 		TextRender()->Text(LeftX, y, Fontsize, Localize("Angle:"), -1.0f);
-		y += LineHeight;
+		y += MOVEMENT_INFORMATION_LINE_HEIGHT;
 
 		UpdateMovementInformationTextContainer(m_PlayerAngleTextContainerIndex, Fontsize, Info.m_Angle, m_PlayerPrevAngle);
 		RenderMovementInformationTextContainer(m_PlayerAngleTextContainerIndex, TextRender()->DefaultTextColor(), RightX, y);
-		y += LineHeight;
+		y += MOVEMENT_INFORMATION_LINE_HEIGHT;
 
 		if(ShowDummyAngle)
 		{
@@ -2482,28 +1859,6 @@ void CHud::RenderMovementInformation(bool ForcePreview)
 			TextRender()->Text(RightX - TextRender()->TextWidth(Fontsize, aBuf), y, Fontsize, aBuf, -1.0f);
 		}
 	}
-
-	if(ShowDummyCoordIndicator)
-	{
-		const ColorRGBA IndicatorNormalColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_BcShowhudDummyCoordIndicatorColor));
-		const ColorRGBA IndicatorSameHeightColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_BcShowhudDummyCoordIndicatorSameHeightColor));
-		const ColorRGBA IndicatorColor = (ForcePreview || HasPlayerBelow) ? IndicatorSameHeightColor : IndicatorNormalColor;
-
-		TextRender()->Text(LeftX, y, Fontsize, Localize("Player below"), -1.0f);
-
-		const float CircleX = RightX - 3.0f * Scale;
-		const float CircleY = y + 3.0f * Scale;
-		ColorRGBA GlowColor = IndicatorColor;
-		GlowColor.a *= 0.35f;
-
-		Graphics()->TextureClear();
-		Graphics()->QuadsBegin();
-		Graphics()->SetColor(ApplyHudAlpha(GlowColor));
-		Graphics()->DrawCircle(CircleX, CircleY, 3.0f * Scale, 16);
-		Graphics()->SetColor(ApplyHudAlpha(IndicatorColor));
-		Graphics()->DrawCircle(CircleX, CircleY, 1.8f * Scale, 16);
-		Graphics()->QuadsEnd();
-	}
 }
 
 void CHud::RenderSpectatorHud()
@@ -2511,10 +1866,10 @@ void CHud::RenderSpectatorHud()
 	if(!g_Config.m_ClShowhudSpectator)
 		return;
 
-	// BestClient
+	// TClient
 	float AdjustedHeight = m_Height - (g_Config.m_TcStatusBar ? g_Config.m_TcStatusBarHeight : 0.0f);
 	// draw the box
-	Graphics()->DrawRect(m_Width - 180.0f, AdjustedHeight - 15.0f, 180.0f, 15.0f, ApplyHudAlpha(ColorRGBA(0.0f, 0.0f, 0.0f, 0.4f)), IGraphics::CORNER_TL, 5.0f);
+	Graphics()->DrawRect(m_Width - 180.0f, AdjustedHeight - 15.0f, 180.0f, 15.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.4f), IGraphics::CORNER_TL, 5.0f);
 
 	// draw the text
 	char aBuf[128];
@@ -2548,47 +1903,29 @@ void CHud::RenderSpectatorHud()
 		constexpr float Padding = 3.0f;
 		const float TagWidth = IconWidth + TextWidth + Padding * 3.0f;
 		const float TagX = m_Width - RightMargin - TagWidth;
-		Graphics()->DrawRect(TagX, m_Height - 12.0f, TagWidth, 10.0f, ApplyHudAlpha(ColorRGBA(1.0f, 1.0f, 1.0f, AutoSpecCameraEnabled ? 0.50f : 0.10f)), IGraphics::CORNER_ALL, 2.5f);
-		SetHudTextColor(1, 1, 1, AutoSpecCameraEnabled ? 1.0f : 0.65f);
+		Graphics()->DrawRect(TagX, m_Height - 12.0f, TagWidth, 10.0f, ColorRGBA(1.0f, 1.0f, 1.0f, AutoSpecCameraEnabled ? 0.50f : 0.10f), IGraphics::CORNER_ALL, 2.5f);
+		TextRender()->TextColor(1, 1, 1, AutoSpecCameraEnabled ? 1.0f : 0.65f);
 		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
-		TextRender()->Text(TagX + Padding, m_Height - 10.0f, 6.0f, FontIcons::FONT_ICON_CAMERA, -1.0f);
+		TextRender()->Text(TagX + Padding, m_Height - 10.0f, 6.0f, FontIcon::CAMERA, -1.0f);
 		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 		TextRender()->Text(TagX + Padding + IconWidth + Padding, m_Height - 10.0f, 6.0f, pLabelText, -1.0f);
-		SetHudTextColor(1, 1, 1, 1);
+		TextRender()->TextColor(1, 1, 1, 1);
 	}
 }
 
-void CHud::RenderLocalTime(float x, bool ForcePreview)
+void CHud::RenderLocalTime(float x)
 {
-	const auto Layout = HudLayout::Get(HudLayout::MODULE_LOCAL_TIME, m_Width, m_Height);
-	if(!ForcePreview && !g_Config.m_ClShowLocalTimeAlways && !GameClient()->m_Scoreboard.IsActive())
+	if(!g_Config.m_ClShowLocalTimeAlways && !GameClient()->m_Scoreboard.IsActive())
 		return;
 
-	const bool Seconds = g_Config.m_TcShowLocalTimeSeconds; // BestClient
-	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
-	const bool BackgroundEnabled = Layout.m_BackgroundEnabled;
-	const unsigned BackgroundColor = Layout.m_BackgroundColor;
+	const bool Seconds = g_Config.m_TcShowLocalTimeSeconds; // TClient
 
 	char aTimeStr[16];
 	str_timestamp_format(aTimeStr, sizeof(aTimeStr), Seconds ? "%H:%M.%S" : "%H:%M");
-	const float FontSize = 5.0f * Scale;
-	const float Width = std::round(TextRender()->TextBoundingBox(FontSize, aTimeStr).m_W);
-	const float BoxWidth = Width + 10.0f * Scale;
-	const float BoxHeight = 12.5f * Scale;
-	float DrawX = x - (Width + 15.0f * Scale);
-	float DrawY = 0.0f;
-	DrawX = std::clamp(DrawX, 0.0f, maximum(0.0f, m_Width - BoxWidth));
-	DrawY = std::clamp(DrawY, 0.0f, maximum(0.0f, m_Height - BoxHeight));
-	DrawX = std::clamp(DrawX + GameClient()->m_MusicPlayer.GetHudPushOffsetForRect({DrawX, DrawY, BoxWidth, BoxHeight}, m_Width, 4.0f * Scale), 0.0f, maximum(0.0f, m_Width - BoxWidth));
-	DrawY = std::clamp(DrawY + GameClient()->m_MusicPlayer.GetHudPushDownOffsetForRect({DrawX, DrawY, BoxWidth, BoxHeight}, m_Height, 4.0f * Scale), 0.0f, maximum(0.0f, m_Height - BoxHeight));
+	const float Width = std::round(TextRender()->TextBoundingBox(5.0f, aTimeStr).m_W);
 
-	if(BackgroundEnabled)
-	{
-		const int CornerMask = DrawY > 0.01f ? IGraphics::CORNER_ALL : IGraphics::CORNER_B;
-		const int Corners = HudModuleBackgroundCorners(CornerMask, DrawX, DrawY, BoxWidth, BoxHeight, m_Width, m_Height);
-		Graphics()->DrawRect(DrawX, DrawY, BoxWidth, BoxHeight, ApplyHudAlpha(HudModuleBackgroundColor(BackgroundColor)), Corners, 3.75f * Scale);
-	}
-	TextRender()->Text(DrawX + 5.0f * Scale, DrawY + (BoxHeight - FontSize) / 2.0f, FontSize, aTimeStr, -1.0f);
+	Graphics()->DrawRect(x - (Width + 15.0f), 0.0f, Width + 10.0f, 12.5f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.4f), IGraphics::CORNER_B, 3.75f);
+	TextRender()->Text(x - (Width + 10.0f), (12.5f - 5.f) / 2.f, 5.0f, aTimeStr, -1.0f);
 
 	// Graphics()->DrawRect(x - 30.0f, 0.0f, 25.0f, 12.5f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.4f), IGraphics::CORNER_B, 3.75f);
 	// TextRender()->Text(x - 25.0f, (12.5f - 5.f) / 2.f, 5.0f, aTimeStr, -1.0f);
@@ -2651,8 +1988,6 @@ void CHud::OnRender()
 	m_Width = 300.0f * Graphics()->ScreenAspect();
 	m_Height = 300.0f;
 	Graphics()->MapScreen(0.0f, 0.0f, m_Width, m_Height);
-	SetHudTextColor(TextRender()->DefaultTextColor());
-	TextRender()->TextOutlineColor(ApplyHudAlpha(TextRender()->DefaultTextOutlineColor()));
 
 #if defined(CONF_VIDEORECORDER)
 	if((IVideo::Current() && g_Config.m_ClVideoShowhud) || (!IVideo::Current() && g_Config.m_ClShowhud))
@@ -2660,18 +1995,6 @@ void CHud::OnRender()
 	if(g_Config.m_ClShowhud)
 #endif
 	{
-		// Check focus mode settings for UI elements
-		bool FocusModeActive = g_Config.m_ClFocusMode;
-		bool HideHudInFocusMode = g_Config.m_ClFocusModeHideHud;
-		bool HideUIInFocusMode = g_Config.m_ClFocusModeHideUI;
-
-		if(FocusModeActive && HideHudInFocusMode)
-		{
-			GameClient()->m_BestClient.RenderHookCombo();
-			RenderCursor();
-			return;
-		}
-
 		if(GameClient()->m_Snap.m_pLocalCharacter && !GameClient()->m_Snap.m_SpecInfo.m_Active && !(GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_GAMEOVER))
 		{
 			if(g_Config.m_ClShowhudHealthAmmo)
@@ -2682,11 +2005,7 @@ void CHud::OnRender()
 			{
 				RenderPlayerState(GameClient()->m_Snap.m_LocalClientId);
 			}
-			// Hide spectator count in focus mode
-			if(!(FocusModeActive && HideUIInFocusMode))
-			{
-				RenderSpectatorCount();
-			}
+			RenderSpectatorCount();
 			RenderMovementInformation();
 			RenderDDRaceEffects();
 		}
@@ -2709,43 +2028,26 @@ void CHud::OnRender()
 			RenderSpectatorHud();
 		}
 
-		RenderPracticeModeBanner();
-		if(g_Config.m_BcSpeedrunTimer || m_SpeedrunTimerExpiredTick > 0)
-			RenderSpeedrunTimer();
+		if(g_Config.m_ClShowhudTimer)
+			RenderGameTimer();
 		RenderPauseNotification();
 		RenderSuddenDeath();
 		if(g_Config.m_ClShowhudScore)
 			RenderScoreHud();
-		// Hide dummy actions in focus mode
-		if(!(FocusModeActive && HideUIInFocusMode))
-		{
-			RenderDummyActions();
-			}
-			RenderWarmupTimer();
-			if(g_Config.m_ClShowhudTimer)
-				RenderGameTimer();
-			RenderTextInfo();
-			RenderLockCam();
-			// Hide local time in focus mode
-			if(!(FocusModeActive && HideUIInFocusMode))
-			{
-				RenderLocalTime((m_Width / 7) * 3);
-			}
-			if(Client()->State() != IClient::STATE_DEMOPLAYBACK)
-				RenderConnectionWarning();
-			RenderTeambalanceWarning();
-			GameClient()->m_Voting.Render();
-			if(g_Config.m_ClShowRecord)
-				RenderRecord();
-			if(!(FocusModeActive && HideUIInFocusMode))
-			{
-				GameClient()->m_VoiceChat.RenderHudMuteStatusIndicator(m_Width, m_Height);
-				GameClient()->m_VoiceChat.RenderHudTalkingIndicator(m_Width, m_Height);
-			}
-		}
-		GameClient()->m_BestClient.RenderHookCombo();
-		RenderCursor();
+		RenderDummyActions();
+		RenderWarmupTimer();
+		RenderTextInfo();
+		GameClient()->m_TClient.RenderCenterLines();
+		RenderLocalTime((m_Width / 7) * 3);
+		if(Client()->State() != IClient::STATE_DEMOPLAYBACK)
+			RenderConnectionWarning();
+		RenderTeambalanceWarning();
+		GameClient()->m_Voting.Render();
+		if(g_Config.m_ClShowRecord)
+			RenderRecord();
 	}
+	RenderCursor();
+}
 
 void CHud::OnMessage(int MsgType, void *pRawMsg)
 {
@@ -2787,7 +2089,7 @@ void CHud::OnMessage(int MsgType, void *pRawMsg)
 		}
 		else if(MsgType == NETMSGTYPE_SV_RECORD || GameClient()->m_GameInfo.m_RaceRecordMessage)
 		{
-			m_ServerRecord = (float)pMsg->m_ServerTimeBest / 100;
+			// ignore m_ServerTimeBest, it's handled by the game client
 			m_aPlayerRecord[g_Config.m_ClDummy] = (float)pMsg->m_PlayerTimeBest / 100;
 		}
 	}
@@ -2801,7 +2103,7 @@ void CHud::RenderDDRaceEffects()
 		char aTime[32];
 		if(m_ShowFinishTime && m_FinishTimeLastReceivedTick + Client()->GameTickSpeed() * 6 > Client()->GameTick(g_Config.m_ClDummy))
 		{
-			str_time(m_DDRaceTime, TIME_HOURS_CENTISECS, aTime, sizeof(aTime));
+			str_time(m_DDRaceTime, ETimeFormat::HOURS_CENTISECS, aTime, sizeof(aTime));
 			str_format(aBuf, sizeof(aBuf), "Finish time: %s", aTime);
 
 			// calculate alpha (4 sec 1 than get lower the next 2 sec)
@@ -2812,27 +2114,27 @@ void CHud::RenderDDRaceEffects()
 				Alpha = ((float)(m_FinishTimeLastReceivedTick + Client()->GameTickSpeed() * 6) - (float)Client()->GameTick(g_Config.m_ClDummy)) / (float)(Client()->GameTickSpeed() * 2);
 			}
 
-			SetHudTextColor(1, 1, 1, Alpha);
+			TextRender()->TextColor(1, 1, 1, Alpha);
 			CTextCursor Cursor;
-			Cursor.SetPosition(vec2(150 * Graphics()->ScreenAspect() - TextRender()->TextWidth(12, aBuf) / 2, 40));
+			Cursor.SetPosition(vec2(150 * Graphics()->ScreenAspect() - TextRender()->TextWidth(12, aBuf) / 2, 20));
 			Cursor.m_FontSize = 12.0f;
 			TextRender()->RecreateTextContainer(m_DDRaceEffectsTextContainerIndex, &Cursor, aBuf);
 			if(m_FinishTimeDiff != 0.0f && m_DDRaceEffectsTextContainerIndex.Valid())
 			{
 				if(m_FinishTimeDiff < 0)
 				{
-					str_time_float(-m_FinishTimeDiff, TIME_HOURS_CENTISECS, aTime, sizeof(aTime));
+					str_time_float(-m_FinishTimeDiff, ETimeFormat::HOURS_CENTISECS, aTime, sizeof(aTime));
 					str_format(aBuf, sizeof(aBuf), "-%s", aTime);
-					SetHudTextColor(0.5f, 1.0f, 0.5f, Alpha); // green
+					TextRender()->TextColor(0.5f, 1.0f, 0.5f, Alpha); // green
 				}
 				else
 				{
-					str_time_float(m_FinishTimeDiff, TIME_HOURS_CENTISECS, aTime, sizeof(aTime));
+					str_time_float(m_FinishTimeDiff, ETimeFormat::HOURS_CENTISECS, aTime, sizeof(aTime));
 					str_format(aBuf, sizeof(aBuf), "+%s", aTime);
-					SetHudTextColor(1.0f, 0.5f, 0.5f, Alpha); // red
+					TextRender()->TextColor(1.0f, 0.5f, 0.5f, Alpha); // red
 				}
 				CTextCursor DiffCursor;
-				DiffCursor.SetPosition(vec2(150 * Graphics()->ScreenAspect() - TextRender()->TextWidth(10, aBuf) / 2, 56));
+				DiffCursor.SetPosition(vec2(150 * Graphics()->ScreenAspect() - TextRender()->TextWidth(10, aBuf) / 2, 34));
 				DiffCursor.m_FontSize = 10.0f;
 				TextRender()->AppendTextContainer(m_DDRaceEffectsTextContainerIndex, &DiffCursor, aBuf);
 			}
@@ -2840,20 +2142,20 @@ void CHud::RenderDDRaceEffects()
 			{
 				auto OutlineColor = TextRender()->DefaultTextOutlineColor();
 				OutlineColor.a *= Alpha;
-				TextRender()->RenderTextContainer(m_DDRaceEffectsTextContainerIndex, ApplyHudAlpha(TextRender()->DefaultTextColor()), ApplyHudAlpha(OutlineColor));
+				TextRender()->RenderTextContainer(m_DDRaceEffectsTextContainerIndex, TextRender()->DefaultTextColor(), OutlineColor);
 			}
-			SetHudTextColor(TextRender()->DefaultTextColor());
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
 		}
 		else if(g_Config.m_ClShowhudTimeCpDiff && !m_ShowFinishTime && m_TimeCpLastReceivedTick + Client()->GameTickSpeed() * 6 > Client()->GameTick(g_Config.m_ClDummy))
 		{
 			if(m_TimeCpDiff < 0)
 			{
-				str_time_float(-m_TimeCpDiff, TIME_HOURS_CENTISECS, aTime, sizeof(aTime));
+				str_time_float(-m_TimeCpDiff, ETimeFormat::HOURS_CENTISECS, aTime, sizeof(aTime));
 				str_format(aBuf, sizeof(aBuf), "-%s", aTime);
 			}
 			else
 			{
-				str_time_float(m_TimeCpDiff, TIME_HOURS_CENTISECS, aTime, sizeof(aTime));
+				str_time_float(m_TimeCpDiff, ETimeFormat::HOURS_CENTISECS, aTime, sizeof(aTime));
 				str_format(aBuf, sizeof(aBuf), "+%s", aTime);
 			}
 
@@ -2866,14 +2168,14 @@ void CHud::RenderDDRaceEffects()
 			}
 
 			if(m_TimeCpDiff > 0)
-				SetHudTextColor(1.0f, 0.5f, 0.5f, Alpha); // red
+				TextRender()->TextColor(1.0f, 0.5f, 0.5f, Alpha); // red
 			else if(m_TimeCpDiff < 0)
-				SetHudTextColor(0.5f, 1.0f, 0.5f, Alpha); // green
+				TextRender()->TextColor(0.5f, 1.0f, 0.5f, Alpha); // green
 			else if(!m_TimeCpDiff)
-				SetHudTextColor(1, 1, 1, Alpha); // white
+				TextRender()->TextColor(1, 1, 1, Alpha); // white
 
 			CTextCursor Cursor;
-			Cursor.SetPosition(vec2(150 * Graphics()->ScreenAspect() - TextRender()->TextWidth(10, aBuf) / 2, 34));
+			Cursor.SetPosition(vec2(150 * Graphics()->ScreenAspect() - TextRender()->TextWidth(10, aBuf) / 2, 20));
 			Cursor.m_FontSize = 10.0f;
 			TextRender()->RecreateTextContainer(m_DDRaceEffectsTextContainerIndex, &Cursor, aBuf);
 
@@ -2881,33 +2183,52 @@ void CHud::RenderDDRaceEffects()
 			{
 				auto OutlineColor = TextRender()->DefaultTextOutlineColor();
 				OutlineColor.a *= Alpha;
-				TextRender()->RenderTextContainer(m_DDRaceEffectsTextContainerIndex, ApplyHudAlpha(TextRender()->DefaultTextColor()), ApplyHudAlpha(OutlineColor));
+				TextRender()->RenderTextContainer(m_DDRaceEffectsTextContainerIndex, TextRender()->DefaultTextColor(), OutlineColor);
 			}
-			SetHudTextColor(TextRender()->DefaultTextColor());
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
 		}
 	}
 }
 
 void CHud::RenderRecord()
 {
-	if(m_ServerRecord > 0.0f)
+	if(GameClient()->m_MapBestTimeSeconds != FinishTime::UNSET && GameClient()->m_MapBestTimeSeconds != FinishTime::NOT_FINISHED_MILLIS)
 	{
 		char aBuf[64];
 		TextRender()->Text(5, 75, 6, Localize("Server best:"), -1.0f);
 		char aTime[32];
-		str_time_float(m_ServerRecord, TIME_HOURS_CENTISECS, aTime, sizeof(aTime));
-		str_format(aBuf, sizeof(aBuf), "%s%s", m_ServerRecord > 3600 ? "" : "   ", aTime);
+		int64_t TimeCentiseconds = static_cast<int64_t>(GameClient()->m_MapBestTimeSeconds) * 100 + static_cast<int64_t>(GameClient()->m_MapBestTimeMillis) / 10;
+		str_time(TimeCentiseconds, ETimeFormat::HOURS_CENTISECS, aTime, sizeof(aTime));
+		str_format(aBuf, sizeof(aBuf), "%s%s", GameClient()->m_MapBestTimeSeconds > 3600 ? "" : "   ", aTime);
 		TextRender()->Text(53, 75, 6, aBuf, -1.0f);
 	}
 
-	const float PlayerRecord = m_aPlayerRecord[g_Config.m_ClDummy];
-	if(PlayerRecord > 0.0f)
+	if(GameClient()->m_ReceivedDDNetPlayerFinishTimes)
 	{
-		char aBuf[64];
-		TextRender()->Text(5, 82, 6, Localize("Personal best:"), -1.0f);
-		char aTime[32];
-		str_time_float(PlayerRecord, TIME_HOURS_CENTISECS, aTime, sizeof(aTime));
-		str_format(aBuf, sizeof(aBuf), "%s%s", PlayerRecord > 3600 ? "" : "   ", aTime);
-		TextRender()->Text(53, 82, 6, aBuf, -1.0f);
+		const int PlayerTimeSeconds = GameClient()->m_aClients[GameClient()->m_aLocalIds[g_Config.m_ClDummy]].m_FinishTimeSeconds;
+		if(PlayerTimeSeconds != FinishTime::NOT_FINISHED_MILLIS)
+		{
+			char aBuf[64];
+			TextRender()->Text(5, 82, 6, Localize("Personal best:"), -1.0f);
+			char aTime[32];
+			const int PlayerTimeMillis = GameClient()->m_aClients[GameClient()->m_aLocalIds[g_Config.m_ClDummy]].m_FinishTimeMillis;
+			int64_t TimeCentiseconds = static_cast<int64_t>(PlayerTimeSeconds) * 100 + static_cast<int64_t>(PlayerTimeMillis) / 10;
+			str_time(TimeCentiseconds, ETimeFormat::HOURS_CENTISECS, aTime, sizeof(aTime));
+			str_format(aBuf, sizeof(aBuf), "%s%s", PlayerTimeSeconds > 3600 ? "" : "   ", aTime);
+			TextRender()->Text(53, 82, 6, aBuf, -1.0f);
+		}
+	}
+	else
+	{
+		const float PlayerRecord = m_aPlayerRecord[g_Config.m_ClDummy];
+		if(PlayerRecord > 0.0f)
+		{
+			char aBuf[64];
+			TextRender()->Text(5, 82, 6, Localize("Personal best:"), -1.0f);
+			char aTime[32];
+			str_time_float(PlayerRecord, ETimeFormat::HOURS_CENTISECS, aTime, sizeof(aTime));
+			str_format(aBuf, sizeof(aBuf), "%s%s", PlayerRecord > 3600 ? "" : "   ", aTime);
+			TextRender()->Text(53, 82, 6, aBuf, -1.0f);
+		}
 	}
 }

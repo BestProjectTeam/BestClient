@@ -5,10 +5,15 @@
 
 #include "uuid_manager.h"
 
+#include <base/bytes.h>
+#include <base/dbg.h>
+#include <base/fs.h>
 #include <base/hash_ctxt.h>
+#include <base/io.h>
 #include <base/log.h>
 #include <base/math.h>
-#include <base/system.h>
+#include <base/mem.h>
+#include <base/str.h>
 
 #include <engine/storage.h>
 
@@ -129,9 +134,13 @@ class CDatafile
 {
 public:
 	IOHANDLE m_File;
+	char m_aFullName[IO_MAX_PATH_LENGTH];
+	const char *m_pBaseName;
+	char m_aPath[IO_MAX_PATH_LENGTH];
 	unsigned m_FileSize;
 	SHA256_DIGEST m_Sha256;
 	unsigned m_Crc;
+
 	CDatafileInfo m_Info;
 	CDatafileHeader m_Header;
 	int m_DataStartOffset;
@@ -442,16 +451,16 @@ CDataFileReader &CDataFileReader::operator=(CDataFileReader &&Other)
 	return *this;
 }
 
-bool CDataFileReader::Open(class IStorage *pStorage, const char *pFilename, int StorageType)
+bool CDataFileReader::Open(const char *pFullName, IStorage *pStorage, const char *pPath, int StorageType)
 {
 	dbg_assert(m_pDataFile == nullptr, "File already open");
 
-	log_trace("datafile", "loading '%s'", pFilename);
+	log_trace("datafile", "loading '%s' from '%s'", pFullName, pPath);
 
-	IOHANDLE File = pStorage->OpenFile(pFilename, IOFLAG_READ, StorageType);
+	IOHANDLE File = pStorage->OpenFile(pPath, IOFLAG_READ, StorageType);
 	if(!File)
 	{
-		log_error("datafile", "failed to open file '%s' for reading", pFilename);
+		log_error("datafile", "failed to open file '%s' for reading", pPath);
 		return false;
 	}
 
@@ -607,6 +616,9 @@ bool CDataFileReader::Open(class IStorage *pStorage, const char *pFilename, int 
 	pTmpDataFile->m_pDataSizes = (int *)(pTmpDataFile->m_ppDataPtrs + Header.m_NumRawData);
 	pTmpDataFile->m_pData = (char *)(pTmpDataFile->m_pDataSizes + Header.m_NumRawData);
 	pTmpDataFile->m_File = File;
+	str_copy(pTmpDataFile->m_aFullName, pFullName);
+	pTmpDataFile->m_pBaseName = fs_filename(pTmpDataFile->m_aFullName);
+	str_copy(pTmpDataFile->m_aPath, pPath);
 	pTmpDataFile->m_FileSize = FileSize;
 	pTmpDataFile->m_Sha256 = Sha256;
 	pTmpDataFile->m_Crc = Crc;
@@ -653,9 +665,16 @@ bool CDataFileReader::Open(class IStorage *pStorage, const char *pFilename, int 
 	}
 
 	m_pDataFile = pTmpDataFile;
-	log_trace("datafile", "loading done. datafile='%s'", pFilename);
+	log_trace("datafile", "loading done. name='%s' path='%s'", pFullName, pPath);
 
 	return true;
+}
+
+bool CDataFileReader::Open(IStorage *pStorage, const char *pPath, int StorageType)
+{
+	char aFilename[IO_MAX_PATH_LENGTH];
+	fs_split_file_extension(fs_filename(pPath), aFilename, sizeof(aFilename));
+	return Open(aFilename, pStorage, pPath, StorageType);
 }
 
 void CDataFileReader::Close()
@@ -894,6 +913,27 @@ int CDataFileReader::NumItems() const
 	return m_pDataFile->m_Header.m_NumItems;
 }
 
+const char *CDataFileReader::FullName() const
+{
+	dbg_assert(m_pDataFile != nullptr, "File not open");
+
+	return m_pDataFile->m_aFullName;
+}
+
+const char *CDataFileReader::BaseName() const
+{
+	dbg_assert(m_pDataFile != nullptr, "File not open");
+
+	return m_pDataFile->m_pBaseName;
+}
+
+const char *CDataFileReader::Path() const
+{
+	dbg_assert(m_pDataFile != nullptr, "File not open");
+
+	return m_pDataFile->m_aPath;
+}
+
 SHA256_DIGEST CDataFileReader::Sha256() const
 {
 	dbg_assert(m_pDataFile != nullptr, "File not open");
@@ -908,7 +948,7 @@ unsigned CDataFileReader::Crc() const
 	return m_pDataFile->m_Crc;
 }
 
-int CDataFileReader::MapSize() const
+int CDataFileReader::Size() const
 {
 	dbg_assert(m_pDataFile != nullptr, "File not open");
 

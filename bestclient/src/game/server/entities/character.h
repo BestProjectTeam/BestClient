@@ -139,7 +139,6 @@ private:
 
 	// last tick that the player took any action ie some input
 	int m_LastAction;
-	int m_LastNoAmmoSound;
 
 	// these are non-heldback inputs
 	CNetObj_PlayerInput m_LatestPrevPrevInput;
@@ -197,7 +196,7 @@ public:
 	void Pause(bool Pause);
 	bool Freeze(int Seconds);
 	bool Freeze();
-	bool UnFreeze();
+	bool Unfreeze();
 	void GiveAllWeapons();
 	void ResetPickups();
 	void ResetJumps();

@@ -55,7 +55,7 @@ void CConsoleLogger::Log(const CLogMessage *pMessage)
 	{
 		return;
 	}
-	ColorRGBA Color = gs_ConsoleDefaultColor;
+	ColorRGBA Color = CONSOLE_DEFAULT_COLOR;
 	if(pMessage->m_HaveColor)
 	{
 		Color.r = pMessage->m_Color.r / 255.0;
@@ -430,7 +430,7 @@ void CGameConsole::CInstance::ExecuteLine(const char *pLine)
 
 	if(m_Type == CGameConsole::CONSOLETYPE_LOCAL)
 	{
-		m_pGameConsole->m_pConsole->ExecuteLine(pLine);
+		m_pGameConsole->m_pConsole->ExecuteLine(pLine, IConsole::CLIENT_ID_UNSPECIFIED);
 	}
 	else
 	{
@@ -484,6 +484,7 @@ void CGameConsole::CInstance::GetCommand(const char *pInput, char (&aCmd)[IConso
 		m_CompletionCommandEnd = m_CompletionCommandStart + (End - Start);
 		aInput[m_CompletionCommandEnd] = '\0';
 	}
+	m_CompletionCommandStart = str_skip_whitespaces_const(aInput + m_CompletionCommandStart) - aInput;
 
 	str_copy(aCmd, aInput + m_CompletionCommandStart, sizeof(aCmd));
 }

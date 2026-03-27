@@ -36,7 +36,6 @@ class CLogMessage;
 class CMsgPacker;
 class CPacker;
 class IEngine;
-class IEngineMap;
 class ILogger;
 
 class CServerBan : public CNetBan
@@ -221,8 +220,6 @@ public:
 	CServerBan m_ServerBan;
 	CHttp m_Http;
 
-	IEngineMap *m_pMap;
-
 	int64_t m_GameStartTime;
 
 	enum
@@ -257,8 +254,6 @@ public:
 		NUM_RECORDERS = MAX_CLIENTS + 2,
 	};
 
-	char m_aCurrentMap[IO_MAX_PATH_LENGTH];
-	const char *m_pCurrentMapName;
 	SHA256_DIGEST m_aCurrentMapSha256[NUM_MAP_TYPES];
 	unsigned m_aCurrentMapCrc[NUM_MAP_TYPES];
 	unsigned char *m_apCurrentMapData[NUM_MAP_TYPES];
@@ -285,21 +280,21 @@ public:
 	~CServer() override;
 
 	bool IsClientNameAvailable(int ClientId, const char *pNameRequest);
-	bool SeBestClientNameImpl(int ClientId, const char *pNameRequest, bool Set);
-	bool SeBestClientClanImpl(int ClientId, const char *pClanRequest, bool Set);
+	bool SetClientNameImpl(int ClientId, const char *pNameRequest, bool Set);
+	bool SetClientClanImpl(int ClientId, const char *pClanRequest, bool Set);
 
 	bool WouldClientNameChange(int ClientId, const char *pNameRequest) override;
 	bool WouldClientClanChange(int ClientId, const char *pClanRequest) override;
-	void SeBestClientName(int ClientId, const char *pName) override;
-	void SeBestClientClan(int ClientId, const char *pClan) override;
-	void SeBestClientCountry(int ClientId, int Country) override;
-	void SeBestClientScore(int ClientId, std::optional<int> Score) override;
-	void SeBestClientFlags(int ClientId, int Flags) override;
+	void SetClientName(int ClientId, const char *pName) override;
+	void SetClientClan(int ClientId, const char *pClan) override;
+	void SetClientCountry(int ClientId, int Country) override;
+	void SetClientScore(int ClientId, std::optional<int> Score) override;
+	void SetClientFlags(int ClientId, int Flags) override;
 
 	void Kick(int ClientId, const char *pReason) override;
 	void Ban(int ClientId, int Seconds, const char *pReason, bool VerbatimReason) override;
-	void ReconnecBestClient(int ClientId);
-	void RedirecBestClient(int ClientId, int Port) override;
+	void ReconnectClient(int ClientId);
+	void RedirectClient(int ClientId, int Port) override;
 
 	void DemoRecorder_HandleAutoStart() override;
 
@@ -315,9 +310,8 @@ public:
 	bool IsRconAuthedAdmin(int ClientId) const override;
 	const char *GetAuthName(int ClientId) const override;
 	bool HasAuthHidden(int ClientId) const override;
-	void GetMapInfo(char *pMapName, int MapNameSize, int *pMapSize, SHA256_DIGEST *pMapSha256, int *pMapCrc) override;
-	bool GeBestClientInfo(int ClientId, CClientInfo *pInfo) const override;
-	void SeBestClientDDNetVersion(int ClientId, int DDNetVersion) override;
+	bool GetClientInfo(int ClientId, CClientInfo *pInfo) const override;
+	void SetClientDDNetVersion(int ClientId, int DDNetVersion) override;
 	const NETADDR *ClientAddr(int ClientId) const override;
 	const std::array<char, NETADDR_MAXSTRSIZE> &ClientAddrStringImpl(int ClientId, bool IncludePort) const override;
 	const char *ClientName(int ClientId) const override;
@@ -328,9 +322,9 @@ public:
 	int Port() const override;
 	int MaxClients() const override;
 	int ClientCount() const override;
-	int DistincBestClientCount() const override;
+	int DistinctClientCount() const override;
 
-	int GeBestClientVersion(int ClientId) const override;
+	int GetClientVersion(int ClientId) const override;
 	int SendMsg(CMsgPacker *pMsg, int Flags, int ClientId) override;
 
 	void DoSnapshot();
@@ -374,6 +368,11 @@ public:
 
 	bool CheckReservedSlotAuth(int ClientId, const char *pPassword);
 	void ProcessClientPacket(CNetChunk *pPacket);
+	void OnNetMsgClientVer(int ClientId, CUuid *pConnectionId, int DDNetVersion, const char *pDDNetVersionStr);
+	void OnNetMsgReady(int ClientId);
+	void OnNetMsgEnterGame(int ClientId);
+	void OnNetMsgRconCmd(int ClientId, const char *pCmd);
+	void OnNetMsgRconAuth(int ClientId, const char *pName, const char *pPw, bool SendRconCmds);
 
 	class CCache
 	{
@@ -398,11 +397,13 @@ public:
 	};
 	CCache m_aServerInfoCache[3 * 2];
 	CCache m_aSixupServerInfoCache[2];
-	bool m_ServerInfoNeedsUpdate;
+	bool m_ServerInfoNeedsUpdate = false;
+	bool m_ServerInfoNeedsResend = false;
 
 	void FillAntibot(CAntibotRoundData *pData) override;
 
 	void ExpireServerInfo() override;
+	void ExpireServerInfoAndQueueResend();
 	void CacheServerInfo(CCache *pCache, int Type, bool SendClients);
 	void CacheServerInfoSixup(CCache *pCache, bool SendClients, int MaxConsideredClients);
 	void SendServerInfo(const NETADDR *pAddr, int Token, int Type, bool SendClients);
@@ -410,12 +411,11 @@ public:
 	bool RateLimitServerInfoConnless();
 	void SendServerInfoConnless(const NETADDR *pAddr, int Token, int Type);
 	void UpdateRegisterServerInfo();
-	void UpdateServerInfo(bool Resend = false);
+	void UpdateServerInfo(bool Resend);
 
 	void PumpNetwork(bool PacketWaiting);
 
 	void ChangeMap(const char *pMap) override;
-	const char *GetMapName() const override;
 	void ReloadMap() override;
 	int LoadMap(const char *pMapName);
 
@@ -456,7 +456,7 @@ public:
 	static void ConchainMaxclientsperipUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainCommandAccessUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 
-	void LogouBestClient(int ClientId, const char *pReason);
+	void LogoutClient(int ClientId, const char *pReason);
 	void LogoutKey(int Key, const char *pReason);
 
 	void ConchainRconPasswordChangeGeneric(const char *pRoleName, const char *pCurrent, IConsole::IResult *pResult);

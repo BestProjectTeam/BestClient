@@ -1,0 +1,7 @@
+Style:
+  AngledHeaders: [
+    "base/.*",
+    "engine/.*",
+    "game/.*",
+    "generated/.*"
+  ]

@@ -2,7 +2,7 @@
 #define ENGINE_SERVER_AUTHMANAGER_H
 
 #include <base/hash.h>
-#include <base/system.h>
+#include <base/str.h>
 
 #include <generated/protocol.h>
 
@@ -100,4 +100,4 @@ public:
 	bool AddRole(const char *pName, int Rank);
 };
 
-#endif //ENGINE_SERVER_AUTHMANAGER_H
+#endif // ENGINE_SERVER_AUTHMANAGER_H

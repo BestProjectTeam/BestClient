@@ -54,7 +54,7 @@ void CLayerSwitch::Resize(int NewW, int NewH)
 void CLayerSwitch::Shift(EShiftDirection Direction)
 {
 	CLayerTiles::Shift(Direction);
-	ShiftImpl(m_pSwitchTile, Direction, Editor()->m_ShiftBy);
+	ShiftImpl(m_pSwitchTile, Direction, Map()->m_ShiftBy);
 }
 
 bool CLayerSwitch::IsEmpty() const
@@ -85,7 +85,7 @@ void CLayerSwitch::BrushDraw(CLayer *pBrush, vec2 WorldPos)
 	CLayerSwitch *pSwitchLayer = static_cast<CLayerSwitch *>(pBrush);
 	int sx = ConvertX(WorldPos.x);
 	int sy = ConvertY(WorldPos.y);
-	if(str_comp(pSwitchLayer->m_aFilename, Editor()->m_aFilename))
+	if(str_comp(pSwitchLayer->m_aFilename, pSwitchLayer->Map()->m_aFilename))
 	{
 		Editor()->m_SwitchNumber = pSwitchLayer->m_SwitchNumber;
 		Editor()->m_SwitchDelay = pSwitchLayer->m_SwitchDelay;

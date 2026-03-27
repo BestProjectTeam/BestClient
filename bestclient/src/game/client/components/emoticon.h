@@ -44,9 +44,14 @@ public:
 	void EyeEmote(int EyeEmote);
 
 	bool IsActive() const { return m_Active; }
+	vec2 SelectorMouse() const { return m_SelectorMouse; }
+	void SetSelectorMouse(vec2 SelectorMouse) { m_SelectorMouse = SelectorMouse; }
+	CUi::CTouchState &TouchState() { return m_TouchState; }
+	const CUi::CTouchState &TouchState() const { return m_TouchState; }
+	void SetTouchPressedOutside(bool TouchPressedOutside) { m_TouchPressedOutside = TouchPressedOutside; }
+	bool TouchPressedOutside() const { return m_TouchPressedOutside; }
 
 	friend class CBindSystem;
 };
 
 #endif
-

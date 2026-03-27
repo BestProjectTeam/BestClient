@@ -1,0 +1,78 @@
+name: Check Rust
+
+on:
+  push:
+    branches-ignore:
+      - gh-readonly-queue/**
+  pull_request:
+  merge_group:
+
+jobs:
+  rustdoc:
+    runs-on: ubuntu-latest
+    env:
+      CARGO_HTTP_MULTIPLEXING: false
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+    - name: Run Rustdoc
+      run: |
+        RUSTDOCFLAGS=-Dwarnings DDNET_TEST_NO_LINK=1 cargo doc
+
+  cxxbridge:
+    runs-on: ubuntu-latest
+    env:
+      CARGO_HTTP_MULTIPLEXING: false
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Run cxxbridge
+      run: |
+        cargo install cxxbridge-cmd@1.0.171
+        cxxbridge src/engine/shared/rust_version.rs --output src/rust-bridge/engine/shared/rust_version.cpp --output src/rust-bridge/engine/shared/rust_version.h
+        cxxbridge src/engine/console.rs --output src/rust-bridge/cpp/console.cpp --output src/rust-bridge/cpp/console.h
+        git diff --exit-code
+
+  rustfmt:
+    runs-on: ubuntu-latest
+    env:
+      CARGO_HTTP_MULTIPLEXING: false
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+      with:
+           workspaces: |
+               src/mastersrv
+               src/masterping
+               ./
+    - name: Run Rustfmt
+      run:
+        cargo fmt -- --check
+
+  cargo-deny:
+    runs-on: ubuntu-latest
+    env:
+      CARGO_HTTP_MULTIPLEXING: false
+    strategy:
+      matrix:
+        checks:
+          - advisories
+          - bans licenses sources
+    continue-on-error: ${{ matrix.checks == 'advisories' }}
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+      with:
+          workspaces:  |
+              src/mastersrv
+              src/masterping
+              ./
+    - uses: EmbarkStudios/cargo-deny-action@76cd80eb775d7bbbd2d80292136d74d39e1b4918 # v2.0.14
+      with:
+        command: check ${{ matrix.checks }}

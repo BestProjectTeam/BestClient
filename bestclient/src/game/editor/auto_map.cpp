@@ -1,12 +1,15 @@
 #include "auto_map.h"
 
+#include <base/io.h>
 #include <base/log.h>
+#include <base/str.h>
 
 #include <engine/shared/linereader.h>
 #include <engine/storage.h>
 
 #include <game/editor/editor_actions.h>
 #include <game/editor/mapitems/layer_tiles.h>
+#include <game/editor/mapitems/map.h>
 #include <game/mapitems.h>
 
 #include <cinttypes>

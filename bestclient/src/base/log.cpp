@@ -1,6 +1,8 @@
+#include "aio.h"
 #include "color.h"
 #include "logger.h"
 #include "system.h"
+#include "windows.h"
 
 #include <atomic>
 #include <cstdio>
@@ -93,7 +95,7 @@ void log_set_scope_logger(ILogger *logger)
 	Msg.m_Level = level;
 	Msg.m_HaveColor = have_color;
 	Msg.m_Color = color;
-	str_timestamp_format(Msg.m_aTimestamp, sizeof(Msg.m_aTimestamp), FORMAT_SPACE);
+	str_timestamp_format(Msg.m_aTimestamp, sizeof(Msg.m_aTimestamp), TimestampFormat::SPACE);
 	Msg.m_TimestampLength = str_length(Msg.m_aTimestamp);
 	str_copy(Msg.m_aSystem, sys);
 	Msg.m_SystemLength = str_length(Msg.m_aSystem);
@@ -159,7 +161,10 @@ public:
 		case LEVEL_WARN: AndroidLevel = ANDROID_LOG_WARN; break;
 		case LEVEL_ERROR: AndroidLevel = ANDROID_LOG_ERROR; break;
 		}
-		__android_log_write(AndroidLevel, pMessage->m_aSystem, pMessage->Message());
+		char aTag[64];
+		str_copy(aTag, ANDROID_PACKAGE_NAME "/");
+		str_append(aTag, pMessage->m_aSystem);
+		__android_log_write(AndroidLevel, aTag, pMessage->Message());
 	}
 };
 std::unique_ptr<ILogger> log_logger_android()

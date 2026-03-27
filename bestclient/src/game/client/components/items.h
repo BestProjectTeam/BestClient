@@ -11,6 +11,7 @@
 
 class CProjectileData;
 class CLaserData;
+class CTClient;
 
 class CItems : public CComponent
 {
@@ -45,6 +46,7 @@ private:
 	int m_FreezeHeadOffset;
 
 	friend class CBestClient;
+	friend class CTClient;
 };
 
 #endif

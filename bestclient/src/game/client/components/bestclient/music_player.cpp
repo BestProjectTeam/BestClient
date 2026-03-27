@@ -287,7 +287,7 @@ static SGameTimerDisplay BuildGameTimerDisplay(const CNetObj_GameInfo *pGameInfo
 	}
 
 	char aBuf[32];
-	str_time((int64_t)Time * 100, TIME_DAYS, aBuf, sizeof(aBuf));
+		str_time((int64_t)Time * 100, ETimeFormat::DAYS, aBuf, sizeof(aBuf));
 	Result.m_Valid = true;
 	Result.m_Text = aBuf;
 	Result.m_Blink = Result.m_Warning && Time <= 10 && (2 * time_get() / time_freq()) % 2;

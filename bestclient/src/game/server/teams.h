@@ -9,6 +9,9 @@
 #include <game/team_state.h>
 #include <game/teamscore.h>
 
+#include <memory>
+#include <optional>
+
 class CCharacter;
 class CPlayer;
 struct CScoreSaveResult;
@@ -125,6 +128,7 @@ public:
 	bool GetSaving(int TeamId) const;
 	void SetPractice(int Team, bool Enabled);
 	bool IsPractice(int Team);
+	bool IsValidTeamNumber(int Team) const;
 };
 
 #endif

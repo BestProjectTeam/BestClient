@@ -6,7 +6,6 @@
 #include <base/math.h>
 #include <base/system.h>
 
-#include <engine/console.h>
 #include <engine/engine.h>
 #include <engine/gfx/image_loader.h>
 #include <engine/gfx/image_manipulation.h>
@@ -488,7 +487,7 @@ IGraphics::CTextureHandle CGraphics_Threaded::LoadTextureRaw(const CImageInfo &I
 	uint8_t *pTmpData;
 	if(!ConvertToRgbaAlloc(pTmpData, Image))
 	{
-		dbg_msg("graphics", "converted image '%s' to RGBA, consider making its file format RGBA", pTexName ? pTexName : "(no name)");
+		log_warn("graphics", "Converted image '%s' to RGBA, consider making its file format RGBA.", pTexName ? pTexName : "(no name)");
 	}
 	Cmd.m_pData = pTmpData;
 
@@ -533,7 +532,7 @@ IGraphics::CTextureHandle CGraphics_Threaded::LoadTexture(const char *pFilename,
 		if(Id.IsValid())
 		{
 			if(g_Config.m_Debug)
-				dbg_msg("graphics/texture", "loaded %s", pFilename);
+				log_trace("graphics/texture", "Loaded texture '%s'", pFilename);
 			return Id;
 		}
 	}
@@ -771,29 +770,26 @@ void CGraphics_Threaded::KickCommandBuffer()
 class CScreenshotSaveJob : public IJob
 {
 	IStorage *m_pStorage;
-	IConsole *m_pConsole;
 	char m_aName[IO_MAX_PATH_LENGTH];
 	CImageInfo m_Image;
 
 	void Run() override
 	{
+		static constexpr LOG_COLOR SCREENSHOT_LOG_COLOR = LOG_COLOR{255, 153, 76};
 		char aWholePath[IO_MAX_PATH_LENGTH];
-		char aBuf[64 + IO_MAX_PATH_LENGTH];
 		if(CImageLoader::SavePng(m_pStorage->OpenFile(m_aName, IOFLAG_WRITE, IStorage::TYPE_SAVE, aWholePath, sizeof(aWholePath)), m_aName, m_Image))
 		{
-			str_format(aBuf, sizeof(aBuf), "saved screenshot to '%s'", aWholePath);
+			log_info_color(SCREENSHOT_LOG_COLOR, "client", "Saved screenshot to '%s'", aWholePath);
 		}
 		else
 		{
-			str_format(aBuf, sizeof(aBuf), "failed to save screenshot to '%s'", aWholePath);
+			log_error_color(SCREENSHOT_LOG_COLOR, "client", "Failed to save screenshot to '%s'", aWholePath);
 		}
-		m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "client", aBuf, ColorRGBA(1.0f, 0.6f, 0.3f, 1.0f));
 	}
 
 public:
-	CScreenshotSaveJob(IStorage *pStorage, IConsole *pConsole, const char *pName, CImageInfo &&Image) :
+	CScreenshotSaveJob(IStorage *pStorage, const char *pName, CImageInfo &&Image) :
 		m_pStorage(pStorage),
-		m_pConsole(pConsole),
 		m_Image(std::move(Image))
 	{
 		str_copy(m_aName, pName);
@@ -825,7 +821,7 @@ void CGraphics_Threaded::ScreenshotDirect(bool *pSwapped)
 
 	if(Image.m_pData)
 	{
-		m_pEngine->AddJob(std::make_shared<CScreenshotSaveJob>(m_pStorage, m_pConsole, m_aScreenshotName, std::move(Image)));
+		m_pEngine->AddJob(std::make_shared<CScreenshotSaveJob>(m_pStorage, m_aScreenshotName, std::move(Image)));
 	}
 }
 
@@ -1477,7 +1473,7 @@ void CGraphics_Threaded::RenderTileLayer(int BufferContainerIndex, const ColorRG
 		pData = m_pCommandBuffer->AllocData((sizeof(char *) + sizeof(unsigned int)) * NumIndicesOffset);
 		if(pData == nullptr)
 		{
-			dbg_msg("graphics", "failed to allocate data for vertices");
+			log_error("graphics", "Failed to allocate data for tile layer vertices. NumIndicesOffset=%" PRIzu, NumIndicesOffset);
 			return;
 		}
 	}
@@ -1541,7 +1537,7 @@ void CGraphics_Threaded::RenderQuadLayer(int BufferContainerIndex, SQuadRenderIn
 		});
 
 		mem_copy(Cmd.m_pQuadInfo, pQuadInfo, sizeof(SQuadRenderInfo) * QuadNum);
-		m_pCommandBuffer->AddRenderCalls(((QuadNum - 1) / gs_GraphicsMaxQuadsRenderCount) + 1);
+		m_pCommandBuffer->AddRenderCalls(((QuadNum - 1) / GRAPHICS_MAX_QUADS_RENDER_COUNT) + 1);
 	}
 	else
 	{
@@ -1996,7 +1992,7 @@ void CGraphics_Threaded::RenderQuadContainerAsSpriteMultiple(int ContainerIndex,
 			Cmd.m_pRenderInfo = (IGraphics::SRenderSpriteInfo *)m_pCommandBuffer->AllocData(sizeof(IGraphics::SRenderSpriteInfo) * DrawCount);
 			if(Cmd.m_pRenderInfo == nullptr)
 			{
-				dbg_msg("graphics", "failed to allocate data for render info");
+				log_error("graphics", "Failed to allocate data for quad container render info. DrawCount=%d", DrawCount);
 				return;
 			}
 		}
@@ -2008,7 +2004,7 @@ void CGraphics_Threaded::RenderQuadContainerAsSpriteMultiple(int ContainerIndex,
 
 		mem_copy(Cmd.m_pRenderInfo, pRenderInfo, sizeof(IGraphics::SRenderSpriteInfo) * DrawCount);
 
-		m_pCommandBuffer->AddRenderCalls(((DrawCount - 1) / gs_GraphicsMaxParticlesRenderCount) + 1);
+		m_pCommandBuffer->AddRenderCalls(((DrawCount - 1) / GRAPHICS_MAX_QUADS_RENDER_COUNT) + 1);
 
 		WrapNormal();
 	}
@@ -2317,10 +2313,6 @@ int CGraphics_Threaded::IssueInit()
 			Flags |= IGraphicsBackend::INITFLAG_BORDERLESS;
 		}
 	}
-	else // Windowed fullscreen
-	{
-		Flags |= IGraphicsBackend::INITFLAG_BORDERLESS;
-	}
 	if(g_Config.m_GfxVsync)
 	{
 		Flags |= IGraphicsBackend::INITFLAG_VSYNC;
@@ -2438,16 +2430,17 @@ int CGraphics_Threaded::InitWindow()
 	// try disabling fsaa
 	while(g_Config.m_GfxFsaaSamples)
 	{
-		// 4 is the minimum required by OpenGL ES spec (GL_MAX_SAMPLES - https://www.khronos.org/registry/OpenGL-Refpages/es3.0/html/glGet.xhtml), so can probably also be assumed for OpenGL
+		// 4 is the minimum required by OpenGL ES spec (GL_MAX_SAMPLES - https://www.khronos.org/registry/OpenGL-Refpages/es3.0/html/glGet.xhtml),
+		// so can probably also be assumed for OpenGL
 		if(g_Config.m_GfxFsaaSamples > 4)
 			g_Config.m_GfxFsaaSamples = 4;
 		else
 			g_Config.m_GfxFsaaSamples = 0;
 
 		if(g_Config.m_GfxFsaaSamples)
-			dbg_msg("gfx", "lowering FSAA to %d and trying again", g_Config.m_GfxFsaaSamples);
+			log_warn("gfx", "Failed to initialize graphics. Lowering FSAA to %d and trying again.", g_Config.m_GfxFsaaSamples);
 		else
-			dbg_msg("gfx", "disabling FSAA and trying again");
+			log_warn("gfx", "Failed to initialize graphics. Disabling FSAA and trying again.");
 
 		ErrorCode = IssueInit();
 		if(ErrorCode == 0)
@@ -2455,7 +2448,8 @@ int CGraphics_Threaded::InitWindow()
 	}
 
 	size_t GLInitTryCount = 0;
-	while(ErrorCode == EGraphicsBackendErrorCodes::GRAPHICS_BACKEND_ERROR_CODE_GL_CONTEXT_FAILED || ErrorCode == EGraphicsBackendErrorCodes::GRAPHICS_BACKEND_ERROR_CODE_GL_VERSION_FAILED)
+	while(ErrorCode == EGraphicsBackendErrorCodes::GRAPHICS_BACKEND_ERROR_CODE_GL_CONTEXT_FAILED ||
+		ErrorCode == EGraphicsBackendErrorCodes::GRAPHICS_BACKEND_ERROR_CODE_GL_VERSION_FAILED)
 	{
 		if(ErrorCode == EGraphicsBackendErrorCodes::GRAPHICS_BACKEND_ERROR_CODE_GL_CONTEXT_FAILED)
 		{
@@ -2515,6 +2509,7 @@ int CGraphics_Threaded::InitWindow()
 				g_Config.m_GfxGLPatch = 0;
 			}
 		}
+		log_warn("gfx", "Failed to initialize graphics. Setting GL version %d.%d.%d and trying again.", g_Config.m_GfxGLMajor, g_Config.m_GfxGLMinor, g_Config.m_GfxGLPatch);
 
 		// new gl version was set by backend, try again
 		ErrorCode = IssueInit();
@@ -2533,9 +2528,9 @@ int CGraphics_Threaded::InitWindow()
 	// try lowering the resolution
 	if(g_Config.m_GfxScreenWidth != 640 || g_Config.m_GfxScreenHeight != 480)
 	{
-		dbg_msg("gfx", "setting resolution to 640x480 and trying again");
 		g_Config.m_GfxScreenWidth = 640;
 		g_Config.m_GfxScreenHeight = 480;
+		log_warn("gfx", "Failed to initialize graphics. Setting resolution to %dx%d and trying again.", g_Config.m_GfxScreenWidth, g_Config.m_GfxScreenHeight);
 
 		if(IssueInit() == 0)
 			return 0;
@@ -2546,13 +2541,13 @@ int CGraphics_Threaded::InitWindow()
 		g_Config.m_GfxGLMajor = 1;
 		g_Config.m_GfxGLMinor = 4;
 		g_Config.m_GfxGLPatch = 0;
+		log_warn("gfx", "Failed to initialize graphics. Setting GL version %d.%d.%d and trying again.", g_Config.m_GfxGLMajor, g_Config.m_GfxGLMinor, g_Config.m_GfxGLPatch);
 
 		if(IssueInit() == 0)
 			return 0;
 	}
 
-	dbg_msg("gfx", "out of ideas. failed to init graphics");
-
+	log_error("gfx", "Failed to initialize graphics. Out of ideas.");
 	return -1;
 }
 
@@ -2560,7 +2555,6 @@ int CGraphics_Threaded::Init()
 {
 	// fetch pointers
 	m_pStorage = Kernel()->RequestInterface<IStorage>();
-	m_pConsole = Kernel()->RequestInterface<IConsole>();
 	m_pEngine = Kernel()->RequestInterface<IEngine>();
 
 	// init textures
@@ -2625,17 +2619,10 @@ int CGraphics_Threaded::Init()
 		dbg_assert(m_NullTexture.IsNullTexture(), "Null texture invalid");
 	}
 
-	ColorRGBA GPUInfoPrintColor{0.6f, 0.5f, 1.0f, 1.0f};
-
-	char aBuf[256];
-	str_format(aBuf, sizeof(aBuf), "GPU vendor: %s", GetVendorString());
-	m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "gfx", aBuf, GPUInfoPrintColor);
-
-	str_format(aBuf, sizeof(aBuf), "GPU renderer: %s", GetRendererString());
-	m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "gfx", aBuf, GPUInfoPrintColor);
-
-	str_format(aBuf, sizeof(aBuf), "GPU version: %s", GetVersionString());
-	m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "gfx", aBuf, GPUInfoPrintColor);
+	static constexpr LOG_COLOR GPU_INFO_LOG_COLOR = LOG_COLOR{153, 127, 255};
+	log_info_color(GPU_INFO_LOG_COLOR, "gfx", "GPU vendor: %s", GetVendorString());
+	log_info_color(GPU_INFO_LOG_COLOR, "gfx", "GPU renderer: %s", GetRendererString());
+	log_info_color(GPU_INFO_LOG_COLOR, "gfx", "GPU version: %s", GetVersionString());
 
 	AdjustViewport(true);
 

@@ -1,8 +1,11 @@
 #ifndef ENGINE_SHARED_HTTP_H
 #define ENGINE_SHARED_HTTP_H
 
+#include <base/dbg.h>
 #include <base/hash_ctxt.h>
-#include <base/system.h>
+#include <base/mem.h>
+#include <base/str.h>
+#include <base/types.h>
 
 #include <engine/http.h>
 #include <engine/shared/jobs.h>
@@ -10,6 +13,7 @@
 #include <algorithm>
 #include <atomic>
 #include <condition_variable>
+#include <cstdlib>
 #include <deque>
 #include <mutex>
 #include <optional>
@@ -94,9 +98,9 @@ class CHttpRequest : public IHttpRequest
 	int64_t m_IfModifiedSince = -1;
 	REQUEST m_Type = REQUEST::GET;
 
-	SHA256_DIGEST m_ActualSha256 = SHA256_ZEROED;
+	std::optional<SHA256_DIGEST> m_ActualSha256;
 	SHA256_CTX m_ActualSha256Ctx;
-	SHA256_DIGEST m_ExpectedSha256 = SHA256_ZEROED;
+	std::optional<SHA256_DIGEST> m_ExpectedSha256;
 
 	bool m_WriteToMemory = true;
 	bool m_WriteToFile = false;

@@ -51,7 +51,6 @@ class CInfoMessages : public CComponent
 		STextContainerIndex m_TimeTextContainerIndex;
 		STextContainerIndex m_DiffTextContainerIndex;
 		bool m_RecordPersonal;
-		float m_FontSize;
 	};
 
 	CInfoMsg m_aInfoMsgs[MAX_INFOMSGS];
@@ -59,17 +58,14 @@ class CInfoMessages : public CComponent
 
 	CInfoMsg CreateInfoMsg(EType Type);
 	void AddInfoMsg(const CInfoMsg &InfoMsg);
-	void RenderKillMsg(const CInfoMsg &InfoMsg, float x, float y, float Scale, float Alpha);
-	void RenderFinishMsg(const CInfoMsg &InfoMsg, float x, float y, float Scale, float Alpha);
-	float KillMsgWidth(const CInfoMsg &InfoMsg, float Scale) const;
-	float FinishMsgWidth(const CInfoMsg &InfoMsg, float Scale) const;
-	void RenderMessages(bool ForcePreview);
+	void RenderKillMsg(const CInfoMsg &InfoMsg, float x, float y);
+	void RenderFinishMsg(const CInfoMsg &InfoMsg, float x, float y);
 
 	void OnTeamKillMessage(const struct CNetMsg_Sv_KillMsgTeam *pMsg);
 	void OnKillMessage(const struct CNetMsg_Sv_KillMsg *pMsg);
 	void OnRaceFinishMessage(const struct CNetMsg_Sv_RaceFinish *pMsg);
 
-	void CreateTextContainersIfNotCreated(CInfoMsg &InfoMsg, float FontSize);
+	void CreateTextContainersIfNotCreated(CInfoMsg &InfoMsg);
 	void DeleteTextContainers(CInfoMsg &InfoMsg);
 	void ResetMessage(CInfoMsg &InfoMsg);
 
@@ -83,3 +79,4 @@ public:
 };
 
 #endif
+

@@ -11,7 +11,7 @@
 
 #include <memory>
 
-static constexpr ColorRGBA gs_ConsoleDefaultColor(1, 1, 1, 1);
+static constexpr ColorRGBA CONSOLE_DEFAULT_COLOR = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
 
 enum LEVEL : char;
 struct CChecksumData;
@@ -36,7 +36,15 @@ public:
 
 		CMDLINE_LENGTH = 512,
 
-		CLIENT_ID_UNSPECIFIED = -1, // has full admin access on the server
+		// The id `-1` has full admin access on the server.
+		// It is used in the following cases:
+		// - Loading the config file on server start
+		// - Econ and fifo connections
+		// - Commands run on passed votes
+		//
+		// Client side it has less importance
+		// because there is no difference in access levels.
+		CLIENT_ID_UNSPECIFIED = -1,
 		CLIENT_ID_GAME = -2,
 		CLIENT_ID_NO_GAME = -3,
 
@@ -114,10 +122,10 @@ public:
 	virtual void StoreCommands(bool Store) = 0;
 
 	virtual bool LineIsValid(const char *pStr) = 0;
-	virtual void ExecuteLine(const char *pStr, int ClientId = CLIENT_ID_UNSPECIFIED, bool InterpretSemicolons = true) = 0;
-	virtual void ExecuteLineFlag(const char *pStr, int FlasgMask, int ClientId = CLIENT_ID_UNSPECIFIED, bool InterpretSemicolons = true) = 0;
-	virtual void ExecuteLineStroked(int Stroke, const char *pStr, int ClientId = CLIENT_ID_UNSPECIFIED, bool InterpretSemicolons = true) = 0;
-	virtual bool ExecuteFile(const char *pFilename, int ClientId = CLIENT_ID_UNSPECIFIED, bool LogFailure = false, int StorageType = IStorage::TYPE_ALL) = 0;
+	virtual void ExecuteLine(const char *pStr, int ClientId, bool InterpretSemicolons = true) = 0;
+	virtual void ExecuteLineFlag(const char *pStr, int FlasgMask, int ClientId, bool InterpretSemicolons = true) = 0;
+	virtual void ExecuteLineStroked(int Stroke, const char *pStr, int ClientId, bool InterpretSemicolons = true) = 0;
+	virtual bool ExecuteFile(const char *pFilename, int ClientId, bool LogFailure = false, int StorageType = IStorage::TYPE_ALL) = 0;
 
 	/**
 	 * @deprecated Prefer using the `log_*` functions from base/log.h instead of this function for the following reasons:
@@ -125,7 +133,7 @@ public:
 	 * - They support all five log levels.
 	 * - They do not require a pointer to `IConsole` to be used.
 	 */
-	virtual void Print(int Level, const char *pFrom, const char *pStr, ColorRGBA PrintColor = gs_ConsoleDefaultColor) const = 0;
+	virtual void Print(int Level, const char *pFrom, const char *pStr, ColorRGBA PrintColor = CONSOLE_DEFAULT_COLOR) const = 0;
 	virtual void SetTeeHistorianCommandCallback(FTeeHistorianCommandCallback pfnCallback, void *pUser) = 0;
 	virtual void SetUnknownCommandCallback(FUnknownCommandCallback pfnCallback, void *pUser) = 0;
 	virtual void SetCanUseCommandCallback(FCanUseCommandCallback pfnCallback, void *pUser) = 0;
@@ -144,4 +152,4 @@ public:
 
 std::unique_ptr<IConsole> CreateConsole(int FlagMask);
 
-#endif // FILE_ENGINE_CONSOLE_H
+#endif // ENGINE_CONSOLE_H

@@ -1,4 +1,6 @@
-#include <base/system.h>
+#include <base/mem.h>
+#include <base/net.h>
+#include <base/secure.h>
 
 #include <gtest/gtest.h>
 
@@ -16,7 +18,7 @@ TEST(Net, Ipv4AndIpv6Work)
 	Socket2 = net_udp_create(Bindaddr);
 	do
 	{
-		Bindaddr.port = secure_rand() % 64511 + 1024;
+		Bindaddr.port = secure_rand_below(65535 - 1024) + 1024;
 	} while(!(Socket1 = net_udp_create(Bindaddr)));
 
 	NETADDR LocalhostV4;

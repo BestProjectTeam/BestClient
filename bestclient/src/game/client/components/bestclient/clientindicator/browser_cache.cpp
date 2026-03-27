@@ -1,5 +1,6 @@
 #include "browser_cache.h"
 
+#include <base/net.h>
 #include <base/system.h>
 
 #include <engine/external/json-parser/json.h>

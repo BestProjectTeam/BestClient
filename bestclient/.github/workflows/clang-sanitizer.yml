@@ -1,0 +1,160 @@
+name: Check ASan & UBSan
+
+on:
+  push:
+    branches-ignore:
+      - gh-readonly-queue/**
+      - master
+  pull_request:
+  merge_group:
+
+jobs:
+  check-clang-san:
+    runs-on: ubuntu-latest
+    env:
+      CARGO_HTTP_MULTIPLEXING: false
+      UBSAN_OPTIONS: suppressions=../ubsan.supp:log_path=SAN:print_stacktrace=1:halt_on_error=0
+      ASAN_OPTIONS: log_path=SAN:strict_string_checks=1:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:detect_leaks=1:halt_on_error=0
+      LSAN_OPTIONS: suppressions=../lsan.supp
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Prepare Linux
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install pkg-config cmake ninja-build libfreetype6-dev libnotify-dev libsdl2-dev libsqlite3-dev libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev libx264-dev libglew-dev -y
+
+    - name: Install Vulkan SDK
+      uses: humbletim/install-vulkan-sdk@v1.2
+      with:
+        version: 1.3.296.0
+        cache: true
+
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Build with ASan and UBSan
+      run: |
+        mkdir clang-sanitizer
+        cd clang-sanitizer
+        export CC=clang
+        export CXX=clang++
+        SAN_FLAGS="-fsanitize=address,undefined,leak -fsanitize-recover=all -fno-omit-frame-pointer -fno-common"
+        export CXXFLAGS="$SAN_FLAGS"
+        export CFLAGS="$SAN_FLAGS"
+        cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DHEADLESS_CLIENT=ON -Werror=dev -DDOWNLOAD_GTEST=ON -DDEV=ON ..
+        cmake --build . --config Debug --target everything
+
+    - name: Run server and headless client with ASan and UBSan
+      run: |
+        cd clang-sanitizer
+        set +e
+        ./DDNet "cl_download_skins 0;quit"
+        client_result=$?
+        ./DDNet-Server shutdown
+        server_result=$?
+        set -e
+        if [ $client_result -ne 0 ]; then
+          echo -e "\033[31mFAILED: Client exit code $client_result\033[m"
+          failed=true
+        fi
+        if [ $server_result -ne 0 ]; then
+          echo -e "\033[31mFAILED: Server exit code $server_result\033[m"
+          failed=true
+        fi
+        san_files=$(find . -maxdepth 1 -type f -name 'SAN.*' -print -quit)
+        if [ -n "$san_files" ]; then
+          echo -e "\033[31mFAILED: Sanitizer errors:\033[m"
+          cat $san_files
+          failed=true
+        fi
+        if [ "$failed" = true ]; then
+          exit 1
+        fi
+
+    - name: Run unit tests with ASan and UBSan
+      run: |
+        cd clang-sanitizer
+        set +e
+        # Rust tests work locally, but still not in CI, even with the same directory
+        cmake --build . --config Debug --target run_cxx_tests
+        unit_test_result=$?
+        set -e
+        failed=false
+        if [ $unit_test_result -ne 0 ]; then
+          echo -e "\033[31mFAILED: Unit test exit code $unit_test_result\033[m"
+          failed=true
+        fi
+        san_files=$(find . -maxdepth 1 -type f -name 'SAN.*' -print -quit)
+        if [ -n "$san_files" ]; then
+          echo -e "\033[31mFAILED: Sanitizer errors:\033[m"
+          cat $san_files
+          failed=true
+        fi
+        if [ "$failed" = true ]; then
+          exit 1
+        fi
+
+    - name: Build mastersrv
+      run: |
+        cd src/mastersrv
+        cargo build
+        cp target/debug/mastersrv ../../clang-sanitizer
+
+    - name: Run integration tests with ASan and UBSan
+      id: integration_test
+      continue-on-error: true
+      run: |
+        cd clang-sanitizer
+        set +e
+        python ../scripts/integration_test.py --show-full-output --test-mastersrv .
+        integration_test_result=$?
+        set -e
+        if [ $integration_test_result -ne 0 ]; then
+          echo -e "\033[31mFAILED: Integration test exit code $integration_test_result\033[m"
+          failed=true
+        fi
+        # TODO: This should be integrated into integration_test.py directly to log sanitizer errors for each test case individually
+        san_files=$(find . -maxdepth 2 -type f -path './integration_*/SAN.*' -print -quit)
+        if [ -n "$san_files" ]; then
+          echo -e "\033[31mFAILED: Sanitizer errors:\033[m"
+          cat $san_files
+          failed=true
+        fi
+        if [ "$failed" = true ]; then
+          exit 1
+        fi
+
+    - name: Upload integration test results
+      id: integration_test_artifact_upload
+      if: steps.integration_test.outcome == 'failure'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ddnet-clang-sanitizer-integration-test-results
+        path: clang-sanitizer/integration_*
+        if-no-files-found: error
+
+    - name: Summarize integration test results
+      if: steps.integration_test.outcome == 'failure'
+      shell: bash
+      run: |
+        echo -e "\033[31mFAILED: Integration test failed. Refer to the workflow logs and uploaded artifacts in the steps above for details.\033[m"
+        echo "### Integration test failed" >> $GITHUB_STEP_SUMMARY
+        echo >> $GITHUB_STEP_SUMMARY
+        echo "See summary below. Refer to the workflow logs and uploaded artifacts for details." >> $GITHUB_STEP_SUMMARY
+        echo >> $GITHUB_STEP_SUMMARY
+        echo "Artifact URL: ${{ steps.integration_test_artifact_upload.outputs.artifact-url }}" >> $GITHUB_STEP_SUMMARY
+        for integration_dir in clang-sanitizer/integration_*; do
+          echo >> $GITHUB_STEP_SUMMARY
+          echo "<details><summary>Test $(basename "$integration_dir")</summary>" >> $GITHUB_STEP_SUMMARY
+          echo >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat "$integration_dir/test_failure.log" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
+        done
+        exit 1

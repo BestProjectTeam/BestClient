@@ -7,6 +7,7 @@
 
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
+#include <engine/font_icons.h>
 #include <engine/shared/localization.h>
 #include <engine/textrender.h>
 
@@ -656,7 +657,7 @@ void CAdminPanel::RenderFastActions(CUIRect View)
 	else
 	{
 		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
-		Add = GameClient()->m_Menus.DoButton_Menu(&m_FastActionAddButton, FontIcons::FONT_ICON_PLUS, 0, &AddButton);
+		Add = GameClient()->m_Menus.DoButton_Menu(&m_FastActionAddButton, FontIcon::PLUS, 0, &AddButton);
 		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 	}
 	Add = Add || (m_FastActionInput.IsActive() && Ui()->ConsumeHotkey(CUi::HOTKEY_ENTER));
@@ -750,12 +751,12 @@ void CAdminPanel::RenderFastActions(CUIRect View)
 			}
 
 			TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
-			if(GameClient()->m_Menus.DoButton_Menu(&m_FastActionEditButtons[i], FontIcons::FONT_ICON_PEN_TO_SQUARE, 0, &Edit))
+			if(GameClient()->m_Menus.DoButton_Menu(&m_FastActionEditButtons[i], FontIcon::PEN_TO_SQUARE, 0, &Edit))
 			{
 				m_FastActionEditIndex = i;
 				m_FastActionInput.Set(pCmd);
 			}
-			if(GameClient()->m_Menus.DoButton_Menu(&m_FastActionRemoveButtons[i], FontIcons::FONT_ICON_TRASH, 0, &Remove))
+			if(GameClient()->m_Menus.DoButton_Menu(&m_FastActionRemoveButtons[i], FontIcon::TRASH, 0, &Remove))
 			{
 				pCmd[0] = '\0';
 				if(m_FastActionEditIndex == i)
@@ -1316,7 +1317,7 @@ void CAdminPanel::RenderPanel(const CUIRect &Screen)
 		CUIRect Settings;
 		HeaderRight.VSplitRight(HEADER_HEIGHT, &HeaderRight, &Settings);
 		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
-		const bool OpenSettings = GameClient()->m_Menus.DoButton_Menu(&m_SettingsButton, FontIcons::FONT_ICON_GEAR, 0, &Settings);
+	const bool OpenSettings = GameClient()->m_Menus.DoButton_Menu(&m_SettingsButton, FontIcon::GEAR, 0, &Settings);
 		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 		if(OpenSettings)
 			OpenActionPopup(-1, ACTION_SETTINGS);

@@ -1,6 +1,10 @@
 #include "render_layer.h"
 
+#include <base/dbg.h>
 #include <base/log.h>
+#include <base/mem.h>
+#include <base/str.h>
+#include <base/time.h>
 
 #include <engine/graphics.h>
 #include <engine/map.h>
@@ -148,16 +152,6 @@ class CTmpQuadTextured
 public:
 	CTmpQuadVertexTextured m_aVertices[4];
 };
-
-static void mem_copy_special(void *pDest, void *pSource, size_t Size, size_t Count, size_t Steps)
-{
-	size_t CurStep = 0;
-	for(size_t i = 0; i < Count; ++i)
-	{
-		mem_copy(((char *)pDest) + CurStep + i * Size, ((char *)pSource) + i * Size, Size);
-		CurStep += Steps;
-	}
-}
 
 bool CRenderLayerTile::CTileLayerVisuals::Init(unsigned int Width, unsigned int Height)
 {
@@ -357,7 +351,7 @@ void CRenderLayerTile::RenderTileLayer(const ColorRGBA &Color, const CRenderLaye
 
 		int X0 = std::max(ScreenRectX0, 0);
 		int X1 = std::min(ScreenRectX1, (int)Visuals.m_Width);
-		int XR = X1 - 1;
+		int XR = X1 == std::numeric_limits<int>::min() ? X1 : X1 - 1;
 		if(X0 <= XR)
 		{
 			int Y0 = std::max(ScreenRectY0, 0);
@@ -835,51 +829,79 @@ void CRenderLayerTile::UploadTileData(std::optional<CTileLayerVisuals> &VisualsO
 	InsertTiles(vTmpBorderLeftTiles, vTmpBorderLeftTilesTexCoords);
 	InsertTiles(vTmpBorderRightTiles, vTmpBorderRightTilesTexCoords);
 
-	// setup params
-	float *pTmpTiles = vTmpTiles.empty() ? nullptr : (float *)vTmpTiles.data();
-	unsigned char *pTmpTileTexCoords = vTmpTileTexCoords.empty() ? nullptr : (unsigned char *)vTmpTileTexCoords.data();
-
 	Visuals.m_BufferContainerIndex = -1;
+
+	// upload data to gpu
 	size_t UploadDataSize = vTmpTileTexCoords.size() * sizeof(CGraphicTileTextureCoords) + vTmpTiles.size() * sizeof(CGraphicTile);
-	if(UploadDataSize > 0)
+	if(UploadDataSize == 0)
 	{
-		char *pUploadData = (char *)malloc(sizeof(char) * UploadDataSize);
-
-		mem_copy_special(pUploadData, pTmpTiles, sizeof(vec2), vTmpTiles.size() * 4, (DoTextureCoords ? sizeof(ubvec4) : 0));
-		if(DoTextureCoords)
-		{
-			mem_copy_special(pUploadData + sizeof(vec2), pTmpTileTexCoords, sizeof(ubvec4), vTmpTiles.size() * 4, sizeof(vec2));
-		}
-
-		// first create the buffer object
-		int BufferObjectIndex = Graphics()->CreateBufferObject(UploadDataSize, pUploadData, 0, true);
-
-		// then create the buffer container
-		SBufferContainerInfo ContainerInfo;
-		ContainerInfo.m_Stride = (DoTextureCoords ? (sizeof(float) * 2 + sizeof(ubvec4)) : 0);
-		ContainerInfo.m_VertBufferBindingIndex = BufferObjectIndex;
-		ContainerInfo.m_vAttributes.emplace_back();
-		SBufferContainerInfo::SAttribute *pAttr = &ContainerInfo.m_vAttributes.back();
-		pAttr->m_DataTypeCount = 2;
-		pAttr->m_Type = GRAPHICS_TYPE_FLOAT;
-		pAttr->m_Normalized = false;
-		pAttr->m_pOffset = nullptr;
-		pAttr->m_FuncType = 0;
-		if(DoTextureCoords)
-		{
-			ContainerInfo.m_vAttributes.emplace_back();
-			pAttr = &ContainerInfo.m_vAttributes.back();
-			pAttr->m_DataTypeCount = 4;
-			pAttr->m_Type = GRAPHICS_TYPE_UNSIGNED_BYTE;
-			pAttr->m_Normalized = false;
-			pAttr->m_pOffset = (void *)(sizeof(vec2));
-			pAttr->m_FuncType = 1;
-		}
-
-		Visuals.m_BufferContainerIndex = Graphics()->CreateBufferContainer(&ContainerInfo);
-		// and finally inform the backend how many indices are required
-		Graphics()->IndicesNumRequiredNotify(vTmpTiles.size() * 6);
+		RenderLoading();
+		return;
 	}
+
+	void *pUploadData = malloc(UploadDataSize);
+
+	if(DoTextureCoords)
+	{
+		class CVertex
+		{
+		public:
+			vec2 m_Pos;
+			ubvec4 m_Tex;
+		};
+
+		static_assert(sizeof(CVertex) == sizeof(vec2) + sizeof(ubvec4)); // no padding
+
+		CVertex *pDst = static_cast<CVertex *>(pUploadData);
+		dbg_assert(UploadDataSize == vTmpTiles.size() * sizeof(*pDst) * 4, "invalid upload size");
+
+		for(size_t TileIndex = 0; TileIndex < vTmpTiles.size(); ++TileIndex)
+		{
+			const auto &GraphicTile = vTmpTiles[TileIndex];
+			const auto &GraphicCoords = vTmpTileTexCoords[TileIndex];
+
+			*pDst++ = {GraphicTile.m_TopLeft, GraphicCoords.m_TexCoordTopLeft};
+			*pDst++ = {GraphicTile.m_TopRight, GraphicCoords.m_TexCoordTopRight};
+			*pDst++ = {GraphicTile.m_BottomRight, GraphicCoords.m_TexCoordBottomRight};
+			*pDst++ = {GraphicTile.m_BottomLeft, GraphicCoords.m_TexCoordBottomLeft};
+		}
+	}
+	else
+	{
+		// we don't have texture coords, so we can optimize
+		dbg_assert(UploadDataSize == vTmpTiles.size() * sizeof(CGraphicTile), "invalid upload size");
+		mem_copy(pUploadData, vTmpTiles.data(), vTmpTiles.size() * sizeof(CGraphicTile));
+	}
+
+	// first create the buffer object
+	int BufferObjectIndex = Graphics()->CreateBufferObject(UploadDataSize, pUploadData, 0, true);
+
+	// then create the buffer container
+	SBufferContainerInfo ContainerInfo;
+	ContainerInfo.m_Stride = (DoTextureCoords ? (sizeof(float) * 2 + sizeof(ubvec4)) : 0);
+	ContainerInfo.m_VertBufferBindingIndex = BufferObjectIndex;
+	ContainerInfo.m_vAttributes.emplace_back();
+	SBufferContainerInfo::SAttribute *pAttr = &ContainerInfo.m_vAttributes.back();
+	pAttr->m_DataTypeCount = 2;
+	pAttr->m_Type = GRAPHICS_TYPE_FLOAT;
+	pAttr->m_Normalized = false;
+	pAttr->m_pOffset = nullptr;
+	pAttr->m_FuncType = 0;
+	if(DoTextureCoords)
+	{
+		ContainerInfo.m_vAttributes.emplace_back();
+		pAttr = &ContainerInfo.m_vAttributes.back();
+		pAttr->m_DataTypeCount = 4;
+		pAttr->m_Type = GRAPHICS_TYPE_UNSIGNED_BYTE;
+		pAttr->m_Normalized = false;
+		pAttr->m_pOffset = (void *)(sizeof(vec2));
+		pAttr->m_FuncType = 1;
+	}
+
+	Visuals.m_BufferContainerIndex = Graphics()->CreateBufferContainer(&ContainerInfo);
+	// and finally inform the backend how many indices are required
+	Graphics()->IndicesNumRequiredNotify(vTmpTiles.size() * 6);
+
 	RenderLoading();
 }
 
@@ -1138,7 +1160,7 @@ void CRenderLayerQuads::Init()
 			bool IsGrouped = QuadCluster.m_Grouped && pQuad->m_ColorEnv == QuadCluster.m_ColorEnv && pQuad->m_ColorEnvOffset == QuadCluster.m_ColorEnvOffset && pQuad->m_PosEnv == QuadCluster.m_PosEnv && pQuad->m_PosEnvOffset == QuadCluster.m_PosEnvOffset;
 
 			// we are reaching gpu batch limit, here we break and close the QuadCluster if it's ungrouped
-			if(QuadClusterId >= (int)gs_GraphicsMaxQuadsRenderCount)
+			if(QuadClusterId >= (int)GRAPHICS_MAX_QUADS_RENDER_COUNT)
 			{
 				// expand a cluster, if it's grouped
 				if(!IsGrouped)

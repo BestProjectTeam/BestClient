@@ -2,7 +2,7 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include "infomessages.h"
 
-#include <base/color.h>
+#include <base/time.h>
 
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
@@ -13,8 +13,6 @@
 #include <generated/protocol.h>
 
 #include <game/client/animstate.h>
-#include <game/client/bc_ui_animations.h>
-#include <game/client/components/hud_layout.h>
 #include <game/client/gameclient.h>
 #include <game/client/prediction/entities/character.h>
 #include <game/client/prediction/gameworld.h>
@@ -23,18 +21,6 @@
 static constexpr float ROW_HEIGHT = 46.0f;
 static constexpr float FONT_SIZE = 36.0f;
 static constexpr float RACE_FLAG_SIZE = 52.0f;
-static constexpr float KILLFEED_COORD_SCALE = 6.0f;
-
-static ColorRGBA HudLayoutBackgroundColor(unsigned PackedColor)
-{
-	return color_cast<ColorRGBA>(ColorHSLA(PackedColor, true));
-}
-
-static int HudLayoutBackgroundCorners(CGameClient *pGameClient, int DefaultCorners, float RectX, float RectY, float RectW, float RectH, float CanvasWidth, float CanvasHeight)
-{
-	(void)pGameClient;
-	return HudLayout::BackgroundCorners(DefaultCorners, RectX, RectY, RectW, RectH, CanvasWidth, CanvasHeight);
-}
 
 void CInfoMessages::OnWindowResize()
 {
@@ -59,11 +45,6 @@ void CInfoMessages::DeleteTextContainers(CInfoMsg &InfoMsg)
 	TextRender()->DeleteTextContainer(InfoMsg.m_KillerTextContainerIndex);
 	TextRender()->DeleteTextContainer(InfoMsg.m_DiffTextContainerIndex);
 	TextRender()->DeleteTextContainer(InfoMsg.m_TimeTextContainerIndex);
-	InfoMsg.m_VictimTextContainerIndex.Reset();
-	InfoMsg.m_KillerTextContainerIndex.Reset();
-	InfoMsg.m_DiffTextContainerIndex.Reset();
-	InfoMsg.m_TimeTextContainerIndex.Reset();
-	InfoMsg.m_FontSize = -1.0f;
 }
 
 void CInfoMessages::ResetMessage(CInfoMsg &InfoMsg)
@@ -134,7 +115,6 @@ CInfoMessages::CInfoMsg CInfoMessages::CreateInfoMsg(EType Type)
 	InfoMsg.m_TimeTextContainerIndex.Reset();
 	InfoMsg.m_DiffTextContainerIndex.Reset();
 	InfoMsg.m_RecordPersonal = false;
-	InfoMsg.m_FontSize = -1.0f;
 	return InfoMsg;
 }
 
@@ -157,12 +137,12 @@ void CInfoMessages::AddInfoMsg(const CInfoMsg &InfoMsg)
 	m_InfoMsgCurrent = (m_InfoMsgCurrent + 1) % MAX_INFOMSGS;
 	DeleteTextContainers(m_aInfoMsgs[m_InfoMsgCurrent]);
 	m_aInfoMsgs[m_InfoMsgCurrent] = InfoMsg;
-	CreateTextContainersIfNotCreated(m_aInfoMsgs[m_InfoMsgCurrent], FONT_SIZE);
+	CreateTextContainersIfNotCreated(m_aInfoMsgs[m_InfoMsgCurrent]);
 
 	Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
 }
 
-void CInfoMessages::CreateTextContainersIfNotCreated(CInfoMsg &InfoMsg, float FontSize)
+void CInfoMessages::CreateTextContainersIfNotCreated(CInfoMsg &InfoMsg)
 {
 	const auto &&NameColor = [&](int ClientId) -> ColorRGBA {
 		unsigned Color;
@@ -177,13 +157,10 @@ void CInfoMessages::CreateTextContainersIfNotCreated(CInfoMsg &InfoMsg, float Fo
 		return color_cast<ColorRGBA>(ColorHSLA(Color));
 	};
 
-	if(absolute(InfoMsg.m_FontSize - FontSize) > 0.001f)
-		DeleteTextContainers(InfoMsg);
-
 	if(!InfoMsg.m_VictimTextContainerIndex.Valid() && InfoMsg.m_aVictimName[0] != '\0')
 	{
 		CTextCursor Cursor;
-		Cursor.m_FontSize = FontSize;
+		Cursor.m_FontSize = FONT_SIZE;
 		TextRender()->TextColor(NameColor(InfoMsg.m_aVictimIds[0]));
 		TextRender()->CreateTextContainer(InfoMsg.m_VictimTextContainerIndex, &Cursor, InfoMsg.m_aVictimName);
 	}
@@ -191,7 +168,7 @@ void CInfoMessages::CreateTextContainersIfNotCreated(CInfoMsg &InfoMsg, float Fo
 	if(!InfoMsg.m_KillerTextContainerIndex.Valid() && InfoMsg.m_aKillerName[0] != '\0')
 	{
 		CTextCursor Cursor;
-		Cursor.m_FontSize = FontSize;
+		Cursor.m_FontSize = FONT_SIZE;
 		TextRender()->TextColor(NameColor(InfoMsg.m_KillerId));
 		TextRender()->CreateTextContainer(InfoMsg.m_KillerTextContainerIndex, &Cursor, InfoMsg.m_aKillerName);
 	}
@@ -199,7 +176,7 @@ void CInfoMessages::CreateTextContainersIfNotCreated(CInfoMsg &InfoMsg, float Fo
 	if(!InfoMsg.m_DiffTextContainerIndex.Valid() && InfoMsg.m_aDiffText[0] != '\0')
 	{
 		CTextCursor Cursor;
-		Cursor.m_FontSize = FontSize;
+		Cursor.m_FontSize = FONT_SIZE;
 
 		if(InfoMsg.m_Diff > 0)
 			TextRender()->TextColor(1.0f, 0.5f, 0.5f, 1.0f); // red
@@ -214,13 +191,12 @@ void CInfoMessages::CreateTextContainersIfNotCreated(CInfoMsg &InfoMsg, float Fo
 	if(!InfoMsg.m_TimeTextContainerIndex.Valid() && InfoMsg.m_aTimeText[0] != '\0')
 	{
 		CTextCursor Cursor;
-		Cursor.m_FontSize = FontSize;
+		Cursor.m_FontSize = FONT_SIZE;
 		TextRender()->TextColor(TextRender()->DefaultTextColor());
 		TextRender()->CreateTextContainer(InfoMsg.m_TimeTextContainerIndex, &Cursor, InfoMsg.m_aTimeText);
 	}
 
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
-	InfoMsg.m_FontSize = FontSize;
 }
 
 void CInfoMessages::OnMessage(int MsgType, void *pRawMsg)
@@ -324,70 +300,31 @@ void CInfoMessages::OnRaceFinishMessage(const CNetMsg_Sv_RaceFinish *pMsg)
 	if(Finish.m_Diff)
 	{
 		char aBuf[64];
-		str_time_float(absolute(Finish.m_Diff) / 1000.0f, TIME_HOURS_CENTISECS, aBuf, sizeof(aBuf));
+		str_time_float(absolute(Finish.m_Diff) / 1000.0f, ETimeFormat::HOURS_CENTISECS, aBuf, sizeof(aBuf));
 		str_format(Finish.m_aDiffText, sizeof(Finish.m_aDiffText), "(%c%s)", Finish.m_Diff < 0 ? '-' : '+', aBuf);
 	}
-	str_time_float(pMsg->m_Time / 1000.0f, TIME_HOURS_CENTISECS, Finish.m_aTimeText, sizeof(Finish.m_aTimeText));
+	str_time_float(pMsg->m_Time / 1000.0f, ETimeFormat::HOURS_CENTISECS, Finish.m_aTimeText, sizeof(Finish.m_aTimeText));
 
 	AddInfoMsg(Finish);
 }
 
-float CInfoMessages::KillMsgWidth(const CInfoMsg &InfoMsg, float Scale) const
+void CInfoMessages::RenderKillMsg(const CInfoMsg &InfoMsg, float x, float y)
 {
-	float Width = 0.0f;
-	if(InfoMsg.m_VictimTextContainerIndex.Valid())
-		Width += TextRender()->GetBoundingBoxTextContainer(InfoMsg.m_VictimTextContainerIndex).m_W;
-	Width += 24.0f * Scale;
-	Width += 44.0f * Scale * InfoMsg.m_TeamSize;
-	Width += 32.0f * Scale;
-	Width += 52.0f * Scale;
-
-	if(InfoMsg.m_aVictimIds[0] != InfoMsg.m_KillerId)
-	{
-		Width += 24.0f * Scale;
-		Width += 32.0f * Scale;
-		if(InfoMsg.m_KillerTextContainerIndex.Valid())
-			Width += TextRender()->GetBoundingBoxTextContainer(InfoMsg.m_KillerTextContainerIndex).m_W;
-	}
-
-	return Width;
-}
-
-float CInfoMessages::FinishMsgWidth(const CInfoMsg &InfoMsg, float Scale) const
-{
-	float Width = 0.0f;
-	if(InfoMsg.m_DiffTextContainerIndex.Valid())
-		Width += TextRender()->GetBoundingBoxTextContainer(InfoMsg.m_DiffTextContainerIndex).m_W;
-	if(InfoMsg.m_TimeTextContainerIndex.Valid())
-		Width += TextRender()->GetBoundingBoxTextContainer(InfoMsg.m_TimeTextContainerIndex).m_W;
-	Width += RACE_FLAG_SIZE * Scale;
-	if(InfoMsg.m_VictimTextContainerIndex.Valid())
-		Width += TextRender()->GetBoundingBoxTextContainer(InfoMsg.m_VictimTextContainerIndex).m_W;
-	Width += 24.0f * Scale;
-	return Width;
-}
-
-void CInfoMessages::RenderKillMsg(const CInfoMsg &InfoMsg, float x, float y, float Scale, float Alpha)
-{
-	Graphics()->SetColor(1.0f, 1.0f, 1.0f, Alpha);
-
 	ColorRGBA TextColor;
 	if(InfoMsg.m_VictimDDTeam)
 		TextColor = GameClient()->GetDDTeamColor(InfoMsg.m_VictimDDTeam, 0.75f);
 	else
 		TextColor = TextRender()->DefaultTextColor();
-	TextColor = TextColor.WithMultipliedAlpha(Alpha);
-	const ColorRGBA TextOutlineColor = TextRender()->DefaultTextOutlineColor().WithMultipliedAlpha(Alpha);
 
 	// render victim name
 	if(InfoMsg.m_VictimTextContainerIndex.Valid())
 	{
 		x -= TextRender()->GetBoundingBoxTextContainer(InfoMsg.m_VictimTextContainerIndex).m_W;
-		TextRender()->RenderTextContainer(InfoMsg.m_VictimTextContainerIndex, TextColor, TextOutlineColor, x, y + (ROW_HEIGHT - FONT_SIZE) * 0.5f * Scale);
+		TextRender()->RenderTextContainer(InfoMsg.m_VictimTextContainerIndex, TextColor, TextRender()->DefaultTextOutlineColor(), x, y + (ROW_HEIGHT - FONT_SIZE) / 2.0f);
 	}
 
 	// render victim flag
-	x -= 24.0f * Scale;
+	x -= 24.0f;
 	if(GameClient()->m_Snap.m_pGameInfoObj && (GameClient()->m_Snap.m_pGameInfoObj->m_GameFlags & GAMEFLAG_FLAGS) && (InfoMsg.m_ModeSpecial & 1))
 	{
 		int QuadOffset;
@@ -401,29 +338,27 @@ void CInfoMessages::RenderKillMsg(const CInfoMsg &InfoMsg, float x, float y, flo
 			Graphics()->TextureSet(GameClient()->m_GameSkin.m_SpriteFlagRed);
 			QuadOffset = 1;
 		}
-		Graphics()->RenderQuadContainerAsSprite(m_SpriteQuadContainerIndex, QuadOffset, x, y - 16.0f * Scale, Scale, Scale);
+		Graphics()->RenderQuadContainerAsSprite(m_SpriteQuadContainerIndex, QuadOffset, x, y - 16);
 	}
 
 	// render victim tees
 	for(int j = (InfoMsg.m_TeamSize - 1); j >= 0; j--)
 	{
-		CTeeRenderInfo TeeRenderInfo = InfoMsg.m_apVictimManagedTeeRenderInfos[j]->TeeRenderInfo();
-		TeeRenderInfo.m_Size *= Scale;
 		vec2 OffsetToMid;
-		CRenderTools::GetRenderTeeOffsetToRenderedTee(CAnimState::GetIdle(), &TeeRenderInfo, OffsetToMid);
-		const vec2 TeeRenderPos = vec2(x, y + ROW_HEIGHT * 0.5f * Scale + OffsetToMid.y);
-		RenderTools()->RenderTee(CAnimState::GetIdle(), &TeeRenderInfo, EMOTE_PAIN, vec2(-1, 0), TeeRenderPos, Alpha);
-		x -= 44.0f * Scale;
+		CRenderTools::GetRenderTeeOffsetToRenderedTee(CAnimState::GetIdle(), &InfoMsg.m_apVictimManagedTeeRenderInfos[j]->TeeRenderInfo(), OffsetToMid);
+		const vec2 TeeRenderPos = vec2(x, y + ROW_HEIGHT / 2.0f + OffsetToMid.y);
+		RenderTools()->RenderTee(CAnimState::GetIdle(), &InfoMsg.m_apVictimManagedTeeRenderInfos[j]->TeeRenderInfo(), EMOTE_PAIN, vec2(-1, 0), TeeRenderPos);
+		x -= 44.0f;
 	}
 
 	// render weapon
-	x -= 32.0f * Scale;
+	x -= 32.0f;
 	if(InfoMsg.m_Weapon >= 0)
 	{
 		Graphics()->TextureSet(GameClient()->m_GameSkin.m_aSpriteWeapons[InfoMsg.m_Weapon]);
-		Graphics()->RenderQuadContainerAsSprite(m_SpriteQuadContainerIndex, 4 + InfoMsg.m_Weapon, x, y + 28.0f * Scale, Scale, Scale);
+		Graphics()->RenderQuadContainerAsSprite(m_SpriteQuadContainerIndex, 4 + InfoMsg.m_Weapon, x, y + 28);
 	}
-	x -= 52.0f * Scale;
+	x -= 52.0f;
 
 	// render killer (only if different from victim)
 	if(InfoMsg.m_aVictimIds[0] != InfoMsg.m_KillerId)
@@ -442,57 +377,49 @@ void CInfoMessages::RenderKillMsg(const CInfoMsg &InfoMsg, float x, float y, flo
 				Graphics()->TextureSet(GameClient()->m_GameSkin.m_SpriteFlagRed);
 				QuadOffset = 3;
 			}
-			Graphics()->RenderQuadContainerAsSprite(m_SpriteQuadContainerIndex, QuadOffset, x - 56.0f * Scale, y - 16.0f * Scale, Scale, Scale);
+			Graphics()->RenderQuadContainerAsSprite(m_SpriteQuadContainerIndex, QuadOffset, x - 56, y - 16);
 		}
 
 		// render killer tee
-		x -= 24.0f * Scale;
+		x -= 24.0f;
 		if(InfoMsg.m_pKillerManagedTeeRenderInfo != nullptr)
 		{
-			CTeeRenderInfo TeeRenderInfo = InfoMsg.m_pKillerManagedTeeRenderInfo->TeeRenderInfo();
-			TeeRenderInfo.m_Size *= Scale;
 			vec2 OffsetToMid;
-			CRenderTools::GetRenderTeeOffsetToRenderedTee(CAnimState::GetIdle(), &TeeRenderInfo, OffsetToMid);
-			const vec2 TeeRenderPos = vec2(x, y + ROW_HEIGHT * 0.5f * Scale + OffsetToMid.y);
-			RenderTools()->RenderTee(CAnimState::GetIdle(), &TeeRenderInfo, EMOTE_ANGRY, vec2(1, 0), TeeRenderPos, Alpha);
+			CRenderTools::GetRenderTeeOffsetToRenderedTee(CAnimState::GetIdle(), &InfoMsg.m_pKillerManagedTeeRenderInfo->TeeRenderInfo(), OffsetToMid);
+			const vec2 TeeRenderPos = vec2(x, y + ROW_HEIGHT / 2.0f + OffsetToMid.y);
+			RenderTools()->RenderTee(CAnimState::GetIdle(), &InfoMsg.m_pKillerManagedTeeRenderInfo->TeeRenderInfo(), EMOTE_ANGRY, vec2(1, 0), TeeRenderPos);
 		}
-		x -= 32.0f * Scale;
+		x -= 32.0f;
 
 		// render killer name
 		if(InfoMsg.m_KillerTextContainerIndex.Valid())
 		{
 			x -= TextRender()->GetBoundingBoxTextContainer(InfoMsg.m_KillerTextContainerIndex).m_W;
-			TextRender()->RenderTextContainer(InfoMsg.m_KillerTextContainerIndex, TextColor, TextOutlineColor, x, y + (ROW_HEIGHT - FONT_SIZE) * 0.5f * Scale);
+			TextRender()->RenderTextContainer(InfoMsg.m_KillerTextContainerIndex, TextColor, TextRender()->DefaultTextOutlineColor(), x, y + (ROW_HEIGHT - FONT_SIZE) / 2.0f);
 		}
 	}
-
-	Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
 }
 
-void CInfoMessages::RenderFinishMsg(const CInfoMsg &InfoMsg, float x, float y, float Scale, float Alpha)
+void CInfoMessages::RenderFinishMsg(const CInfoMsg &InfoMsg, float x, float y)
 {
-	Graphics()->SetColor(1.0f, 1.0f, 1.0f, Alpha);
-	const ColorRGBA DefaultTextColor = TextRender()->DefaultTextColor().WithMultipliedAlpha(Alpha);
-	const ColorRGBA DefaultTextOutlineColor = TextRender()->DefaultTextOutlineColor().WithMultipliedAlpha(Alpha);
-
 	// render time diff
 	if(InfoMsg.m_DiffTextContainerIndex.Valid())
 	{
 		x -= TextRender()->GetBoundingBoxTextContainer(InfoMsg.m_DiffTextContainerIndex).m_W;
-		TextRender()->RenderTextContainer(InfoMsg.m_DiffTextContainerIndex, DefaultTextColor, DefaultTextOutlineColor, x, y + (ROW_HEIGHT - FONT_SIZE) * 0.5f * Scale);
+		TextRender()->RenderTextContainer(InfoMsg.m_DiffTextContainerIndex, TextRender()->DefaultTextColor(), TextRender()->DefaultTextOutlineColor(), x, y + (ROW_HEIGHT - FONT_SIZE) / 2.0f);
 	}
 
 	// render time
 	if(InfoMsg.m_TimeTextContainerIndex.Valid())
 	{
 		x -= TextRender()->GetBoundingBoxTextContainer(InfoMsg.m_TimeTextContainerIndex).m_W;
-		TextRender()->RenderTextContainer(InfoMsg.m_TimeTextContainerIndex, DefaultTextColor, DefaultTextOutlineColor, x, y + (ROW_HEIGHT - FONT_SIZE) * 0.5f * Scale);
+		TextRender()->RenderTextContainer(InfoMsg.m_TimeTextContainerIndex, TextRender()->DefaultTextColor(), TextRender()->DefaultTextOutlineColor(), x, y + (ROW_HEIGHT - FONT_SIZE) / 2.0f);
 	}
 
 	// render flag
-	x -= RACE_FLAG_SIZE * Scale;
+	x -= RACE_FLAG_SIZE;
 	Graphics()->TextureSet(g_pData->m_aImages[IMAGE_RACEFLAG].m_Id);
-	Graphics()->RenderQuadContainerAsSprite(m_SpriteQuadContainerIndex, m_QuadOffsetRaceFlag, x, y, Scale, Scale);
+	Graphics()->RenderQuadContainerAsSprite(m_SpriteQuadContainerIndex, m_QuadOffsetRaceFlag, x, y);
 
 	// render victim name
 	if(InfoMsg.m_VictimTextContainerIndex.Valid())
@@ -503,56 +430,38 @@ void CInfoMessages::RenderFinishMsg(const CInfoMsg &InfoMsg, float x, float y, f
 			TextColor = GameClient()->GetDDTeamColor(InfoMsg.m_VictimDDTeam, 0.75f);
 		else
 			TextColor = TextRender()->DefaultTextColor();
-		TextRender()->RenderTextContainer(InfoMsg.m_VictimTextContainerIndex, TextColor.WithMultipliedAlpha(Alpha), DefaultTextOutlineColor, x, y + (ROW_HEIGHT - FONT_SIZE) * 0.5f * Scale);
+		TextRender()->RenderTextContainer(InfoMsg.m_VictimTextContainerIndex, TextColor, TextRender()->DefaultTextOutlineColor(), x, y + (ROW_HEIGHT - FONT_SIZE) / 2.0f);
 	}
 
 	// render victim tee
-	x -= 24.0f * Scale;
-	CTeeRenderInfo TeeRenderInfo = InfoMsg.m_apVictimManagedTeeRenderInfos[0]->TeeRenderInfo();
-	TeeRenderInfo.m_Size *= Scale;
+	x -= 24.0f;
 	vec2 OffsetToMid;
-	CRenderTools::GetRenderTeeOffsetToRenderedTee(CAnimState::GetIdle(), &TeeRenderInfo, OffsetToMid);
-	const vec2 TeeRenderPos = vec2(x, y + ROW_HEIGHT * 0.5f * Scale + OffsetToMid.y);
+	CRenderTools::GetRenderTeeOffsetToRenderedTee(CAnimState::GetIdle(), &InfoMsg.m_apVictimManagedTeeRenderInfos[0]->TeeRenderInfo(), OffsetToMid);
+	const vec2 TeeRenderPos = vec2(x, y + ROW_HEIGHT / 2.0f + OffsetToMid.y);
 	const int Emote = InfoMsg.m_RecordPersonal ? EMOTE_HAPPY : EMOTE_NORMAL;
-	RenderTools()->RenderTee(CAnimState::GetIdle(), &TeeRenderInfo, Emote, vec2(-1, 0), TeeRenderPos, Alpha);
-
-	Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
+	RenderTools()->RenderTee(CAnimState::GetIdle(), &InfoMsg.m_apVictimManagedTeeRenderInfos[0]->TeeRenderInfo(), Emote, vec2(-1, 0), TeeRenderPos);
 }
 
-void CInfoMessages::RenderMessages(bool ForcePreview)
+void CInfoMessages::OnRender()
 {
-	if(!ForcePreview && Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
+	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return;
 
 	const float Height = 1.5f * 400.0f * 3.0f;
 	const float Width = Height * Graphics()->ScreenAspect();
 
-	const bool ShowKillMessages = g_Config.m_ClShowKillMessages != 0;
-	const bool ShowFinishMessages = g_Config.m_ClShowFinishMessages != 0;
-	if(!ShowKillMessages && !ShowFinishMessages)
-		return;
+	Graphics()->MapScreen(0, 0, Width, Height);
+	Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
 
-	const auto Layout = HudLayout::Get(HudLayout::MODULE_KILLFEED, Width, Height);
-	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
-	const float RowHeight = ROW_HEIGHT * Scale;
-	const float FontSize = FONT_SIZE * Scale;
-	const float StartX = Layout.m_X;
 	int Showfps = g_Config.m_ClShowfps;
 #if defined(CONF_VIDEORECORDER)
 	if(IVideo::Current())
 		Showfps = 0;
 #endif
-	const float StartY = Layout.m_Y * KILLFEED_COORD_SCALE + (Showfps ? 100.0f : 0.0f) + (g_Config.m_ClShowpred && Client()->State() != IClient::STATE_DEMOPLAYBACK ? 100.0f : 0.0f);
-	const bool BackgroundEnabled = Layout.m_BackgroundEnabled;
-	const unsigned BackgroundColor = Layout.m_BackgroundColor;
+	const float StartX = Width - 10.0f;
+	const float StartY = 30.0f + (Showfps ? 100.0f : 0.0f) + (g_Config.m_ClShowpred && Client()->State() != IClient::STATE_DEMOPLAYBACK ? 100.0f : 0.0f);
 
-	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
-	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
-	Graphics()->MapScreen(0, 0, Width, Height);
-	Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
-
-	int VisibleMessages = 0;
-	float MaxMessageWidth = 0.0f;
+	float y = StartY;
 	for(int i = 1; i <= MAX_INFOMSGS; i++)
 	{
 		CInfoMsg &InfoMsg = m_aInfoMsgs[(m_InfoMsgCurrent + i) % MAX_INFOMSGS];
@@ -566,83 +475,17 @@ void CInfoMessages::RenderMessages(bool ForcePreview)
 			continue;
 		}
 
-		const bool ShowCurrentMessage = (InfoMsg.m_Type == EType::TYPE_KILL && ShowKillMessages) || (InfoMsg.m_Type == EType::TYPE_FINISH && ShowFinishMessages);
-		if(!ShowCurrentMessage)
-			continue;
+		CreateTextContainersIfNotCreated(InfoMsg);
 
-		CreateTextContainersIfNotCreated(InfoMsg, FontSize);
-		MaxMessageWidth = maximum(MaxMessageWidth, InfoMsg.m_Type == EType::TYPE_KILL ? KillMsgWidth(InfoMsg, Scale) : FinishMsgWidth(InfoMsg, Scale));
-		++VisibleMessages;
-	}
-
-	if(VisibleMessages <= 0)
-	{
-		Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
-		return;
-	}
-
-	const float TotalHeight = VisibleMessages * RowHeight;
-	const float DrawAnchorX = std::clamp(StartX, MaxMessageWidth, Width);
-	const float DrawX = DrawAnchorX - MaxMessageWidth;
-	const float DrawY = std::clamp(StartY, 0.0f, maximum(0.0f, Height - TotalHeight));
-
-	if(BackgroundEnabled)
-	{
-		const float PaddingX = 4.0f * Scale;
-		const float PaddingY = 4.0f * Scale;
-		const float RectX = maximum(0.0f, DrawX - PaddingX);
-		const float RectY = maximum(0.0f, DrawY - PaddingY);
-		const float RectW = minimum(Width - RectX, MaxMessageWidth + PaddingX * 2.0f);
-		const float RectH = minimum(Height - RectY, TotalHeight + PaddingY * 2.0f);
-		const int Corners = HudLayoutBackgroundCorners(GameClient(), IGraphics::CORNER_ALL, RectX, RectY, RectW, RectH, Width, Height);
-		Graphics()->DrawRect(RectX, RectY, RectW, RectH, HudLayoutBackgroundColor(BackgroundColor), Corners, 4.0f * Scale);
-	}
-
-	float y = DrawY;
-	const int CurTick = Client()->GameTick(g_Config.m_ClDummy);
-	const float TickSpeed = (float)Client()->GameTickSpeed();
-	const float LifeTimeSeconds = 10.0f;
-	for(int i = 1; i <= MAX_INFOMSGS; i++)
-	{
-		CInfoMsg &InfoMsg = m_aInfoMsgs[(m_InfoMsgCurrent + i) % MAX_INFOMSGS];
-		if(InfoMsg.m_Tick == -1)
-			continue;
-		if((InfoMsg.m_Type == EType::TYPE_KILL && !ShowKillMessages) || (InfoMsg.m_Type == EType::TYPE_FINISH && !ShowFinishMessages))
-			continue;
-
-		const float MessageWidth = InfoMsg.m_Type == EType::TYPE_KILL ? KillMsgWidth(InfoMsg, Scale) : FinishMsgWidth(InfoMsg, Scale);
-		const float MessageAnchorX = ForcePreview ? std::clamp(StartX, MessageWidth, Width) : DrawAnchorX;
-
-		float Alpha = 1.0f;
-		float XOff = 0.0f;
-		float YOff = 0.0f;
-		if(BCUiAnimations::Enabled() && TickSpeed > 0.0f)
+		if(InfoMsg.m_Type == EType::TYPE_KILL && g_Config.m_ClShowKillMessages)
 		{
-			const float AgeSeconds = (CurTick - InfoMsg.m_Tick) / TickSpeed;
-			const float AppearDuration = 0.20f;
-			const float AppearProgress = std::clamp(AgeSeconds / AppearDuration, 0.0f, 1.0f);
-			const float AppearEase = BCUiAnimations::EaseInOutQuad(AppearProgress);
-
-			const float TimeLeftSeconds = (InfoMsg.m_Tick + (int)(LifeTimeSeconds * TickSpeed) - CurTick) / TickSpeed;
-			const float FadeOutDuration = 0.55f;
-			const float FadeOutFactor = TimeLeftSeconds < FadeOutDuration ? std::clamp(TimeLeftSeconds / FadeOutDuration, 0.0f, 1.0f) : 1.0f;
-
-			Alpha = AppearEase * FadeOutFactor;
-			XOff = (1.0f - AppearEase) * 40.0f * Scale;
-			YOff = -(1.0f - AppearEase) * 6.0f * Scale;
+			RenderKillMsg(InfoMsg, StartX, y);
+			y += ROW_HEIGHT;
 		}
-
-		if(InfoMsg.m_Type == EType::TYPE_KILL)
-			RenderKillMsg(InfoMsg, MessageAnchorX + XOff, y + YOff, Scale, Alpha);
-		else
-			RenderFinishMsg(InfoMsg, MessageAnchorX + XOff, y + YOff, Scale, Alpha);
-		y += RowHeight;
+		else if(InfoMsg.m_Type == EType::TYPE_FINISH && g_Config.m_ClShowFinishMessages)
+		{
+			RenderFinishMsg(InfoMsg, StartX, y);
+			y += ROW_HEIGHT;
+		}
 	}
-
-	Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
-}
-
-void CInfoMessages::OnRender()
-{
-	RenderMessages(false);
 }

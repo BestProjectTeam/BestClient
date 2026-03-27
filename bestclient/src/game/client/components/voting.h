@@ -10,6 +10,8 @@
 #include <game/client/ui_rect.h>
 #include <game/voting.h>
 
+class CTClient;
+
 class CVoting : public CComponent
 {
 	CHeap m_Heap;
@@ -40,6 +42,7 @@ class CVoting : public CComponent
 
 public:
 	friend class CBestClient; // BestClient
+	friend class CTClient;
 
 	CVoting();
 	int Sizeof() const override { return sizeof(*this); }

@@ -9,6 +9,7 @@
 #include <engine/storage.h>
 
 #include <game/version.h>
+#include <game/client/components/bestclient/version.h>
 
 #include <algorithm>
 #include <cctype>
@@ -325,7 +326,7 @@ bool CUpdater::ParseReleaseTask()
 		return false;
 	}
 
-	if(CompareVersionStrings(m_aLatestVersion, BestClient_VERSION) <= 0)
+	if(CompareVersionStrings(m_aLatestVersion, BESTCLIENT_VERSION) <= 0)
 	{
 		SetStatus("No new release found");
 		SetCurrentState(IUpdater::CLEAN);
