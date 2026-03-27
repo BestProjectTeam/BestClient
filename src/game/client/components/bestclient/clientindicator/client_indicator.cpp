@@ -265,6 +265,8 @@ void CClientIndicator::OnUpdate()
 	else if(!PresenceEnabled)
 	{
 		m_RuntimeState = ESubsystemRuntimeState::COOLDOWN;
+		if(!m_pBrowserTask && (m_LastBrowserRefreshTick == 0 || Now - m_LastBrowserRefreshTick >= BrowserRefreshInterval))
+			RefreshBrowserCache(false);
 		if(m_WasPresenceEnabled || m_Socket || m_HasServerAddr || m_pTokenTask || m_aWebSharedToken[0] != '\0')
 		{
 			StopPresence(true);

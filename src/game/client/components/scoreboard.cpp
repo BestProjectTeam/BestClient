@@ -25,6 +25,8 @@
 #include <game/client/ui.h>
 #include <game/localization.h>
 
+#include <cmath>
+
 namespace
 {
 void RenderBestClientIcon(IGraphics *pGraphics, const CUIRect &Rect)
@@ -36,6 +38,36 @@ void RenderBestClientIcon(IGraphics *pGraphics, const CUIRect &Rect)
 	const IGraphics::CQuadItem Quad(Rect.x, Rect.y, Rect.w, Rect.h);
 	pGraphics->QuadsDrawTL(&Quad, 1);
 	pGraphics->QuadsEnd();
+}
+
+float ScoreTextWidthForRenderTime(ITextRender *pTextRender, float FontSize, int Seconds, bool NotFinished, int Millis, bool TrueMilliseconds)
+{
+	if(NotFinished)
+		return 0.0f;
+
+	char aBuf[128];
+	str_time(((int64_t)absolute(Seconds)) * 100, ETimeFormat::HOURS, aBuf, sizeof(aBuf));
+
+	STextSizeProperties TextSizeProps{};
+	const float SecondsWidth = pTextRender->TextWidth(FontSize, aBuf, -1, -1.0f, 0, TextSizeProps);
+
+	// Mirror CUi::RenderTime width behavior when milliseconds are shown in smaller font.
+	if(Millis >= 0 && Seconds < 60 * 60)
+	{
+		const float CentisecondFontSize = FontSize * 0.61803398875f;
+		char aMillis[4];
+		Millis %= 1000;
+		if(!TrueMilliseconds)
+			str_format(aMillis, sizeof(aMillis), "%02d", (int)std::round(Millis / 10));
+		else
+			str_format(aMillis, sizeof(aMillis), "%03d", Millis);
+
+		const float MillisWidth = pTextRender->TextWidth(CentisecondFontSize, aMillis, -1, -1.0f, 0, TextSizeProps);
+		const float Tightening = TrueMilliseconds ? MillisWidth / (3.0f * 6.0f) : MillisWidth / (2.0f * 6.0f);
+		return SecondsWidth + MillisWidth - Tightening;
+	}
+
+	return SecondsWidth;
 }
 }
 
@@ -751,15 +783,28 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 			ScorePosition.y = Row.y;
 			ScorePosition.h = Row.h;
 
+			float ScoreTextWidth = 0.0f;
+			if(Race7)
+			{
+				ScoreTextWidth = ScoreTextWidthForRenderTime(TextRender(), FontSize, pInfo->m_Score / 1000, pInfo->m_Score == protocol7::FinishTime::NOT_FINISHED, pInfo->m_Score % 1000, true);
+			}
+			else if(MillisecondScore)
+			{
+				ScoreTextWidth = ScoreTextWidthForRenderTime(TextRender(), FontSize, ClientData.m_FinishTimeSeconds, ClientData.m_FinishTimeSeconds == FinishTime::NOT_FINISHED_MILLIS, ClientData.m_FinishTimeMillis, TrueMilliseconds);
+			}
+			else if(TimeScore)
+			{
+				ScoreTextWidth = ScoreTextWidthForRenderTime(TextRender(), FontSize, pInfo->m_Score, pInfo->m_Score == FinishTime::NOT_FINISHED_TIMESCORE, -1, false);
+			}
+			else
+			{
+				str_format(aBuf, sizeof(aBuf), "%d", std::clamp(pInfo->m_Score, -999, 99999));
+				ScoreTextWidth = TextRender()->TextWidth(FontSize, aBuf);
+			}
+			const float ScoreTextX = ScoreOffset + ScoreLength - ScoreTextWidth;
+
 			if(g_Config.m_BcClientIndicatorInScoreboard && pInfo->m_ClientId >= 0 && GameClient()->m_ClientIndicator.IsPlayerBestClient(pInfo->m_ClientId))
 			{
-				float ScoreTextWidth = TextRender()->TextWidth(FontSize, "99999");
-				if(Race7 || MillisecondScore)
-					ScoreTextWidth = TextRender()->TextWidth(FontSize, "00:00.000");
-				else if(TimeScore)
-					ScoreTextWidth = TextRender()->TextWidth(FontSize, "00:00:00");
-
-				const float ScoreTextX = ScoreOffset + ScoreLength - ScoreTextWidth;
 				const float IconSize = FontSize * (0.8f + 0.3f * g_Config.m_BcClientIndicatorInSoreboardSize / 100.0f);
 				const float IconSpacing = 4.0f;
 				const CUIRect IconRect = {
