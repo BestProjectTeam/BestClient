@@ -2565,6 +2565,8 @@ if(CLIENT)
     components/bestclient/clientindicator/protocol.h
     components/bestclient/fast_actions.cpp
     components/bestclient/fast_actions.h
+    components/bestclient/fast_practice.cpp
+    components/bestclient/fast_practice.h
     components/bestclient/chat_bubbles.cpp
     components/bestclient/chat_bubbles.h
     components/bestclient/magic_particles.cpp

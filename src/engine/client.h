@@ -400,6 +400,7 @@ public:
 	virtual void OnWindowResize() = 0;
 
 	virtual int OnSnapInput(int *pData, bool Dummy, bool Force) = 0;
+	virtual void PrepareInputForSend(int *pData, int Size, bool Dummy) = 0;
 	virtual void OnDummySwap() = 0;
 	virtual void SendDummyInfo(bool Start) = 0;
 

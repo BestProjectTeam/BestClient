@@ -361,6 +361,8 @@ void CClient::SendInput()
 
 		if(Size)
 		{
+			GameClient()->PrepareInputForSend(m_aInputs[i][m_aCurrentInput[i]].m_aData, Size, Dummy);
+
 			// pack input
 			CMsgPacker Msg(NETMSG_INPUT, true);
 			Msg.AddInt(m_aAckGameTick[i]);

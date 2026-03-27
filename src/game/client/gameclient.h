@@ -35,6 +35,7 @@
 #include "components/bestclient/bestclient.h"
 #include "components/bestclient/clientindicator/client_indicator.h"
 #include "components/bestclient/fast_actions.h"
+#include "components/bestclient/fast_practice.h"
 #include "components/bestclient/chat_bubbles.h"
 #include "components/bestclient/magic_particles.h"
 #include "components/bestclient/music_player.h"
@@ -174,6 +175,7 @@ class CGameClient : public IGameClient
 {
 public:
 	friend class CTClient;
+	friend class CFastPractice;
 
 	// all components
 	CInfoMessages m_InfoMessages;
@@ -231,6 +233,7 @@ public:
 	CMusicPlayer m_MusicPlayer;
 	CAdminPanel m_AdminPanel;
 	CFastActions m_FastActions;
+	CFastPractice m_FastPractice;
 	CBestClient m_BestClient;
 
 	CTooltips m_Tooltips;
@@ -699,6 +702,7 @@ public:
 	void OnActivateEditor() override;
 	void OnDummySwap() override;
 	int OnSnapInput(int *pData, bool Dummy, bool Force) override;
+	void PrepareInputForSend(int *pData, int Size, bool Dummy) override;
 	void OnShutdown() override;
 	void OnEnterGame() override;
 	void OnRconType(bool UsernameReq) override;
@@ -745,6 +749,7 @@ public:
 	bool GotWantedSkin7(bool Dummy);
 	void SendInfo(bool Start);
 	void SendDummyInfo(bool Start) override;
+	void SendKill();
 	void SendKill() const;
 	void SendReadyChange7();
 
@@ -772,10 +777,10 @@ public:
 
 	bool IsTeamPlay() const { return m_Snap.m_pGameInfoObj && m_Snap.m_pGameInfoObj->m_GameFlags & GAMEFLAG_TEAMS; }
 
-	bool AntiPingPlayers() const { return g_Config.m_ClAntiPing && g_Config.m_ClAntiPingPlayers && !m_Snap.m_SpecInfo.m_Active && Client()->State() != IClient::STATE_DEMOPLAYBACK; }
-	bool AntiPingGrenade() const { return g_Config.m_ClAntiPing && g_Config.m_ClAntiPingGrenade && !m_Snap.m_SpecInfo.m_Active && Client()->State() != IClient::STATE_DEMOPLAYBACK; }
-	bool AntiPingWeapons() const { return g_Config.m_ClAntiPing && g_Config.m_ClAntiPingWeapons && !m_Snap.m_SpecInfo.m_Active && Client()->State() != IClient::STATE_DEMOPLAYBACK; }
-	bool AntiPingGunfire() const { return AntiPingGrenade() && AntiPingWeapons() && g_Config.m_ClAntiPingGunfire; }
+	bool AntiPingPlayers() const { return m_FastPractice.ForcePredictPlayers() || (g_Config.m_ClAntiPing && g_Config.m_ClAntiPingPlayers && !m_Snap.m_SpecInfo.m_Active && Client()->State() != IClient::STATE_DEMOPLAYBACK && (m_aTuning[g_Config.m_ClDummy].m_PlayerCollision || m_aTuning[g_Config.m_ClDummy].m_PlayerHooking)); }
+	bool AntiPingGrenade() const { return m_FastPractice.ForcePredictGrenade() || (g_Config.m_ClAntiPing && g_Config.m_ClAntiPingGrenade && !m_Snap.m_SpecInfo.m_Active && Client()->State() != IClient::STATE_DEMOPLAYBACK); }
+	bool AntiPingWeapons() const { return m_FastPractice.ForcePredictWeapons() || (g_Config.m_ClAntiPing && g_Config.m_ClAntiPingWeapons && !m_Snap.m_SpecInfo.m_Active && Client()->State() != IClient::STATE_DEMOPLAYBACK); }
+	bool AntiPingGunfire() const { return m_FastPractice.ForcePredictGunfire() || (AntiPingGrenade() && AntiPingWeapons() && g_Config.m_ClAntiPingGunfire); }
 	bool OptimizerEnabled() const;
 	bool OptimizerDisableParticles() const;
 	bool OptimizerFpsFogEnabled() const;
@@ -784,7 +789,15 @@ public:
 	void OptimizerSetDdnetPriorityHigh();
 	void OptimizerSetDiscordPriorityBelowNormal();
 	bool Predict() const;
-	bool PredictDummy() const { return g_Config.m_ClPredictDummy && Client()->DummyConnected() && m_Snap.m_LocalClientId >= 0 && m_aLocalIds[!g_Config.m_ClDummy] >= 0 && !m_aClients[m_aLocalIds[!g_Config.m_ClDummy]].m_Paused; }
+	bool PredictDummy() const
+	{
+		if(m_FastPractice.Enabled())
+		{
+			const int FastPracticeDummyId = m_FastPractice.CurrentPracticeDummyId();
+			return FastPracticeDummyId >= 0 && m_Snap.m_LocalClientId >= 0 && !m_aClients[FastPracticeDummyId].m_Paused;
+		}
+		return g_Config.m_ClPredictDummy && Client()->DummyConnected() && m_Snap.m_LocalClientId >= 0 && m_PredictedDummyId >= 0 && !m_aClients[m_PredictedDummyId].m_Paused;
+	}
 	const CTuningParams *GetTuning(int i) const { return &m_aTuningList[i]; }
 	ColorRGBA GetDDTeamColor(int DDTeam, float Lightness = 0.5f) const;
 	void FormatClientId(int ClientId, char (&aClientId)[16], EClientIdFormat Format) const;
@@ -1037,6 +1050,7 @@ private:
 	void DetectStrongHook();
 
 	int m_IsDummySwapping;
+	int m_PredictedDummyId = -1;
 	int m_aAutoTeamLockLastTeam[NUM_DUMMIES];
 	int64_t m_aAutoTeamLockDeadlineTick[NUM_DUMMIES];
 	bool m_aAutoTeamLockPending[NUM_DUMMIES];

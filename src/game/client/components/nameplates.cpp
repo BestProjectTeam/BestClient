@@ -924,6 +924,8 @@ void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *p
 		Alpha *= std::clamp(1.0f - std::pow(distance(GameClient()->m_Controls.m_aTargetPos[g_Config.m_ClDummy], Position) / 200.0f, 16.0f), 0.0f, 1.0f);
 	if(OtherTeam)
 		Alpha *= (float)g_Config.m_ClShowOthersAlpha / 100.0f;
+	if(GameClient()->m_FastPractice.Enabled() && !GameClient()->m_FastPractice.IsPracticeParticipant(pPlayerInfo->m_ClientId))
+		Alpha = std::min(Alpha, 0.5f);
 
 	Data.m_Color = ColorRGBA(1.0f, 1.0f, 1.0f);
 	if(g_Config.m_ClNamePlatesTeamcolors)

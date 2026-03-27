@@ -493,6 +493,7 @@ void CGameClient::OnConsoleInit()
 					      &m_Afterimage,
 					      &m_Players,
 						  &m_MovingTilesBackground, // TClient
+						  &m_FastPractice,
 						  &m_MapLayersForeground,
 						  &m_MovingTilesForeground, // TClient
 					      &m_Outlines,  // TClient
@@ -963,8 +964,14 @@ int CGameClient::OnSnapInput(int *pData, bool Dummy, bool Force)
 	}
 }
 
+void CGameClient::PrepareInputForSend(int *pData, int Size, bool Dummy)
+{
+	m_FastPractice.PrepareInputForSend(pData, Size, Dummy);
+}
+
 void CGameClient::OnConnected()
 {
+	m_FastPractice.InvalidateBufferedInputState();
 	const char *pConnectCaption = DemoPlayer()->IsPlaying() ? Localize("Preparing demo playback") : Localize("Connected");
 	const char *pLoadMapContent = Localize("Initializing map logic");
 	// render loading before skip is calculated
@@ -1083,6 +1090,7 @@ void CGameClient::OnReset()
 	std::fill(std::begin(m_aLastUpdateTick), std::end(m_aLastUpdateTick), 0);
 
 	m_IsDummySwapping = false;
+	m_PredictedDummyId = -1;
 	for(int Dummy = 0; Dummy < NUM_DUMMIES; ++Dummy)
 	{
 		m_aAutoTeamLockLastTeam[Dummy] = TEAM_FLOCK;
@@ -1329,6 +1337,8 @@ void CGameClient::OnDummyDisconnect()
 	m_aShowOthers[1] = SHOW_OTHERS_NOT_SET;
 	m_aEnableSpectatorCount[1] = -1;
 	m_aLastNewPredictedTick[1] = -1;
+	m_PredictedDummyId = -1;
+	m_FastPractice.InvalidateBufferedInputState();
 }
 
 int CGameClient::LastRaceTick() const
@@ -1347,7 +1357,7 @@ int CGameClient::CurrentRaceTime() const
 
 bool CGameClient::Predict() const
 {
-	if(!g_Config.m_ClPredict)
+	if(!g_Config.m_ClPredict && !m_FastPractice.Enabled())
 		return false;
 
 	if(m_Snap.m_pGameInfoObj)
@@ -2568,6 +2578,14 @@ void CGameClient::OnNewSnapshot()
 			m_Controls.OnPlayerDeath();
 		}
 	}
+
+	if(m_FastPractice.Enabled())
+		m_PredictedDummyId = m_FastPractice.CurrentPracticeDummyId();
+	else if(Client()->DummyConnected() && m_aLocalIds[!g_Config.m_ClDummy] >= 0)
+		m_PredictedDummyId = m_aLocalIds[!g_Config.m_ClDummy];
+	else
+		m_PredictedDummyId = -1;
+
 	if(Client()->State() == IClient::STATE_DEMOPLAYBACK)
 	{
 		if(m_Snap.m_LocalClientId == -1 && m_DemoSpecId == SPEC_FOLLOW)
@@ -3082,6 +3100,9 @@ void CGameClient::OnPredict()
 		}
 		return;
 	}
+
+	if(m_FastPractice.Enabled() && m_FastPractice.OverridePredict())
+		return;
 
 	vec2 aBeforeRender[MAX_CLIENTS];
 	for(int i = 0; i < MAX_CLIENTS; i++)
@@ -4086,8 +4107,11 @@ void CGameClient::SendDummyInfo(bool Start)
 	}
 }
 
-void CGameClient::SendKill() const
+void CGameClient::SendKill()
 {
+	if(m_FastPractice.ConsumeKillCommand())
+		return;
+
 	CNetMsg_Cl_Kill Msg;
 	Client()->SendPackMsgActive(&Msg, MSGFLAG_VITAL);
 
@@ -4096,6 +4120,11 @@ void CGameClient::SendKill() const
 		CMsgPacker MsgP(NETMSGTYPE_CL_KILL, false);
 		Client()->SendMsg(!g_Config.m_ClDummy, &MsgP, MSGFLAG_VITAL);
 	}
+}
+
+void CGameClient::SendKill() const
+{
+	const_cast<CGameClient *>(this)->SendKill();
 }
 
 void CGameClient::SendReadyChange7()
@@ -4597,7 +4626,8 @@ void CGameClient::UpdateRenderedCharacters()
 		if(i == m_Snap.m_LocalClientId)
 			Client()->m_IsLocalFrozen = pChar && pChar->m_FreezeTime > 0;
 
-		if(Predict() && (i == m_Snap.m_LocalClientId || (AntiPingPlayers() && !IsOtherTeam(i))) && pChar)
+		const bool IsPracticeParticipant = m_FastPractice.Enabled() && m_FastPractice.IsPracticeParticipant(i);
+		if(Predict() && (i == m_Snap.m_LocalClientId || IsPracticeParticipant || (AntiPingPlayers() && !IsOtherTeam(i))) && pChar)
 		{
 			m_aClients[i].m_Predicted.Write(&m_aClients[i].m_RenderCur);
 			m_aClients[i].m_PrevPredicted.Write(&m_aClients[i].m_RenderPrev);
@@ -4611,10 +4641,17 @@ void CGameClient::UpdateRenderedCharacters()
 
 			if(g_Config.m_TcRemoveAnti)
 				Pos = GetFreezePos(i);
+			else if(IsPracticeParticipant)
+			{
+				if(HasFastInput && (i == m_Snap.m_LocalClientId || FastInputOthers))
+					Pos = GetFastInputPos(i);
+			}
 			else if(HasFastInput && (i == m_Snap.m_LocalClientId || (PredictDummy() && i == m_aLocalIds[!g_Config.m_ClDummy])))
+			{
 				Pos = GetFastInputPos(i);
+			}
 
-			if(i == m_Snap.m_LocalClientId || (PredictDummy() && i == m_aLocalIds[!g_Config.m_ClDummy]))
+			if(i == m_Snap.m_LocalClientId || IsPracticeParticipant || (PredictDummy() && i == m_aLocalIds[!g_Config.m_ClDummy]))
 			{
 				m_aClients[i].m_IsPredictedLocal = true;
 				if(AntiPingGunfire() && ((pChar->m_NinjaJetpack && pChar->m_FreezeTime == 0) || m_Snap.m_aCharacters[i].m_Cur.m_Weapon != WEAPON_NINJA || m_Snap.m_aCharacters[i].m_Cur.m_Weapon == m_aClients[i].m_Predicted.m_ActiveWeapon))
