@@ -1577,6 +1577,17 @@ bool CMenus::RenderLanguageSelection(CUIRect MainView)
 
 void CMenus::RenderSettings(CUIRect MainView)
 {
+	if(g_Config.m_UiSettingsPage == SETTINGS_BESTCLIENT && m_AssetsEditorState.m_VisualsEditorOpen && m_AssetsEditorState.m_FullscreenOpen)
+	{
+		RenderSettingsBestClient(MainView);
+		return;
+	}
+	if(g_Config.m_UiSettingsPage == SETTINGS_BESTCLIENT && m_ComponentsEditorState.m_Open && m_ComponentsEditorState.m_FullscreenOpen)
+	{
+		RenderSettingsBestClient(MainView);
+		return;
+	}
+
 	const bool NeedRestart = m_NeedRestartGraphics || m_NeedRestartSound || m_NeedRestartUpdate;
 	auto RenderSettingsPage = [&](CUIRect PageView) {
 		if(g_Config.m_UiSettingsPage == SETTINGS_LANGUAGE)
@@ -3396,6 +3407,21 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 	static int s_CurTab = BESTCLIENT_TAB_VISUALS;
 	static CButtonContainer s_aPageTabs[NUM_BESTCLIENT_TABS] = {};
 
+	if(m_AssetsEditorState.m_VisualsEditorOpen && m_AssetsEditorState.m_FullscreenOpen)
+	{
+		s_CurTab = BESTCLIENT_TAB_VISUALS;
+		m_AssetsEditorState.m_VisualsSubTab = BESTCLIENT_VISUALS_SUBTAB_EDITORS;
+		RenderAssetsEditorScreen(*Ui()->Screen());
+		return;
+	}
+	if(m_ComponentsEditorState.m_Open && m_ComponentsEditorState.m_FullscreenOpen)
+	{
+		s_CurTab = BESTCLIENT_TAB_VISUALS;
+		m_AssetsEditorState.m_VisualsSubTab = BESTCLIENT_VISUALS_SUBTAB_EDITORS;
+		RenderComponentsEditorScreen(*Ui()->Screen());
+		return;
+	}
+
 	CUIRect TabBar, Button;
 	MainView.HSplitTop(24.0f, &TabBar, &MainView);
 	const char *apTabNames[NUM_BESTCLIENT_TABS] = {
@@ -3453,6 +3479,9 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 
 	if(s_CurTab == BESTCLIENT_TAB_VISUALS)
 	{
+		if(m_AssetsEditorState.m_VisualsSubTab < 0 || m_AssetsEditorState.m_VisualsSubTab >= BESTCLIENT_VISUALS_SUBTAB_LENGTH)
+			m_AssetsEditorState.m_VisualsSubTab = BESTCLIENT_VISUALS_SUBTAB_GENERAL;
+
 		const float LineSize = 20.0f;
 		const float HeadlineFontSize = 20.0f;
 		const float MarginSmall = 5.0f;
@@ -3471,6 +3500,72 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			else
 				Phase = Expanded ? 1.0f : 0.0f;
 		};
+
+		CUIRect VisualsTabBar, VisualsTabButton;
+		MainView.HSplitTop(LineSize + 2.0f, &VisualsTabBar, &MainView);
+		const float VisualsTabWidth = VisualsTabBar.w / (float)BESTCLIENT_VISUALS_SUBTAB_LENGTH;
+		const char *apVisualsTabs[BESTCLIENT_VISUALS_SUBTAB_LENGTH] = {
+			Localize("General"),
+			Localize("Editors"),
+		};
+		static CButtonContainer s_aVisualsTabs[BESTCLIENT_VISUALS_SUBTAB_LENGTH] = {};
+		for(int Tab = 0; Tab < BESTCLIENT_VISUALS_SUBTAB_LENGTH; ++Tab)
+		{
+			VisualsTabBar.VSplitLeft(VisualsTabWidth, &VisualsTabButton, &VisualsTabBar);
+			const int Corners = Tab == 0 ? IGraphics::CORNER_L : (Tab == BESTCLIENT_VISUALS_SUBTAB_LENGTH - 1 ? IGraphics::CORNER_R : IGraphics::CORNER_NONE);
+			if(DoButton_MenuTab(&s_aVisualsTabs[Tab], apVisualsTabs[Tab], m_AssetsEditorState.m_VisualsSubTab == Tab, &VisualsTabButton, Corners, nullptr, nullptr, nullptr, nullptr, 4.0f))
+				m_AssetsEditorState.m_VisualsSubTab = Tab;
+		}
+		MainView.HSplitTop(10.0f, nullptr, &MainView);
+
+		if(m_AssetsEditorState.m_VisualsSubTab == BESTCLIENT_VISUALS_SUBTAB_EDITORS)
+		{
+			if(m_AssetsEditorState.m_VisualsEditorOpen)
+			{
+				RenderAssetsEditorScreen(MainView);
+				return;
+			}
+
+			CUIRect Label, Button;
+			MainView.HSplitTop(24.0f, &Label, &MainView);
+			Ui()->DoLabel(&Label, Localize("Editors"), 20.0f, TEXTALIGN_ML);
+			MainView.HSplitTop(5.0f, nullptr, &MainView);
+
+			MainView.HSplitTop(LineSize, &Label, &MainView);
+			Ui()->DoLabel(&Label, Localize("Create mixed assets or jump to the name plate editor."), 14.0f, TEXTALIGN_ML);
+			MainView.HSplitTop(5.0f, nullptr, &MainView);
+
+			static CButtonContainer s_OpenAssetsEditorButton;
+			MainView.HSplitTop(LineSize + 4.0f, &Button, &MainView);
+			if(DoButton_Menu(&s_OpenAssetsEditorButton, Localize("Assets editor"), 0, &Button))
+			{
+				m_AssetsEditorState.m_VisualsEditorOpen = true;
+				m_AssetsEditorState.m_FullscreenOpen = true;
+				if(!m_AssetsEditorState.m_VisualsEditorInitialized)
+				{
+					AssetsEditorReloadAssets();
+					AssetsEditorResetPartSlots();
+					AssetsEditorEnsureDefaultExportNames();
+					AssetsEditorSyncExportNameFromType();
+					m_AssetsEditorState.m_VisualsEditorInitialized = true;
+				}
+			}
+
+			MainView.HSplitTop(30.0f, nullptr, &MainView);
+			MainView.HSplitTop(LineSize, &Label, &MainView);
+			Ui()->DoLabel(&Label, Localize("Open a dedicated component toggles page."), 14.0f, TEXTALIGN_ML);
+			MainView.HSplitTop(5.0f, nullptr, &MainView);
+
+			static CButtonContainer s_OpenComponentsEditorButton;
+			MainView.HSplitTop(LineSize + 4.0f, &Button, &MainView);
+			if(DoButton_Menu(&s_OpenComponentsEditorButton, Localize("Components editor"), 0, &Button))
+			{
+				m_ComponentsEditorState.m_Open = true;
+				m_ComponentsEditorState.m_FullscreenOpen = true;
+			}
+
+			return;
+		}
 
 		static CScrollRegion s_BestClientVisualsScrollRegion;
 		vec2 VisualsScrollOffset(0.0f, 0.0f);
@@ -4992,6 +5087,88 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		RenderSettingsBestClientInfo(MainView);
 	}
 
+}
+
+void CMenus::RenderComponentsEditorScreen(CUIRect MainView)
+{
+	if(m_ComponentsEditorState.m_FullscreenOpen)
+		MainView = *Ui()->Screen();
+
+	CUIRect EditorRect = MainView;
+	EditorRect.Margin(8.0f, &EditorRect);
+	EditorRect.Draw(ColorRGBA(0.10f, 0.11f, 0.15f, 1.0f), IGraphics::CORNER_ALL, 8.0f);
+	Ui()->ClipEnable(&EditorRect);
+
+	CUIRect WorkRect;
+	EditorRect.Margin(8.0f, &WorkRect);
+	CUIRect Header, Content;
+	WorkRect.HSplitTop(24.0f, &Header, &Content);
+
+	CUIRect CloseButtonArea, HeaderText;
+	Header.VSplitLeft(14.0f, &CloseButtonArea, &HeaderText);
+	HeaderText.VSplitLeft(6.0f, nullptr, &HeaderText);
+	CloseButtonArea.HMargin(5.0f, &CloseButtonArea);
+
+	static CButtonContainer s_CloseComponentsEditorButton;
+	if(Ui()->DoButton_FontIcon(&s_CloseComponentsEditorButton, FontIcon::XMARK, 0, &CloseButtonArea, IGraphics::CORNER_ALL) || Ui()->ConsumeHotkey(CUi::HOTKEY_ESCAPE))
+	{
+		m_ComponentsEditorState.m_Open = false;
+		Ui()->ClipDisable();
+		return;
+	}
+
+	Ui()->DoLabel(&HeaderText, Localize("Components Editor"), 20.0f, TEXTALIGN_ML);
+	Content.HSplitTop(10.0f, nullptr, &Content);
+
+	struct SComponentToggleEntry
+	{
+		int *m_pValue;
+		const char *m_pLabel;
+	};
+
+	static const SComponentToggleEntry s_aEntries[] = {
+		{&g_Config.m_BcMusicPlayer, "Music Player"},
+		{&g_Config.m_BcMagicParticles, "Magic Particles"},
+		{&g_Config.m_BcOrbitAura, "Orbit Aura"},
+		{&g_Config.m_Bc3dParticles, "3D Particles"},
+		{&g_Config.m_BcMenuMediaBackground, "Menu Media Background"},
+		{&g_Config.m_BcGameMediaBackground, "Game Media Background"},
+		{&g_Config.m_BcChatBubbles, "Chat Bubbles"},
+		{&g_Config.m_BcOptimizer, "Optimizer"},
+		{&g_Config.m_BcCameraDrift, "Camera Drift"},
+		{&g_Config.m_BcDynamicFov, "Dynamic FOV"},
+		{&g_Config.m_BcAfterimage, "Afterimage"},
+	};
+
+	static CScrollRegion s_ComponentsEditorScrollRegion;
+	vec2 ScrollOffset(0.0f, 0.0f);
+	CScrollRegionParams ScrollParams;
+	ScrollParams.m_ScrollUnit = 60.0f;
+	ScrollParams.m_Flags = CScrollRegionParams::FLAG_CONTENT_STATIC_WIDTH;
+	ScrollParams.m_ScrollbarMargin = 5.0f;
+	s_ComponentsEditorScrollRegion.Begin(&Content, &ScrollOffset, &ScrollParams);
+
+	CUIRect View = Content;
+	View.y += ScrollOffset.y;
+	View.VSplitLeft(5.0f, nullptr, &View);
+	View.VSplitRight(5.0f, &View, nullptr);
+
+	CUIRect Label;
+	View.HSplitTop(20.0f, &Label, &View);
+	Ui()->DoLabel(&Label, Localize("Toggle BestClient visual components directly."), 14.0f, TEXTALIGN_ML);
+	View.HSplitTop(10.0f, nullptr, &View);
+
+	for(const auto &Entry : s_aEntries)
+		DoButton_CheckBoxAutoVMarginAndSet(Entry.m_pValue, Localize(Entry.m_pLabel), Entry.m_pValue, &View, 20.0f);
+
+	CUIRect ScrollRegion;
+	ScrollRegion.x = Content.x;
+	ScrollRegion.y = View.y;
+	ScrollRegion.w = Content.w;
+	ScrollRegion.h = 0.0f;
+	s_ComponentsEditorScrollRegion.AddRect(ScrollRegion);
+	s_ComponentsEditorScrollRegion.End();
+	Ui()->ClipDisable();
 }
 
 void CMenus::RenderSettingsBestClientInfo(CUIRect MainView)

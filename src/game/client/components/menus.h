@@ -32,6 +32,9 @@
 #include <optional>
 #include <vector>
 
+class CImageInfo;
+struct CDataSprite;
+
 class CMenus : public CComponent
 {
 	static ColorRGBA ms_GuiColor;
@@ -83,6 +86,124 @@ private:
 
 	int m_DirectionQuadContainerIndex;
 	CMenuMediaBackground m_MenuMediaBackground;
+
+public:
+	enum
+	{
+		ASSETS_EDITOR_TYPE_GAME = 0,
+		ASSETS_EDITOR_TYPE_EMOTICONS,
+		ASSETS_EDITOR_TYPE_ENTITIES,
+		ASSETS_EDITOR_TYPE_HUD,
+		ASSETS_EDITOR_TYPE_PARTICLES,
+		ASSETS_EDITOR_TYPE_EXTRAS,
+		ASSETS_EDITOR_TYPE_COUNT,
+	};
+
+	struct SAssetsEditorAssetEntry
+	{
+		IGraphics::CTextureHandle m_PreviewTexture;
+		int m_PreviewWidth = 0;
+		int m_PreviewHeight = 0;
+		char m_aName[64] = {0};
+		char m_aPath[IO_MAX_PATH_LENGTH] = {0};
+		bool m_IsDefault = false;
+	};
+
+	struct SAssetsEditorPartSlot
+	{
+		int m_SpriteId = -1;
+		int m_SourceSpriteId = -1;
+		int m_Group = 0;
+		int m_DstX = 0;
+		int m_DstY = 0;
+		int m_DstW = 0;
+		int m_DstH = 0;
+		int m_SrcX = 0;
+		int m_SrcY = 0;
+		int m_SrcW = 0;
+		int m_SrcH = 0;
+		char m_aFamilyKey[64] = {0};
+		char m_aSourceAsset[64] = {0};
+	};
+
+private:
+	enum
+	{
+		BESTCLIENT_VISUALS_SUBTAB_GENERAL = 0,
+		BESTCLIENT_VISUALS_SUBTAB_EDITORS,
+		BESTCLIENT_VISUALS_SUBTAB_LENGTH,
+	};
+
+	struct SAssetsEditorState
+	{
+		bool m_VisualsEditorOpen = false;
+		bool m_VisualsEditorInitialized = false;
+		int m_VisualsSubTab = BESTCLIENT_VISUALS_SUBTAB_GENERAL;
+		int m_Type = ASSETS_EDITOR_TYPE_GAME;
+		int m_aMainAssetIndex[ASSETS_EDITOR_TYPE_COUNT] = {0};
+		int m_aDonorAssetIndex[ASSETS_EDITOR_TYPE_COUNT] = {0};
+		bool m_ShowGrid = true;
+		bool m_ApplySameSize = false;
+		int m_ApplySameSizeScope = 0;
+		bool m_DragActive = false;
+		int m_ActiveDraggedSlotIndex = -1;
+		char m_aDraggedSourceAsset[64] = {0};
+		int m_HoveredDonorSlotIndex = -1;
+		int m_HoveredTargetSlotIndex = -1;
+		bool m_DirtyPreview = true;
+		bool m_LastComposeFailed = false;
+		char m_aExportName[64] = {0};
+		char m_aaExportNameByType[ASSETS_EDITOR_TYPE_COUNT][64] = {};
+		bool m_aExportNameTouchedByUser[ASSETS_EDITOR_TYPE_COUNT] = {};
+		char m_aStatusMessage[256] = {0};
+		bool m_StatusIsError = false;
+		bool m_HasUnsavedChanges = false;
+		bool m_PendingCloseRequest = false;
+		bool m_ShowExitConfirm = false;
+		bool m_FullscreenOpen = true;
+		int m_HoverCycleSlotIndex = -1;
+		int m_HoverCyclePositionX = -1;
+		int m_HoverCyclePositionY = -1;
+		int m_HoverCycleCandidateCursor = 0;
+		std::vector<int> m_vHoverCycleCandidates;
+		IGraphics::CTextureHandle m_ComposedPreviewTexture;
+		int m_ComposedPreviewWidth = 0;
+		int m_ComposedPreviewHeight = 0;
+		std::vector<SAssetsEditorAssetEntry> m_avAssets[ASSETS_EDITOR_TYPE_COUNT];
+		std::vector<SAssetsEditorPartSlot> m_vPartSlots;
+	};
+
+	struct SComponentsEditorState
+	{
+		bool m_Open = false;
+		bool m_FullscreenOpen = true;
+	};
+
+	SAssetsEditorState m_AssetsEditorState;
+	SComponentsEditorState m_ComponentsEditorState;
+	void RenderAssetsEditorScreen(CUIRect MainView);
+	void RenderComponentsEditorScreen(CUIRect MainView);
+	void AssetsEditorClearAssets();
+	void AssetsEditorReloadAssets();
+	void AssetsEditorReloadAssetsImagesOnly();
+	void AssetsEditorResetPartSlots();
+	void AssetsEditorEnsureDefaultExportNames();
+	void AssetsEditorSyncExportNameFromType();
+	void AssetsEditorCommitExportNameForType();
+	void AssetsEditorValidateRequiredSlotsForType(int Type);
+	bool AssetsEditorComposeImage(CImageInfo &OutputImage);
+	bool AssetsEditorExport();
+	void AssetsEditorRenderCanvas(const CUIRect &Rect, IGraphics::CTextureHandle Texture, int W, int H, int Type, bool ShowGrid, int HighlightSlot);
+	void AssetsEditorCollectHoveredCandidates(const CUIRect &Rect, int Type, const std::vector<SAssetsEditorPartSlot> &vSlots, vec2 Mouse, std::vector<int> &vOutCandidates) const;
+	int AssetsEditorResolveHoveredSlotWithCycle(const CUIRect &Rect, int Type, const std::vector<SAssetsEditorPartSlot> &vSlots, vec2 Mouse, bool ClickedLmb, int PreferredSlotIndex);
+	void AssetsEditorCancelDrag();
+	void AssetsEditorApplyDrop(int TargetSlotIndex, const char *pDonorName, int SourceSlotIndex, bool ApplyAllSameSize);
+	void AssetsEditorUpdatePreviewIfDirty();
+	void AssetsEditorRequestClose();
+	void AssetsEditorCloseNow();
+	void AssetsEditorRenderExitConfirm(const CUIRect &Rect);
+	void AssetsEditorBuildFamilyKey(int Type, const CDataSprite *pSprite, char *pOut, int OutSize);
+	bool AssetsEditorCopyRectScaledNearest(CImageInfo &Dst, const CImageInfo &Src, int DstX, int DstY, int DstW, int DstH, int SrcX, int SrcY, int SrcW, int SrcH);
 
 	// menus_settings_assets.cpp
 public:

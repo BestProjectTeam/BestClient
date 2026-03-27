@@ -1197,8 +1197,17 @@ void CMenus::Render()
 		}
 		else
 		{
+			const bool FullscreenBestClientEditor =
+				m_MenuPage == PAGE_SETTINGS &&
+				g_Config.m_UiSettingsPage == SETTINGS_BESTCLIENT &&
+				((m_AssetsEditorState.m_VisualsEditorOpen && m_AssetsEditorState.m_FullscreenOpen) ||
+					(m_ComponentsEditorState.m_Open && m_ComponentsEditorState.m_FullscreenOpen));
+
 			CUIRect TabBar, MainView;
-			Screen.HSplitTop(24.0f, &TabBar, &MainView);
+			if(FullscreenBestClientEditor)
+				MainView = Screen;
+			else
+				Screen.HSplitTop(24.0f, &TabBar, &MainView);
 
 			if(m_MenuPage == PAGE_NEWS)
 			{
@@ -1221,7 +1230,8 @@ void CMenus::Render()
 				dbg_assert_failed("Invalid m_MenuPage: %d", m_MenuPage);
 			}
 
-			RenderMenubar(TabBar, ClientState);
+			if(!FullscreenBestClientEditor)
+				RenderMenubar(TabBar, ClientState);
 		}
 		break;
 
@@ -1232,8 +1242,17 @@ void CMenus::Render()
 		}
 		else
 		{
+			const bool FullscreenBestClientEditor =
+				m_GamePage == PAGE_SETTINGS &&
+				g_Config.m_UiSettingsPage == SETTINGS_BESTCLIENT &&
+				((m_AssetsEditorState.m_VisualsEditorOpen && m_AssetsEditorState.m_FullscreenOpen) ||
+					(m_ComponentsEditorState.m_Open && m_ComponentsEditorState.m_FullscreenOpen));
+
 			CUIRect TabBar, MainView;
-			Screen.HSplitTop(24.0f, &TabBar, &MainView);
+			if(FullscreenBestClientEditor)
+				MainView = Screen;
+			else
+				Screen.HSplitTop(24.0f, &TabBar, &MainView);
 
 			if(m_GamePage == PAGE_GAME)
 			{
@@ -1273,7 +1292,8 @@ void CMenus::Render()
 				dbg_assert_failed("Invalid m_GamePage: %d", m_GamePage);
 			}
 
-			RenderMenubar(TabBar, ClientState);
+			if(!FullscreenBestClientEditor)
+				RenderMenubar(TabBar, ClientState);
 		}
 		break;
 

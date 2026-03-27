@@ -39,7 +39,11 @@
 #include <mutex>
 #include <condition_variable>
 
-#if defined(CONF_PLATFORM_LINUX)
+#if !defined(BC_MUSICPLAYER_HAS_DBUS)
+#define BC_MUSICPLAYER_HAS_DBUS 0
+#endif
+
+#if defined(CONF_PLATFORM_LINUX) && BC_MUSICPLAYER_HAS_DBUS
 #include <dbus/dbus.h>
 #endif
 
@@ -305,7 +309,7 @@ static SGameTimerDisplay BuildGameTimerDisplay(const CNetObj_GameInfo *pGameInfo
 	return Result;
 }
 
-#if defined(CONF_PLATFORM_LINUX)
+#if defined(CONF_PLATFORM_LINUX) && BC_MUSICPLAYER_HAS_DBUS
 class CLinuxNowPlayingProvider final : public INowPlayingProvider
 {
 	DBusConnection *m_pConnection = nullptr;
@@ -1799,7 +1803,11 @@ public:
 	{
 		m_aVisualizerLevels.fill(0.18f);
 #if defined(CONF_PLATFORM_LINUX)
+#if BC_MUSICPLAYER_HAS_DBUS
 		m_pProvider = std::make_unique<CLinuxNowPlayingProvider>();
+#else
+		m_pProvider = std::make_unique<CNullNowPlayingProvider>();
+#endif
 #elif defined(CONF_FAMILY_WINDOWS) && BC_MUSICPLAYER_HAS_WINRT
 		m_pProvider = std::make_unique<CWindowsNowPlayingProvider>();
 #else

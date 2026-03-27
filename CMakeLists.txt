@@ -590,6 +590,9 @@ find_package(Python3)
 find_package(Rust)
 find_package(SDL2)
 find_package(SQLite3)
+if(UNIX AND NOT APPLE AND PKG_CONFIG_FOUND)
+  pkg_check_modules(DBUS QUIET dbus-1)
+endif()
 if(DISCORD)
   find_package(DiscordSdk)
 endif()
@@ -2569,6 +2572,7 @@ if(CLIENT)
     components/bestclient/fast_practice.h
     components/bestclient/chat_bubbles.cpp
     components/bestclient/chat_bubbles.h
+    components/bestclient/editors/menus_assets_editor.cpp
     components/bestclient/magic_particles.cpp
     components/bestclient/magic_particles.h
     components/bestclient/music_player.cpp
@@ -2901,6 +2905,10 @@ if(CLIENT)
     ${LIBS}
   )
 
+  if(DBUS_FOUND)
+    list(APPEND LIBS_CLIENT ${DBUS_LIBRARIES})
+  endif()
+
   if(DISCORD)
     if(NOT DISCORD_DYNAMIC)
       list(APPEND LIBS_CLIENT discord-shared)
@@ -2989,6 +2997,10 @@ if(CLIENT)
     ${PLATFORM_CLIENT_INCLUDE_DIRS}
   )
 
+  if(DBUS_FOUND)
+    target_include_directories(game-client SYSTEM PRIVATE ${DBUS_INCLUDE_DIRS})
+  endif()
+
   if(STEAMAPI_KIND STREQUAL SHARED OR DISCORD_DYNAMIC)
     set_own_rpath(game-client)
   endif()
@@ -3020,6 +3032,12 @@ if(CLIENT)
 
   if(VULKAN)
     target_compile_definitions(game-client PRIVATE CONF_BACKEND_VULKAN)
+  endif()
+
+  if(DBUS_FOUND)
+    target_compile_definitions(game-client PRIVATE BC_MUSICPLAYER_HAS_DBUS=1)
+  else()
+    target_compile_definitions(game-client PRIVATE BC_MUSICPLAYER_HAS_DBUS=0)
   endif()
 
   list(APPEND TARGETS_OWN game-client)
