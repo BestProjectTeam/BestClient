@@ -83,6 +83,7 @@ public:
 		char m_aaSkin7[protocol7::NUM_SKINPARTS][protocol7::MAX_SKIN_LENGTH];
 		bool m_aUseCustomSkinColor7[protocol7::NUM_SKINPARTS];
 		int m_aCustomSkinColor7[protocol7::NUM_SKINPARTS];
+		bool m_BestClient;
 	};
 
 	int m_ServerIndex;
@@ -123,6 +124,8 @@ public:
 	CClient m_aClients[SERVERINFO_MAX_CLIENTS];
 	int m_NumFilteredPlayers;
 	bool m_RequiresLogin;
+	int m_NumBestClientPlayers;
+	bool m_HasBestClientPlayers;
 
 	static int EstimateLatency(int Loc1, int Loc2);
 	static bool ParseLocation(int *pResult, const char *pString);
@@ -328,6 +331,12 @@ public:
 		CServerEntry *m_pNextReq;
 	};
 
+	struct CBestClientPlayerEntry
+	{
+		char m_aServerAddress[MAX_SERVER_ADDRESSES * NETADDR_MAXSTRSIZE];
+		char m_aName[MAX_NAME_LENGTH];
+	};
+
 	static constexpr const char *COMMUNITY_DDNET = "ddnet";
 	static constexpr const char *COMMUNITY_NONE = "none";
 
@@ -382,6 +391,7 @@ public:
 	virtual CServerEntry *Find(const NETADDR &Addr) = 0;
 	virtual int GetCurrentType() = 0;
 	virtual const char *GetTutorialServer() = 0;
+	virtual void SetBestClientPlayers(const std::vector<CBestClientPlayerEntry> &vPlayers) = 0;
 };
 
 #endif

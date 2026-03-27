@@ -14,6 +14,7 @@
 #include <engine/textrender.h>
 
 #include <generated/client_data7.h>
+#include <generated/client_data.h>
 #include <generated/protocol.h>
 
 #include <game/client/animstate.h>
@@ -23,6 +24,20 @@
 #include <game/client/gameclient.h>
 #include <game/client/ui.h>
 #include <game/localization.h>
+
+namespace
+{
+void RenderBestClientIcon(IGraphics *pGraphics, const CUIRect &Rect)
+{
+	pGraphics->TextureSet(g_pData->m_aImages[IMAGE_BCICON].m_Id);
+	pGraphics->QuadsBegin();
+	pGraphics->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
+	pGraphics->QuadsSetSubset(0.0f, 0.0f, 1.0f, 1.0f);
+	const IGraphics::CQuadItem Quad(Rect.x, Rect.y, Rect.w, Rect.h);
+	pGraphics->QuadsDrawTL(&Quad, 1);
+	pGraphics->QuadsEnd();
+}
+}
 
 CScoreboard::CScoreboard()
 {
@@ -735,6 +750,25 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 			ScorePosition.w = ScoreLength;
 			ScorePosition.y = Row.y;
 			ScorePosition.h = Row.h;
+
+			if(g_Config.m_BcClientIndicatorInScoreboard && pInfo->m_ClientId >= 0 && GameClient()->m_ClientIndicator.IsPlayerBestClient(pInfo->m_ClientId))
+			{
+				float ScoreTextWidth = TextRender()->TextWidth(FontSize, "99999");
+				if(Race7 || MillisecondScore)
+					ScoreTextWidth = TextRender()->TextWidth(FontSize, "00:00.000");
+				else if(TimeScore)
+					ScoreTextWidth = TextRender()->TextWidth(FontSize, "00:00:00");
+
+				const float ScoreTextX = ScoreOffset + ScoreLength - ScoreTextWidth;
+				const float IconSize = FontSize * (0.8f + 0.3f * g_Config.m_BcClientIndicatorInSoreboardSize / 100.0f);
+				const float IconSpacing = 4.0f;
+				const CUIRect IconRect = {
+					ScoreTextX - IconSize - IconSpacing,
+					Row.y + (Row.h - IconSize) / 2.0f,
+					IconSize,
+					IconSize};
+				RenderBestClientIcon(Graphics(), IconRect);
+			}
 
 			if(Race7)
 			{

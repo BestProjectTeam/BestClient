@@ -14,6 +14,8 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <string>
+#include <unordered_map>
 
 typedef struct _json_value json_value;
 class CNetClient;
@@ -277,6 +279,7 @@ public:
 	void UpdateServerFriends(CServerInfo *pInfo) const;
 	void UpdateServerCommunity(CServerInfo *pInfo) const;
 	void UpdateServerRank(CServerInfo *pInfo) const;
+	void UpdateServerBestClients(CServerInfo *pInfo) const;
 	void ValidateServerlistType();
 	const char *GetTutorialServer() override;
 
@@ -301,6 +304,7 @@ public:
 	const CExcludedCommunityCountryFilterList &CountriesFilter() const override { return m_CountriesFilter; }
 	const CExcludedCommunityTypeFilterList &TypesFilter() const override { return m_TypesFilter; }
 	void CleanFilters() override;
+	void SetBestClientPlayers(const std::vector<CBestClientPlayerEntry> &vPlayers) override;
 
 	//
 	void Update();
@@ -341,6 +345,7 @@ private:
 
 	std::vector<CCommunity> m_vCommunities;
 	std::unordered_map<NETADDR, CCommunityServer> m_CommunityServersByAddr;
+	std::unordered_map<std::string, std::unordered_set<std::string>> m_BestClientPlayersByServer;
 
 	int m_OwnLocation = CServerInfo::LOC_UNKNOWN;
 

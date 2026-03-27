@@ -51,6 +51,9 @@ public:
 	bool m_ShowHookStrongWeakId;
 	int m_HookStrongWeakId;
 	float m_FontSizeHookStrongWeak;
+	bool m_ShowBClientIndicator;
+	float m_FontSizeBClientIndicator;
+	bool m_IsUserBClientIndicator;
 };
 
 // Part Types
@@ -686,6 +689,32 @@ public:
 		CNamePlatePartText(This) {}
 };
 
+class CNamePlatePartBClientIndicator : public CNamePlatePartIcon
+{
+protected:
+	void Update(CGameClient &This, const CNamePlateData &Data) override
+	{
+		if(!Data.m_ShowBClientIndicator)
+		{
+			m_ShiftOnInvis = false;
+			m_Visible = false;
+			return;
+		}
+		m_ShiftOnInvis = !g_Config.m_BcClientIndicatorInNamePlateDynamic;
+		m_Size = vec2(Data.m_FontSizeBClientIndicator + DEFAULT_PADDING, Data.m_FontSizeBClientIndicator + DEFAULT_PADDING);
+		m_Visible = Data.m_IsUserBClientIndicator;
+		m_Color = ColorRGBA(1.0f, 1.0f, 1.0f, Data.m_Color.a);
+	}
+
+public:
+	CNamePlatePartBClientIndicator(CGameClient &This) :
+		CNamePlatePartIcon(This)
+	{
+		m_Texture = g_pData->m_aImages[IMAGE_BCICON].m_Id;
+		m_Padding = vec2(0.0f, 0.0f);
+	}
+};
+
 // ***** Name Plates *****
 
 class CNamePlate
@@ -728,6 +757,7 @@ private:
 		AddPart<CNamePlatePartIgnoreMark>(This); // TClient
 		AddPart<CNamePlatePartFriendMark>(This);
 		AddPart<CNamePlatePartClientId>(This, false);
+		AddPart<CNamePlatePartBClientIndicator>(This);
 		AddPart<CNamePlatePartName>(This);
 		AddPart<CNamePlatePartNewLine>(This);
 
@@ -881,6 +911,7 @@ void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *p
 
 	Data.m_FontSizeHookStrongWeak = 18.0f + 20.0f * g_Config.m_ClNamePlatesStrongSize / 100.0f;
 	Data.m_FontSizeDirection = 18.0f + 20.0f * g_Config.m_ClDirectionSize / 100.0f;
+	Data.m_FontSizeBClientIndicator = 18.0f + 20.0f * g_Config.m_BcClientIndicatorInNamePlateSize / 100.0f;
 
 	if(g_Config.m_ClNamePlatesAlways == 0)
 		Alpha *= std::clamp(1.0f - std::pow(distance(GameClient()->m_Controls.m_aTargetPos[g_Config.m_ClDummy], Position) / 200.0f, 16.0f), 0.0f, 1.0f);
@@ -959,6 +990,9 @@ void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *p
 	Data.m_HookStrongWeakState = EHookStrongWeakState::NEUTRAL;
 	Data.m_ShowHookStrongWeakId = false;
 	Data.m_HookStrongWeakId = 0;
+	Data.m_ShowBClientIndicator = g_Config.m_BcClientIndicator && g_Config.m_BcClientIndicatorInNamePlate &&
+		(!pPlayerInfo->m_Local || g_Config.m_BcClientIndicatorInNamePlateAboveSelf);
+	Data.m_IsUserBClientIndicator = Data.m_ShowBClientIndicator && GameClient()->m_ClientIndicator.IsPlayerBClient(pPlayerInfo->m_ClientId);
 
 	const bool Following = (GameClient()->m_Snap.m_SpecInfo.m_Active && !GameClient()->m_MultiViewActivated && GameClient()->m_Snap.m_SpecInfo.m_SpectatorId != SPEC_FREEVIEW);
 	if(GameClient()->m_Snap.m_LocalClientId != -1 || Following)
@@ -1000,6 +1034,7 @@ void CNamePlates::RenderNamePlatePreview(vec2 Position, int Dummy)
 
 	const float FontSizeDirection = 18.0f + 20.0f * g_Config.m_ClDirectionSize / 100.0f;
 	const float FontSizeHookStrongWeak = 18.0f + 20.0f * g_Config.m_ClNamePlatesStrongSize / 100.0f;
+	const float FontSizeBClientIndicator = 18.0f + 20.0f * g_Config.m_BcClientIndicatorInNamePlateSize / 100.0f;
 
 	CNamePlateData Data;
 
@@ -1031,6 +1066,13 @@ void CNamePlates::RenderNamePlatePreview(vec2 Position, int Dummy)
 	Data.m_ShowDirection = g_Config.m_ClShowDirection != 0 ? true : false;
 	Data.m_DirLeft = Data.m_DirJump = Data.m_DirRight = true;
 	Data.m_FontSizeDirection = FontSizeDirection;
+	const bool HasPreviewClient = GameClient()->m_aLocalIds[Dummy] >= 0;
+	const int PreviewDisplayClientId = HasPreviewClient ? GameClient()->m_aLocalIds[Dummy] : Dummy;
+	Data.m_ShowBClientIndicator = g_Config.m_BcClientIndicator && g_Config.m_BcClientIndicatorInNamePlate &&
+		(Dummy != 0 || g_Config.m_BcClientIndicatorInNamePlateAboveSelf);
+	Data.m_FontSizeBClientIndicator = FontSizeBClientIndicator;
+	Data.m_IsUserBClientIndicator = Data.m_ShowBClientIndicator &&
+		(HasPreviewClient ? GameClient()->m_ClientIndicator.IsPlayerBClient(PreviewDisplayClientId) : true);
 
 	Data.m_FontSizeHookStrongWeak = FontSizeHookStrongWeak;
 	Data.m_HookStrongWeakId = Data.m_ClientId;
@@ -1093,7 +1135,8 @@ void CNamePlates::OnRender()
 	if(IVideo::Current())
 		ShowDirection = g_Config.m_ClVideoShowDirection;
 #endif
-	if(!g_Config.m_ClNamePlates && ShowDirection == 0)
+	if(!g_Config.m_ClNamePlates && !g_Config.m_ClNamePlatesOwn && ShowDirection == 0 &&
+		!(g_Config.m_BcClientIndicator && g_Config.m_BcClientIndicatorInNamePlate))
 		return;
 
 	for(int i = 0; i < MAX_CLIENTS; i++)

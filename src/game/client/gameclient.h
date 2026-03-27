@@ -32,6 +32,7 @@
 #include "components/bestclient/afterimage.h"
 #include "components/bestclient/audio_visualizer.h"
 #include "components/bestclient/bestclient.h"
+#include "components/bestclient/clientindicator/client_indicator.h"
 #include "components/bestclient/fast_actions.h"
 #include "components/bestclient/chat_bubbles.h"
 #include "components/bestclient/magic_particles.h"
@@ -224,6 +225,7 @@ public:
 	CMagicParticles m_MagicParticles;
 	COrbitAura m_OrbitAura;
 	CChatBubbles m_ChatBubbles;
+	CClientIndicator m_ClientIndicator;
 	CAudioVisualizer m_AudioVisualizer;
 	CMusicPlayer m_MusicPlayer;
 	CFastActions m_FastActions;

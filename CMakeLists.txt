@@ -2220,6 +2220,8 @@ set_src(ENGINE_INTERFACE GLOB src/engine
 set_src(ENGINE_SHARED GLOB_RECURSE src/engine/shared
   assertion_logger.cpp
   assertion_logger.h
+  bestclient_indicator_protocol.cpp
+  bestclient_indicator_protocol.h
   compression.cpp
   compression.h
   config.cpp
@@ -2528,6 +2530,14 @@ if(CLIENT)
     components/bestclient/audio_visualizer.h
     components/bestclient/bestclient.cpp
     components/bestclient/bestclient.h
+    components/bestclient/clientindicator/browser_cache.cpp
+    components/bestclient/clientindicator/browser_cache.h
+    components/bestclient/clientindicator/client_indicator.cpp
+    components/bestclient/clientindicator/client_indicator.h
+    components/bestclient/clientindicator/client_indicator_sync.h
+    components/bestclient/clientindicator/presence_cache.cpp
+    components/bestclient/clientindicator/presence_cache.h
+    components/bestclient/clientindicator/protocol.h
     components/bestclient/fast_actions.cpp
     components/bestclient/fast_actions.h
     components/bestclient/chat_bubbles.cpp
@@ -3295,6 +3305,7 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     aio_test.cpp
     bezier_test.cpp
     blocklist_driver_test.cpp
+    clientindicator_test.cpp
     bytes_be_test.cpp
     chunk_header_test.cpp
     color_test.cpp

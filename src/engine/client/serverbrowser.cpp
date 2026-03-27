@@ -103,6 +103,24 @@ void CServerBrowser::OnInit()
 	m_pHttp = CreateServerBrowserHttp(m_pEngine, m_pStorage, m_pHttpClient, g_Config.m_BrCachedBestServerinfoUrl);
 }
 
+void CServerBrowser::SetBestClientPlayers(const std::vector<CBestClientPlayerEntry> &vPlayers)
+{
+	m_BestClientPlayersByServer.clear();
+	for(const auto &Entry : vPlayers)
+	{
+		if(Entry.m_aServerAddress[0] == '\0' || Entry.m_aName[0] == '\0')
+			continue;
+		m_BestClientPlayersByServer[Entry.m_aServerAddress].insert(Entry.m_aName);
+	}
+
+	for(CServerEntry *pEntry : m_vpServerlist)
+	{
+		UpdateServerBestClients(&pEntry->m_Info);
+	}
+
+	RequestResort();
+}
+
 void CServerBrowser::RegisterCommands()
 {
 	m_pConfigManager->RegisterCallback(CServerBrowser::ConfigSaveCallback, this);
@@ -736,6 +754,7 @@ void CServerBrowser::SetInfo(CServerEntry *pEntry, const CServerInfo &Info) cons
 	str_copy(pEntry->m_Info.m_aCommunityCountry, TmpInfo.m_aCommunityCountry);
 	str_copy(pEntry->m_Info.m_aCommunityType, TmpInfo.m_aCommunityType);
 	UpdateServerRank(&pEntry->m_Info);
+	UpdateServerBestClients(&pEntry->m_Info);
 
 	if(pEntry->m_Info.m_ClientScoreKind == CServerInfo::CLIENT_SCORE_KIND_UNSPECIFIED)
 	{
@@ -1683,6 +1702,43 @@ void CServerBrowser::UpdateServerRank(CServerInfo *pInfo) const
 {
 	const CCommunity *pCommunity = Community(pInfo->m_aCommunityId);
 	pInfo->m_HasRank = pCommunity == nullptr ? CServerInfo::RANK_UNAVAILABLE : pCommunity->HasRank(pInfo->m_aMap);
+}
+
+void CServerBrowser::UpdateServerBestClients(CServerInfo *pInfo) const
+{
+	pInfo->m_NumBestClientPlayers = 0;
+	pInfo->m_HasBestClientPlayers = false;
+	for(auto &Client : pInfo->m_aClients)
+	{
+		Client.m_BestClient = false;
+	}
+
+	const int NumClients = minimum(pInfo->m_NumReceivedClients, (int)MAX_CLIENTS);
+	std::vector<const std::unordered_set<std::string> *> vpAddressMatches;
+	vpAddressMatches.reserve(pInfo->m_NumAddresses);
+	for(int AddressIndex = 0; AddressIndex < pInfo->m_NumAddresses; ++AddressIndex)
+	{
+		char aAddress[NETADDR_MAXSTRSIZE];
+		net_addr_str(&pInfo->m_aAddresses[AddressIndex], aAddress, sizeof(aAddress), true);
+		const auto It = m_BestClientPlayersByServer.find(aAddress);
+		if(It != m_BestClientPlayersByServer.end())
+			vpAddressMatches.push_back(&It->second);
+	}
+
+	if(vpAddressMatches.empty())
+		return;
+
+	for(int ClientIndex = 0; ClientIndex < NumClients; ++ClientIndex)
+	{
+		CServerInfo::CClient &Client = pInfo->m_aClients[ClientIndex];
+		Client.m_BestClient = std::any_of(vpAddressMatches.begin(), vpAddressMatches.end(), [&](const std::unordered_set<std::string> *pPlayers) {
+			return pPlayers->find(Client.m_aName) != pPlayers->end();
+		});
+		if(Client.m_BestClient)
+			pInfo->m_NumBestClientPlayers++;
+	}
+
+	pInfo->m_HasBestClientPlayers = pInfo->m_NumBestClientPlayers > 0;
 }
 
 void CServerBrowser::ValidateServerlistType()

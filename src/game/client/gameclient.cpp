@@ -501,6 +501,7 @@ void CGameClient::OnConsoleInit()
 					      &m_MagicParticles,
 					      &m_OrbitAura,
 					      &m_ChatBubbles,
+					      &m_ClientIndicator,
 					      &m_Particles.m_RenderExplosions,
 					      &m_NamePlates,
 					      &m_Particles.m_RenderExtra,

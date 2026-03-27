@@ -198,6 +198,8 @@ bool CHttpRequest::ConfigureHandle(void *pHandle)
 	curl_easy_setopt(pH, CURLOPT_NOSIGNAL, 1L);
 	curl_easy_setopt(pH, CURLOPT_USERAGENT, GAME_NAME " " GAME_RELEASE_VERSION " (" CONF_PLATFORM_STRING "; " CONF_ARCH_STRING ")");
 	curl_easy_setopt(pH, CURLOPT_ACCEPT_ENCODING, ""); // Use any compression algorithm supported by libcurl.
+	curl_easy_setopt(pH, CURLOPT_SSL_VERIFYPEER, m_VerifyPeer ? 1L : 0L);
+	curl_easy_setopt(pH, CURLOPT_SSL_VERIFYHOST, m_VerifyPeer ? 2L : 0L);
 
 	curl_easy_setopt(pH, CURLOPT_HEADERDATA, this);
 	curl_easy_setopt(pH, CURLOPT_HEADERFUNCTION, HeaderCallback);
