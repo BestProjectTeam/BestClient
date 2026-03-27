@@ -90,7 +90,7 @@
 #include "components/tclient/statusbar.h"
 #include "components/tclient/tclient.h"
 #include "components/tclient/trails.h"
-#include "components/tclient/translate.h"
+#include "components/bestclient/translate.h"
 #include "components/tclient/warlist.h"
 #include "components/tooltips.h"
 #include "components/touch_controls.h"

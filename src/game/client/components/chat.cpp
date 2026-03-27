@@ -680,9 +680,19 @@ CUi::EPopupMenuFunctionResult CChat::PopupTranslateSettings(void *pContext, CUIR
 	const float Spacing = 5.0f;
 	const float RowHeight = 20.0f;
 	const float FontSize = 11.0f;
-	static CUi::SDropDownState s_TargetDropDown;
-	static CScrollRegion s_TargetScroll;
-	s_TargetDropDown.m_SelectionPopupContext.m_pScrollRegion = &s_TargetScroll;
+	static CUi::SDropDownState s_IncomingSourceDropDown;
+	static CUi::SDropDownState s_IncomingTargetDropDown;
+	static CUi::SDropDownState s_OutgoingSourceDropDown;
+	static CUi::SDropDownState s_OutgoingTargetDropDown;
+	static CScrollRegion s_IncomingSourceScroll;
+	static CScrollRegion s_IncomingTargetScroll;
+	static CScrollRegion s_OutgoingSourceScroll;
+	static CScrollRegion s_OutgoingTargetScroll;
+
+	s_IncomingSourceDropDown.m_SelectionPopupContext.m_pScrollRegion = &s_IncomingSourceScroll;
+	s_IncomingTargetDropDown.m_SelectionPopupContext.m_pScrollRegion = &s_IncomingTargetScroll;
+	s_OutgoingSourceDropDown.m_SelectionPopupContext.m_pScrollRegion = &s_OutgoingSourceScroll;
+	s_OutgoingTargetDropDown.m_SelectionPopupContext.m_pScrollRegion = &s_OutgoingTargetScroll;
 
 	CUIRect Row;
 	View.HSplitTop(14.0f, &Row, &View);
@@ -690,21 +700,47 @@ CUi::EPopupMenuFunctionResult CChat::PopupTranslateSettings(void *pContext, CUIR
 
 	View.HSplitTop(Spacing, nullptr, &View);
 	View.HSplitTop(18.0f, &Row, &View);
-	if(pChat->GameClient()->m_Menus.DoButton_CheckBox(&pChat->m_TranslateSettingsEnableButton, Localize("Auto translate messages"), g_Config.m_TcTranslateAuto, &Row))
-		g_Config.m_TcTranslateAuto ^= 1;
+	if(pChat->GameClient()->m_Menus.DoButton_CheckBox(&pChat->m_TranslateSettingsEnableButton, Localize("Auto translate others' messages"), g_Config.m_TcTranslateAutoIncoming, &Row))
+		g_Config.m_TcTranslateAutoIncoming ^= 1;
 
 	View.HSplitTop(Spacing, nullptr, &View);
-	View.HSplitTop(RowHeight, &Row, &View);
-	CUIRect Label, DropDown;
-	Row.VSplitLeft(145.0f, &Label, &DropDown);
-	pChat->Ui()->DoLabel(&Label, Localize("Target language"), FontSize, TEXTALIGN_ML);
+	View.HSplitTop(18.0f, &Row, &View);
+	if(pChat->GameClient()->m_Menus.DoButton_CheckBox(&pChat->m_TranslateSettingsEnableOutgoingButton, Localize("Auto translate your messages"), g_Config.m_TcTranslateAutoOutgoing, &Row))
+		g_Config.m_TcTranslateAutoOutgoing ^= 1;
 
+	const auto RenderLanguageField = [&](const char *pLabel, int CurrentIndex, const char **ppLabels, int LabelCount, CUi::SDropDownState &DropDownState) {
+		View.HSplitTop(Spacing, nullptr, &View);
+		View.HSplitTop(RowHeight, &Row, &View);
+		CUIRect Label, DropDown;
+		Row.VSplitLeft(145.0f, &Label, &DropDown);
+		pChat->Ui()->DoLabel(&Label, pLabel, FontSize, TEXTALIGN_ML);
+		return pChat->Ui()->DoDropDown(&DropDown, CurrentIndex, ppLabels, LabelCount, DropDownState);
+	};
+
+	static const char *s_apSourceLabels[] = {
+		"Auto", "Russian", "English", "German", "Chinese", "Brazilian"};
 	static const char *s_apTargetLabels[] = {
 		"Auto", "Russian", "English", "German", "Chinese", "Brazilian"};
-	const int TargetIndex = TranslateLanguageIndex(g_Config.m_TcTranslateTarget, gs_aTranslateTargetOptions);
-	const int NewTargetIndex = pChat->Ui()->DoDropDown(&DropDown, TargetIndex, s_apTargetLabels, std::size(s_apTargetLabels), s_TargetDropDown);
-	if(NewTargetIndex != TargetIndex)
-		ApplyTranslateLanguage(g_Config.m_TcTranslateTarget, sizeof(g_Config.m_TcTranslateTarget), NewTargetIndex, gs_aTranslateTargetOptions);
+
+	const int IncomingSourceIndex = TranslateLanguageIndex(g_Config.m_BcTranslateIncomingSource, gs_aTranslateSourceOptions);
+	const int NewIncomingSourceIndex = RenderLanguageField(Localize("Incoming from"), IncomingSourceIndex, s_apSourceLabels, std::size(s_apSourceLabels), s_IncomingSourceDropDown);
+	if(NewIncomingSourceIndex != IncomingSourceIndex)
+		ApplyTranslateLanguage(g_Config.m_BcTranslateIncomingSource, sizeof(g_Config.m_BcTranslateIncomingSource), NewIncomingSourceIndex, gs_aTranslateSourceOptions);
+
+	const int IncomingTargetIndex = TranslateLanguageIndex(g_Config.m_TcTranslateTarget, gs_aTranslateTargetOptions);
+	const int NewIncomingTargetIndex = RenderLanguageField(Localize("Incoming to"), IncomingTargetIndex, s_apTargetLabels, std::size(s_apTargetLabels), s_IncomingTargetDropDown);
+	if(NewIncomingTargetIndex != IncomingTargetIndex)
+		ApplyTranslateLanguage(g_Config.m_TcTranslateTarget, sizeof(g_Config.m_TcTranslateTarget), NewIncomingTargetIndex, gs_aTranslateTargetOptions);
+
+	const int OutgoingSourceIndex = TranslateLanguageIndex(g_Config.m_BcTranslateOutgoingSource, gs_aTranslateSourceOptions);
+	const int NewOutgoingSourceIndex = RenderLanguageField(Localize("Your messages from"), OutgoingSourceIndex, s_apSourceLabels, std::size(s_apSourceLabels), s_OutgoingSourceDropDown);
+	if(NewOutgoingSourceIndex != OutgoingSourceIndex)
+		ApplyTranslateLanguage(g_Config.m_BcTranslateOutgoingSource, sizeof(g_Config.m_BcTranslateOutgoingSource), NewOutgoingSourceIndex, gs_aTranslateSourceOptions);
+
+	const int OutgoingTargetIndex = TranslateLanguageIndex(g_Config.m_BcTranslateOutgoingTarget, gs_aTranslateTargetOptions);
+	const int NewOutgoingTargetIndex = RenderLanguageField(Localize("Your messages to"), OutgoingTargetIndex, s_apTargetLabels, std::size(s_apTargetLabels), s_OutgoingTargetDropDown);
+	if(NewOutgoingTargetIndex != OutgoingTargetIndex)
+		ApplyTranslateLanguage(g_Config.m_BcTranslateOutgoingTarget, sizeof(g_Config.m_BcTranslateOutgoingTarget), NewOutgoingTargetIndex, gs_aTranslateTargetOptions);
 
 	return CUi::POPUP_KEEP_OPEN;
 }
@@ -5334,6 +5370,8 @@ void CChat::SendChatQueued(const char *pLine)
 
 	const int Team = m_Mode == MODE_ALL ? 0 : 1;
 	AddHistoryEntry(Team, pLine);
+	if(GameClient()->m_Translate.TryTranslateOutgoingChat(Team, pLine))
+		return;
 	SendChatPayloadQueued(Team, pLine);
 }
 

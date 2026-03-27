@@ -2538,6 +2538,8 @@ if(CLIENT)
     components/bestclient/music_player.h
     components/bestclient/orbit_aura.cpp
     components/bestclient/orbit_aura.h
+    components/bestclient/translate.cpp
+    components/bestclient/translate.h
     components/bestclient/subsystem_runtime.h
     components/binds.cpp
     components/binds.h
@@ -2675,8 +2677,6 @@ if(CLIENT)
     components/tclient/tclient.h
     components/tclient/trails.cpp
     components/tclient/trails.h
-    components/tclient/translate.cpp
-    components/tclient/translate.h
     components/tclient/warlist.cpp
     components/tclient/warlist.h
     components/tooltips.cpp
