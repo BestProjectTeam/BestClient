@@ -112,6 +112,7 @@ static const char *FindBestClientReleaseVersion(const json_value *pJson)
 
 	if(pJson->type == json_array)
 	{
+		const char *pBestVersion = nullptr;
 		for(int i = 0; i < json_array_length(pJson); ++i)
 		{
 			const json_value *pRelease = json_array_get(pJson, i);
@@ -120,9 +121,12 @@ static const char *FindBestClientReleaseVersion(const json_value *pJson)
 			const char *pVersion = json_string_get(json_object_get(pRelease, "tag_name"));
 			if(!pVersion)
 				pVersion = json_string_get(json_object_get(pRelease, "name"));
-			if(pVersion)
-				return pVersion;
+			if(!pVersion)
+				continue;
+			if(!pBestVersion || CompareBestClientVersions(pVersion, pBestVersion) > 0)
+				pBestVersion = pVersion;
 		}
+		return pBestVersion;
 	}
 
 	return nullptr;
@@ -699,8 +703,8 @@ void CBestClient::FinishBestClientInfo()
 
 	const char *pCurrentVersion = FindBestClientReleaseVersion(pJson);
 
-	// Treat any tag difference as an available update.
-	if(pCurrentVersion && str_comp(pCurrentVersion, BESTCLIENT_VERSION) != 0)
+	// Update is available only when the remote tag is higher than current version.
+	if(pCurrentVersion && CompareBestClientVersions(pCurrentVersion, BESTCLIENT_VERSION) > 0)
 		str_copy(m_aVersionStr, pCurrentVersion, sizeof(m_aVersionStr));
 	else
 	{

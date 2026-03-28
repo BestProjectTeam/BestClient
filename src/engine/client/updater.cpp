@@ -191,11 +191,34 @@ static bool ParseLatestRelease(json_value *pJson, char *pVersion, int VersionSiz
 
 	if(pJson->type == json_array)
 	{
+		bool Found = false;
+		char aBestVersion[64] = "";
+		char aBestArchiveName[128] = "";
+		char aBestArchiveUrl[2048] = "";
 		for(int i = 0; i < json_array_length(pJson); ++i)
 		{
 			const json_value *pRelease = json_array_get(pJson, i);
-			if(ParseReleaseObject(pRelease, pVersion, VersionSize, pArchiveName, ArchiveNameSize, pArchiveUrl, ArchiveUrlSize))
-				return true;
+			char aVersion[64];
+			char aArchiveName[128];
+			char aArchiveUrl[2048];
+			if(!ParseReleaseObject(pRelease, aVersion, sizeof(aVersion), aArchiveName, sizeof(aArchiveName), aArchiveUrl, sizeof(aArchiveUrl)))
+				continue;
+
+			if(!Found || CompareVersionStrings(aVersion, aBestVersion) > 0)
+			{
+				Found = true;
+				str_copy(aBestVersion, aVersion, sizeof(aBestVersion));
+				str_copy(aBestArchiveName, aArchiveName, sizeof(aBestArchiveName));
+				str_copy(aBestArchiveUrl, aArchiveUrl, sizeof(aBestArchiveUrl));
+			}
+		}
+
+		if(Found)
+		{
+			str_copy(pVersion, aBestVersion, VersionSize);
+			str_copy(pArchiveName, aBestArchiveName, ArchiveNameSize);
+			str_copy(pArchiveUrl, aBestArchiveUrl, ArchiveUrlSize);
+			return true;
 		}
 	}
 
@@ -327,9 +350,8 @@ bool CUpdater::ParseReleaseTask()
 		return false;
 	}
 
-	// Treat any tag difference as an available update:
-	// this also allows updating when an existing release tag was changed.
-	if(str_comp(m_aLatestVersion, BESTCLIENT_VERSION) == 0)
+	// Update is available only when the remote tag is higher than current version.
+	if(CompareVersionStrings(m_aLatestVersion, BESTCLIENT_VERSION) <= 0)
 	{
 		SetStatus("No new release found");
 		SetCurrentState(IUpdater::CLEAN);

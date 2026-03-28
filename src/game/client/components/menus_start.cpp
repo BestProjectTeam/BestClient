@@ -131,7 +131,7 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 
 		if(ShowDownloadButton)
 		{
-			str_format(aUpdateBuf, sizeof(aUpdateBuf), "%s %s is out!", CLIENT_NAME, GameClient()->m_BestClient.m_aVersionStr);
+			str_format(aUpdateBuf, sizeof(aUpdateBuf), "BestClient %s is out!", GameClient()->m_BestClient.m_aVersionStr);
 			TextRender()->TextColor(1.0f, 0.4f, 0.4f, 1.0f);
 		}
 		else if(ShowUpdateProgress)
