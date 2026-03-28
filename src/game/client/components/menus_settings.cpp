@@ -4853,7 +4853,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 
 			const float FastInputExtraTargetHeight = MarginSmall * (g_Config.m_BcFastInputMode == 1 ? 4.0f : 3.0f) +
 				LineSize * (g_Config.m_BcFastInputMode == 1 ? 4.0f : 3.0f);
-			const float ContentHeight = LineSize + MarginSmall + LineSize * 3.0f +
+			const float ContentHeight = LineSize + MarginSmall + LineSize * 2.0f +
 				FastInputExtraTargetHeight * s_FastInputPhase;
 
 			CUIRect Content, Label, Button, Visible;
