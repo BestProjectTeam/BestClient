@@ -4843,18 +4843,13 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		if(!GameClient()->m_BestClient.IsComponentDisabled(CBestClient::COMPONENT_GAMEPLAY_INPUT))
 		{
 			static float s_FastInputPhase = 0.0f;
-			static float s_SnapTapPhase = 0.0f;
 			const bool FastInputExpanded = g_Config.m_TcFastInput != 0;
-			const bool SnapTapExpanded = g_Config.m_BcSnapTap != 0;
 			UpdateRevealPhase(s_FastInputPhase, FastInputExpanded);
-			UpdateRevealPhase(s_SnapTapPhase, SnapTapExpanded);
 
 			const float FastInputExtraTargetHeight = MarginSmall * (g_Config.m_BcFastInputMode == 1 ? 4.0f : 3.0f) +
 				LineSize * (g_Config.m_BcFastInputMode == 1 ? 4.0f : 3.0f);
-			const float SnapTapExtraTargetHeight = MarginSmall + LineSize;
-			const float ContentHeight = LineSize + MarginSmall + LineSize * 4.0f +
-				FastInputExtraTargetHeight * s_FastInputPhase +
-				SnapTapExtraTargetHeight * s_SnapTapPhase;
+			const float ContentHeight = LineSize + MarginSmall + LineSize * 3.0f +
+				FastInputExtraTargetHeight * s_FastInputPhase;
 
 			CUIRect Content, Label, Button, Visible;
 			BeginBlock(Column, ContentHeight, Content);
@@ -4971,7 +4966,20 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			}
 
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClSubTickAiming, Localize("Sub-Tick aiming"), &g_Config.m_ClSubTickAiming, &Content, LineSize);
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcSnapTap, "Snap Tap", &g_Config.m_BcSnapTap, &Content, LineSize);
+			Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
+
+			static float s_SnapTapPhase = 0.0f;
+			const bool SnapTapExpanded = g_Config.m_BcSnapTap != 0;
+			UpdateRevealPhase(s_SnapTapPhase, SnapTapExpanded);
+			const float SnapTapExtraTargetHeight = MarginSmall + LineSize;
+			const float SnapTapContentHeight = LineSize + MarginSmall + LineSize +
+				SnapTapExtraTargetHeight * s_SnapTapPhase;
+
+			BeginBlock(Column, SnapTapContentHeight, Content);
+			Content.HSplitTop(LineSize, &Label, &Content);
+			Ui()->DoLabel(&Label, Localize("Snap Tap"), HeadlineFontSize, TEXTALIGN_ML);
+			Content.HSplitTop(MarginSmall, nullptr, &Content);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcSnapTap, Localize("Enable"), &g_Config.m_BcSnapTap, &Content, LineSize);
 
 			const float SnapTapExtraHeight = SnapTapExtraTargetHeight * s_SnapTapPhase;
 			if(SnapTapExtraHeight > 0.0f)
@@ -5013,6 +5021,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				Value = (int)(Min + NewRel * (Max - Min) + 0.5f);
 				g_Config.m_BcSnapTapDelay = std::clamp(Value, Min, Max);
 			}
+
 			Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
 		}
 		if(!GameClient()->m_BestClient.IsComponentDisabled(CBestClient::COMPONENT_GAMEPLAY_FAST_ACTIONS))
