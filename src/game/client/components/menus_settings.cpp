@@ -5313,11 +5313,11 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				static CButtonContainer s_HookComboModeHook;
 				static CButtonContainer s_HookComboModeHammer;
 				static CButtonContainer s_HookComboModeHookHammer;
-				if(DoButton_Menu(&s_HookComboModeHook, Localize("Hook"), g_Config.m_BcHookComboMode == 0, &HookButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_L))
+				if(DoButton_Menu(&s_HookComboModeHook, "hook", g_Config.m_BcHookComboMode == 0, &HookButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_L))
 					g_Config.m_BcHookComboMode = 0;
-				if(DoButton_Menu(&s_HookComboModeHammer, Localize("Hammer"), g_Config.m_BcHookComboMode == 1, &HammerButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_NONE))
+				if(DoButton_Menu(&s_HookComboModeHammer, "hammer", g_Config.m_BcHookComboMode == 1, &HammerButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_NONE))
 					g_Config.m_BcHookComboMode = 1;
-				if(DoButton_Menu(&s_HookComboModeHookHammer, Localize("Hook&Hammer"), g_Config.m_BcHookComboMode == 2, &HookHammerButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
+				if(DoButton_Menu(&s_HookComboModeHookHammer, "hook&hammer", g_Config.m_BcHookComboMode == 2, &HookHammerButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
 					g_Config.m_BcHookComboMode = 2;
 
 				Expand.HSplitTop(LineSize, &Button, &Expand);
