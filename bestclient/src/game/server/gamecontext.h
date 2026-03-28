@@ -68,9 +68,9 @@ struct CSnapContext
 	{
 	}
 
-	int GeBestClientVersion() const { return m_ClientVersion; }
+	int GetClientVersion() const { return m_ClientVersion; }
 	bool IsSixup() const { return m_Sixup; }
-	bool ClientId() const { return m_ClientId; }
+	int ClientId() const { return m_ClientId; }
 
 private:
 	int m_ClientVersion;
@@ -184,7 +184,7 @@ class CGameContext : public IGameServer
 		CUuid m_PrevGameUuid;
 	};
 
-	struct CPersistenBestClientData
+	struct CPersistentClientData
 	{
 		bool m_IsSpectator;
 		bool m_IsAfk;
@@ -367,7 +367,7 @@ public:
 	void OnClientPredictedInput(int ClientId, const void *pInput) override;
 	void OnClientPredictedEarlyInput(int ClientId, const void *pInput) override;
 
-	void PreInpuBestClients(int ClientId, bool *pClients) override;
+	void PreInputClients(int ClientId, bool *pClients) override;
 
 	void TeehistorianRecordAntibot(const void *pData, int DataSize) override;
 	void TeehistorianRecordPlayerJoin(int ClientId, bool Sixup) override;
@@ -383,7 +383,7 @@ public:
 	// Whether the client is allowed to have high bandwidth.
 	bool IsClientHighBandwidth(int ClientId) const override;
 	int PersistentDataSize() const override { return sizeof(CPersistentData); }
-	int PersistenBestClientDataSize() const override { return sizeof(CPersistenBestClientData); }
+	int PersistentClientDataSize() const override { return sizeof(CPersistentClientData); }
 
 	CUuid GameUuid() const override;
 	const char *GameType() const override;
@@ -399,7 +399,7 @@ public:
 	// Describes the time when the first player joined the server.
 	int64_t m_NonEmptySince;
 	int64_t m_LastMapVote;
-	int GeBestClientVersion(int ClientId) const;
+	int GetClientVersion(int ClientId) const;
 	CClientMask ClientsMaskExcludeClientVersionAndHigher(int Version) const;
 	bool PlayerExists(int ClientId) const override { return m_apPlayers[ClientId]; }
 	// Returns true if someone is actively moderating.

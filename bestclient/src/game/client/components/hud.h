@@ -95,11 +95,13 @@ class CHud : public CComponent
 	class CMovementInformation GetMovementInformation(int ClientId, int Conn) const;
 
 	void RenderGameTimer();
+	void RenderSpeedrunTimer();
 	void RenderPauseNotification();
 	void RenderSuddenDeath();
 
 	void RenderScoreHud();
 	int m_LastLocalClientId = -1;
+	int m_SpeedrunTimerExpiredTick = 0;
 
 	void RenderSpectatorHud();
 	void RenderWarmupTimer();
@@ -172,4 +174,3 @@ private:
 };
 
 #endif
-

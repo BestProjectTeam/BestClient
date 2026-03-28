@@ -170,7 +170,7 @@ void CPickup::Snap(int SnappingClient)
 	if(NetworkClipped(SnappingClient))
 		return;
 
-	int SnappingClientVersion = GameServer()->GeBestClientVersion(SnappingClient);
+	int SnappingClientVersion = GameServer()->GetClientVersion(SnappingClient);
 	bool Sixup = Server()->IsSixup(SnappingClient);
 
 	if(SnappingClientVersion < VERSION_DDNET_ENTITY_NETOBJS)

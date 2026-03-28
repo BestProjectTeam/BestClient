@@ -272,7 +272,7 @@ char *CSaveTee::GetString(const CSaveTeam *pTeam)
 	{
 		for(int n = 0; n < pTeam->GetMembersCount(); n++)
 		{
-			if(m_HookedPlayer == pTeam->m_pSavedTees[n].GeBestClientId())
+			if(m_HookedPlayer == pTeam->m_pSavedTees[n].GetClientId())
 			{
 				HookedPlayer = n;
 				break;
@@ -479,7 +479,7 @@ void CSaveTee::LoadHookedPlayer(const CSaveTeam *pTeam)
 {
 	if(m_HookedPlayer == -1)
 		return;
-	m_HookedPlayer = pTeam->m_pSavedTees[m_HookedPlayer].GeBestClientId();
+	m_HookedPlayer = pTeam->m_pSavedTees[m_HookedPlayer].GetClientId();
 }
 
 bool CSaveTee::IsHooking() const
@@ -633,11 +633,11 @@ bool CSaveTeam::Load(CGameContext *pGameServer, int Team, bool KeepCurrentWeakSt
 	{
 		for(int i = m_MembersCount; i-- > 0;)
 		{
-			int ClientId = m_pSavedTees[i].GeBestClientId();
+			int ClientId = m_pSavedTees[i].GetClientId();
 			aPlayerCids[i] = ClientId;
 			if(pGameServer->m_apPlayers[ClientId] && pTeams->m_Core.Team(ClientId) == Team)
 			{
-				CCharacter *pChr = MatchCharacter(pGameServer, m_pSavedTees[i].GeBestClientId(), i, KeepCurrentWeakStrong);
+				CCharacter *pChr = MatchCharacter(pGameServer, m_pSavedTees[i].GetClientId(), i, KeepCurrentWeakStrong);
 				ContainsInvalidPlayer |= !m_pSavedTees[i].Load(pChr, Team);
 			}
 		}
@@ -883,7 +883,7 @@ bool CSaveTeam::MatchPlayers(const char (*paNames)[MAX_NAME_LENGTH], const int *
 		{
 			if(str_comp(m_pSavedTees[i].GetName(), paNames[j]) == 0)
 			{
-				m_pSavedTees[i].SeBestClientId(pClientId[j]);
+				m_pSavedTees[i].SetClientId(pClientId[j]);
 				Found = true;
 				break;
 			}

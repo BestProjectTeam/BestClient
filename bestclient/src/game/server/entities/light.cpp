@@ -101,7 +101,7 @@ void CLight::Snap(int SnappingClient)
 	if(NetworkClipped(SnappingClient, m_Pos) && NetworkClipped(SnappingClient, m_To))
 		return;
 
-	int SnappingClientVersion = GameServer()->GeBestClientVersion(SnappingClient);
+	int SnappingClientVersion = GameServer()->GetClientVersion(SnappingClient);
 
 	CCharacter *pChr = GameServer()->GetPlayerChar(SnappingClient);
 

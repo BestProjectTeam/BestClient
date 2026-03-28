@@ -27,6 +27,11 @@ CControls::CControls()
 	std::fill(std::begin(m_aMouseInputType), std::end(m_aMouseInputType), EMouseInputType::ABSOLUTE);
 }
 
+vec2 CControls::GetCameraMousePos() const
+{
+	return m_aCameraMousePos[g_Config.m_ClDummy];
+}
+
 void CControls::OnReset()
 {
 	ResetInput(0);

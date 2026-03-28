@@ -351,7 +351,7 @@ bool CServer::IsClientNameAvailable(int ClientId, const char *pNameRequest)
 	return true;
 }
 
-bool CServer::SeBestClientNameImpl(int ClientId, const char *pNameRequest, bool Set)
+bool CServer::SetClientNameImpl(int ClientId, const char *pNameRequest, bool Set)
 {
 	dbg_assert(0 <= ClientId && ClientId < MAX_CLIENTS, "Invalid ClientId: %d", ClientId);
 	if(m_aClients[ClientId].m_State < CClient::STATE_READY)
@@ -407,7 +407,7 @@ bool CServer::SeBestClientNameImpl(int ClientId, const char *pNameRequest, bool 
 	return Changed;
 }
 
-bool CServer::SeBestClientClanImpl(int ClientId, const char *pClanRequest, bool Set)
+bool CServer::SetClientClanImpl(int ClientId, const char *pClanRequest, bool Set)
 {
 	dbg_assert(0 <= ClientId && ClientId < MAX_CLIENTS, "Invalid ClientId: %d", ClientId);
 	if(m_aClients[ClientId].m_State < CClient::STATE_READY)
@@ -450,25 +450,25 @@ bool CServer::SeBestClientClanImpl(int ClientId, const char *pClanRequest, bool 
 
 bool CServer::WouldClientNameChange(int ClientId, const char *pNameRequest)
 {
-	return SeBestClientNameImpl(ClientId, pNameRequest, false);
+	return SetClientNameImpl(ClientId, pNameRequest, false);
 }
 
 bool CServer::WouldClientClanChange(int ClientId, const char *pClanRequest)
 {
-	return SeBestClientClanImpl(ClientId, pClanRequest, false);
+	return SetClientClanImpl(ClientId, pClanRequest, false);
 }
 
-void CServer::SeBestClientName(int ClientId, const char *pName)
+void CServer::SetClientName(int ClientId, const char *pName)
 {
-	SeBestClientNameImpl(ClientId, pName, true);
+	SetClientNameImpl(ClientId, pName, true);
 }
 
-void CServer::SeBestClientClan(int ClientId, const char *pClan)
+void CServer::SetClientClan(int ClientId, const char *pClan)
 {
-	SeBestClientClanImpl(ClientId, pClan, true);
+	SetClientClanImpl(ClientId, pClan, true);
 }
 
-void CServer::SeBestClientCountry(int ClientId, int Country)
+void CServer::SetClientCountry(int ClientId, int Country)
 {
 	if(ClientId < 0 || ClientId >= MAX_CLIENTS || m_aClients[ClientId].m_State < CClient::STATE_READY)
 		return;
@@ -476,7 +476,7 @@ void CServer::SeBestClientCountry(int ClientId, int Country)
 	m_aClients[ClientId].m_Country = Country;
 }
 
-void CServer::SeBestClientScore(int ClientId, std::optional<int> Score)
+void CServer::SetClientScore(int ClientId, std::optional<int> Score)
 {
 	if(ClientId < 0 || ClientId >= MAX_CLIENTS || m_aClients[ClientId].m_State < CClient::STATE_READY)
 		return;
@@ -487,7 +487,7 @@ void CServer::SeBestClientScore(int ClientId, std::optional<int> Score)
 	m_aClients[ClientId].m_Score = Score;
 }
 
-void CServer::SeBestClientFlags(int ClientId, int Flags)
+void CServer::SetClientFlags(int ClientId, int Flags)
 {
 	if(ClientId < 0 || ClientId >= MAX_CLIENTS || m_aClients[ClientId].m_State < CClient::STATE_READY)
 		return;
@@ -521,14 +521,14 @@ void CServer::Ban(int ClientId, int Seconds, const char *pReason, bool VerbatimR
 	m_NetServer.NetBan()->BanAddr(ClientAddr(ClientId), Seconds, pReason, VerbatimReason);
 }
 
-void CServer::ReconnecBestClient(int ClientId)
+void CServer::ReconnectClient(int ClientId)
 {
 	dbg_assert(0 <= ClientId && ClientId < MAX_CLIENTS, "Invalid ClientId: %d", ClientId);
 	dbg_assert(m_aClients[ClientId].m_State != CClient::STATE_EMPTY, "Client slot empty: %d", ClientId);
 
-	if(GeBestClientVersion(ClientId) < VERSION_DDNET_RECONNECT)
+	if(GetClientVersion(ClientId) < VERSION_DDNET_RECONNECT)
 	{
-		RedirecBestClient(ClientId, m_NetServer.Address().port);
+		RedirectClient(ClientId, m_NetServer.Address().port);
 		return;
 	}
 	log_info("server", "telling client to reconnect, cid=%d", ClientId);
@@ -545,12 +545,12 @@ void CServer::ReconnecBestClient(int ClientId)
 	m_aClients[ClientId].m_State = CClient::STATE_REDIRECTED;
 }
 
-void CServer::RedirecBestClient(int ClientId, int Port)
+void CServer::RedirectClient(int ClientId, int Port)
 {
 	dbg_assert(0 <= ClientId && ClientId < MAX_CLIENTS, "Invalid ClientId: %d", ClientId);
 	dbg_assert(m_aClients[ClientId].m_State != CClient::STATE_EMPTY, "Client slot empty: %d", ClientId);
 
-	bool SupportsRedirect = GeBestClientVersion(ClientId) >= VERSION_DDNET_REDIRECT;
+	bool SupportsRedirect = GetClientVersion(ClientId) >= VERSION_DDNET_REDIRECT;
 
 	log_info("server", "redirecting client, cid=%d port=%d supported=%d", ClientId, Port, SupportsRedirect);
 
@@ -687,7 +687,7 @@ bool CServer::HasAuthHidden(int ClientId) const
 	return m_aClients[ClientId].m_AuthHidden;
 }
 
-bool CServer::GeBestClientInfo(int ClientId, CClientInfo *pInfo) const
+bool CServer::GetClientInfo(int ClientId, CClientInfo *pInfo) const
 {
 	dbg_assert(ClientId >= 0 && ClientId < MAX_CLIENTS, "Invalid ClientId: %d", ClientId);
 	dbg_assert(pInfo != nullptr, "pInfo cannot be null");
@@ -713,7 +713,7 @@ bool CServer::GeBestClientInfo(int ClientId, CClientInfo *pInfo) const
 	return false;
 }
 
-void CServer::SeBestClientDDNetVersion(int ClientId, int DDNetVersion)
+void CServer::SetClientDDNetVersion(int ClientId, int DDNetVersion)
 {
 	dbg_assert(ClientId >= 0 && ClientId < MAX_CLIENTS, "Invalid ClientId: %d", ClientId);
 
@@ -810,7 +810,7 @@ int CServer::ClientCount() const
 	return ClientCount;
 }
 
-int CServer::DistincBestClientCount() const
+int CServer::DistinctClientCount() const
 {
 	const NETADDR *apAddresses[MAX_CLIENTS];
 	for(int i = 0; i < MAX_CLIENTS; i++)
@@ -839,14 +839,14 @@ int CServer::DistincBestClientCount() const
 	return ClientCount;
 }
 
-int CServer::GeBestClientVersion(int ClientId) const
+int CServer::GetClientVersion(int ClientId) const
 {
 	// Assume latest client version for server demos
 	if(ClientId == SERVER_DEMO_CLIENT)
 		return DDNET_VERSION_NUMBER;
 
 	CClientInfo Info;
-	if(GeBestClientInfo(ClientId, &Info))
+	if(GetClientInfo(ClientId, &Info))
 		return Info.m_DDNetVersion;
 	return VERSION_NONE;
 }
@@ -1860,8 +1860,8 @@ void CServer::ProcessClientPacket(CNetChunk *pPacket)
 			if(g_Config.m_SvPreInput)
 			{
 				// send preinputs of ClientId to valid clients
-				bool aPreInpuBestClients[MAX_CLIENTS] = {};
-				GameServer()->PreInpuBestClients(ClientId, aPreInpuBestClients);
+				bool aPreInputClients[MAX_CLIENTS] = {};
+				GameServer()->PreInputClients(ClientId, aPreInputClients);
 
 				CNetMsg_Sv_PreInput PreInput = {};
 				mem_zero(&PreInput, sizeof(PreInput));
@@ -1888,7 +1888,7 @@ void CServer::ProcessClientPacket(CNetChunk *pPacket)
 
 					for(int Id = 0; Id < MAX_CLIENTS; Id++)
 					{
-						if(!aPreInpuBestClients[Id])
+						if(!aPreInputClients[Id])
 							continue;
 
 						SendPackMsg(&PreInput, MSGFLAG_FLUSH | MSGFLAG_NORECORD, Id);
@@ -3073,7 +3073,7 @@ int CServer::Run()
 	}
 
 	{
-		int Size = GameServer()->PersistenBestClientDataSize();
+		int Size = GameServer()->PersistentClientDataSize();
 		for(auto &Client : m_aClients)
 		{
 			Client.m_HasPersistentData = false;
@@ -3975,7 +3975,7 @@ void CServer::ConLogout(IConsole::IResult *pResult, void *pUser)
 	if(pServer->m_RconClientId >= 0 && pServer->m_RconClientId < MAX_CLIENTS &&
 		pServer->m_aClients[pServer->m_RconClientId].m_State != CServer::CClient::STATE_EMPTY)
 	{
-		pServer->LogouBestClient(pServer->m_RconClientId, "");
+		pServer->LogoutClient(pServer->m_RconClientId, "");
 	}
 }
 
@@ -4179,7 +4179,7 @@ void CServer::ConchainCommandAccessUpdate(IConsole::IResult *pResult, void *pUse
 		pfnCallback(pResult, pCallbackUserData);
 }
 
-void CServer::LogouBestClient(int ClientId, const char *pReason)
+void CServer::LogoutClient(int ClientId, const char *pReason)
 {
 	if(!IsSixup(ClientId))
 	{
@@ -4220,7 +4220,7 @@ void CServer::LogoutKey(int Key, const char *pReason)
 {
 	for(int i = 0; i < MAX_CLIENTS; i++)
 		if(m_aClients[i].m_AuthKey == Key)
-			LogouBestClient(i, pReason);
+			LogoutClient(i, pReason);
 }
 
 void CServer::ConchainRconPasswordChangeGeneric(const char *pRoleName, const char *pCurrent, IConsole::IResult *pResult)
@@ -4611,7 +4611,7 @@ bool CServer::SetTimedOut(int ClientId, int OrigId)
 	// The login was on the current conn, logout should also be on the current conn
 	if(IsRconAuthed(OrigId))
 	{
-		LogouBestClient(OrigId, "Timeout Protection");
+		LogoutClient(OrigId, "Timeout Protection");
 	}
 
 	m_NetServer.ResumeOldConnection(ClientId, OrigId);

@@ -11,6 +11,7 @@
 #include <engine/client.h>
 #include <engine/client/enums.h>
 #include <engine/console.h>
+#include <engine/map.h>
 #include <engine/shared/config.h>
 #include <engine/shared/protocol.h>
 #include <engine/shared/snapshot.h>
@@ -673,6 +674,7 @@ public:
 	};
 
 	CClientStats m_aStats[MAX_CLIENTS];
+	std::unique_ptr<IMap> m_pMap = CreateMap();
 
 	CRenderTools m_RenderTools;
 	CRenderMap m_RenderMap;
@@ -727,6 +729,8 @@ public:
 	std::shared_ptr<CManagedTeeRenderInfo> CreateManagedTeeRenderInfo(const CTeeRenderInfo &TeeRenderInfo, const CSkinDescriptor &SkinDescriptor);
 	std::shared_ptr<CManagedTeeRenderInfo> CreateManagedTeeRenderInfo(const CClientData &Client);
 	void CollectManagedTeeRenderInfos(const std::function<void(const char *pSkinName)> &ActiveSkinAcceptor);
+	IMap *Map() override { return m_pMap.get(); }
+	const IMap *Map() const override { return m_pMap.get(); }
 
 	void RenderShutdownMessage() override;
 	void ProcessDemoSnapshot(CSnapshot *pSnap) override;

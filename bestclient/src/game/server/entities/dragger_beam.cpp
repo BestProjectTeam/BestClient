@@ -122,7 +122,7 @@ void CDraggerBeam::Snap(int SnappingClient)
 		StartTick = Server()->Tick();
 	}
 
-	int SnappingClientVersion = GameServer()->GeBestClientVersion(SnappingClient);
+	int SnappingClientVersion = GameServer()->GetClientVersion(SnappingClient);
 	if(SnappingClientVersion >= VERSION_DDNET_ENTITY_NETOBJS)
 	{
 		StartTick = -1;

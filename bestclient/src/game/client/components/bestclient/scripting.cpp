@@ -75,7 +75,7 @@ private:
 		if(Str == "map")
 		{
 			if(Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK)
-				return Client()->GetCurrentMap();
+				return GameClient()->Map()->BaseName();
 			else if(GameClient()->m_ConnectServerInfo)
 				return GameClient()->m_ConnectServerInfo->m_aMap;
 			else

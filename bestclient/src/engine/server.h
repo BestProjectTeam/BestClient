@@ -58,14 +58,14 @@ public:
 	virtual int Port() const = 0;
 	virtual int MaxClients() const = 0;
 	virtual int ClientCount() const = 0;
-	virtual int DistincBestClientCount() const = 0;
+	virtual int DistinctClientCount() const = 0;
 	virtual const char *ClientName(int ClientId) const = 0;
 	virtual const char *ClientClan(int ClientId) const = 0;
 	virtual int ClientCountry(int ClientId) const = 0;
 	virtual bool ClientSlotEmpty(int ClientId) const = 0;
 	virtual bool ClientIngame(int ClientId) const = 0;
-	virtual bool GeBestClientInfo(int ClientId, CClientInfo *pInfo) const = 0;
-	virtual void SeBestClientDDNetVersion(int ClientId, int DDNetVersion) = 0;
+	virtual bool GetClientInfo(int ClientId, CClientInfo *pInfo) const = 0;
+	virtual void SetClientDDNetVersion(int ClientId, int DDNetVersion) = 0;
 	virtual const NETADDR *ClientAddr(int ClientId) const = 0;
 	virtual const std::array<char, NETADDR_MAXSTRSIZE> &ClientAddrStringImpl(int ClientId, bool IncludePort) const = 0;
 	const char *ClientAddrString(int ClientId, bool IncludePort) const { return ClientAddrStringImpl(ClientId, IncludePort).data(); }
@@ -80,7 +80,7 @@ public:
 	 * For server demos this is always the latest client version.
 	 * On errors, VERSION_NONE is returned.
 	 */
-	virtual int GeBestClientVersion(int ClientId) const = 0;
+	virtual int GetClientVersion(int ClientId) const = 0;
 	virtual int SendMsg(CMsgPacker *pMsg, int Flags, int ClientId) = 0;
 
 	template<class T, typename std::enable_if<!protocol7::is_sixup<T>::value, int>::type = 0>
@@ -196,7 +196,7 @@ public:
 	{
 		if(IsSixup(Client))
 			return true;
-		if(GeBestClientVersion(Client) >= VERSION_DDNET_OLD)
+		if(GetClientVersion(Client) >= VERSION_DDNET_OLD)
 			return true;
 		int *pMap = GetIdMap(Client);
 		bool Found = false;
@@ -216,7 +216,7 @@ public:
 	{
 		if(IsSixup(Client))
 			return true;
-		if(GeBestClientVersion(Client) >= VERSION_DDNET_OLD)
+		if(GetClientVersion(Client) >= VERSION_DDNET_OLD)
 			return true;
 		Target = std::clamp(Target, 0, VANILLA_MAX_CLIENTS - 1);
 		int *pMap = GetIdMap(Client);
@@ -228,11 +228,11 @@ public:
 
 	virtual bool WouldClientNameChange(int ClientId, const char *pNameRequest) = 0;
 	virtual bool WouldClientClanChange(int ClientId, const char *pClanRequest) = 0;
-	virtual void SeBestClientName(int ClientId, const char *pName) = 0;
-	virtual void SeBestClientClan(int ClientId, const char *pClan) = 0;
-	virtual void SeBestClientCountry(int ClientId, int Country) = 0;
-	virtual void SeBestClientScore(int ClientId, std::optional<int> Score) = 0;
-	virtual void SeBestClientFlags(int ClientId, int Flags) = 0;
+	virtual void SetClientName(int ClientId, const char *pName) = 0;
+	virtual void SetClientClan(int ClientId, const char *pClan) = 0;
+	virtual void SetClientCountry(int ClientId, int Country) = 0;
+	virtual void SetClientScore(int ClientId, std::optional<int> Score) = 0;
+	virtual void SetClientFlags(int ClientId, int Flags) = 0;
 
 	virtual int SnapNewId() = 0;
 	virtual void SnapFreeId(int Id) = 0;
@@ -260,7 +260,7 @@ public:
 	virtual bool HasAuthHidden(int ClientId) const = 0;
 	virtual void Kick(int ClientId, const char *pReason) = 0;
 	virtual void Ban(int ClientId, int Seconds, const char *pReason, bool VerbatimReason) = 0;
-	virtual void RedirecBestClient(int ClientId, int Port) = 0;
+	virtual void RedirectClient(int ClientId, int Port) = 0;
 	virtual void ChangeMap(const char *pMap) = 0;
 	virtual void ReloadMap() = 0;
 
@@ -331,7 +331,7 @@ public:
 	// Called before map reload, for any data that the game wants to
 	// persist to the next map.
 	//
-	// Has the size of the return value of `PersistenBestClientDataSize()`.
+	// Has the size of the return value of `PersistentClientDataSize()`.
 	//
 	// Returns whether the game should be supplied with the data when the
 	// client connects for the next map.
@@ -351,14 +351,14 @@ public:
 	virtual void OnClientPredictedInput(int ClientId, const void *pInput) = 0;
 	virtual void OnClientPredictedEarlyInput(int ClientId, const void *pInput) = 0;
 
-	virtual void PreInpuBestClients(int ClientId, bool *pClients) = 0;
+	virtual void PreInputClients(int ClientId, bool *pClients) = 0;
 
 	virtual bool IsClientReady(int ClientId) const = 0;
 	virtual bool IsClientPlayer(int ClientId) const = 0;
 	virtual bool IsClientHighBandwidth(int ClientId) const = 0;
 
 	virtual int PersistentDataSize() const = 0;
-	virtual int PersistenBestClientDataSize() const = 0;
+	virtual int PersistentClientDataSize() const = 0;
 
 	virtual CUuid GameUuid() const = 0;
 	virtual const char *GameType() const = 0;

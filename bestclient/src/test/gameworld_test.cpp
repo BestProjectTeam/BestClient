@@ -95,7 +95,7 @@ public:
 		m_pServer->m_AuthManager.Init();
 
 		{
-			int Size = GameServer()->PersistenBestClientDataSize();
+			int Size = GameServer()->PersistentClientDataSize();
 			for(auto &Client : m_pServer->m_aClients)
 			{
 				Client.m_HasPersistentData = false;

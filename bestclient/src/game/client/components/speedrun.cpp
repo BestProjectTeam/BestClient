@@ -69,9 +69,9 @@ void CHud::RenderSpeedrunTimer()
 			const float Half = m_Width / 2.0f;
 			const float FontSize = 12.0f;
 			const float w = TextRender()->TextWidth(FontSize, aBuf, -1, -1.0f);
-			SetHudTextColor(1.0f, 0.25f, 0.25f, 1.0f);
+			TextRender()->TextColor(1.0f, 0.25f, 0.25f, 1.0f);
 			TextRender()->Text(Half - w / 2, SpeedrunTimerExpiredY, FontSize, aBuf, -1.0f);
-			SetHudTextColor(1.0f, 1.0f, 1.0f, 1.0f);
+			TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
 		}
 		else
 		{
@@ -108,8 +108,8 @@ void CHud::RenderSpeedrunTimer()
 	const float w = TextRender()->TextWidth(FontSize, aBuf, -1, -1.0f);
 
 	if(RemainingMilliseconds <= 60 * 1000)
-		SetHudTextColor(1.0f, 0.25f, 0.25f, 1.0f);
+		TextRender()->TextColor(1.0f, 0.25f, 0.25f, 1.0f);
 
 	TextRender()->Text(Half - w / 2, SpeedrunTimerY, FontSize, aBuf, -1.0f);
-	SetHudTextColor(1.0f, 1.0f, 1.0f, 1.0f);
+	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
 }

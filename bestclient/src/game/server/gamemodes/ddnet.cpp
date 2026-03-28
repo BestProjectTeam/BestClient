@@ -216,7 +216,7 @@ void CGameControllerDDNet::OnPlayerDisconnect(CPlayer *pPlayer, const char *pRea
 
 	for(int Team = TEAM_FLOCK + 1; Team < TEAM_SUPER; Team++)
 		if(Teams().IsInvited(Team, ClientId))
-			Teams().SeBestClientInvited(Team, ClientId, false);
+			Teams().SetClientInvited(Team, ClientId, false);
 }
 
 void CGameControllerDDNet::OnReset()

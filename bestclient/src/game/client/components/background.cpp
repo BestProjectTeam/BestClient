@@ -91,6 +91,13 @@ void CBackground::OnMapLoad()
 	}
 }
 
+void CBackground::OnShutdown()
+{
+	if(m_pBackgroundMap && m_pBackgroundMap->IsLoaded())
+		m_pBackgroundMap->Unload();
+	m_Loaded = false;
+}
+
 void CBackground::OnRender()
 {
 	if(!m_Loaded)

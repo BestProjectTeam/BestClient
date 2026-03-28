@@ -1069,7 +1069,7 @@ void CCharacter::CancelSwapRequests()
 
 void CCharacter::SnapCharacter(int SnappingClient, int Id)
 {
-	int SnappingClientVersion = GameServer()->GeBestClientVersion(SnappingClient);
+	int SnappingClientVersion = GameServer()->GetClientVersion(SnappingClient);
 	CCharacterCore *pCore;
 	int Weapon = m_Core.m_ActiveWeapon, AmmoCount = 0,
 	    Health = 0, Armor = 0;
@@ -1097,7 +1097,7 @@ void CCharacter::SnapCharacter(int SnappingClient, int Id)
 	if(m_pPlayer->GetCid() == SnappingClient)
 	{
 		int Faketuning = 0;
-		if(m_pPlayer->GeBestClientVersion() < VERSION_DDNET_NEW_HUD)
+		if(m_pPlayer->GetClientVersion() < VERSION_DDNET_NEW_HUD)
 		{
 			if(m_Core.m_Jetpack && Weapon != WEAPON_NINJA)
 				Faketuning |= FAKETUNE_JETPACK;
@@ -1414,7 +1414,7 @@ void CCharacter::HandleBroadcast()
 {
 	CPlayerData *pData = GameServer()->Score()->PlayerData(m_pPlayer->GetCid());
 
-	if(m_DDRaceState == ERaceState::STARTED && m_pPlayer->GeBestClientVersion() == VERSION_VANILLA && !Server()->IsSixup(m_pPlayer->GetCid()) &&
+	if(m_DDRaceState == ERaceState::STARTED && m_pPlayer->GetClientVersion() == VERSION_VANILLA && !Server()->IsSixup(m_pPlayer->GetCid()) &&
 		m_LastTimeCpBroadcasted != m_LastTimeCp && m_LastTimeCp > -1 &&
 		m_TimeCpBroadcastEndTick > Server()->Tick() && pData->m_BestTime && pData->m_aBestTimeCp[m_LastTimeCp] != 0)
 	{
@@ -1573,7 +1573,7 @@ void CCharacter::SetTimeCheckpoint(int TimeCheckpoint)
 		m_LastTimeCp = TimeCheckpoint;
 		m_aCurrentTimeCp[m_LastTimeCp] = m_Time;
 		m_TimeCpBroadcastEndTick = Server()->Tick() + Server()->TickSpeed() * 2;
-		if(m_pPlayer->GeBestClientVersion() >= VERSION_DDRACE || Server()->IsSixup(m_pPlayer->GetCid()))
+		if(m_pPlayer->GetClientVersion() >= VERSION_DDRACE || Server()->IsSixup(m_pPlayer->GetCid()))
 		{
 			CPlayerData *pData = GameServer()->Score()->PlayerData(m_pPlayer->GetCid());
 			if(pData->m_aBestTimeCp[m_LastTimeCp] != 0.0f)

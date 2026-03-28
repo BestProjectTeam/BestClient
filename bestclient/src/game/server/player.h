@@ -39,7 +39,7 @@ public:
 	int GetTeam() const { return m_Team; }
 	int GetCid() const { return m_ClientId; }
 	uint32_t GetUniqueCid() const { return m_UniqueClientId; }
-	int GeBestClientVersion() const;
+	int GetClientVersion() const;
 	bool SetTimerType(int TimerType);
 
 	void Tick();

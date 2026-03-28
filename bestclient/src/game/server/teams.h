@@ -100,7 +100,7 @@ public:
 	void SetTeamLock(int Team, bool Lock);
 	void SetTeamFlock(int Team, bool Mode);
 	void ResetInvited(int Team);
-	void SeBestClientInvited(int Team, int ClientId, bool Invited);
+	void SetClientInvited(int Team, int ClientId, bool Invited);
 
 	ERaceState GetDDRaceState(const CPlayer *Player) const;
 	int GetStartTime(CPlayer *Player);

@@ -113,6 +113,10 @@ CClient::CClient() :
 	m_Sixup = false;
 }
 
+void CClient::DiscordRPCchange()
+{
+}
+
 // ----- send functions -----
 static inline bool RepackMsg(const CMsgPacker *pMsg, CPacker &Packer, bool Sixup)
 {
@@ -5378,6 +5382,10 @@ bool CClient::ViewFile(const char *pFilename)
 	str_format(aFileLink, sizeof(aFileLink), "file://%s%s", aWorkingDir, pFilename);
 	return ViewLinkImpl(aFileLink);
 #endif
+}
+
+void CClient::TestCrash()
+{
 }
 
 #if defined(CONF_FAMILY_WINDOWS)

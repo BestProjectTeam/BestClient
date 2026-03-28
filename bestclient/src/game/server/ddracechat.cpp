@@ -1204,7 +1204,7 @@ void CGameContext::ConInvite(IConsole::IResult *pResult, void *pUserData)
 			return;
 		}
 
-		pController->Teams().SeBestClientInvited(Team, Target, true);
+		pController->Teams().SetClientInvited(Team, Target, true);
 		pSelf->m_apPlayers[pResult->m_ClientId]->m_LastInvited = pSelf->Server()->Tick();
 
 		char aBuf[512];

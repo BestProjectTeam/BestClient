@@ -48,8 +48,8 @@ public:
 	bool IsHooking() const;
 	vec2 GetPos() const { return m_Pos; }
 	const char *GetName() const { return m_aName; }
-	int GeBestClientId() const { return m_ClientId; }
-	void SeBestClientId(int ClientId) { m_ClientId = ClientId; }
+	int GetClientId() const { return m_ClientId; }
+	void SetClientId(int ClientId) { m_ClientId = ClientId; }
 
 	enum
 	{

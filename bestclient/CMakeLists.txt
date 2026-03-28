@@ -125,7 +125,9 @@ set(AUTOUPDATE_DEFAULT OFF)
 set(AUTO_VULKAN_BACKEND ON)
 if(TARGET_OS STREQUAL "windows")
   set(AUTO_DEPENDENCIES_DEFAULT ON)
-  set(AUTO_VULKAN_BACKEND ON)
+  if(TARGET_CPU_ARCHITECTURE STREQUAL "x86")
+    set(AUTO_VULKAN_BACKEND OFF)
+  endif()
 elseif(TARGET_OS STREQUAL "mac")
   set(AUTO_VULKAN_BACKEND OFF)
 endif()
@@ -3331,8 +3333,8 @@ if(SERVER)
     gamecontext.h
     gamecontroller.cpp
     gamecontroller.h
-    gamemodes/DDRace.cpp
-    gamemodes/DDRace.h
+    gamemodes/ddnet.cpp
+    gamemodes/ddnet.h
     gamemodes/mod.cpp
     gamemodes/mod.h
     gameworld.cpp
@@ -3585,7 +3587,7 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     mapbugs_test.cpp
     mapitems_test.cpp
     math_test.cpp
-    memory_test.cpp
+    mem_test.cpp
     name_ban_test.cpp
     net_test.cpp
     netaddr_test.cpp
@@ -3597,7 +3599,7 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     server_test.cpp
     serverbrowser_test.cpp
     serverinfo_test.cpp
-    shell_execute_test.cpp
+    windows_test.cpp
     snapshot_test.cpp
     str_test.cpp
     strip_path_and_extension_test.cpp

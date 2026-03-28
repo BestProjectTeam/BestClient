@@ -575,7 +575,7 @@ void CGameContext::ConUninvite(IConsole::IResult *pResult, void *pUserData)
 	CGameContext *pSelf = (CGameContext *)pUserData;
 	auto *pController = pSelf->m_pController;
 
-	pController->Teams().SeBestClientInvited(pResult->GetInteger(1), pResult->GetVictim(), false);
+	pController->Teams().SetClientInvited(pResult->GetInteger(1), pResult->GetVictim(), false);
 }
 
 void CGameContext::ConVoteNo(IConsole::IResult *pResult, void *pUserData)
@@ -674,7 +674,7 @@ void CGameContext::LogEvent(const char *Description, int ClientId)
 	pNewEntry->m_FromServer = ClientId < 0;
 	if(!pNewEntry->m_FromServer)
 	{
-		pNewEntry->m_ClientVersion = Server()->GeBestClientVersion(ClientId);
+		pNewEntry->m_ClientVersion = Server()->GetClientVersion(ClientId);
 		str_copy(pNewEntry->m_aClientAddrStr, Server()->ClientAddrString(ClientId, false));
 		str_copy(pNewEntry->m_aClientName, Server()->ClientName(ClientId));
 	}

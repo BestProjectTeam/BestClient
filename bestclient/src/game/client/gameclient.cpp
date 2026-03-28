@@ -710,7 +710,7 @@ void CGameClient::OnConnected()
 	const char *pLoadMapContent = Localize("Initializing map logic");
 	// render loading before skip is calculated
 	m_Menus.RenderLoading(pConnectCaption, pLoadMapContent, 0);
-	m_Layers.Init(Kernel()->RequestInterface<IMap>(), false);
+	m_Layers.Init(Map(), false);
 	m_Collision.Init(Layers());
 	m_GameWorld.m_Core.InitSwitchers(m_Collision.m_HighestSwitchNumber);
 	m_RaceHelper.Init(this);
@@ -2731,7 +2731,7 @@ void CGameClient::OnPredict()
 		bool DummyFirst = pInputData && pDummyInputData && pDummyChar->GetCid() < pLocalChar->GetCid();
 
 		if(FastInputTicks > 0 && Tick > FinalTickRegular)
-			pInputData = &m_Controls.m_FastInput;
+			pInputData = &m_Controls.m_aFastInput[m_IsDummySwapping];
 
 		if(DummyFirst)
 			pDummyChar->OnDirectInput(pDummyInputData);
@@ -3221,7 +3221,7 @@ CSkinDescriptor CGameClient::CClientData::ToSkinDescriptor() const
 			{
 				str_copy(SkinDescriptor.m_aSixup[Dummy].m_aaSkinPartNames[Part], m_aSixup[Dummy].m_aaSkinPartNames[Part]);
 			}
-			SkinDescriptor.m_aSixup[Dummy].m_XmasHat = time_season() == SEASON_XMAS;
+			SkinDescriptor.m_aSixup[Dummy].m_XmasHat = time_season() == ETimeSeason::XMAS;
 			SkinDescriptor.m_aSixup[Dummy].m_BotDecoration = (TranslatedClient.m_PlayerFlags7 & protocol7::PLAYERFLAG_BOT) != 0;
 		}
 	}
@@ -4969,9 +4969,8 @@ static bool UnknownMapSettingCallback(const char *pCommand, void *pUser)
 
 void CGameClient::LoadMapSettings()
 {
-	IEngineMap *pMap = Kernel()->RequestInterface<IEngineMap>();
-
-	m_MapBugs = CMapBugs::Create(Client()->GetCurrentMap(), pMap->MapSize(), pMap->Sha256());
+	IMap *pMap = Map();
+	m_MapBugs = CMapBugs::Create(pMap->BaseName(), pMap->Size(), pMap->Sha256());
 
 	// Reset Tunezones
 	for(int TuneZone = 0; TuneZone < TuneZone::NUM; TuneZone++)
@@ -5560,7 +5559,7 @@ void CGameClient::StoreSave(const char *pTeamMembers, const char *pGeneratedCode
 	};
 
 	char aTimestamp[20];
-	str_timestamp_format(aTimestamp, sizeof(aTimestamp), FORMAT_SPACE);
+	str_timestamp_format(aTimestamp, sizeof(aTimestamp), TimestampFormat::SPACE);
 
 	const bool SavesFileExists = Storage()->FileExists(SAVES_FILE, IStorage::TYPE_SAVE);
 	IOHANDLE File = Storage()->OpenFile(SAVES_FILE, IOFLAG_APPEND, IStorage::TYPE_SAVE);
@@ -5573,7 +5572,7 @@ void CGameClient::StoreSave(const char *pTeamMembers, const char *pGeneratedCode
 	const char *apColumns[std::size(SAVES_HEADER)] = {
 		aTimestamp,
 		pTeamMembers,
-		Client()->GetCurrentMap(),
+		Map()->BaseName(),
 		pGeneratedCode,
 	};
 

@@ -103,6 +103,15 @@ void CServerBrowser::OnInit()
 	m_pHttp = CreateServerBrowserHttp(m_pEngine, m_pStorage, m_pHttpClient, g_Config.m_BrCachedBestServerinfoUrl);
 }
 
+void CServerBrowser::SetBestClientPlayers(const std::vector<CBestClientPlayerEntry> &vPlayers)
+{
+	m_BestClientPlayersByServer.clear();
+	for(const auto &Player : vPlayers)
+	{
+		m_BestClientPlayersByServer[Player.m_aServerAddress].insert(Player.m_aName);
+	}
+}
+
 void CServerBrowser::RegisterCommands()
 {
 	m_pConfigManager->RegisterCallback(CServerBrowser::ConfigSaveCallback, this);
