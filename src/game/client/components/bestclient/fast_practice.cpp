@@ -415,6 +415,7 @@ void CFastPractice::SyncPracticeWorldConfig()
 	m_PracticeBaseWorld.m_WorldConfig.m_PredictWeapons = true;
 	m_PracticeBaseWorld.m_WorldConfig.m_PredictFreeze = true;
 	m_PracticeBaseWorld.m_WorldConfig.m_PredictTiles = true;
+	m_PracticeBaseWorld.m_WorldConfig.m_PredictTeleports = true;
 	m_PracticeBaseWorld.m_WorldConfig.m_PredictDDRace = true;
 	m_PracticeBaseWorld.m_Teams = GameClient()->m_Teams;
 }

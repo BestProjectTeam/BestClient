@@ -1045,6 +1045,79 @@ void CCharacter::HandleTiles(int Index)
 		if(NewJumps != m_Core.m_Jumps)
 			m_Core.m_Jumps = NewJumps;
 	}
+
+	if(!GameWorld()->m_WorldConfig.m_PredictTeleports)
+		return;
+
+	if(m_Core.m_Super || m_Core.m_Invincible)
+		return;
+
+	// Process teleport tiles only for the tee's current center tile.
+	// Using anti-skip path indices here can trigger teleports too early
+	// compared to point-based character position checks.
+	if(MapIndex != Collision()->GetMapIndex(m_Pos))
+		return;
+
+	const auto TeleportTo = [&](const vec2 &TelePos, bool ResetVelocity, bool ReleaseHooked) {
+		m_Core.m_Pos = TelePos;
+		if(ResetVelocity)
+			m_Core.m_Vel = vec2(0.0f, 0.0f);
+		if(!g_Config.m_SvTeleportHoldHook)
+		{
+			ResetHook();
+			if(ReleaseHooked)
+				GameWorld()->ReleaseHooked(GetCid());
+		}
+		m_Pos = m_Core.m_Pos;
+		m_PrevPos = m_Core.m_Pos;
+		m_PrevPrevPos = m_Core.m_Pos;
+	};
+
+	const int Teleport = Collision()->IsTeleport(MapIndex);
+	if(!g_Config.m_SvOldTeleportHook && !g_Config.m_SvOldTeleportWeapons && Teleport > 0 && !Collision()->TeleOuts(Teleport - 1).empty())
+	{
+		const auto &vTeleOuts = Collision()->TeleOuts(Teleport - 1);
+		const int TeleOut = GameWorld()->m_Core.RandomOr0((int)vTeleOuts.size());
+		TeleportTo(vTeleOuts[TeleOut], false, false);
+		return;
+	}
+
+	const int EvilTeleport = Collision()->IsEvilTeleport(MapIndex);
+	if(EvilTeleport > 0 && !Collision()->TeleOuts(EvilTeleport - 1).empty())
+	{
+		const auto &vTeleOuts = Collision()->TeleOuts(EvilTeleport - 1);
+		const int TeleOut = GameWorld()->m_Core.RandomOr0((int)vTeleOuts.size());
+		TeleportTo(vTeleOuts[TeleOut], !g_Config.m_SvOldTeleportHook && !g_Config.m_SvOldTeleportWeapons, !g_Config.m_SvOldTeleportHook && !g_Config.m_SvOldTeleportWeapons);
+		return;
+	}
+
+	if(Collision()->IsCheckEvilTeleport(MapIndex))
+	{
+		for(int k = m_TeleCheckpoint - 1; k >= 0; k--)
+		{
+			if(Collision()->TeleCheckOuts(k).empty())
+				continue;
+			const auto &vTeleCheckOuts = Collision()->TeleCheckOuts(k);
+			const int TeleOut = GameWorld()->m_Core.RandomOr0((int)vTeleCheckOuts.size());
+			TeleportTo(vTeleCheckOuts[TeleOut], true, true);
+			return;
+		}
+		return;
+	}
+
+	if(Collision()->IsCheckTeleport(MapIndex))
+	{
+		for(int k = m_TeleCheckpoint - 1; k >= 0; k--)
+		{
+			if(Collision()->TeleCheckOuts(k).empty())
+				continue;
+			const auto &vTeleCheckOuts = Collision()->TeleCheckOuts(k);
+			const int TeleOut = GameWorld()->m_Core.RandomOr0((int)vTeleCheckOuts.size());
+			TeleportTo(vTeleCheckOuts[TeleOut], false, false);
+			return;
+		}
+		return;
+	}
 }
 
 void CCharacter::HandleTuneLayer()

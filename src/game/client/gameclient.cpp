@@ -4354,6 +4354,7 @@ void CGameClient::UpdatePrediction()
 	m_GameWorld.m_WorldConfig.m_IsFNG = m_GameInfo.m_PredictFNG;
 	m_GameWorld.m_WorldConfig.m_PredictDDRace = m_GameInfo.m_PredictDDRace;
 	m_GameWorld.m_WorldConfig.m_PredictTiles = m_GameInfo.m_PredictDDRace && m_GameInfo.m_PredictDDRaceTiles;
+	m_GameWorld.m_WorldConfig.m_PredictTeleports = false;
 	m_GameWorld.m_WorldConfig.m_PredictFreeze = g_Config.m_ClPredictFreeze;
 	m_GameWorld.m_WorldConfig.m_PredictWeapons = AntiPingWeapons();
 	m_GameWorld.m_WorldConfig.m_BugDDRaceInput = m_GameInfo.m_BugDDRaceInput;
@@ -4660,13 +4661,13 @@ void CGameClient::UpdateRenderedCharacters()
 				vec2(m_aClients[i].m_RenderCur.m_X, m_aClients[i].m_RenderCur.m_Y),
 				m_aClients[i].m_IsPredicted ? Client()->PredIntraGameTick(g_Config.m_ClDummy) : Client()->IntraGameTick(g_Config.m_ClDummy));
 
-			if(g_Config.m_TcRemoveAnti)
-				Pos = GetFreezePos(i);
-			else if(IsPracticeParticipant)
+			if(IsPracticeParticipant)
 			{
 				if(HasFastInput && (i == m_Snap.m_LocalClientId || FastInputOthers))
 					Pos = GetFastInputPos(i);
 			}
+			else if(g_Config.m_TcRemoveAnti)
+				Pos = GetFreezePos(i);
 			else if(HasFastInput && (i == m_Snap.m_LocalClientId || (PredictDummy() && i == m_aLocalIds[!g_Config.m_ClDummy])))
 			{
 				Pos = GetFastInputPos(i);

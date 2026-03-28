@@ -32,6 +32,7 @@ CGameWorld::CGameWorld()
 		pFirstEntityType = nullptr;
 	for(auto &pCharacter : m_apCharacters)
 		pCharacter = nullptr;
+	m_WorldConfig = {};
 	m_pCollision = nullptr;
 	m_GameTick = 0;
 	m_pParent = nullptr;
