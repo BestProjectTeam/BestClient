@@ -1881,7 +1881,7 @@ void CMenus::RenderSettings(CUIRect MainView)
 			Localize("General"),
 			Localize("Appearance"),
 			TCLocalize("TClient"),
-			"bestclient",
+			"BestClient",
 		};
 		static CButtonContainer s_aRootTabButtons[ROOT_TAB_LENGTH];
 		const int CurRootTab = GetRootTabByPage(g_Config.m_UiSettingsPage);
@@ -2016,7 +2016,7 @@ void CMenus::RenderSettings(CUIRect MainView)
 		Localize("DDNet"),
 		Localize("Assets"),
 		TCLocalize("TClient"),
-		"bestclient",
+		"BestClient",
 		Localize("Profiles"),
 		Localize("Configs")};
 
@@ -3676,17 +3676,17 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			BeginBlock(Column, ContentHeight, Content);
 
 			Content.HSplitTop(LineSize, &Label, &Content);
-			Ui()->DoLabel(&Label, Localize("misc"), HeadlineFontSize, TEXTALIGN_ML);
+			Ui()->DoLabel(&Label, Localize("Misc"), HeadlineFontSize, TEXTALIGN_ML);
 			Content.HSplitTop(MarginSmall, nullptr, &Content);
 
 			static CButtonContainer s_SettingsLayoutButton;
 			int UseNewMenuLayout = g_Config.m_BcSettingsLayout == 0 ? 1 : 0;
 			DoButton_CheckBoxAutoVMarginAndSet(&s_SettingsLayoutButton, Localize("Use new menu layout"), &UseNewMenuLayout, &Content, LineSize);
 			g_Config.m_BcSettingsLayout = UseNewMenuLayout ? 0 : 1;
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcHideHudInSettings, Localize("hide hud in settings"), &g_Config.m_BcHideHudInSettings, &Content, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcHideHudInSettings, Localize("Hide hud in settings"), &g_Config.m_BcHideHudInSettings, &Content, LineSize);
 
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcEmoticonShadow, Localize("Тень у эмоций"), &g_Config.m_BcEmoticonShadow, &Content, LineSize);
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatSaveDraft, Localize("Сохранять недописанное сообщение"), &g_Config.m_BcChatSaveDraft, &Content, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcEmoticonShadow, Localize("Shadow of Emotions"), &g_Config.m_BcEmoticonShadow, &Content, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatSaveDraft, Localize("Save unsent messages"), &g_Config.m_BcChatSaveDraft, &Content, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowhudDummyCoordIndicator, TCLocalize("Show player below indicator"), &g_Config.m_BcShowhudDummyCoordIndicator, &Content, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowRealHitbox, Localize("Show real hitbox"), &g_Config.m_BcShowRealHitbox, &Content, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcUseShortKogServerName, Localize("Use short KoG server name"), &g_Config.m_BcUseShortKogServerName, &Content, LineSize);
@@ -5912,7 +5912,7 @@ void CMenus::RenderSettingsBestClientInfo(CUIRect MainView)
 		"Gameplay",
 		Localize("Others"),
 		Localize("Fun"),
-		"shop",
+		"Shop",
 		Localize("Editors"),
 		"info",
 	};

@@ -3163,8 +3163,8 @@ void CMenus::RenderSettingsBestClientVisualsGeneral(CUIRect MainView)
 		s_ScrollRegion.AddRect(Label, true);
 	SettingsSearchDrawLabel(&Label, TCLocalize("Visual"), HeadlineFontSize, TEXTALIGN_ML, "Visual");
 	Column.HSplitTop(MarginSmall, nullptr, &Column);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcEmoticonShadow, TCLocalize("Тень у эмоций"), &g_Config.m_BcEmoticonShadow, &Column, LineSize);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatSaveDraft, TCLocalize("Сохранять недописанное сообщение"), &g_Config.m_BcChatSaveDraft, &Column, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcEmoticonShadow, TCLocalize("Shadow of Emotions"), &g_Config.m_BcEmoticonShadow, &Column, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatSaveDraft, TCLocalize("Save unsent messages"), &g_Config.m_BcChatSaveDraft, &Column, LineSize);
 	static CButtonContainer s_SettingsLayoutButton;
 	int UseNewMenuLayout = g_Config.m_BcSettingsLayout == 0 ? 1 : 0;
 	DoButton_CheckBoxAutoVMarginAndSet(&s_SettingsLayoutButton, TCLocalize("Use new menu layout"), &UseNewMenuLayout, &Column, LineSize);
