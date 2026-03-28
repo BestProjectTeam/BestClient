@@ -4046,8 +4046,7 @@ public:
 		VkExtent2D AutoViewportExtent = RetSize;
 		bool UsesForcedViewport = false;
 		// keep this in sync with graphics_threaded AdjustViewport's check
-		const int AspectMode = g_Config.m_BcCustomAspectRatioMode >= 0 ? g_Config.m_BcCustomAspectRatioMode : (g_Config.m_BcCustomAspectRatio > 0 ? 1 : 0);
-		const bool HasCustomAspect = AspectMode > 0 && g_Config.m_BcCustomAspectRatio >= 100;
+		const bool HasCustomAspect = g_GraphicsCustomAspect >= 100;
 		if(!HasCustomAspect && AutoViewportExtent.height > 4 * AutoViewportExtent.width / 5 && g_GraphicsForcedAspect)
 		{
 			AutoViewportExtent.height = 4 * AutoViewportExtent.width / 5;

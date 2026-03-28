@@ -548,6 +548,8 @@ bool CTClient::ServerCommandExists(const char *pCommand)
 
 void CTClient::OnRender()
 {
+	SetForcedAspect();
+
 	if(m_pTClientInfoTask)
 	{
 		if(m_pTClientInfoTask->State() == EHttpState::DONE)
@@ -649,7 +651,8 @@ void CTClient::SetForcedAspect()
 		Force = false;
 	else if(State == CClient::EClientState::STATE_ONLINE && GameClient()->m_GameInfo.m_AllowZoom && !GameClient()->m_Menus.IsActive())
 		Force = false;
-	Graphics()->SetForcedAspect(Force);
+	const bool ApplyCustomAspect = g_Config.m_BcCustomAspectRatioApplyMode != 0 || !GameClient()->m_Menus.IsActive();
+	Graphics()->SetForcedAspect(Force, ApplyCustomAspect);
 }
 
 void CTClient::OnStateChange(int OldState, int NewState)

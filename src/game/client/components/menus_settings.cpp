@@ -4749,7 +4749,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		{
 			const int AspectMode = g_Config.m_BcCustomAspectRatioMode >= 0 ? g_Config.m_BcCustomAspectRatioMode : (g_Config.m_BcCustomAspectRatio > 0 ? 1 : 0);
 			const bool IsCustomMode = AspectMode == 2;
-			const float ContentHeight = LineSize + MarginSmall + LineSize + (IsCustomMode ? (MarginSmall + LineSize) : 0.0f);
+			const float ContentHeight = LineSize + MarginSmall + LineSize + MarginSmall + LineSize + (IsCustomMode ? (MarginSmall + LineSize) : 0.0f);
 			CUIRect Content, Label, Row;
 			BeginBlock(Column, ContentHeight, Content);
 
@@ -4825,15 +4825,87 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				GameClient()->m_TClient.SetForcedAspect();
 			}
 
+			Content.HSplitTop(MarginSmall, nullptr, &Content);
+			Content.HSplitTop(LineSize, &Row, &Content);
+			CUIRect ApplyLabel, ApplyDropDown;
+			Row.VSplitLeft(170.0f, &ApplyLabel, &ApplyDropDown);
+			Ui()->DoLabel(&ApplyLabel, Localize("Apply"), 14.0f, TEXTALIGN_ML);
+			const char *apAspectApplyNames[2] = {
+				Localize("Game only"),
+				Localize("Full"),
+			};
+			static CUi::SDropDownState s_AspectApplyState;
+			static CScrollRegion s_AspectApplyScrollRegion;
+			s_AspectApplyState.m_SelectionPopupContext.m_pScrollRegion = &s_AspectApplyScrollRegion;
+			const int CurrentApplyMode = g_Config.m_BcCustomAspectRatioApplyMode;
+			const int NewApplyMode = Ui()->DoDropDown(&ApplyDropDown, CurrentApplyMode, apAspectApplyNames, (int)std::size(apAspectApplyNames), s_AspectApplyState);
+			if(NewApplyMode != CurrentApplyMode)
+			{
+				g_Config.m_BcCustomAspectRatioApplyMode = NewApplyMode;
+				GameClient()->m_TClient.SetForcedAspect();
+			}
+
 			const int EffectiveAspectMode = g_Config.m_BcCustomAspectRatioMode >= 0 ? g_Config.m_BcCustomAspectRatioMode : (g_Config.m_BcCustomAspectRatio > 0 ? 1 : 0);
 			if(EffectiveAspectMode == 2)
 			{
 				Content.HSplitTop(MarginSmall, nullptr, &Content);
 				Content.HSplitTop(LineSize, &Row, &Content);
-				const int OldAspectValue = g_Config.m_BcCustomAspectRatio;
-				Ui()->DoScrollbarOption(&g_Config.m_BcCustomAspectRatio, &g_Config.m_BcCustomAspectRatio, &Row, Localize("Stretch"), 100, 300);
-				if(g_Config.m_BcCustomAspectRatio != OldAspectValue)
-					GameClient()->m_TClient.SetForcedAspect();
+				CUIRect RatioLabel, RatioControls;
+				Row.VSplitLeft(170.0f, &RatioLabel, &RatioControls);
+				Ui()->DoLabel(&RatioLabel, Localize("Custom ratio"), 14.0f, TEXTALIGN_ML);
+
+				static CLineInputNumber s_CustomAspectNumeratorInput;
+				static CLineInputNumber s_CustomAspectDenominatorInput;
+				static int s_LastCustomAspectValue = -1;
+
+				const int CurrentAspectValue = maximum(g_Config.m_BcCustomAspectRatio, 100);
+				if(!s_CustomAspectNumeratorInput.IsActive() && !s_CustomAspectDenominatorInput.IsActive() && s_LastCustomAspectValue != CurrentAspectValue)
+				{
+					int Numerator = CurrentAspectValue;
+					int Denominator = 100;
+					if(absolute(CurrentAspectValue - 178) <= 1)
+					{
+						Numerator = 16;
+						Denominator = 9;
+					}
+					else
+					{
+						const int Divider = std::gcd(Numerator, Denominator);
+						if(Divider > 1)
+						{
+							Numerator /= Divider;
+							Denominator /= Divider;
+						}
+					}
+
+					s_CustomAspectNumeratorInput.SetInteger(Numerator);
+					s_CustomAspectDenominatorInput.SetInteger(Denominator);
+					s_LastCustomAspectValue = CurrentAspectValue;
+				}
+
+				CUIRect NumeratorRect, SeparatorRect, DenominatorRect;
+				RatioControls.VSplitLeft(54.0f, &NumeratorRect, &RatioControls);
+				RatioControls.VSplitLeft(8.0f, nullptr, &RatioControls);
+				RatioControls.VSplitLeft(14.0f, &SeparatorRect, &RatioControls);
+				RatioControls.VSplitLeft(8.0f, nullptr, &RatioControls);
+				RatioControls.VSplitLeft(54.0f, &DenominatorRect, nullptr);
+
+				const bool NumeratorChanged = Ui()->DoEditBox(&s_CustomAspectNumeratorInput, &NumeratorRect, 14.0f);
+				Ui()->DoLabel(&SeparatorRect, ":", 14.0f, TEXTALIGN_MC);
+				const bool DenominatorChanged = Ui()->DoEditBox(&s_CustomAspectDenominatorInput, &DenominatorRect, 14.0f);
+
+				if(NumeratorChanged || DenominatorChanged)
+				{
+					const int Numerator = maximum(1, s_CustomAspectNumeratorInput.GetInteger());
+					const int Denominator = maximum(1, s_CustomAspectDenominatorInput.GetInteger());
+					const int NewAspectValue = std::clamp((int)std::lround((double)Numerator * 100.0 / (double)Denominator), 100, 300);
+					if(NewAspectValue != g_Config.m_BcCustomAspectRatio)
+					{
+						g_Config.m_BcCustomAspectRatio = NewAspectValue;
+						s_LastCustomAspectValue = NewAspectValue;
+						GameClient()->m_TClient.SetForcedAspect();
+					}
+				}
 			}
 		}
 

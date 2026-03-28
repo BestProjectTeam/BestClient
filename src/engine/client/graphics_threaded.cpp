@@ -2240,19 +2240,21 @@ int CGraphics_Threaded::IssueInit()
 bool g_GraphicsForcedAspect = true;
 int g_GraphicsCustomAspect = -1;
 
-static int GetEffectiveCustomAspect()
+static int GetEffectiveCustomAspect(bool ApplyCustomAspect)
 {
+	if(!ApplyCustomAspect)
+		return 0;
 	const int AspectMode = g_Config.m_BcCustomAspectRatioMode >= 0 ? g_Config.m_BcCustomAspectRatioMode : (g_Config.m_BcCustomAspectRatio > 0 ? 1 : 0);
 	if(AspectMode <= 0)
 		return 0;
 	return g_Config.m_BcCustomAspectRatio >= 100 ? g_Config.m_BcCustomAspectRatio : 0;
 }
 
-void CGraphics_Threaded::SetForcedAspect(bool Force)
+void CGraphics_Threaded::SetForcedAspect(bool Force, bool ApplyCustomAspect)
 {
 	if(!IsBackendInitialized())
 		return;
-	const int CustomAspect = GetEffectiveCustomAspect();
+	const int CustomAspect = GetEffectiveCustomAspect(ApplyCustomAspect);
 	if(g_GraphicsForcedAspect == Force && g_GraphicsCustomAspect == CustomAspect)
 		return;
 
@@ -2276,7 +2278,7 @@ void CGraphics_Threaded::AdjustViewport(bool SendViewportChangeToBackend)
 	// adjust the viewport to only allow certain aspect ratios
 	// keep this in sync with backend_vulkan GetSwapImageSize's check
 	// custom aspect is logical (ScreenAspect override), so keep full render resolution.
-	if(GetEffectiveCustomAspect() >= 100)
+	if(g_GraphicsCustomAspect >= 100)
 	{
 		m_IsForcedViewport = false;
 		return;

@@ -614,7 +614,7 @@ protected:
 
 public:
 	// TClient
-	virtual void SetForcedAspect(bool Force) = 0;
+	virtual void SetForcedAspect(bool Force, bool ApplyCustomAspect = true) = 0;
 };
 
 class IEngineGraphics : public IGraphics
