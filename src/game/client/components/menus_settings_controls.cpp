@@ -29,6 +29,39 @@ inline constexpr float MARGIN = 10.0f;
 inline constexpr float BUTTON_HEIGHT = 20.0f;
 inline constexpr float BUTTON_SPACING = 2.0f;
 inline constexpr float BIND_OPTION_SPACING = 4.0f;
+inline constexpr int MAX_SENSITIVITY = 1000000;
+inline constexpr int MAX_SENSITIVITY_SLIDER = 500;
+
+namespace
+{
+bool DoSensitivityInput(CUi *pUi, CLineInputNumber *pInput, int *pOption, const CUIRect *pRect, const char *pLabel)
+{
+	CUIRect Label, EditBox;
+	pRect->VSplitLeft(210.0f, &Label, &EditBox);
+	pUi->DoLabel(&Label, pLabel, FONT_SIZE, TEXTALIGN_ML);
+	pInput->SetEmptyText("1-1000000");
+
+	if(!pInput->IsActive())
+	{
+		pInput->SetInteger(*pOption);
+	}
+
+	if(pUi->DoEditBox(pInput, &EditBox, 14.0f))
+	{
+		if(pInput->GetLength() > 0)
+		{
+			*pOption = maximum(1, minimum(MAX_SENSITIVITY, pInput->GetInteger()));
+			if(!pInput->IsActive())
+			{
+				pInput->SetInteger(*pOption);
+			}
+		}
+		return true;
+	}
+
+	return false;
+}
+} // namespace
 
 bool CBindSlotUiElement::operator<(const CBindSlotUiElement &Other) const
 {
@@ -577,20 +610,30 @@ void CMenusSettingsControls::RenderSettingsBinds(EBindOptionGroup Group, CUIRect
 
 float CMenusSettingsControls::MeasureSettingsMouseHeight() const
 {
-	return 2.0f * BUTTON_HEIGHT + BUTTON_SPACING;
+	return 4.0f * BUTTON_HEIGHT + 3.0f * BUTTON_SPACING;
 }
 
 void CMenusSettingsControls::RenderSettingsMouse(CUIRect View)
 {
 	CUIRect Button;
 	View.HSplitTop(BUTTON_HEIGHT, &Button, &View);
-	Ui()->DoScrollbarOption(&g_Config.m_InpMousesens, &g_Config.m_InpMousesens, &Button, Localize("Ingame mouse sens."), 1, 500,
+	DoSensitivityInput(Ui(), &m_IngameMouseSensInput, &g_Config.m_InpMousesens, &Button, Localize("Ingame mouse sens"));
+
+	View.HSplitTop(BUTTON_SPACING, nullptr, &View);
+
+	View.HSplitTop(BUTTON_HEIGHT, &Button, &View);
+	Ui()->DoScrollbarOption(&g_Config.m_InpMousesens, &g_Config.m_InpMousesens, &Button, Localize("Ingame mouse sens."), 1, MAX_SENSITIVITY_SLIDER,
 		&CUi::ms_LogarithmicScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE);
 
 	View.HSplitTop(BUTTON_SPACING, nullptr, &View);
 
 	View.HSplitTop(BUTTON_HEIGHT, &Button, &View);
-	Ui()->DoScrollbarOption(&g_Config.m_UiMousesens, &g_Config.m_UiMousesens, &Button, Localize("UI mouse sens."), 1, 500,
+	DoSensitivityInput(Ui(), &m_UiMouseSensInput, &g_Config.m_UiMousesens, &Button, Localize("UI mouse sens"));
+
+	View.HSplitTop(BUTTON_SPACING, nullptr, &View);
+
+	View.HSplitTop(BUTTON_HEIGHT, &Button, &View);
+	Ui()->DoScrollbarOption(&g_Config.m_UiMousesens, &g_Config.m_UiMousesens, &Button, Localize("UI mouse sens."), 1, MAX_SENSITIVITY_SLIDER,
 		&CUi::ms_LogarithmicScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE | CUi::SCROLLBAR_OPTION_DELAYUPDATE);
 }
 
@@ -602,9 +645,9 @@ float CMenusSettingsControls::MeasureSettingsJoystickHeight() const
 		NumOptions++; // message or joystick name/selection
 		if(Input()->NumJoysticks() > 0)
 		{
-			NumOptions += 3; // mode, ui sens, tolerance
+			NumOptions += 4; // mode, ui sens input, ui sens slider, tolerance
 			if(!g_Config.m_InpControllerAbsolute)
-				NumOptions++; // ingame sens
+				NumOptions += 2; // ingame sens input + slider
 			NumOptions += Input()->GetActiveJoystick()->GetNumAxes() + 1; // axis selection + header
 		}
 	}
@@ -675,13 +718,21 @@ void CMenusSettingsControls::RenderSettingsJoystick(CUIRect View)
 		{
 			View.HSplitTop(BUTTON_SPACING, nullptr, &View);
 			View.HSplitTop(BUTTON_HEIGHT, &Button, &View);
-			Ui()->DoScrollbarOption(&g_Config.m_InpControllerSens, &g_Config.m_InpControllerSens, &Button, Localize("Ingame controller sens."), 1, 500,
+			DoSensitivityInput(Ui(), &m_IngameControllerSensInput, &g_Config.m_InpControllerSens, &Button, Localize("Ingame controller sens"));
+
+			View.HSplitTop(BUTTON_SPACING, nullptr, &View);
+			View.HSplitTop(BUTTON_HEIGHT, &Button, &View);
+			Ui()->DoScrollbarOption(&g_Config.m_InpControllerSens, &g_Config.m_InpControllerSens, &Button, Localize("Ingame controller sens."), 1, MAX_SENSITIVITY_SLIDER,
 				&CUi::ms_LogarithmicScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE);
 		}
 
 		View.HSplitTop(BUTTON_SPACING, nullptr, &View);
 		View.HSplitTop(BUTTON_HEIGHT, &Button, &View);
-		Ui()->DoScrollbarOption(&g_Config.m_UiControllerSens, &g_Config.m_UiControllerSens, &Button, Localize("UI controller sens."), 1, 500,
+		DoSensitivityInput(Ui(), &m_UiControllerSensInput, &g_Config.m_UiControllerSens, &Button, Localize("UI controller sens"));
+
+		View.HSplitTop(BUTTON_SPACING, nullptr, &View);
+		View.HSplitTop(BUTTON_HEIGHT, &Button, &View);
+		Ui()->DoScrollbarOption(&g_Config.m_UiControllerSens, &g_Config.m_UiControllerSens, &Button, Localize("UI controller sens."), 1, MAX_SENSITIVITY_SLIDER,
 			&CUi::ms_LogarithmicScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE);
 
 		View.HSplitTop(BUTTON_SPACING, nullptr, &View);
