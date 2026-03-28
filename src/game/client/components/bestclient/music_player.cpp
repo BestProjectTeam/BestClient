@@ -1336,14 +1336,18 @@ static SMusicPlayerPalette BuildPaletteFromAnalysis(const SArtworkColorAnalysis 
 		return Palette;
 	}
 
-	ColorRGBA Base = DesaturateColor(ClampColor(Analysis.m_Base), 0.10f + (1.0f - Analysis.m_Saturation) * 0.18f);
-	const float LightLuma = std::clamp(0.26f + Analysis.m_Saturation * 0.12f, 0.24f, 0.42f);
-	const float MidLuma = std::clamp(LightLuma * 0.56f, 0.12f, 0.23f);
-	const float DarkLuma = std::clamp(MidLuma * 0.44f, 0.05f, 0.11f);
+	const bool DominantColorMode = g_Config.m_BcMusicPlayerColorMode == 2;
+	const float BaseDesaturation = DominantColorMode ?
+		(0.04f + (1.0f - Analysis.m_Saturation) * 0.10f) :
+		(0.10f + (1.0f - Analysis.m_Saturation) * 0.18f);
+	ColorRGBA Base = DesaturateColor(ClampColor(Analysis.m_Base), BaseDesaturation);
+	const float LightLuma = std::clamp((DominantColorMode ? 0.24f : 0.26f) + Analysis.m_Saturation * (DominantColorMode ? 0.11f : 0.12f), 0.20f, 0.38f);
+	const float MidLuma = std::clamp(LightLuma * (DominantColorMode ? 0.48f : 0.56f), 0.10f, 0.21f);
+	const float DarkLuma = std::clamp(MidLuma * (DominantColorMode ? 0.36f : 0.44f), 0.04f, 0.10f);
 	Palette.m_Light = SetColorLuminance(Base, LightLuma);
 	Palette.m_Mid = SetColorLuminance(Base, MidLuma);
 	Palette.m_Dark = SetColorLuminance(Base, DarkLuma);
-	Palette.m_Glow = SetColorLuminance(DesaturateColor(Base, 0.18f), std::clamp(LightLuma + 0.03f, 0.26f, 0.40f));
+	Palette.m_Glow = SetColorLuminance(DesaturateColor(Base, DominantColorMode ? 0.12f : 0.18f), std::clamp(LightLuma + 0.03f, 0.22f, 0.38f));
 	return Palette;
 }
 
@@ -1358,12 +1362,21 @@ static SMusicPlayerPalette BuildPaletteFromAccent(ColorRGBA Accent)
 	return BuildPaletteFromAnalysis(Analysis);
 }
 
+static ColorRGBA DefaultPreviewAccentForColorMode(int ColorMode)
+{
+	if(ColorMode == 2)
+		return ColorRGBA(0.18f, 0.68f, 0.52f, 1.0f);
+	return ColorRGBA(0.34f, 0.53f, 0.79f, 1.0f);
+}
+
 static ColorRGBA SelectMusicPlayerAccent(const SArtworkColorAnalysis &Analysis)
 {
 	if(g_Config.m_BcMusicPlayerColorMode == 0)
 		return color_cast<ColorRGBA>(ColorHSLA(g_Config.m_BcMusicPlayerStaticColor));
 	if(!Analysis.m_Valid)
-		return ColorRGBA(0.34f, 0.53f, 0.79f, 1.0f);
+		return DefaultPreviewAccentForColorMode(g_Config.m_BcMusicPlayerColorMode);
+	if(g_Config.m_BcMusicPlayerColorMode == 2)
+		return Analysis.m_Dominant;
 	return Analysis.m_Base;
 }
 
@@ -2495,16 +2508,17 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	const float UiFontScale = UiScreen.h / maximum(Height, 1.0f);
 
 	const SMusicPlayerPalette Palette = ForcePreview ?
-		(g_Config.m_BcMusicPlayerColorMode == 0 ? BuildPaletteFromAccent(color_cast<ColorRGBA>(ColorHSLA(g_Config.m_BcMusicPlayerStaticColor))) : BuildPaletteFromAccent(ColorRGBA(0.34f, 0.53f, 0.79f, 1.0f))) :
+		BuildPaletteFromAccent(g_Config.m_BcMusicPlayerColorMode == 0 ? color_cast<ColorRGBA>(ColorHSLA(g_Config.m_BcMusicPlayerStaticColor)) : DefaultPreviewAccentForColorMode(g_Config.m_BcMusicPlayerColorMode)) :
 		m_pImpl->m_Palette;
 	ColorRGBA LayoutColor = color_cast<ColorRGBA>(ColorHSLA(BackgroundColor, true));
 	if(!BackgroundEnabled)
 		LayoutColor = ColorRGBA(0.12f, 0.13f, 0.16f, 0.72f);
 	const bool CoverColorMode = g_Config.m_BcMusicPlayerColorMode != 0;
-	const float PanelTintT = (CoverColorMode ? 0.62f : 0.50f) - HoverT * 0.04f;
-	const ColorRGBA PanelTintColor = CoverColorMode ? MixColor(Palette.m_Mid, Palette.m_Dark, 0.40f) : Palette.m_Dark;
+	const bool DominantColorMode = g_Config.m_BcMusicPlayerColorMode == 2;
+	const float PanelTintT = ((DominantColorMode ? 0.72f : (CoverColorMode ? 0.62f : 0.50f)) - HoverT * (DominantColorMode ? 0.03f : 0.04f));
+	const ColorRGBA PanelTintColor = DominantColorMode ? MixColor(Palette.m_Mid, Palette.m_Dark, 0.58f) : (CoverColorMode ? MixColor(Palette.m_Mid, Palette.m_Dark, 0.40f) : Palette.m_Dark);
 	const ColorRGBA PanelColor = WithAlpha(MixColor(LayoutColor, PanelTintColor, PanelTintT), maximum(LayoutColor.a, 0.90f));
-	const ColorRGBA GlowColor = WithAlpha(MixColor(Palette.m_Glow, Palette.m_Light, CoverColorMode ? 0.28f : 0.18f), 0.02f + 0.05f * HoverT);
+	const ColorRGBA GlowColor = WithAlpha(MixColor(Palette.m_Glow, Palette.m_Light, DominantColorMode ? 0.40f : (CoverColorMode ? 0.28f : 0.18f)), (DominantColorMode ? 0.04f : 0.02f) + (DominantColorMode ? 0.07f : 0.05f) * HoverT);
 	const float OuterPad = 0.42f * Scale + HoverT * 0.48f * Scale;
 
 	if(GlowColor.a > 0.001f)
