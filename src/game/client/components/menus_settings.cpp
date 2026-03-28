@@ -4098,7 +4098,9 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			const bool ChatMediaEnabled = g_Config.m_BcChatMediaPreview != 0;
 			UpdateRevealPhase(s_ChatMediaPhase, ChatMediaEnabled);
 			const float KeyReaderHeight = LineSize + MarginSmall;
-			const float ExpandedTargetHeight = 5.0f * LineSize + KeyReaderHeight;
+			const float FilterDomainsHeight = LineSize + MarginSmall;
+			const float FilterSettingsHeight = 2.0f * LineSize + FilterDomainsHeight;
+			const float ExpandedTargetHeight = 5.0f * LineSize + KeyReaderHeight + FilterSettingsHeight;
 			const float ContentHeight = LineSize + MarginSmall + LineSize + ExpandedTargetHeight * s_ChatMediaPhase;
 			CUIRect Content, Label, Row, Visible;
 			BeginBlock(Column, ContentHeight, Content);
@@ -4129,6 +4131,22 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 
 				if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatMediaGifs, Localize("Show GIFs in chat media"), &g_Config.m_BcChatMediaGifs, &Expand, LineSize))
 					Chat.RebuildChat();
+
+				if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatMediaContentFilter, Localize("Content filtering"), &g_Config.m_BcChatMediaContentFilter, &Expand, LineSize))
+					Chat.RebuildChat();
+
+				if(g_Config.m_BcChatMediaContentFilter)
+				{
+					Expand.HSplitTop(LineSize, &Row, &Expand);
+					Ui()->DoLabel(&Row, Localize("Allowed media domains"), 12.0f, TEXTALIGN_ML);
+
+					Expand.HSplitTop(LineSize, &Row, &Expand);
+					static CLineInput s_ChatMediaAllowedDomains(g_Config.m_BcChatMediaAllowedDomains, sizeof(g_Config.m_BcChatMediaAllowedDomains));
+					s_ChatMediaAllowedDomains.SetEmptyText("tenor.com; imgur.com");
+					if(Ui()->DoClearableEditBox(&s_ChatMediaAllowedDomains, &Row, 14.0f))
+						Chat.RebuildChat();
+					GameClient()->m_Tooltips.DoToolTip(&s_ChatMediaAllowedDomains, &Row, Localize("Semicolon-separated allowlist, for example: tenor.com; imgur.com; cdn.discordapp.com"));
+				}
 
 				Expand.HSplitTop(LineSize, &Row, &Expand);
 				if(Ui()->DoScrollbarOption(&g_Config.m_BcChatMediaPreviewMaxWidth, &g_Config.m_BcChatMediaPreviewMaxWidth, &Row, Localize("Media preview width"), 120, 400))

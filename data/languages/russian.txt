@@ -25,6 +25,9 @@ Add
 Address
 == Адрес
 
+Allowed media domains
+== Разрешённые домены для медиа
+
 All
 == Все
 
@@ -36,6 +39,9 @@ Automatically record demos
 
 Automatically take game over screenshot
 == Делать снимок результатов игры
+
+Semicolon-separated allowlist, for example: tenor.com; imgur.com; cdn.discordapp.com
+== Список разрешённых доменов через ;, например: tenor.com; imgur.com; cdn.discordapp.com
 
 Blue team
 == Синие
@@ -54,6 +60,9 @@ Change settings
 
 Chat
 == Чат
+
+Content filtering
+== Фильтрация контента
 
 Clan
 == Клан

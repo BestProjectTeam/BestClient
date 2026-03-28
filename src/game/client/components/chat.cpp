@@ -46,11 +46,11 @@ static constexpr float CHAT_SCROLLBAR_MARGIN = 0.0f;
 static constexpr int CHAT_TYPING_ANIM_MAX_TEXT_BYTES = 16;
 static constexpr int CHAT_MEDIA_MAX_CONCURRENT_DOWNLOADS = 3;
 static constexpr int CHAT_MEDIA_MAX_COMPLETED_DECODE_PER_FRAME = 1;
-static constexpr int CHAT_MEDIA_MAX_TEXTURE_UPLOADS_PER_FRAME = 2;
-static constexpr int64_t CHAT_MEDIA_TEXTURE_UPLOAD_BUDGET_US = 1500; // keep frame hitches low
+static constexpr int CHAT_MEDIA_MAX_TEXTURE_UPLOADS_PER_FRAME = 3;
+static constexpr int64_t CHAT_MEDIA_TEXTURE_UPLOAD_BUDGET_US = 2500; // keep frame hitches low while filling short animations faster
 static constexpr int64_t CHAT_MEDIA_MAX_RESPONSE_SIZE = 64 * 1024 * 1024;
-static constexpr int CHAT_MEDIA_MAX_GIF_FRAMES = 120;
-static constexpr int CHAT_MEDIA_MAX_DIMENSION = 768;
+static constexpr int CHAT_MEDIA_MAX_GIF_FRAMES = 360;
+static constexpr int CHAT_MEDIA_MAX_DIMENSION = 960;
 static constexpr int CHAT_MEDIA_DOUBLE_CLICK_MS = 300;
 static constexpr int CHAT_MEDIA_MAX_RESOLVE_DEPTH = 2;
 static constexpr int CHAT_MEDIA_MAX_VIDEO_ANIMATION_MS = 15000;
@@ -59,7 +59,7 @@ static constexpr float CHAT_MEDIA_MAX_PREVIEW_HEIGHT = 70.0f;
 static constexpr float CHAT_MEDIA_MAX_PREVIEW_HEIGHT_SCOREBOARD = 56.0f;
 static constexpr int CHAT_MEDIA_MAX_URL_LENGTH = 240;
 static constexpr int CHAT_MEDIA_MAX_HTML_CANDIDATES = 32;
-static constexpr size_t CHAT_MEDIA_MAX_ANIMATED_MEMORY_BYTES = 20ull * 1024ull * 1024ull;
+static constexpr size_t CHAT_MEDIA_MAX_ANIMATED_MEMORY_BYTES = 48ull * 1024ull * 1024ull;
 static constexpr bool CHAT_MEDIA_ANIMATE_VIDEOS = true;
 static constexpr float CHAT_MEDIA_MIN_PREVIEW_SIDE = 28.0f;
 
@@ -842,6 +842,98 @@ static bool HostIsOrEndsWith(const std::string &HostLower, const char *pDomainLo
 		return false;
 	const size_t Start = HostLower.size() - Domain.size();
 	return HostLower.compare(Start, Domain.size(), Domain) == 0 && HostLower[Start - 1] == '.';
+}
+
+static std::string TrimAsciiWhitespaceCopy(std::string Value)
+{
+	while(!Value.empty() && std::isspace((unsigned char)Value.front()))
+		Value.erase(Value.begin());
+	while(!Value.empty() && std::isspace((unsigned char)Value.back()))
+		Value.pop_back();
+	return Value;
+}
+
+static std::string NormalizeAllowedMediaDomain(std::string Domain)
+{
+	Domain = TrimAsciiWhitespaceCopy(std::move(Domain));
+	std::transform(Domain.begin(), Domain.end(), Domain.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+
+	const size_t SchemePos = Domain.find("://");
+	if(SchemePos != std::string::npos)
+		Domain = Domain.substr(SchemePos + 3);
+
+	const size_t AtPos = Domain.rfind('@');
+	if(AtPos != std::string::npos)
+		Domain = Domain.substr(AtPos + 1);
+
+	if(!Domain.empty() && Domain.front() == '[')
+	{
+		const size_t ClosePos = Domain.find(']');
+		if(ClosePos != std::string::npos)
+			Domain = Domain.substr(1, ClosePos - 1);
+	}
+	else
+	{
+		const size_t SlashPos = Domain.find_first_of("/?#");
+		if(SlashPos != std::string::npos)
+			Domain.resize(SlashPos);
+		const size_t ColonPos = Domain.find(':');
+		if(ColonPos != std::string::npos)
+			Domain.resize(ColonPos);
+	}
+
+	while(!Domain.empty() && (Domain.front() == '.' || std::isspace((unsigned char)Domain.front())))
+		Domain.erase(Domain.begin());
+	while(!Domain.empty() && (Domain.back() == '.' || std::isspace((unsigned char)Domain.back())))
+		Domain.pop_back();
+
+	return Domain;
+}
+
+static bool IsAllowedChatMediaHost(const std::string &HostLower)
+{
+	if(!g_Config.m_BcChatMediaContentFilter)
+		return true;
+	if(HostLower.empty())
+		return false;
+
+	const char *pList = g_Config.m_BcChatMediaAllowedDomains;
+	if(pList == nullptr || pList[0] == '\0')
+		return false;
+
+	const char *pTokenStart = pList;
+	while(true)
+	{
+		const char *pSep = str_find(pTokenStart, ";");
+		const size_t TokenLen = pSep ? (size_t)(pSep - pTokenStart) : str_length(pTokenStart);
+		std::string Domain = NormalizeAllowedMediaDomain(std::string(pTokenStart, TokenLen));
+		if(!Domain.empty())
+		{
+			if(HostLower == Domain)
+				return true;
+			if(HostLower.size() > Domain.size())
+			{
+				const size_t Start = HostLower.size() - Domain.size();
+				if(HostLower.compare(Start, Domain.size(), Domain) == 0 && HostLower[Start - 1] == '.')
+					return true;
+			}
+		}
+
+		if(!pSep)
+			break;
+		pTokenStart = pSep + 1;
+	}
+
+	return false;
+}
+
+static bool IsAllowedChatMediaUrl(const char *pUrl)
+{
+	if(!g_Config.m_BcChatMediaContentFilter)
+		return true;
+	if(pUrl == nullptr || pUrl[0] == '\0')
+		return false;
+	return IsAllowedChatMediaHost(ExtractUrlHostLower(pUrl));
 }
 
 static bool IsYouTubeUrl(const std::string &Url)
@@ -1989,7 +2081,7 @@ bool CChat::IsMediaKindAllowed(EMediaKind Kind) const
 
 bool CChat::IsMediaUrlAllowed(const char *pUrl) const
 {
-	return IsMediaKindAllowed(MediaKindFromUrl(pUrl));
+	return IsMediaKindAllowed(MediaKindFromUrl(pUrl)) && IsAllowedChatMediaUrl(pUrl);
 }
 
 bool CChat::HasAllowedMediaCandidates(const CLine &Line) const
