@@ -4095,11 +4095,12 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		{
 			static float s_ChatMediaPhase = 0.0f;
 			const bool ChatMediaEnabled = g_Config.m_BcChatMediaPreview != 0;
+			const bool ContentFilterEnabled = g_Config.m_BcChatMediaContentFilter != 0;
 			UpdateRevealPhase(s_ChatMediaPhase, ChatMediaEnabled);
-			const float KeyReaderHeight = LineSize + MarginSmall;
-			const float FilterDomainsHeight = LineSize + MarginSmall;
-			const float FilterSettingsHeight = 2.0f * LineSize + FilterDomainsHeight;
-			const float ExpandedTargetHeight = 5.0f * LineSize + KeyReaderHeight + FilterSettingsHeight;
+			const float KeyReaderHeight = LineSize + 2.5f;
+			const float BaseExpandedHeight = 6.0f * LineSize + KeyReaderHeight;
+			const float FilterSettingsHeight = 2.0f * LineSize;
+			const float ExpandedTargetHeight = BaseExpandedHeight + (ContentFilterEnabled ? FilterSettingsHeight : 0.0f);
 			const float ContentHeight = LineSize + MarginSmall + LineSize + ExpandedTargetHeight * s_ChatMediaPhase;
 			CUIRect Content, Label, Row, Visible;
 			BeginBlock(Column, ContentHeight, Content);
