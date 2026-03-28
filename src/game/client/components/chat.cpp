@@ -1055,11 +1055,14 @@ static bool ExtractImgurMediaId(const std::string &Url, std::string &OutMediaId)
 	if(Path.empty() || Path == "/")
 		return false;
 
-	// Imgur album/gallery share links often still use a media-like ID that can be
-	// resolved through i.imgur.com/<id>.<ext>. Keep /t/ blocked because topic URLs
-	// are category pages and not stable media IDs.
-	if(str_startswith(Path.c_str(), "/t/"))
-		return false;
+	// Album/gallery/topic share links use post IDs that frequently do not map to a
+	// direct i.imgur.com media ID. Let HTML extraction resolve the real media URL.
+	const char *apPrefixes[] = {"/a/", "/gallery/", "/t/"};
+	for(const char *pPrefix : apPrefixes)
+	{
+		if(str_startswith(Path.c_str(), pPrefix))
+			return false;
+	}
 
 	size_t SegmentStart = Path.find_last_of('/');
 	if(SegmentStart == std::string::npos || SegmentStart + 1 >= Path.size())
