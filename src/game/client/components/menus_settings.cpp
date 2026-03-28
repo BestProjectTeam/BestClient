@@ -1666,6 +1666,8 @@ bool CMenus::RenderLanguageSelection(CUIRect MainView)
 void CMenus::RenderSettings(CUIRect MainView)
 {
 	const bool BestClientPageVisible = g_Config.m_UiSettingsPage == SETTINGS_BESTCLIENT;
+	if(!BestClientPageVisible)
+		SetBestClientShopVisible(false);
 	if(!BestClientPageVisible && (m_AssetsEditorState.m_VisualsEditorOpen || m_AssetsEditorState.m_VisualsEditorInitialized))
 		m_AssetsEditorState.m_VisualsEditorOpen = false;
 	if(!BestClientPageVisible && m_ComponentsEditorState.m_Open)
@@ -1673,11 +1675,13 @@ void CMenus::RenderSettings(CUIRect MainView)
 
 	if(g_Config.m_UiSettingsPage == SETTINGS_BESTCLIENT && m_AssetsEditorState.m_VisualsEditorOpen && m_AssetsEditorState.m_FullscreenOpen)
 	{
+		SetBestClientShopVisible(false);
 		RenderSettingsBestClient(MainView);
 		return;
 	}
 	if(g_Config.m_UiSettingsPage == SETTINGS_BESTCLIENT && m_ComponentsEditorState.m_Open && m_ComponentsEditorState.m_FullscreenOpen)
 	{
+		SetBestClientShopVisible(false);
 		RenderSettingsBestClient(MainView);
 		return;
 	}
@@ -3511,12 +3515,14 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 	if(m_AssetsEditorState.m_VisualsEditorOpen && m_AssetsEditorState.m_FullscreenOpen)
 	{
 		s_CurTab = BESTCLIENT_TAB_EDITORS;
+		SetBestClientShopVisible(false);
 		RenderAssetsEditorScreen(*Ui()->Screen());
 		return;
 	}
 	if(m_ComponentsEditorState.m_Open && m_ComponentsEditorState.m_FullscreenOpen)
 	{
 		s_CurTab = BESTCLIENT_TAB_EDITORS;
+		SetBestClientShopVisible(false);
 		RenderComponentsEditorScreen(*Ui()->Screen());
 		return;
 	}
@@ -3587,6 +3593,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 	}
 
 	MainView.HSplitTop(10.0f, nullptr, &MainView);
+	SetBestClientShopVisible(s_CurTab == BESTCLIENT_TAB_SHOP);
 
 	if(s_CurTab == BESTCLIENT_TAB_VISUALS)
 	{

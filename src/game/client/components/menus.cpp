@@ -1159,6 +1159,14 @@ void CMenus::Render()
 		ms_ColorTabbarHover = ms_ColorTabbarHoverOutgame;
 	}
 
+	const bool BestClientSettingsMightRender =
+		(ClientState == IClient::STATE_OFFLINE && m_Popup == POPUP_NONE && !m_ShowStart && m_MenuPage == PAGE_SETTINGS && g_Config.m_UiSettingsPage == SETTINGS_BESTCLIENT) ||
+		(ClientState == IClient::STATE_ONLINE && m_Popup == POPUP_NONE && m_GamePage == PAGE_SETTINGS && g_Config.m_UiSettingsPage == SETTINGS_BESTCLIENT);
+	if(!BestClientSettingsMightRender)
+	{
+		SetBestClientShopVisible(false);
+	}
+
 	CUIRect Screen = *Ui()->Screen();
 	if(IsActive() && (ClientState == IClient::STATE_ONLINE || ClientState == IClient::STATE_DEMOPLAYBACK))
 	{

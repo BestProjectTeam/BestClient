@@ -1026,6 +1026,7 @@ private:
 	void RenderSettingsBestClientInfo(CUIRect MainView);
 	void RenderSettingsBestClientFun(CUIRect MainView);
 	void RenderSettingsBestClientShop(CUIRect MainView);
+	void SetBestClientShopVisible(bool Visible);
 	void RenderSettingsAppearance(CUIRect MainView);
 
 	// found in menus_tclient.cpp

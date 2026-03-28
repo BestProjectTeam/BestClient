@@ -138,6 +138,7 @@ struct SBestClientShopState
 	char m_aStatus[256]{};
 	char m_aOpenPreviewItemId[64]{};
 	bool m_PreviewOpen = false;
+	bool m_Visible = false;
 	CButtonContainer m_PreviewCloseButton;
 };
 
@@ -242,6 +243,34 @@ static void BestClientShopAbortPreviewTask()
 	gs_BestClientShopState.m_aPreviewItemId[0] = '\0';
 	gs_BestClientShopState.m_aPreviewPath[0] = '\0';
 	gs_BestClientShopState.m_aPreviewSearch[0] = '\0';
+}
+
+static void BestClientShopStopBackgroundWork()
+{
+	BestClientShopAbortTask(gs_BestClientShopState.m_pFetchTask);
+	gs_BestClientShopState.m_FetchTab = -1;
+	gs_BestClientShopState.m_FetchPage = 0;
+	gs_BestClientShopState.m_aFetchSearch[0] = '\0';
+
+	BestClientShopAbortPreviewTask();
+	BestClientShopAbortTask(gs_BestClientShopState.m_pInstallTask);
+	BestClientShopResetInstallState();
+	BestClientShopClosePreview();
+}
+
+static void BestClientShopSetVisible(bool Visible)
+{
+	BestClientShopInitState();
+	if(gs_BestClientShopState.m_Visible == Visible)
+	{
+		return;
+	}
+
+	gs_BestClientShopState.m_Visible = Visible;
+	if(!Visible)
+	{
+		BestClientShopStopBackgroundWork();
+	}
 }
 
 static void BestClientShopInvalidatePage(CMenus *pMenus)
@@ -1572,8 +1601,15 @@ static void BestClientShopRenderPreview(CMenus *pMenus, const CUIRect &MainView)
 
 } // namespace
 
+void CMenus::SetBestClientShopVisible(bool Visible)
+{
+	BestClientShopSetVisible(Visible);
+}
+
 void CMenus::RenderSettingsBestClientShop(CUIRect MainView)
 {
+	SetBestClientShopVisible(true);
+
 	const CUIRect FullView = MainView;
 	BestClientShopInitState();
 
