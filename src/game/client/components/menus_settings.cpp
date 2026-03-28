@@ -4750,44 +4750,9 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		// Aspect ratio (right column block)
 		if(!GameClient()->m_BestClient.IsComponentDisabled(CBestClient::COMPONENT_VISUALS_ASPECT_RATIO))
 		{
-			const int LiveAspectMode = g_Config.m_BcCustomAspectRatioMode >= 0 ? g_Config.m_BcCustomAspectRatioMode : (g_Config.m_BcCustomAspectRatio > 0 ? 1 : 0);
-			const int LiveAspectValue = g_Config.m_BcCustomAspectRatio;
-			const int LiveApplyMode = g_Config.m_BcCustomAspectRatioApplyMode;
-
-			static bool s_AspectStageInitialized = false;
-			static bool s_AspectStageDirty = false;
-			static int s_AspectStageMode = 0;
-			static int s_AspectStageValue = 0;
-			static int s_AspectStageApplyMode = 1;
-			static CLineInputNumber s_CustomAspectNumeratorInput;
-			static CLineInputNumber s_CustomAspectDenominatorInput;
-			static int s_LastCustomAspectValue = -1;
-
-			const auto SyncAspectStageFromConfig = [&]() {
-				s_AspectStageMode = LiveAspectMode;
-				s_AspectStageValue = LiveAspectValue;
-				s_AspectStageApplyMode = LiveApplyMode;
-				s_AspectStageInitialized = true;
-				s_AspectStageDirty = false;
-				s_LastCustomAspectValue = -1;
-			};
-
-			if(!s_AspectStageInitialized)
-				SyncAspectStageFromConfig();
-
-			const bool StageMatchesLive =
-				s_AspectStageMode == LiveAspectMode &&
-				s_AspectStageValue == LiveAspectValue &&
-				s_AspectStageApplyMode == LiveApplyMode;
-
-			// If values changed externally and user has no staged edits, keep UI in sync.
-			if(!s_AspectStageDirty && !StageMatchesLive)
-				SyncAspectStageFromConfig();
-			else if(StageMatchesLive)
-				s_AspectStageDirty = false;
-
-			const bool IsCustomMode = s_AspectStageMode == 2;
-			const float ContentHeight = LineSize + MarginSmall + LineSize + MarginSmall + LineSize + MarginSmall + LineSize + (IsCustomMode ? (MarginSmall + LineSize) : 0.0f);
+			const int AspectMode = g_Config.m_BcCustomAspectRatioMode >= 0 ? g_Config.m_BcCustomAspectRatioMode : (g_Config.m_BcCustomAspectRatio > 0 ? 1 : 0);
+			const bool IsCustomMode = AspectMode == 2;
+			const float ContentHeight = LineSize + MarginSmall + LineSize + MarginSmall + LineSize + (IsCustomMode ? (MarginSmall + LineSize + MarginSmall + LineSize) : 0.0f);
 			CUIRect Content, Label, Row;
 			BeginBlock(Column, ContentHeight, Content);
 
@@ -4814,22 +4779,22 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 
 			auto GetAspectPresetIndex = [&]() -> int {
 				const int CustomPresetIndex = (int)std::size(apAspectPresetNames) - 1;
-				if(s_AspectStageMode <= 0 || s_AspectStageValue == 0)
+				if(AspectMode <= 0 || g_Config.m_BcCustomAspectRatio == 0)
 					return 0;
-				if(s_AspectStageMode == 2)
+				if(AspectMode == 2)
 					return CustomPresetIndex;
 
 				for(size_t i = 1; i < s_aAspectPresetValues.size(); ++i)
 				{
-					if(s_AspectStageValue == s_aAspectPresetValues[i])
+					if(g_Config.m_BcCustomAspectRatio == s_aAspectPresetValues[i])
 						return (int)i;
 				}
 
 				int BestIndex = 1;
-				int BestDiff = absolute(s_AspectStageValue - s_aAspectPresetValues[BestIndex]);
+				int BestDiff = absolute(g_Config.m_BcCustomAspectRatio - s_aAspectPresetValues[BestIndex]);
 				for(size_t i = 2; i < s_aAspectPresetValues.size(); ++i)
 				{
-					const int CurDiff = absolute(s_AspectStageValue - s_aAspectPresetValues[i]);
+					const int CurDiff = absolute(g_Config.m_BcCustomAspectRatio - s_aAspectPresetValues[i]);
 					if(CurDiff < BestDiff)
 					{
 						BestDiff = CurDiff;
@@ -4850,21 +4815,21 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			{
 				if(NewPreset == 0)
 				{
-					s_AspectStageMode = 0;
-					s_AspectStageValue = 0;
+					g_Config.m_BcCustomAspectRatioMode = 0;
+					g_Config.m_BcCustomAspectRatio = 0;
 				}
 				else if(NewPreset == CustomPresetIndex)
 				{
-					s_AspectStageMode = 2;
-					if(s_AspectStageValue < 100)
-						s_AspectStageValue = 178;
+					g_Config.m_BcCustomAspectRatioMode = 2;
+					if(g_Config.m_BcCustomAspectRatio < 100)
+						g_Config.m_BcCustomAspectRatio = 178;
 				}
 				else
 				{
-					s_AspectStageMode = 1;
-					s_AspectStageValue = s_aAspectPresetValues[NewPreset];
+					g_Config.m_BcCustomAspectRatioMode = 1;
+					g_Config.m_BcCustomAspectRatio = s_aAspectPresetValues[NewPreset];
 				}
-				s_AspectStageDirty = true;
+				GameClient()->m_TClient.SetForcedAspect();
 			}
 
 			Content.HSplitTop(MarginSmall, nullptr, &Content);
@@ -4879,34 +4844,52 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			static CUi::SDropDownState s_AspectApplyState;
 			static CScrollRegion s_AspectApplyScrollRegion;
 			s_AspectApplyState.m_SelectionPopupContext.m_pScrollRegion = &s_AspectApplyScrollRegion;
-			const int CurrentApplyMode = s_AspectStageApplyMode;
+			const int CurrentApplyMode = g_Config.m_BcCustomAspectRatioApplyMode;
 			const int NewApplyMode = Ui()->DoDropDown(&ApplyDropDown, CurrentApplyMode, apAspectApplyNames, (int)std::size(apAspectApplyNames), s_AspectApplyState);
 			if(NewApplyMode != CurrentApplyMode)
 			{
-				s_AspectStageApplyMode = NewApplyMode;
-				s_AspectStageDirty = true;
+				g_Config.m_BcCustomAspectRatioApplyMode = NewApplyMode;
+				GameClient()->m_TClient.SetForcedAspect();
 			}
 
-			const int EffectiveAspectMode = s_AspectStageMode;
+			const int EffectiveAspectMode = g_Config.m_BcCustomAspectRatioMode >= 0 ? g_Config.m_BcCustomAspectRatioMode : (g_Config.m_BcCustomAspectRatio > 0 ? 1 : 0);
+			static CLineInputNumber s_CustomAspectNumeratorInput;
+			static CLineInputNumber s_CustomAspectDenominatorInput;
+			static int s_CustomPendingAspectValue = -1;
+			static bool s_CustomPendingDirty = false;
+			static int s_LastAppliedAspectValue = -1;
 			if(EffectiveAspectMode == 2)
 			{
+				const int AppliedAspectValue = maximum(g_Config.m_BcCustomAspectRatio, 100);
+				if(!s_CustomPendingDirty && s_LastAppliedAspectValue != AppliedAspectValue)
+				{
+					s_CustomPendingAspectValue = AppliedAspectValue;
+					s_LastAppliedAspectValue = AppliedAspectValue;
+				}
+
+				const int DisplayAspectValue = maximum(s_CustomPendingAspectValue, 100);
+				if(!s_CustomAspectNumeratorInput.IsActive() && !s_CustomAspectDenominatorInput.IsActive() && DisplayAspectValue != s_LastAppliedAspectValue)
+				{
+					s_CustomPendingAspectValue = DisplayAspectValue;
+					s_LastAppliedAspectValue = DisplayAspectValue;
+				}
+
+				if(!s_CustomAspectNumeratorInput.IsActive() && !s_CustomAspectDenominatorInput.IsActive())
+				{
+					const int Denominator = 1080;
+					const int Numerator = maximum(1, (int)std::lround((double)maximum(s_CustomPendingAspectValue, 100) * (double)Denominator / 100.0));
+					if(s_CustomAspectNumeratorInput.GetInteger() != Numerator || s_CustomAspectDenominatorInput.GetInteger() != Denominator)
+					{
+						s_CustomAspectNumeratorInput.SetInteger(Numerator);
+						s_CustomAspectDenominatorInput.SetInteger(Denominator);
+					}
+				}
+
 				Content.HSplitTop(MarginSmall, nullptr, &Content);
 				Content.HSplitTop(LineSize, &Row, &Content);
 				CUIRect RatioLabel, RatioControls;
 				SplitRowLabelControl(Row, RatioLabel, RatioControls);
 				Ui()->DoLabel(&RatioLabel, Localize("Custom size"), 14.0f, TEXTALIGN_ML);
-
-				const int CurrentAspectValue = maximum(s_AspectStageValue, 100);
-				if(!s_CustomAspectNumeratorInput.IsActive() && !s_CustomAspectDenominatorInput.IsActive() && s_LastCustomAspectValue != CurrentAspectValue)
-				{
-					// Keep custom inputs in a resolution-like form (e.g. 1920 x 1080).
-					const int Denominator = 1080;
-					const int Numerator = maximum(1, (int)std::lround((double)CurrentAspectValue * (double)Denominator / 100.0));
-
-					s_CustomAspectNumeratorInput.SetInteger(Numerator);
-					s_CustomAspectDenominatorInput.SetInteger(Denominator);
-					s_LastCustomAspectValue = CurrentAspectValue;
-				}
 
 				CUIRect NumeratorRect, SeparatorRect, DenominatorRect;
 				const float Gap = minimum(6.0f, RatioControls.w * 0.08f);
@@ -4927,33 +4910,33 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 					const int Numerator = maximum(1, s_CustomAspectNumeratorInput.GetInteger());
 					const int Denominator = maximum(1, s_CustomAspectDenominatorInput.GetInteger());
 					const int NewAspectValue = std::clamp((int)std::lround((double)Numerator * 100.0 / (double)Denominator), 100, 300);
-					if(NewAspectValue != s_AspectStageValue)
+					if(NewAspectValue != s_CustomPendingAspectValue)
 					{
-						s_AspectStageValue = NewAspectValue;
-						s_LastCustomAspectValue = NewAspectValue;
-						s_AspectStageDirty = true;
+						s_CustomPendingAspectValue = NewAspectValue;
+						s_CustomPendingDirty = s_CustomPendingAspectValue != g_Config.m_BcCustomAspectRatio;
 					}
 				}
+
+				const bool HasPendingCustomChange = s_CustomPendingAspectValue >= 100 && s_CustomPendingAspectValue != g_Config.m_BcCustomAspectRatio;
+				Content.HSplitTop(MarginSmall, nullptr, &Content);
+				Content.HSplitTop(LineSize, &Row, &Content);
+				CUIRect ButtonSpace, ApplyButton;
+				SplitRowLabelControl(Row, ButtonSpace, ApplyButton);
+				(void)ButtonSpace;
+				static CButtonContainer s_AspectApplyButton;
+				if(DoButton_Menu(&s_AspectApplyButton, Localize("Apply"), HasPendingCustomChange ? 0 : -1, &ApplyButton) && HasPendingCustomChange)
+				{
+					g_Config.m_BcCustomAspectRatio = s_CustomPendingAspectValue;
+					s_CustomPendingDirty = false;
+					s_LastAppliedAspectValue = g_Config.m_BcCustomAspectRatio;
+					GameClient()->m_TClient.SetForcedAspect();
+				}
 			}
-
-			const bool HasPendingAspectChanges =
-				s_AspectStageMode != LiveAspectMode ||
-				s_AspectStageValue != LiveAspectValue ||
-				s_AspectStageApplyMode != LiveApplyMode;
-
-			Content.HSplitTop(MarginSmall, nullptr, &Content);
-			Content.HSplitTop(LineSize, &Row, &Content);
-			CUIRect ButtonSpace, ApplyButton;
-			Row.VSplitLeft(std::clamp(Row.w * 0.40f, 90.0f, 170.0f), &ButtonSpace, &ApplyButton);
-			(void)ButtonSpace;
-			static CButtonContainer s_AspectApplyButton;
-			if(DoButton_Menu(&s_AspectApplyButton, Localize("Apply"), HasPendingAspectChanges ? 0 : -1, &ApplyButton) && HasPendingAspectChanges)
+			else
 			{
-				g_Config.m_BcCustomAspectRatioMode = s_AspectStageMode;
-				g_Config.m_BcCustomAspectRatio = s_AspectStageValue;
-				g_Config.m_BcCustomAspectRatioApplyMode = s_AspectStageApplyMode;
-				s_AspectStageDirty = false;
-				GameClient()->m_TClient.SetForcedAspect();
+				s_CustomPendingDirty = false;
+				s_CustomPendingAspectValue = -1;
+				s_LastAppliedAspectValue = -1;
 			}
 		}
 
