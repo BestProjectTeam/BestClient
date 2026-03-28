@@ -4578,8 +4578,9 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			const bool Enabled = g_Config.m_ClFocusMode != 0;
 			UpdateRevealPhase(s_FocusModePhase, Enabled);
 
+			const float KeyReaderHeight = LineSize + MarginSmall;
 			const float TargetHeight = 7.0f * LineSize;
-			const float ContentHeight = LineSize + MarginSmall + LineSize + TargetHeight * s_FocusModePhase;
+			const float ContentHeight = LineSize + MarginSmall + LineSize + KeyReaderHeight + TargetHeight * s_FocusModePhase;
 			CUIRect Content, Label, Visible;
 			BeginBlock(Column, ContentHeight, Content);
 
@@ -4588,6 +4589,9 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			Content.HSplitTop(MarginSmall, nullptr, &Content);
 
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClFocusMode, Localize("Enable Focus Mode"), &g_Config.m_ClFocusMode, &Content, LineSize);
+			static CButtonContainer s_FocusModeBindReader;
+			static CButtonContainer s_FocusModeBindClear;
+			DoLine_KeyReader(Content, s_FocusModeBindReader, s_FocusModeBindClear, Localize("Focus mode bind"), "toggle p_focus_mode 0 1");
 
 			const float CurHeight = TargetHeight * s_FocusModePhase;
 			if(CurHeight > 0.0f)
