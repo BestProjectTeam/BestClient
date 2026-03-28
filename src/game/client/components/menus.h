@@ -127,18 +127,10 @@ public:
 	};
 
 private:
-	enum
-	{
-		BESTCLIENT_VISUALS_SUBTAB_GENERAL = 0,
-		BESTCLIENT_VISUALS_SUBTAB_EDITORS,
-		BESTCLIENT_VISUALS_SUBTAB_LENGTH,
-	};
-
 	struct SAssetsEditorState
 	{
 		bool m_VisualsEditorOpen = false;
 		bool m_VisualsEditorInitialized = false;
-		int m_VisualsSubTab = BESTCLIENT_VISUALS_SUBTAB_GENERAL;
 		int m_Type = ASSETS_EDITOR_TYPE_GAME;
 		int m_aMainAssetIndex[ASSETS_EDITOR_TYPE_COUNT] = {0};
 		int m_aDonorAssetIndex[ASSETS_EDITOR_TYPE_COUNT] = {0};

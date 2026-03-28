@@ -3500,6 +3500,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		BESTCLIENT_TAB_OTHERS,
 		BESTCLIENT_TAB_FUN,
 		BESTCLIENT_TAB_SHOP,
+		BESTCLIENT_TAB_EDITORS,
 		BESTCLIENT_TAB_INFO,
 		NUM_BESTCLIENT_TABS,
 	};
@@ -3509,15 +3510,13 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 
 	if(m_AssetsEditorState.m_VisualsEditorOpen && m_AssetsEditorState.m_FullscreenOpen)
 	{
-		s_CurTab = BESTCLIENT_TAB_VISUALS;
-		m_AssetsEditorState.m_VisualsSubTab = BESTCLIENT_VISUALS_SUBTAB_EDITORS;
+		s_CurTab = BESTCLIENT_TAB_EDITORS;
 		RenderAssetsEditorScreen(*Ui()->Screen());
 		return;
 	}
 	if(m_ComponentsEditorState.m_Open && m_ComponentsEditorState.m_FullscreenOpen)
 	{
-		s_CurTab = BESTCLIENT_TAB_VISUALS;
-		m_AssetsEditorState.m_VisualsSubTab = BESTCLIENT_VISUALS_SUBTAB_EDITORS;
+		s_CurTab = BESTCLIENT_TAB_EDITORS;
 		RenderComponentsEditorScreen(*Ui()->Screen());
 		return;
 	}
@@ -3530,7 +3529,17 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		Localize("Others"),
 		Localize("Fun"),
 		TCLocalize("Texture Shop"),
+		Localize("Editors"),
 		Localize("Info"),
+	};
+	const int aTabOrder[NUM_BESTCLIENT_TABS] = {
+		BESTCLIENT_TAB_VISUALS,
+		BESTCLIENT_TAB_GAMEPLAY,
+		BESTCLIENT_TAB_OTHERS,
+		BESTCLIENT_TAB_EDITORS,
+		BESTCLIENT_TAB_FUN,
+		BESTCLIENT_TAB_SHOP,
+		BESTCLIENT_TAB_INFO,
 	};
 
 	auto IsTabHidden = [&](int Tab) {
@@ -3540,8 +3549,9 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 
 	int TabCount = 0;
 	int FirstVisibleTab = -1;
-	for(int Tab = BESTCLIENT_TAB_VISUALS; Tab < NUM_BESTCLIENT_TABS; ++Tab)
+	for(int TabIndex = 0; TabIndex < NUM_BESTCLIENT_TABS; ++TabIndex)
 	{
+		const int Tab = aTabOrder[TabIndex];
 		if(IsTabHidden(Tab))
 			continue;
 		if(FirstVisibleTab == -1)
@@ -3561,8 +3571,9 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 
 	const float TabWidth = TabBar.w / (float)TabCount;
 	int VisibleIndex = 0;
-	for(int Tab = BESTCLIENT_TAB_VISUALS; Tab < NUM_BESTCLIENT_TABS; ++Tab)
+	for(int TabIndex = 0; TabIndex < NUM_BESTCLIENT_TABS; ++TabIndex)
 	{
+		const int Tab = aTabOrder[TabIndex];
 		if(IsTabHidden(Tab))
 			continue;
 
@@ -3579,9 +3590,6 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 
 	if(s_CurTab == BESTCLIENT_TAB_VISUALS)
 	{
-		if(m_AssetsEditorState.m_VisualsSubTab < 0 || m_AssetsEditorState.m_VisualsSubTab >= BESTCLIENT_VISUALS_SUBTAB_LENGTH)
-			m_AssetsEditorState.m_VisualsSubTab = BESTCLIENT_VISUALS_SUBTAB_GENERAL;
-
 		const float LineSize = 20.0f;
 		const float HeadlineFontSize = 20.0f;
 		const float MarginSmall = 5.0f;
@@ -3600,69 +3608,6 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			else
 				Phase = Expanded ? 1.0f : 0.0f;
 		};
-
-		CUIRect VisualsTabBar, VisualsTabButton;
-		MainView.HSplitTop(LineSize + 2.0f, &VisualsTabBar, &MainView);
-		const float VisualsTabWidth = VisualsTabBar.w / (float)BESTCLIENT_VISUALS_SUBTAB_LENGTH;
-		const char *apVisualsTabs[BESTCLIENT_VISUALS_SUBTAB_LENGTH] = {
-			Localize("General"),
-			Localize("Editors"),
-		};
-		static CButtonContainer s_aVisualsTabs[BESTCLIENT_VISUALS_SUBTAB_LENGTH] = {};
-		for(int Tab = 0; Tab < BESTCLIENT_VISUALS_SUBTAB_LENGTH; ++Tab)
-		{
-			VisualsTabBar.VSplitLeft(VisualsTabWidth, &VisualsTabButton, &VisualsTabBar);
-			const int Corners = Tab == 0 ? IGraphics::CORNER_L : (Tab == BESTCLIENT_VISUALS_SUBTAB_LENGTH - 1 ? IGraphics::CORNER_R : IGraphics::CORNER_NONE);
-			if(DoButton_MenuTab(&s_aVisualsTabs[Tab], apVisualsTabs[Tab], m_AssetsEditorState.m_VisualsSubTab == Tab, &VisualsTabButton, Corners, nullptr, nullptr, nullptr, nullptr, 4.0f))
-				m_AssetsEditorState.m_VisualsSubTab = Tab;
-		}
-		MainView.HSplitTop(10.0f, nullptr, &MainView);
-
-		if(m_AssetsEditorState.m_VisualsSubTab == BESTCLIENT_VISUALS_SUBTAB_EDITORS)
-		{
-			if(m_AssetsEditorState.m_VisualsEditorOpen)
-			{
-				RenderAssetsEditorScreen(MainView);
-				return;
-			}
-
-			CUIRect Label, Button;
-			MainView.HSplitTop(24.0f, &Label, &MainView);
-			Ui()->DoLabel(&Label, Localize("Editors"), 20.0f, TEXTALIGN_ML);
-			MainView.HSplitTop(5.0f, nullptr, &MainView);
-
-			MainView.HSplitTop(LineSize, &Label, &MainView);
-			Ui()->DoLabel(&Label, Localize("Create mixed assets or jump to the name plate editor."), 14.0f, TEXTALIGN_ML);
-			MainView.HSplitTop(5.0f, nullptr, &MainView);
-
-			static CButtonContainer s_OpenAssetsEditorButton;
-			MainView.HSplitTop(LineSize + 4.0f, &Button, &MainView);
-			if(DoButton_Menu(&s_OpenAssetsEditorButton, Localize("Assets editor"), 0, &Button))
-			{
-				m_AssetsEditorState.m_VisualsEditorOpen = true;
-				m_AssetsEditorState.m_FullscreenOpen = true;
-				if(!m_AssetsEditorState.m_VisualsEditorInitialized)
-				{
-					AssetsEditorReloadAssets();
-					AssetsEditorResetPartSlots();
-					AssetsEditorEnsureDefaultExportNames();
-					AssetsEditorSyncExportNameFromType();
-					m_AssetsEditorState.m_VisualsEditorInitialized = true;
-				}
-			}
-
-			MainView.HSplitTop(30.0f, nullptr, &MainView);
-			MainView.HSplitTop(LineSize, &Label, &MainView);
-			Ui()->DoLabel(&Label, Localize("Open a dedicated component toggles page."), 14.0f, TEXTALIGN_ML);
-			MainView.HSplitTop(5.0f, nullptr, &MainView);
-
-			static CButtonContainer s_OpenComponentsEditorButton;
-			MainView.HSplitTop(LineSize + 4.0f, &Button, &MainView);
-			if(DoButton_Menu(&s_OpenComponentsEditorButton, Localize("Components editor"), 0, &Button))
-				ComponentsEditorOpen();
-
-			return;
-		}
 
 		static CScrollRegion s_BestClientVisualsScrollRegion;
 		vec2 VisualsScrollOffset(0.0f, 0.0f);
@@ -4778,6 +4723,51 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		s_BestClientVisualsScrollRegion.AddRect(ScrollRegion);
 		s_BestClientVisualsScrollRegion.End();
 	}
+	else if(s_CurTab == BESTCLIENT_TAB_EDITORS)
+	{
+		const float LineSize = 20.0f;
+
+		if(m_AssetsEditorState.m_VisualsEditorOpen)
+		{
+			RenderAssetsEditorScreen(MainView);
+			return;
+		}
+
+		CUIRect Label, Button;
+		MainView.HSplitTop(24.0f, &Label, &MainView);
+		Ui()->DoLabel(&Label, Localize("Editors"), 20.0f, TEXTALIGN_ML);
+		MainView.HSplitTop(5.0f, nullptr, &MainView);
+
+		MainView.HSplitTop(LineSize, &Label, &MainView);
+		Ui()->DoLabel(&Label, Localize("Create mixed assets or jump to the name plate editor."), 14.0f, TEXTALIGN_ML);
+		MainView.HSplitTop(5.0f, nullptr, &MainView);
+
+		static CButtonContainer s_OpenAssetsEditorButton;
+		MainView.HSplitTop(LineSize + 4.0f, &Button, &MainView);
+		if(DoButton_Menu(&s_OpenAssetsEditorButton, Localize("Assets editor"), 0, &Button))
+		{
+			m_AssetsEditorState.m_VisualsEditorOpen = true;
+			m_AssetsEditorState.m_FullscreenOpen = true;
+			if(!m_AssetsEditorState.m_VisualsEditorInitialized)
+			{
+				AssetsEditorReloadAssets();
+				AssetsEditorResetPartSlots();
+				AssetsEditorEnsureDefaultExportNames();
+				AssetsEditorSyncExportNameFromType();
+				m_AssetsEditorState.m_VisualsEditorInitialized = true;
+			}
+		}
+
+		MainView.HSplitTop(30.0f, nullptr, &MainView);
+		MainView.HSplitTop(LineSize, &Label, &MainView);
+		Ui()->DoLabel(&Label, Localize("Open a dedicated component toggles page."), 14.0f, TEXTALIGN_ML);
+		MainView.HSplitTop(5.0f, nullptr, &MainView);
+
+		static CButtonContainer s_OpenComponentsEditorButton;
+		MainView.HSplitTop(LineSize + 4.0f, &Button, &MainView);
+		if(DoButton_Menu(&s_OpenComponentsEditorButton, Localize("Components editor"), 0, &Button))
+			ComponentsEditorOpen();
+	}
 	else if(s_CurTab == BESTCLIENT_TAB_GAMEPLAY)
 	{
 		const float LineSize = 20.0f;
@@ -5671,6 +5661,7 @@ void CMenus::RenderSettingsBestClientInfo(CUIRect MainView)
 		BESTCLIENT_TAB_OTHERS,
 		BESTCLIENT_TAB_FUN,
 		BESTCLIENT_TAB_SHOP,
+		BESTCLIENT_TAB_EDITORS,
 		BESTCLIENT_TAB_INFO,
 		NUM_BESTCLIENT_TABS,
 	};
@@ -5845,23 +5836,34 @@ void CMenus::RenderSettingsBestClientInfo(CUIRect MainView)
 		Localize("Others"),
 		Localize("Fun"),
 		TCLocalize("Texture Shop"),
+		Localize("Editors"),
 		Localize("Info"),
+	};
+	const int aTabOrder[NUM_BESTCLIENT_TABS] = {
+		BESTCLIENT_TAB_VISUALS,
+		BESTCLIENT_TAB_GAMEPLAY,
+		BESTCLIENT_TAB_OTHERS,
+		BESTCLIENT_TAB_EDITORS,
+		BESTCLIENT_TAB_FUN,
+		BESTCLIENT_TAB_SHOP,
+		BESTCLIENT_TAB_INFO,
 	};
 
 	static CButtonContainer s_aShowTabButtons[NUM_BESTCLIENT_TABS] = {};
 	int HideableTabCount = 0;
 	int HideableVisibleIndex = 0;
-	for(int i = 0; i < NUM_BESTCLIENT_TABS; ++i)
+	for(int TabIndex = 0; TabIndex < NUM_BESTCLIENT_TABS; ++TabIndex)
 	{
+		const int Tab = aTabOrder[TabIndex];
 		// Keep Info visible the same way as in legacy BestClient.
-		if(i == BESTCLIENT_TAB_INFO)
+		if(Tab == BESTCLIENT_TAB_INFO)
 			continue;
 
 		++HideableTabCount;
-		int Hidden = IsBestClientTabFlagSet(g_Config.m_BcBestClientSettingsTabs, i);
+		int Hidden = IsBestClientTabFlagSet(g_Config.m_BcBestClientSettingsTabs, Tab);
 		CUIRect *pColumn = HideableVisibleIndex % 2 == 0 ? &LeftSettings : &RightSettings;
-		DoButton_CheckBoxAutoVMarginAndSet(&s_aShowTabButtons[i], apTabNames[i], &Hidden, pColumn, LineSize);
-		SetBestClientTabFlag(g_Config.m_BcBestClientSettingsTabs, i, Hidden);
+		DoButton_CheckBoxAutoVMarginAndSet(&s_aShowTabButtons[Tab], apTabNames[Tab], &Hidden, pColumn, LineSize);
+		SetBestClientTabFlag(g_Config.m_BcBestClientSettingsTabs, Tab, Hidden);
 		++HideableVisibleIndex;
 	}
 	const int HideableRows = (HideableTabCount + 1) / 2;
