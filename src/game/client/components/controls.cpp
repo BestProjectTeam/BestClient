@@ -610,11 +610,22 @@ bool CControls::CheckNewInput()
 		CNetObj_PlayerInput TestInput = m_aInputData[Dummy];
 		if(Dummy == g_Config.m_ClDummy)
 		{
-			TestInput.m_Direction = 0;
-			if(m_aInputDirectionLeft[Dummy] && !m_aInputDirectionRight[Dummy])
-				TestInput.m_Direction = -1;
-			if(!m_aInputDirectionLeft[Dummy] && m_aInputDirectionRight[Dummy])
-				TestInput.m_Direction = 1;
+			const bool LeftPressed = m_aInputDirectionLeft[Dummy] != 0;
+			const bool RightPressed = m_aInputDirectionRight[Dummy] != 0;
+
+			UpdateSnapTapState(Dummy, LeftPressed, RightPressed);
+			if(IsSnapTapActive())
+			{
+				TestInput.m_Direction = ResolveSnapTapDirection(Dummy, LeftPressed, RightPressed);
+			}
+			else
+			{
+				TestInput.m_Direction = 0;
+				if(LeftPressed && !RightPressed)
+					TestInput.m_Direction = -1;
+				if(!LeftPressed && RightPressed)
+					TestInput.m_Direction = 1;
+			}
 		}
 
 		if(m_aFastInput[Dummy].m_Direction != TestInput.m_Direction)
