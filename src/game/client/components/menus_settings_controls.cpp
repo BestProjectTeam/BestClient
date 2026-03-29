@@ -132,10 +132,14 @@ void CMenusSettingsControls::OnInterfacesInit(CGameClient *pClient)
 		{EBindOptionGroup::BEST_CLIENT, Localizable("45 deg bind"), "+BC_45_degrees"},
 		{EBindOptionGroup::BEST_CLIENT, Localizable("Small sens bind"), "BC_small_sens"},
 		{EBindOptionGroup::BEST_CLIENT, Localizable("Cinematic camera"), "BC_cinematic_camera_toggle"},
-		{EBindOptionGroup::BEST_CLIENT, Localizable("Left jump"), "+jump; +left"},
-		{EBindOptionGroup::BEST_CLIENT, Localizable("Right jump"), "+jump; +right"},
-		{EBindOptionGroup::BEST_CLIENT, Localizable("Admin Panel"), "toggle_admin_panel"},
-		{EBindOptionGroup::BEST_CLIENT_PRACTICE, Localizable("say /r"), "say /r"},
+			{EBindOptionGroup::BEST_CLIENT, Localizable("Left jump"), "+jump; +left"},
+			{EBindOptionGroup::BEST_CLIENT, Localizable("Right jump"), "+jump; +right"},
+			{EBindOptionGroup::BEST_CLIENT, Localizable("Admin Panel"), "toggle_admin_panel"},
+			{EBindOptionGroup::BEST_CLIENT_VOICE, Localizable("Voice panel"), "toggle_voice_panel"},
+			{EBindOptionGroup::BEST_CLIENT_VOICE, Localizable("Push-to-talk"), "+voicechat"},
+			{EBindOptionGroup::BEST_CLIENT_VOICE, Localizable("Mute microphone"), "toggle_voice_mic_mute"},
+			{EBindOptionGroup::BEST_CLIENT_VOICE, Localizable("Mute headphones"), "toggle_voice_headphones_mute"},
+			{EBindOptionGroup::BEST_CLIENT_PRACTICE, Localizable("say /r"), "say /r"},
 		{EBindOptionGroup::BEST_CLIENT_PRACTICE, Localizable("say /invincible"), "say /invincible"},
 		{EBindOptionGroup::BEST_CLIENT_PRACTICE, Localizable("say /telecursor"), "say /telecursor"},
 		{EBindOptionGroup::BEST_CLIENT_PRACTICE, Localizable("say /weapons"), "say /weapons"},
@@ -240,6 +244,7 @@ void CMenusSettingsControls::Render(CUIRect MainView)
 	RenderSettingsBindsBlock(EBindOptionGroup::CHAT, &RightColumn, Localize("Chat"));
 	RenderSettingsBindsBlock(EBindOptionGroup::DUMMY, &RightColumn, Localize("Dummy"));
 	RenderSettingsBindsBlock(EBindOptionGroup::BEST_CLIENT, &RightColumn, Localize("BestClient"));
+	RenderSettingsBindsBlock(EBindOptionGroup::BEST_CLIENT_VOICE, &RightColumn, Localize("BestClient Voice"));
 	RenderSettingsBindsBlock(EBindOptionGroup::BEST_CLIENT_PRACTICE, &RightColumn, Localize("BestClient Practice"));
 	RenderSettingsBindsBlock(EBindOptionGroup::MISCELLANEOUS, &RightColumn, Localize("Miscellaneous"));
 	if(std::any_of(m_vBindOptions.begin(), m_vBindOptions.end(), [](const CBindOption &Option) { return Option.m_Group == EBindOptionGroup::CUSTOM; }))

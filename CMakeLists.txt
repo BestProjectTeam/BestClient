@@ -2667,6 +2667,9 @@ if(CLIENT)
     components/bestclient/music_player.h
     components/bestclient/orbit_aura.cpp
     components/bestclient/orbit_aura.h
+    components/bestclient/voice/protocol.h
+    components/bestclient/voice/voice.cpp
+    components/bestclient/voice/voice.h
     components/bestclient/menus_bestclient_shop.cpp
     components/bestclient/translate.cpp
     components/bestclient/translate.h
@@ -2966,6 +2969,7 @@ if(CLIENT)
     src/generated/client_data7.cpp
     src/generated/client_data7.h
   )
+  list(REMOVE_ITEM GAME_CLIENT "${PROJECT_SOURCE_DIR}/src/game/client/components/bestclient/voice/server.cpp")
   set(CLIENT_SRC ${ENGINE_CLIENT} ${PLATFORM_CLIENT} ${GAME_CLIENT} ${GAME_EDITOR} ${GAME_MAP} ${GAME_GENERATED_CLIENT})
 
   set(DEPS_CLIENT ${DEPS} ${GLEW_DEP} ${WAVPACK_DEP})
@@ -3127,6 +3131,17 @@ if(CLIENT)
   else()
     target_compile_definitions(game-client PRIVATE BC_MUSICPLAYER_HAS_DBUS=0)
   endif()
+
+  add_executable(bestclient-voice-server EXCLUDE_FROM_ALL
+    ${DEPS}
+    src/game/client/components/bestclient/voice/server.cpp
+    $<TARGET_OBJECTS:engine-shared>
+    $<TARGET_OBJECTS:game-shared>
+  )
+  target_link_libraries(bestclient-voice-server ${LIBS})
+
+  list(APPEND TARGETS_OWN bestclient-voice-server)
+  list(APPEND TARGETS_LINK bestclient-voice-server)
 
   list(APPEND TARGETS_OWN game-client)
   list(APPEND TARGETS_LINK game-client)

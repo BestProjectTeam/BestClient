@@ -52,6 +52,7 @@ namespace FontIcon
 	inline const char *const GEAR = "\uF013";
 	inline const char *const HEART = "\uF004";
 	inline const char *const HEART_CRACK = "\uF7A9";
+	inline const char *const HEADPHONES = "\uF025";
 	inline const char *const HOUSE = "\uF015";
 	inline const char *const IMAGE = "\uF03E";
 	inline const char *const INFO = "\uF129";
@@ -63,6 +64,7 @@ namespace FontIcon
 	inline const char *const MAGNIFYING_GLASS = "\uF002";
 	inline const char *const MAP = "\uF279";
 	inline const char *const MINUS = "-";
+	inline const char *const MICROPHONE = "\uF130";
 	inline const char *const MUSIC = "\uF001";
 	inline const char *const NETWORK_WIRED = "\uF6FF";
 	inline const char *const NEWSPAPER = "\uF1EA";
