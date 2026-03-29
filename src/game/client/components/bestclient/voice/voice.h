@@ -199,7 +199,9 @@ private:
 	std::unordered_set<std::string> m_MutedNameKeys;
 	std::unordered_map<std::string, int> m_NameVolumePercent;
 	char m_aLastMutedNames[512] = {};
+	char m_aLastPersistedMutedNames[512] = {};
 	char m_aLastNameVolumes[512] = {};
+	bool m_MutedNamesLoadedFromFile = false;
 	bool m_PushToTalkPressed = false;
 	int64_t m_AutoActivationUntilTick = 0;
 	float m_MicLevel = 0.0f;
@@ -316,6 +318,8 @@ private:
 	void ResetServerListTask();
 	void StartServerListPings();
 	void CloseServerListPingSocket();
+	void LoadMutedNamesFromFile();
+	void SaveMutedNamesToFile();
 
 	static void ConVoiceConnect(IConsole::IResult *pResult, void *pUserData);
 	static void ConVoiceDisconnect(IConsole::IResult *pResult, void *pUserData);

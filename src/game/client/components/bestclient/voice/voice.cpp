@@ -11,6 +11,7 @@
 
 #include <engine/client.h>
 #include <engine/font_icons.h>
+#include <engine/storage.h>
 #include <engine/shared/config.h>
 #include <engine/shared/http.h>
 #include <engine/shared/json.h>
@@ -26,6 +27,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <limits>
 #include <unordered_set>
 
@@ -57,6 +59,7 @@ constexpr int SERVER_LIST_PING_TIMEOUT_SEC = 2;
 constexpr int SERVER_LIST_PING_INTERVAL_SEC = 30;
 constexpr const char *VOICE_MASTER_LIST_URL = "https://150.241.70.188:3000/voice/servers.json";
 constexpr const char *DEFAULT_VOICE_SERVER_ADDRESS = "150.241.70.188:8777";
+constexpr const char *VOICE_MUTED_CFG_PATH = "BestClient/voice_muted.cfg";
 
 enum
 {
@@ -236,6 +239,40 @@ void ParseVoiceNameList(const char *pList, std::unordered_set<std::string> &Out)
 	}
 }
 
+void ParseVoiceMutedConfigFile(const char *pData, unsigned DataSize, std::unordered_set<std::string> &Out)
+{
+	Out.clear();
+	if(!pData || DataSize == 0)
+		return;
+
+	const char *p = pData;
+	const char *pEnd = pData + DataSize;
+	while(p < pEnd)
+	{
+		const char *pLineStart = p;
+		while(p < pEnd && *p != '\n')
+			++p;
+		const char *pLineEnd = p;
+		if(p < pEnd && *p == '\n')
+			++p;
+
+		while(pLineStart < pLineEnd && std::isspace((unsigned char)*pLineStart))
+			++pLineStart;
+		while(pLineEnd > pLineStart && std::isspace((unsigned char)pLineEnd[-1]))
+			--pLineEnd;
+		if(pLineStart >= pLineEnd)
+			continue;
+		if(*pLineStart == '#' || *pLineStart == ';')
+			continue;
+
+		char aName[128];
+		str_truncate(aName, sizeof(aName), pLineStart, (int)(pLineEnd - pLineStart));
+		const std::string Key = NormalizeVoiceNameKey(aName);
+		if(!Key.empty())
+			Out.insert(Key);
+	}
+}
+
 void ParseVoiceNameVolumeList(const char *pList, std::unordered_map<std::string, int> &Out)
 {
 	Out.clear();
@@ -400,6 +437,56 @@ void CVoiceChat::OnReset()
 	InvalidatePeerCaches();
 }
 
+void CVoiceChat::LoadMutedNamesFromFile()
+{
+	if(m_MutedNamesLoadedFromFile)
+		return;
+	m_MutedNamesLoadedFromFile = true;
+
+	void *pData = nullptr;
+	unsigned DataSize = 0;
+	if(!Storage()->ReadFile(VOICE_MUTED_CFG_PATH, IStorage::TYPE_SAVE, &pData, &DataSize))
+	{
+		// No legacy file yet: persist current state so future sessions use the dedicated file.
+		SaveMutedNamesToFile();
+		str_copy(m_aLastPersistedMutedNames, g_Config.m_BcVoiceChatMutedNames, sizeof(m_aLastPersistedMutedNames));
+		return;
+	}
+
+	std::unordered_set<std::string> LoadedMutedNames;
+	ParseVoiceMutedConfigFile((const char *)pData, DataSize, LoadedMutedNames);
+	free(pData);
+
+	m_MutedNameKeys = std::move(LoadedMutedNames);
+	char aOut[512];
+	WriteVoiceNameList(m_MutedNameKeys, aOut, sizeof(aOut));
+	str_copy(g_Config.m_BcVoiceChatMutedNames, aOut, sizeof(g_Config.m_BcVoiceChatMutedNames));
+	str_copy(m_aLastMutedNames, g_Config.m_BcVoiceChatMutedNames, sizeof(m_aLastMutedNames));
+	str_copy(m_aLastPersistedMutedNames, g_Config.m_BcVoiceChatMutedNames, sizeof(m_aLastPersistedMutedNames));
+	m_PeerListDirty = true;
+}
+
+void CVoiceChat::SaveMutedNamesToFile()
+{
+	Storage()->CreateFolder("BestClient", IStorage::TYPE_SAVE);
+	IOHANDLE File = Storage()->OpenFile(VOICE_MUTED_CFG_PATH, IOFLAG_WRITE, IStorage::TYPE_SAVE);
+	if(!File)
+		return;
+
+	std::vector<const char *> vpKeys;
+	vpKeys.reserve(m_MutedNameKeys.size());
+	for(const auto &Key : m_MutedNameKeys)
+		vpKeys.push_back(Key.c_str());
+	std::sort(vpKeys.begin(), vpKeys.end(), [](const char *pA, const char *pB) { return str_comp(pA, pB) < 0; });
+
+	for(const char *pKey : vpKeys)
+	{
+		io_write(File, pKey, str_length(pKey));
+		io_write_newline(File);
+	}
+	io_close(File);
+}
+
 void CVoiceChat::OnStateChange(int NewState, int OldState)
 {
 	(void)OldState;
@@ -438,6 +525,12 @@ void CVoiceChat::OnUpdate()
 		ParseVoiceNameVolumeList(g_Config.m_BcVoiceChatNameVolumes, m_NameVolumePercent);
 		str_copy(m_aLastNameVolumes, g_Config.m_BcVoiceChatNameVolumes, sizeof(m_aLastNameVolumes));
 		m_PeerListDirty = true;
+	}
+	LoadMutedNamesFromFile();
+	if(str_comp(m_aLastPersistedMutedNames, g_Config.m_BcVoiceChatMutedNames) != 0)
+	{
+		SaveMutedNamesToFile();
+		str_copy(m_aLastPersistedMutedNames, g_Config.m_BcVoiceChatMutedNames, sizeof(m_aLastPersistedMutedNames));
 	}
 
 	const bool ServerChanged = str_comp(m_aLastServerAddr, g_Config.m_BcVoiceChatServerAddress) != 0;
@@ -2501,7 +2594,7 @@ void CVoiceChat::RefreshPeerMappingCache()
 				{
 					m_PeerVolumePercent[PeerId] = std::clamp(ItVolume->second, 0, 200);
 				}
-				else if(m_PeerVolumePercent.find(PeerId) == m_PeerVolumePercent.end())
+				else
 				{
 					m_PeerVolumePercent[PeerId] = 100;
 				}
