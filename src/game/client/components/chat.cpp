@@ -3305,15 +3305,15 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 		{
 			if(SaveDraft)
 			{
-				if(m_SavedInputPending)
-				{
-					m_SavedInputPending = false;
-					m_aSavedInputText[0] = '\0';
-				}
-				else if(m_Input.GetString()[0] != '\0')
+				if(m_Input.GetString()[0] != '\0')
 				{
 					str_copy(m_aSavedInputText, m_Input.GetString(), sizeof(m_aSavedInputText));
 					m_SavedInputPending = true;
+				}
+				else
+				{
+					m_SavedInputPending = false;
+					m_aSavedInputText[0] = '\0';
 				}
 			}
 			else
