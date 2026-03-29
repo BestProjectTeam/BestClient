@@ -3702,7 +3702,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			Ui()->DoLabel(&TitleLabel, Localize("Hook combo"), HeadlineFontSize, TEXTALIGN_ML);
 			Content.HSplitTop(MarginSmall, nullptr, &Content);
 
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcHookCombo, Localize("Enable hook combo effect"), &g_Config.m_BcHookCombo, &Content, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcHookCombo, Localize("Hook combo"), &g_Config.m_BcHookCombo, &Content, LineSize);
 			if(!HookComboResetClicked && ExpandedHeight > 0.0f)
 			{
 				Content.HSplitTop(ExpandedHeight, &Visible, &Content);

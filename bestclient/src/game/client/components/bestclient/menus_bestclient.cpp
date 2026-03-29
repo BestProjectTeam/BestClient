@@ -1217,7 +1217,7 @@ void CMenus::RenderSettingsBestClientGoresFeatures(CUIRect MainView)
 		SettingsSearchDrawLabel(&Label, TCLocalize("Hook Combo"), HeadlineFontSize, TEXTALIGN_ML, "Hook Combo");
 		Column.HSplitTop(MarginSmall, nullptr, &Column);
 
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcHookCombo, TCLocalize("Enable hook combo effect"), &g_Config.m_BcHookCombo, &Column, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcHookCombo, TCLocalize("Hook combo"), &g_Config.m_BcHookCombo, &Column, LineSize);
 		static float s_HookComboPhase = 0.0f;
 		const float Dt = Client()->RenderFrameTime();
 		const bool Enabled = g_Config.m_BcHookCombo != 0;
