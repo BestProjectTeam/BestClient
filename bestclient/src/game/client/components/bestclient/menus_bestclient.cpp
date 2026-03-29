@@ -3553,6 +3553,7 @@ void CMenus::RenderSettingsBestClientVisualsGeneral(CUIRect MainView)
 		}
 
 		CUIRect MediaPathRow, MediaFileDropDown, MediaReloadButton, MediaFolderButton;
+		Column.HSplitTop(MarginExtraSmall, nullptr, &Column);
 		Column.HSplitTop(LineSize, &MediaPathRow, &Column);
 		MediaPathRow.VSplitRight(20.0f, &MediaPathRow, &MediaFolderButton);
 		MediaPathRow.VSplitRight(MarginSmall, &MediaPathRow, nullptr);
@@ -3593,24 +3594,7 @@ void CMenus::RenderSettingsBestClientVisualsGeneral(CUIRect MainView)
 			Client()->ViewFile(aBuf);
 		}
 
-		char aMediaFolderPath[IO_MAX_PATH_LENGTH];
-		Storage()->GetCompletePath(IStorage::TYPE_SAVE, "BestClient/backgrounds", aMediaFolderPath, sizeof(aMediaFolderPath));
-
-		char aSelectedMediaPath[IO_MAX_PATH_LENGTH + 32];
-		if(g_Config.m_BcMenuMediaBackgroundPath[0] != '\0')
-			str_format(aSelectedMediaPath, sizeof(aSelectedMediaPath), "%s %s", TCLocalize("Selected:"), g_Config.m_BcMenuMediaBackgroundPath);
-		else
-			str_format(aSelectedMediaPath, sizeof(aSelectedMediaPath), "%s %s", TCLocalize("Selected:"), TCLocalize("none"));
-
-		char aFolderLabel[IO_MAX_PATH_LENGTH + 32];
-		str_format(aFolderLabel, sizeof(aFolderLabel), "%s %s", TCLocalize("Folder:"), aMediaFolderPath);
-
 		CUIRect MediaInfoRow;
-		Column.HSplitTop(MarginExtraSmall, nullptr, &Column);
-		Column.HSplitTop(LineSize, &MediaInfoRow, &Column);
-		Ui()->DoLabel(&MediaInfoRow, aFolderLabel, 11.0f, TEXTALIGN_ML);
-		Column.HSplitTop(LineSize, &MediaInfoRow, &Column);
-		Ui()->DoLabel(&MediaInfoRow, aSelectedMediaPath, 11.0f, TEXTALIGN_ML);
 
 		Column.HSplitTop(LineSize, &Button, &Column);
 		Ui()->DoScrollbarOption(&g_Config.m_BcGameMediaBackgroundOffset, &g_Config.m_BcGameMediaBackgroundOffset, &Button, TCLocalize("Map offset"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");

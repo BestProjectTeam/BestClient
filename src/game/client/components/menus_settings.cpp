@@ -4050,7 +4050,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		// Media background (left column block)
 		if(!GameClient()->m_BestClient.IsComponentDisabled(CBestClient::COMPONENT_VISUALS_MEDIA_BACKGROUND))
 		{
-			const float ContentHeight = LineSize + MarginSmall + 7.0f * LineSize + MarginSmall;
+			const float ContentHeight = LineSize + MarginSmall + 5.0f * LineSize + MarginSmall;
 			CUIRect Content, Label, Row;
 			BeginBlock(Column, ContentHeight, Content);
 
@@ -4124,6 +4124,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			}
 
 			CUIRect MediaPathRow, MediaFileDropDown, MediaReloadButton, MediaFolderButton;
+			Content.HSplitTop(MarginSmall, nullptr, &Content);
 			Content.HSplitTop(LineSize, &MediaPathRow, &Content);
 			MediaPathRow.VSplitRight(20.0f, &MediaPathRow, &MediaFolderButton);
 			MediaPathRow.VSplitRight(MarginSmall, &MediaPathRow, nullptr);
@@ -4163,25 +4164,6 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				Storage()->GetCompletePath(IStorage::TYPE_SAVE, "BestClient/backgrounds", aBuf, sizeof(aBuf));
 				Client()->ViewFile(aBuf);
 			}
-
-			Content.HSplitTop(MarginSmall, nullptr, &Content);
-
-			char aMediaFolderPath[IO_MAX_PATH_LENGTH];
-			Storage()->GetCompletePath(IStorage::TYPE_SAVE, "BestClient/backgrounds", aMediaFolderPath, sizeof(aMediaFolderPath));
-
-			char aSelectedMediaPath[IO_MAX_PATH_LENGTH + 32];
-			if(g_Config.m_BcMenuMediaBackgroundPath[0] != '\0')
-				str_format(aSelectedMediaPath, sizeof(aSelectedMediaPath), "%s %s", Localize("Selected:"), g_Config.m_BcMenuMediaBackgroundPath);
-			else
-				str_format(aSelectedMediaPath, sizeof(aSelectedMediaPath), "%s %s", Localize("Selected:"), Localize("none"));
-
-			char aFolderLabel[IO_MAX_PATH_LENGTH + 32];
-			str_format(aFolderLabel, sizeof(aFolderLabel), "%s %s", Localize("Folder:"), aMediaFolderPath);
-
-			Content.HSplitTop(LineSize, &Row, &Content);
-			Ui()->DoLabel(&Row, aFolderLabel, 11.0f, TEXTALIGN_ML);
-			Content.HSplitTop(LineSize, &Row, &Content);
-			Ui()->DoLabel(&Row, aSelectedMediaPath, 11.0f, TEXTALIGN_ML);
 
 			Content.HSplitTop(LineSize, &Row, &Content);
 			Ui()->DoScrollbarOption(&g_Config.m_BcGameMediaBackgroundOffset, &g_Config.m_BcGameMediaBackgroundOffset, &Row, Localize("Map offset"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
