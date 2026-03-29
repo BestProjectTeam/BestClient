@@ -2668,6 +2668,8 @@ if(CLIENT)
     components/bestclient/music_player.h
     components/bestclient/orbit_aura.cpp
     components/bestclient/orbit_aura.h
+    components/bestclient/r_jelly.cpp
+    components/bestclient/r_jelly.h
     components/bestclient/voice/protocol.h
     components/bestclient/voice/voice.cpp
     components/bestclient/voice/voice.h

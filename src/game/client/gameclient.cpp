@@ -42,6 +42,7 @@
 #include "prediction/entities/projectile.h"
 #include "race.h"
 #include "render.h"
+#include "components/bestclient/r_jelly.h"
 
 #include <base/log.h>
 #include <base/math.h>
@@ -601,6 +602,8 @@ void CGameClient::OnConsoleInit()
 	for(auto &pComponent : m_vpAll)
 		pComponent->OnConsoleInit();
 
+	rJelly = std::make_unique<CRJelly>(this);
+
 	Console()->Chain("cl_languagefile", ConchainLanguageUpdate, this);
 
 	Console()->Chain("player_name", ConchainSpecialInfoupdate, this);
@@ -1139,6 +1142,9 @@ void CGameClient::OnReset()
 
 	m_CursorInfo.m_CursorOwnerId = -1;
 	m_CursorInfo.m_NumSamples = 0;
+
+	if(rJelly)
+		rJelly->Reset();
 
 	for(auto &pComponent : m_vpAll)
 		pComponent->OnReset();

@@ -78,6 +78,7 @@ static const SBestClientComponentEntry gs_aBestClientComponentEntries[] = {
 	{CBestClient::COMPONENT_VISUALS_3D_PARTICLES, "3D Particles", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_VISUALS_DYNAMIC_FOV, "Dynamic FOV", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_VISUALS_AFTERIMAGE, "Afterimage", COMPONENTS_GROUP_VISUALS},
+	{CBestClient::COMPONENT_VISUALS_JELLY_TEE, "Jelly Tee", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_VISUALS_CRYSTAL_LASER, "Crystal Laser", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_VISUALS_MUSIC_PLAYER, "Music Player", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_VISUALS_MEDIA_BACKGROUND, "Media Background", COMPONENTS_GROUP_VISUALS},
@@ -4552,6 +4553,56 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 
 				Expand.HSplitTop(LineSize, &Row, &Expand);
 				Ui()->DoScrollbarOption(&g_Config.m_BcAfterimageSpacing, &g_Config.m_BcAfterimageSpacing, &Row, Localize("Afterimage spacing"), 1, 64);
+			}
+			Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
+		}
+
+		// Jelly tee (right column block)
+		if(!GameClient()->m_BestClient.IsComponentDisabled(CBestClient::COMPONENT_VISUALS_JELLY_TEE))
+		{
+			static float s_JellyTeePhase = 0.0f;
+			static CButtonContainer s_JellyTeeResetButton;
+			const bool JellyTeeEnabled = g_Config.m_BcJellyTee != 0;
+			UpdateRevealPhase(s_JellyTeePhase, JellyTeeEnabled);
+			const float ExtraTargetHeight = 2.0f * LineSize;
+			const float ContentHeight = LineSize + MarginSmall + LineSize + ExtraTargetHeight * s_JellyTeePhase;
+			CUIRect Content, Label, Row, Visible;
+			BeginBlock(Column, ContentHeight, Content);
+
+			Content.HSplitTop(LineSize, &Label, &Content);
+			CUIRect TitleLabel, ResetButton, ResetHitbox;
+			Label.VSplitRight(LineSize + 8.0f, &TitleLabel, &ResetButton);
+			ResetHitbox = ResetButton;
+			const bool JellyTeeResetClicked = Ui()->DoButton_FontIcon(&s_JellyTeeResetButton, FontIcon::ARROW_ROTATE_LEFT, 0, &ResetHitbox, BUTTONFLAG_LEFT);
+			GameClient()->m_Tooltips.DoToolTip(&s_JellyTeeResetButton, &ResetHitbox, Localize("Reset to defaults"));
+			if(JellyTeeResetClicked)
+			{
+				g_Config.m_BcJellyTeeStrength = DefaultConfig::BcJellyTeeStrength;
+				g_Config.m_BcJellyTeeDuration = DefaultConfig::BcJellyTeeDuration;
+			}
+			Ui()->DoLabel(&TitleLabel, Localize("Jelly Tee"), HeadlineFontSize, TEXTALIGN_ML);
+			Content.HSplitTop(MarginSmall, nullptr, &Content);
+
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcJellyTee, Localize("Enable Jelly Tee"), &g_Config.m_BcJellyTee, &Content, LineSize);
+
+			const float ExtraHeight = ExtraTargetHeight * s_JellyTeePhase;
+			if(!JellyTeeResetClicked && ExtraHeight > 0.0f)
+			{
+				Content.HSplitTop(ExtraHeight, &Visible, &Content);
+				Ui()->ClipEnable(&Visible);
+				struct SScopedClip
+				{
+					CUi *m_pUi;
+					~SScopedClip() { m_pUi->ClipDisable(); }
+				} ClipGuard{Ui()};
+
+				CUIRect Expand = {Visible.x, Visible.y, Visible.w, ExtraTargetHeight};
+
+				Expand.HSplitTop(LineSize, &Row, &Expand);
+				Ui()->DoScrollbarOption(&g_Config.m_BcJellyTeeStrength, &g_Config.m_BcJellyTeeStrength, &Row, Localize("Jelly strength"), 0, 1000);
+
+				Expand.HSplitTop(LineSize, &Row, &Expand);
+				Ui()->DoScrollbarOption(&g_Config.m_BcJellyTeeDuration, &g_Config.m_BcJellyTeeDuration, &Row, Localize("Jelly duration"), 1, 500);
 			}
 			Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
 		}
