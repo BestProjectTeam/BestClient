@@ -5634,7 +5634,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		Column.HSplitTop(10.0f, nullptr, &Column);
 
 		{
-			const float VoiceSettingsHeight = 430.0f;
+			const float VoiceSettingsHeight = 300.0f;
 			CUIRect VoiceSettingsView;
 			BeginBlock(Column, VoiceSettingsHeight, VoiceSettingsView);
 			GameClient()->m_VoiceChat.RenderMenuSettingsBlock(VoiceSettingsView);
