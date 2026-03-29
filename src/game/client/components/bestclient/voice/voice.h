@@ -199,6 +199,7 @@ private:
 	bool m_PushToTalkPressed = false;
 	int64_t m_AutoActivationUntilTick = 0;
 	float m_MicLevel = 0.0f;
+	bool m_WasTransmitActive = false;
 	bool m_WasEnabled = false;
 	char m_aLastServerAddr[128] = "";
 	int64_t m_LastStartAttempt = 0;

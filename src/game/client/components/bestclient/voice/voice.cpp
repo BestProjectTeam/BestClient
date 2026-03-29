@@ -48,6 +48,7 @@ constexpr int VOICE_MAX_BITRATE_KBPS = 96;
 constexpr int VOICE_HEARTBEAT_SECONDS = 5;
 constexpr int VOICE_SERVER_STALE_SECONDS = 10;
 constexpr int VOICE_IDLE_SHUTDOWN_SECONDS = 5;
+constexpr int VOICE_START_RETRY_SECONDS = 5;
 constexpr float PANEL_PADDING = 14.0f;
 constexpr float PANEL_HEADER_HEIGHT = 34.0f;
 constexpr float PANEL_SECTION_BUTTON_SIZE = 34.0f;
@@ -367,6 +368,7 @@ void CVoiceChat::OnReset()
 	m_AutoActivationUntilTick = 0;
 	m_SendSequence = 0;
 	m_MicLevel = 0.0f;
+	m_WasTransmitActive = false;
 	m_LastHelloTick = 0;
 	m_LastServerPacketTick = 0;
 	m_LastHeartbeatTick = 0;
@@ -457,7 +459,8 @@ void CVoiceChat::OnUpdate()
 	if(!m_Socket)
 	{
 		const int64_t Now = time_get();
-		if(ShouldStartVoicePipeline(Online) && (m_LastStartAttempt == 0 || Now - m_LastStartAttempt > time_freq()))
+		const int64_t RetryDelay = m_RuntimeState == RUNTIME_RECONNECTING ? time_freq() : VOICE_START_RETRY_SECONDS * time_freq();
+		if(ShouldStartVoicePipeline(Online) && (m_LastStartAttempt == 0 || Now - m_LastStartAttempt > RetryDelay))
 		{
 			m_LastStartAttempt = Now;
 			m_RuntimeState = m_RuntimeState == RUNTIME_RECONNECTING ? RUNTIME_RECONNECTING : RUNTIME_STARTING;
@@ -1366,23 +1369,18 @@ bool CVoiceChat::OpenAudioDevices()
 	WantedCapture.callback = nullptr;
 
 	const char *pCaptureDeviceName = GetAudioDeviceNameByIndex(1, g_Config.m_BcVoiceChatInputDevice);
-	m_CaptureDevice = SDL_OpenAudioDevice(pCaptureDeviceName, 1, &WantedCapture, &m_CaptureSpec, SDL_AUDIO_ALLOW_CHANNELS_CHANGE);
+	m_CaptureDevice = SDL_OpenAudioDevice(pCaptureDeviceName, 1, &WantedCapture, nullptr, 0);
 	if(m_CaptureDevice == 0 && pCaptureDeviceName)
 	{
 		dbg_msg("voice", "failed to open selected capture device, fallback to default: %s", SDL_GetError());
-		m_CaptureDevice = SDL_OpenAudioDevice(nullptr, 1, &WantedCapture, &m_CaptureSpec, SDL_AUDIO_ALLOW_CHANNELS_CHANGE);
+		m_CaptureDevice = SDL_OpenAudioDevice(nullptr, 1, &WantedCapture, nullptr, 0);
 	}
 	if(m_CaptureDevice == 0)
 	{
 		dbg_msg("voice", "failed to open capture device: %s", SDL_GetError());
 		return false;
 	}
-	if(m_CaptureSpec.freq != BestClientVoice::SAMPLE_RATE || m_CaptureSpec.format != AUDIO_S16SYS)
-	{
-		dbg_msg("voice", "capture format unsupported (need 48kHz s16)");
-		CloseAudioDevices();
-		return false;
-	}
+	m_CaptureSpec = WantedCapture;
 
 	SDL_AudioSpec WantedPlayback = {};
 	WantedPlayback.freq = BestClientVoice::SAMPLE_RATE;
@@ -1392,11 +1390,11 @@ bool CVoiceChat::OpenAudioDevices()
 	WantedPlayback.callback = nullptr;
 
 	const char *pPlaybackDeviceName = GetAudioDeviceNameByIndex(0, g_Config.m_BcVoiceChatOutputDevice);
-	m_PlaybackDevice = SDL_OpenAudioDevice(pPlaybackDeviceName, 0, &WantedPlayback, &m_PlaybackSpec, SDL_AUDIO_ALLOW_CHANNELS_CHANGE);
+	m_PlaybackDevice = SDL_OpenAudioDevice(pPlaybackDeviceName, 0, &WantedPlayback, nullptr, 0);
 	if(m_PlaybackDevice == 0 && pPlaybackDeviceName)
 	{
 		dbg_msg("voice", "failed to open selected playback device, fallback to default: %s", SDL_GetError());
-		m_PlaybackDevice = SDL_OpenAudioDevice(nullptr, 0, &WantedPlayback, &m_PlaybackSpec, SDL_AUDIO_ALLOW_CHANNELS_CHANGE);
+		m_PlaybackDevice = SDL_OpenAudioDevice(nullptr, 0, &WantedPlayback, nullptr, 0);
 	}
 	if(m_PlaybackDevice == 0)
 	{
@@ -1404,12 +1402,7 @@ bool CVoiceChat::OpenAudioDevices()
 		CloseAudioDevices();
 		return false;
 	}
-	if(m_PlaybackSpec.freq != BestClientVoice::SAMPLE_RATE || m_PlaybackSpec.format != AUDIO_S16SYS || m_PlaybackSpec.channels != 2)
-	{
-		dbg_msg("voice", "playback format unsupported (need 48kHz s16)");
-		CloseAudioDevices();
-		return false;
-	}
+	m_PlaybackSpec = WantedPlayback;
 
 	SDL_PauseAudioDevice(m_CaptureDevice, 0);
 	SDL_PauseAudioDevice(m_PlaybackDevice, 0);
@@ -2193,7 +2186,14 @@ void CVoiceChat::ProcessCapture()
 	if(!m_CaptureDevice || !m_pEncoder)
 		return;
 	if(g_Config.m_BcVoiceChatActivationMode == 1 && !m_PushToTalkPressed && !g_Config.m_BcVoiceChatMicCheck)
+	{
+		m_WasTransmitActive = false;
+		m_AutoActivationUntilTick = 0;
+		m_MicLevel = mix(m_MicLevel, 0.0f, 0.25f);
+		if(SDL_GetQueuedAudioSize(m_CaptureDevice) > 0)
+			SDL_ClearQueuedAudio(m_CaptureDevice);
 		return;
+	}
 
 	int16_t aCaptureRaw[CAPTURE_READ_SAMPLES * 2];
 	const int BytesRead = SDL_DequeueAudio(m_CaptureDevice, aCaptureRaw, sizeof(aCaptureRaw));
@@ -2249,15 +2249,20 @@ void CVoiceChat::ProcessCapture()
 			AvgLevel += absolute(aFrame[i]);
 		AvgLevel /= BestClientVoice::FRAME_SIZE;
 		const float LevelLinear = std::clamp((float)AvgLevel / 32767.0f, 0.0f, 1.0f);
+		const float PeakLinear = std::clamp((float)Peak / 32767.0f, 0.0f, 1.0f);
 		const float MicLevelScale = 2.0f;
 		const float LevelLinearScaled = std::clamp(LevelLinear * MicLevelScale, 0.0f, 1.0f);
+		const float ActivationLevel = maximum(LevelLinearScaled, PeakLinear * 0.85f);
 		m_MicLevel = mix(m_MicLevel, LevelLinearScaled, 0.2f);
 
 		if(g_Config.m_BcVoiceChatMicCheck)
 			m_MicMonitorPcm.PushBack(aFrame, BestClientVoice::FRAME_SIZE);
 
 		if(!ShouldTransmit())
+		{
+			m_WasTransmitActive = false;
 			continue;
+		}
 
 		const int64_t NowTick = time_get();
 		bool Active = false;
@@ -2268,15 +2273,24 @@ void CVoiceChat::ProcessCapture()
 		}
 		else
 		{
-			// Automatic activation (simple VAD): start transmitting above threshold and keep it alive for a short hangover.
-			const float StartThreshold = 0.06f;
-			const int64_t HangoverTicks = (time_freq() * 300) / 1000;
-			if(LevelLinearScaled >= StartThreshold)
+			// Automatic activation (VAD): trigger by RMS/peak level and keep it alive shortly to avoid choppy speech.
+			const float StartThreshold = 0.035f;
+			const int64_t HangoverTicks = (time_freq() * 500) / 1000;
+			if(ActivationLevel >= StartThreshold)
 				m_AutoActivationUntilTick = NowTick + HangoverTicks;
 			Active = m_AutoActivationUntilTick > 0 && NowTick <= m_AutoActivationUntilTick;
 		}
 		if(!Active)
+		{
+			m_WasTransmitActive = false;
 			continue;
+		}
+
+		if(!m_WasTransmitActive)
+		{
+			opus_encoder_ctl(m_pEncoder, OPUS_RESET_STATE);
+			m_WasTransmitActive = true;
+		}
 
 		uint8_t aEncoded[BestClientVoice::MAX_OPUS_PACKET_SIZE];
 		const int EncodedSize = opus_encode(m_pEncoder, aFrame, BestClientVoice::FRAME_SIZE, aEncoded, (int)sizeof(aEncoded));
