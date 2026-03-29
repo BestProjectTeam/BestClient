@@ -116,6 +116,10 @@ MACRO_CONFIG_STR(BcAdminFastAction9, bc_admin_fast_action9, 96, "", CFGFLAG_CLIE
 // Music player
 MACRO_CONFIG_INT(BcMusicPlayer, bc_music_player, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable Music Player HUD element")
 MACRO_CONFIG_INT(BcMusicPlayerShowWhenPaused, bc_music_player_show_when_paused, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Keep Music Player visible while playback is paused")
+MACRO_CONFIG_INT(BcMusicPlayerVisualizer, bc_music_player_visualizer, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable music player visualizer")
+MACRO_CONFIG_INT(BcMusicPlayerVisualizerMode, bc_music_player_visualizer_mode, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player visualizer mode (0=bottom, 1=center)")
+MACRO_CONFIG_INT(BcMusicPlayerVisualizerSensitivity, bc_music_player_visualizer_sensitivity, 100, 50, 2000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player visualizer sensitivity in percent (higher catches quieter audio)")
+MACRO_CONFIG_INT(BcMusicPlayerVisualizerSmoothing, bc_music_player_visualizer_smoothing, 62, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player visualizer smoothing (0-100)")
 MACRO_CONFIG_INT(BcMusicPlayerColorMode, bc_music_player_color_mode, 2, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player color mode (0=static color, 1=cover accent color, 2=dominant cover color)")
 MACRO_CONFIG_COL(BcMusicPlayerStaticColor, bc_music_player_static_color, 128, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Static color for the music player when static color mode is selected")
 MACRO_CONFIG_INT(BcDisabledComponentsMaskLo, bc_disabled_components_mask_lo, 0, 0, 2147483647, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Low bitmask for disabled components")
@@ -172,6 +176,7 @@ MACRO_CONFIG_INT(BcChatBubbleFadeIn, bc_chat_bubble_fadein, 15, 15, 100, CFGFLAG
 // Client Indicator
 MACRO_CONFIG_INT(BcClientIndicator, bc_client_indicator, 1, 1, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Client indicator is always enabled")
 MACRO_CONFIG_INT(DbgClientIndicator, dbg_client_indicator, 0, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Debug logging for BestClient indicator (1=verbose, 2=dump all UDP packet bytes sent/received)")
+MACRO_CONFIG_INT(DbgMusicPlayer, dbg_music_player, 0, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Debug logging for music player (0=off, 1=state changes, 2=verbose periodic diagnostics)")
 MACRO_CONFIG_INT(BcNameplateVoiceOffsetX, bc_nameplate_voice_offset_x, 0, -400, 400, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Horizontal offset for the voice icon in nameplates")
 MACRO_CONFIG_INT(BcNameplateVoiceOffsetY, bc_nameplate_voice_offset_y, 0, -400, 400, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Vertical offset for the voice icon in nameplates")
 MACRO_CONFIG_INT(BcNameplateClientIndicatorOffsetX, bc_nameplate_client_indicator_offset_x, 0, -400, 400, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Horizontal offset for the client indicator in nameplates")
@@ -254,4 +259,3 @@ MACRO_CONFIG_COL(Bc3dParticlesColor, bc_3d_particles_color, 4294967295, CFGFLAG_
 MACRO_CONFIG_INT(Bc3dParticlesGlow, bc_3d_particles_glow, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable 3D particles glow")
 MACRO_CONFIG_INT(Bc3dParticlesGlowAlpha, bc_3d_particles_glow_alpha, 35, 1, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Glow alpha of 3D particles (1-100)")
 MACRO_CONFIG_INT(Bc3dParticlesGlowOffset, bc_3d_particles_glow_offset, 2, 1, 20, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Glow offset for 3D particles")
-
