@@ -5046,6 +5046,12 @@ int main(int argc, const char **argv)
 	vpLoggers.push_back(pFutureAssertionLogger);
 	log_set_global_logger(log_logger_collection(std::move(vpLoggers)).release());
 
+	if(SteamRestartAppIfNecessary())
+	{
+		log_info("steam", "Restarting through Steam");
+		return 0;
+	}
+
 #if defined(CONF_PLATFORM_ANDROID)
 	// Initialize Android after logger is available
 	const char *pAndroidInitError = InitAndroid();

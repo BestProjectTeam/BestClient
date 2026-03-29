@@ -6,6 +6,7 @@
 
 extern "C" {
 
+bool SteamAPI_RestartAppIfNecessary(uint32_t unOwnAppID) { return false; }
 bool SteamAPI_Init() { return false; }
 HSteamPipe SteamAPI_GetHSteamPipe() { abort(); }
 void SteamAPI_Shutdown() { abort(); }

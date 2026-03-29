@@ -23,6 +23,7 @@ public:
 	virtual void SetGameInfo(const NETADDR &ServerAddr, const char *pMapName, bool AnnounceAddr) = 0;
 };
 
+bool SteamRestartAppIfNecessary();
 ISteam *CreateSteam();
 
 #endif // ENGINE_STEAM_H

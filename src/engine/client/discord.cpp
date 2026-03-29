@@ -88,6 +88,7 @@ public:
 		m_pActivityManager->register_steam(m_pActivityManager, 412220); // steam id
 
 		ClearGameInfo();
+		dbg_msg("discord", "initialized custom RPC (app_id=1444576875774083133)");
 
 		return false;
 	}
@@ -98,7 +99,10 @@ public:
 		m_Enabled = Enabled;
 
 		if(NeedsUpdate)
+		{
+			dbg_msg("discord", "rpc %s", m_Enabled ? "enabled" : "disabled");
 			InitDiscord();
+		}
 
 		if(m_pCore && m_Enabled)
 		{

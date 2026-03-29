@@ -7,6 +7,11 @@
 
 #include <steam/steam_api_flat.h>
 
+namespace
+{
+constexpr uint32_t STEAM_APP_ID_DDNET = 412220;
+}
+
 class CSteam : public ISteam
 {
 	HSteamPipe m_SteamPipe;
@@ -141,10 +146,16 @@ class CSteamStub : public ISteam
 	void SetGameInfo(const NETADDR &ServerAddr, const char *pMapName, bool AnnounceAddr) override {}
 };
 
+bool SteamRestartAppIfNecessary()
+{
+	return SteamAPI_RestartAppIfNecessary(STEAM_APP_ID_DDNET);
+}
+
 ISteam *CreateSteam()
 {
 	if(!SteamAPI_Init())
 	{
+		dbg_msg("steam", "SteamAPI_Init failed, running without Steam integration");
 		return new CSteamStub();
 	}
 	return new CSteam();
