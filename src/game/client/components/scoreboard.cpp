@@ -99,8 +99,6 @@ float CScoreboard::GetPopupHeight(int ClientId, bool IsLocal, bool IsSpectating)
 	{
 		// Profile, whisper, vote kick, clip name, swap.
 		Height += (ItemSpacing * 2.0f + ButtonSize) * 5.0f;
-		// Voice mute + per-name voice volume.
-		Height += (ItemSpacing * 2.0f + ButtonSize) * 2.0f;
 		// War list quick actions: enemy/team/helper.
 		Height += ItemSpacing * 2.0f + ActionSize;
 
@@ -1399,32 +1397,6 @@ CUi::EPopupMenuFunctionResult CScoreboard::CScoreboardPopupContext::Render(void 
 			char aSwapBuf[256];
 			str_format(aSwapBuf, sizeof(aSwapBuf), "say /swap %s", Client.m_aName);
 			pScoreboard->Console()->ExecuteLine(aSwapBuf, IConsole::CLIENT_ID_UNSPECIFIED);
-		}
-
-		View.HSplitTop(ItemSpacing * 2, nullptr, &View);
-		View.HSplitTop(ButtonSize, &Container, &View);
-
-		ColorRGBA VcMuteButtonColor = CBestClient::VoiceListHasName(g_Config.m_RiVoiceMute, Client.m_aName) ? ColorRGBA(1.0f, 0.42f, 0.42f, 0.8f * pUi->ButtonColorMul(&pPopupContext->m_VcMuteButton)) : ColorRGBA(0.53f, 0.78f, 0.53f, 0.8f * pUi->ButtonColorMul(&pPopupContext->m_VcMuteButton));
-		if(pUi->DoButton_PopupMenu(&pPopupContext->m_VcMuteButton, CBestClient::VoiceListHasName(g_Config.m_RiVoiceMute, Client.m_aName) ? Localize("Unmute") : Localize("Mute"), &Container, FontSize, TEXTALIGN_MC, 0.0f, false, true, VcMuteButtonColor))
-		{
-			if(CBestClient::VoiceListHasName(g_Config.m_RiVoiceMute, Client.m_aName))
-				CBestClient::VoiceListRemoveName(g_Config.m_RiVoiceMute, sizeof(g_Config.m_RiVoiceMute), Client.m_aName);
-			else
-				CBestClient::VoiceListAddName(g_Config.m_RiVoiceMute, sizeof(g_Config.m_RiVoiceMute), Client.m_aName);
-		}
-
-		View.HSplitTop(ItemSpacing * 2, nullptr, &View);
-		View.HSplitTop(ButtonSize, &Container, &View);
-
-		const int CurrentVoiceVolume = pScoreboard->GameClient()->m_BestClient.VoiceNameVolume(Client.m_aName, 100);
-		int NewVoiceVolume = CurrentVoiceVolume;
-		pUi->DoScrollbarOption(&pPopupContext->m_VoiceVolumeSlider, &NewVoiceVolume, &Container, Localize("Voice"), 0, 200, &CUi::ms_LinearScrollbarScale, 0, "%");
-		if(NewVoiceVolume != CurrentVoiceVolume)
-		{
-			if(NewVoiceVolume == 100)
-				pScoreboard->GameClient()->m_BestClient.VoiceNameVolumeClear(Client.m_aName);
-			else
-				pScoreboard->GameClient()->m_BestClient.VoiceNameVolumeSet(Client.m_aName, NewVoiceVolume);
 		}
 
 		const float ActionSize = 25.0f;

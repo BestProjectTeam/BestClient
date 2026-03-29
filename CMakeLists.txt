@@ -2646,8 +2646,6 @@ if(CLIENT)
     components/bestclient/afterimage.h
     components/bestclient/bestclient.cpp
     components/bestclient/bestclient.h
-    components/bestclient/voice.cpp
-    components/bestclient/voice.h
     components/bestclient/clientindicator/browser_cache.cpp
     components/bestclient/clientindicator/browser_cache.h
     components/bestclient/clientindicator/client_indicator.cpp

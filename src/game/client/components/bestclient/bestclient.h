@@ -6,8 +6,6 @@
 
 #include <game/client/component.h>
 
-#include "voice.h"
-
 #include <array>
 #include <memory>
 #include <vector>
@@ -40,20 +38,6 @@ class CBestClient : public CComponent
 	static void ConToggleSmallSens(IConsole::IResult *pResult, void *pUserData);
 	static void ConToggleDeepfly(IConsole::IResult *pResult, void *pUserData);
 	static void ConToggleCinematicCamera(IConsole::IResult *pResult, void *pUserData);
-	static void ConVoiceAllow(IConsole::IResult *pResult, void *pUserData);
-	static void ConVoiceBlock(IConsole::IResult *pResult, void *pUserData);
-	static void ConVoicePtt(IConsole::IResult *pResult, void *pUserData);
-	static void ConVoiceListDevices(IConsole::IResult *pResult, void *pUserData);
-	static void ConVoiceClearInput(IConsole::IResult *pResult, void *pUserData);
-	static void ConVoiceClearOutput(IConsole::IResult *pResult, void *pUserData);
-	static void ConVoiceSetVolume(IConsole::IResult *pResult, void *pUserData);
-	static void ConVoiceClearVolume(IConsole::IResult *pResult, void *pUserData);
-	static void ConVoiceListVolumes(IConsole::IResult *pResult, void *pUserData);
-	static void ConVoiceMuteAdd(IConsole::IResult *pResult, void *pUserData);
-	static void ConVoiceMuteRemove(IConsole::IResult *pResult, void *pUserData);
-	static void ConVoiceVadAllowAdd(IConsole::IResult *pResult, void *pUserData);
-	static void ConVoiceVadAllowRemove(IConsole::IResult *pResult, void *pUserData);
-	void AppendListItem(char *pList, int ListSize, const char *pItem);
 
 	int m_45degreestoggle = 0;
 	int m_45degreestogglelastinput = 0;
@@ -62,7 +46,6 @@ class CBestClient : public CComponent
 	int m_Smallsenstogglelastinput = 0;
 	int m_SmallsensEnabled = 0;
 	char m_Oldmouse1Bind[128] = {};
-	CRClientVoice m_Voice;
 
 	void FinishBestClientInfo();
 	void ResetBestClientInfoTask();
@@ -140,17 +123,6 @@ public:
 	bool NeedUpdate();
 	bool m_FetchedBestClientInfo = false;
 	char m_aVersionStr[64] = "0";
-	bool IsVoiceActive(int ClientId) const;
-	int VoicePingMs() const;
-	float VoiceMicLevel() const;
-	bool IsVoiceInputUnavailable() const;
-	bool IsVoiceOutputUnavailable() const;
-	static bool VoiceListHasName(const char *pList, const char *pName);
-	static bool VoiceListAddName(char *pList, int ListSize, const char *pName);
-	static bool VoiceListRemoveName(char *pList, int ListSize, const char *pName);
-	int VoiceNameVolume(const char *pName, int DefaultPercent = 100) const;
-	void VoiceNameVolumeSet(const char *pName, int Percent);
-	void VoiceNameVolumeClear(const char *pName);
 };
 
 #endif

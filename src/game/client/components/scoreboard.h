@@ -60,8 +60,6 @@ class CScoreboard : public CComponent
 		CButtonContainer m_VoteKickButton;
 		CButtonContainer m_ClipNameButton;
 		CButtonContainer m_SwapButton;
-		CButtonContainer m_VcMuteButton;
-		CButtonContainer m_VoiceVolumeSlider;
 		CButtonContainer m_WarListWarButton;
 		CButtonContainer m_WarListTeamButton;
 		CButtonContainer m_WarListHelperButton;

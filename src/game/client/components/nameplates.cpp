@@ -54,9 +54,6 @@ public:
 	bool m_ShowBClientIndicator;
 	float m_FontSizeBClientIndicator;
 	bool m_IsUserBClientIndicator;
-	bool m_ShowVoiceIcon;
-	float m_FontSizeVoiceIcon;
-	bool m_IsVoiceActive;
 };
 
 // Part Types
@@ -692,35 +689,6 @@ public:
 		CNamePlatePartText(This) {}
 };
 
-class CNamePlatePartVoice : public CNamePlatePartText
-{
-private:
-	float m_FontSize = -INFINITY;
-
-protected:
-	bool UpdateNeeded(CGameClient &This, const CNamePlateData &Data) override
-	{
-		m_Visible = Data.m_ShowVoiceIcon && Data.m_IsVoiceActive;
-		if(!m_Visible)
-			return false;
-		m_Color = ColorRGBA(1.0f, 1.0f, 1.0f, Data.m_Color.a);
-		return m_FontSize != Data.m_FontSizeVoiceIcon;
-	}
-	void UpdateText(CGameClient &This, const CNamePlateData &Data) override
-	{
-		m_FontSize = Data.m_FontSizeVoiceIcon;
-		CTextCursor Cursor;
-		This.TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
-		Cursor.m_FontSize = m_FontSize;
-		This.TextRender()->CreateOrAppendTextContainer(m_TextContainerIndex, &Cursor, FontIcon::MICROPHONE);
-		This.TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
-	}
-
-public:
-	CNamePlatePartVoice(CGameClient &This) :
-		CNamePlatePartText(This) {}
-};
-
 class CNamePlatePartBClientIndicator : public CNamePlatePartIcon
 {
 protected:
@@ -818,9 +786,6 @@ private:
 		AddPart<CNamePlatePartDirection>(This, DIRECTION_LEFT);
 		AddPart<CNamePlatePartDirection>(This, DIRECTION_UP);
 		AddPart<CNamePlatePartDirection>(This, DIRECTION_RIGHT);
-		AddPart<CNamePlatePartNewLine>(This);
-
-		AddPart<CNamePlatePartVoice>(This);
 	}
 
 public:
@@ -954,7 +919,6 @@ void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *p
 	Data.m_FontSizeHookStrongWeak = 18.0f + 20.0f * g_Config.m_ClNamePlatesStrongSize / 100.0f;
 	Data.m_FontSizeDirection = 18.0f + 20.0f * g_Config.m_ClDirectionSize / 100.0f;
 	Data.m_FontSizeBClientIndicator = 18.0f + 20.0f * g_Config.m_BcClientIndicatorInNamePlateSize / 100.0f;
-	Data.m_FontSizeVoiceIcon = Data.m_FontSize;
 
 	if(g_Config.m_ClNamePlatesAlways == 0)
 		Alpha *= std::clamp(1.0f - std::pow(distance(GameClient()->m_Controls.m_aTargetPos[g_Config.m_ClDummy], Position) / 200.0f, 16.0f), 0.0f, 1.0f);
@@ -1038,9 +1002,6 @@ void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *p
 	Data.m_ShowBClientIndicator = g_Config.m_BcClientIndicator && g_Config.m_BcClientIndicatorInNamePlate &&
 		(!pPlayerInfo->m_Local || g_Config.m_BcClientIndicatorInNamePlateAboveSelf);
 	Data.m_IsUserBClientIndicator = Data.m_ShowBClientIndicator && GameClient()->m_ClientIndicator.IsPlayerBClient(pPlayerInfo->m_ClientId);
-	Data.m_ShowVoiceIcon = g_Config.m_RiVoiceShowIndicator &&
-		(g_Config.m_RiVoiceIndicatorAboveSelf || !pPlayerInfo->m_Local);
-	Data.m_IsVoiceActive = GameClient()->m_BestClient.IsVoiceActive(pPlayerInfo->m_ClientId);
 
 	const bool Following = (GameClient()->m_Snap.m_SpecInfo.m_Active && !GameClient()->m_MultiViewActivated && GameClient()->m_Snap.m_SpecInfo.m_SpectatorId != SPEC_FREEVIEW);
 	if(GameClient()->m_Snap.m_LocalClientId != -1 || Following)
@@ -1121,9 +1082,6 @@ void CNamePlates::RenderNamePlatePreview(vec2 Position, int Dummy)
 	Data.m_FontSizeBClientIndicator = FontSizeBClientIndicator;
 	Data.m_IsUserBClientIndicator = Data.m_ShowBClientIndicator &&
 		(HasPreviewClient ? GameClient()->m_ClientIndicator.IsPlayerBClient(PreviewDisplayClientId) : true);
-	Data.m_FontSizeVoiceIcon = FontSize;
-	Data.m_ShowVoiceIcon = false;
-	Data.m_IsVoiceActive = false;
 
 	Data.m_FontSizeHookStrongWeak = FontSizeHookStrongWeak;
 	Data.m_HookStrongWeakId = Data.m_ClientId;
@@ -1187,8 +1145,7 @@ void CNamePlates::OnRender()
 		ShowDirection = g_Config.m_ClVideoShowDirection;
 #endif
 	if(!g_Config.m_ClNamePlates && !g_Config.m_ClNamePlatesOwn && ShowDirection == 0 &&
-		!(g_Config.m_BcClientIndicator && g_Config.m_BcClientIndicatorInNamePlate) &&
-		!g_Config.m_RiVoiceShowIndicator)
+		!(g_Config.m_BcClientIndicator && g_Config.m_BcClientIndicatorInNamePlate))
 		return;
 
 	for(int i = 0; i < MAX_CLIENTS; i++)
