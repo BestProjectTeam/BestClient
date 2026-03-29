@@ -2,6 +2,7 @@
 
 #include "data_version.h"
 
+#include <base/math.h>
 #include <base/log.h>
 
 #include <engine/client.h>
@@ -16,11 +17,14 @@
 
 #include <game/client/animstate.h>
 #include <game/client/components/chat.h>
+#include <game/client/components/hud_layout.h>
 #include <game/client/gameclient.h>
 #include <game/client/render.h>
 #include <game/client/ui.h>
 #include <game/localization.h>
 #include <game/version.h>
+
+#include <algorithm>
 
 static constexpr const char *TCLIENT_INFO_URL = "https://update.tclient.app/info.json";
 
@@ -754,9 +758,18 @@ static void StripStr(const char *pIn, char *pOut, const char *pEnd)
 
 void CTClient::RenderMiniVoteHud()
 {
-	CUIRect View = {0.0f, 60.0f, 70.0f, 35.0f};
-	View.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.4f), IGraphics::CORNER_R, 3.0f);
-	View.Margin(3.0f, &View);
+	const float HudHeight = HudLayout::CANVAS_HEIGHT;
+	const float HudWidth = HudHeight * Graphics()->ScreenAspect();
+	const auto Layout = HudLayout::Get(HudLayout::MODULE_VOTES, HudWidth, HudHeight);
+	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+
+	CUIRect Outer = {Layout.m_X, Layout.m_Y, 70.0f * Scale, 35.0f * Scale};
+	Outer.x = std::clamp(Outer.x, 0.0f, maximum(0.0f, HudWidth - Outer.w));
+	Outer.y = std::clamp(Outer.y, 0.0f, maximum(0.0f, HudHeight - Outer.h));
+	Outer.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.4f), IGraphics::CORNER_R, 3.0f * Scale);
+
+	CUIRect View = Outer;
+	View.Margin(3.0f * Scale, &View);
 
 	SLabelProperties Props;
 	Props.m_EllipsisAtEnd = true;
@@ -766,47 +779,47 @@ void CTClient::RenderMiniVoteHud()
 	char aBuf[256];
 
 	// Vote description
-	View.HSplitTop(6.0f, &Row, &View);
+	View.HSplitTop(6.0f * Scale, &Row, &View);
 	StripStr(GameClient()->m_Voting.VoteDescription(), aBuf, aBuf + sizeof(aBuf));
-	Ui()->DoLabel(&Row, aBuf, 6.0f, TEXTALIGN_ML, Props);
+	Ui()->DoLabel(&Row, aBuf, 6.0f * Scale, TEXTALIGN_ML, Props);
 
 	// Vote reason
-	View.HSplitTop(3.0f, nullptr, &View);
-	View.HSplitTop(4.0f, &Row, &View);
-	Ui()->DoLabel(&Row, GameClient()->m_Voting.VoteReason(), 4.0f, TEXTALIGN_ML, Props);
+	View.HSplitTop(3.0f * Scale, nullptr, &View);
+	View.HSplitTop(4.0f * Scale, &Row, &View);
+	Ui()->DoLabel(&Row, GameClient()->m_Voting.VoteReason(), 4.0f * Scale, TEXTALIGN_ML, Props);
 
 	// Time left
 	str_format(aBuf, sizeof(aBuf), Localize("%ds left"), GameClient()->m_Voting.SecondsLeft());
-	View.HSplitTop(3.0f, nullptr, &View);
-	View.HSplitTop(3.0f, &Row, &View);
-	Row.VSplitLeft(2.0f, nullptr, &Row);
-	Row.VSplitLeft(3.0f, &ProgressSpinner, &Row);
-	Row.VSplitLeft(2.0f, nullptr, &Row);
+	View.HSplitTop(3.0f * Scale, nullptr, &View);
+	View.HSplitTop(3.0f * Scale, &Row, &View);
+	Row.VSplitLeft(2.0f * Scale, nullptr, &Row);
+	Row.VSplitLeft(3.0f * Scale, &ProgressSpinner, &Row);
+	Row.VSplitLeft(2.0f * Scale, nullptr, &Row);
 
 	SProgressSpinnerProperties ProgressProps;
 	ProgressProps.m_Progress = std::clamp((time() - GameClient()->m_Voting.m_Opentime) / (float)(GameClient()->m_Voting.m_Closetime - GameClient()->m_Voting.m_Opentime), 0.0f, 1.0f);
 	Ui()->RenderProgressSpinner(ProgressSpinner.Center(), ProgressSpinner.h / 2.0f, ProgressProps);
 
-	Ui()->DoLabel(&Row, aBuf, 3.0f, TEXTALIGN_ML);
+	Ui()->DoLabel(&Row, aBuf, 3.0f * Scale, TEXTALIGN_ML);
 
 	// Bars
-	View.HSplitTop(3.0f, nullptr, &View);
-	View.HSplitTop(3.0f, &Row, &View);
+	View.HSplitTop(3.0f * Scale, nullptr, &View);
+	View.HSplitTop(3.0f * Scale, &Row, &View);
 	GameClient()->m_Voting.RenderBars(Row);
 
 	// F3 / F4
-	View.HSplitTop(3.0f, nullptr, &View);
-	View.HSplitTop(0.5f, &Row, &View);
-	Row.VSplitMid(&LeftColumn, &RightColumn, 4.0f);
+	View.HSplitTop(3.0f * Scale, nullptr, &View);
+	View.HSplitTop(maximum(0.5f * Scale, 0.5f), &Row, &View);
+	Row.VSplitMid(&LeftColumn, &RightColumn, 4.0f * Scale);
 
 	char aKey[64];
 	GameClient()->m_Binds.GetKey("vote yes", aKey, sizeof(aKey));
 	TextRender()->TextColor(GameClient()->m_Voting.TakenChoice() == 1 ? ColorRGBA(0.2f, 0.9f, 0.2f, 0.85f) : TextRender()->DefaultTextColor());
-	Ui()->DoLabel(&LeftColumn, aKey[0] == '\0' ? "yes" : aKey, 0.5f, TEXTALIGN_ML);
+	Ui()->DoLabel(&LeftColumn, aKey[0] == '\0' ? "yes" : aKey, maximum(0.5f * Scale, 0.5f), TEXTALIGN_ML);
 
 	GameClient()->m_Binds.GetKey("vote no", aKey, sizeof(aKey));
 	TextRender()->TextColor(GameClient()->m_Voting.TakenChoice() == -1 ? ColorRGBA(0.95f, 0.25f, 0.25f, 0.85f) : TextRender()->DefaultTextColor());
-	Ui()->DoLabel(&RightColumn, aKey[0] == '\0' ? "no" : aKey, 0.5f, TEXTALIGN_MR);
+	Ui()->DoLabel(&RightColumn, aKey[0] == '\0' ? "no" : aKey, maximum(0.5f * Scale, 0.5f), TEXTALIGN_MR);
 
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
 }

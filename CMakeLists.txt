@@ -296,6 +296,14 @@ if(CMAKE_GENERATOR STREQUAL "Ninja")
   add_cxx_compiler_flag_if_supported(OUR_FLAGS -fcolor-diagnostics)
 endif()
 
+# MSVC + Ninja can run out of memory in debug builds when many compile/link
+# jobs run in parallel (C1060/LNK1102). Limit job concurrency globally.
+if(CMAKE_GENERATOR STREQUAL "Ninja" AND MSVC)
+  set_property(GLOBAL PROPERTY JOB_POOLS compile_pool=2 link_pool=1)
+  set(CMAKE_JOB_POOL_COMPILE compile_pool)
+  set(CMAKE_JOB_POOL_LINK link_pool)
+endif()
+
 if(NOT MSVC AND NOT HAIKU)
   if(NOT TARGET_OS STREQUAL "mac")
     if(NOT FUSE_LD STREQUAL OFF)
@@ -4066,7 +4074,8 @@ foreach(target ${TARGETS})
   if(MSVC)
     set_property(TARGET ${target} PROPERTY MSVC_RUNTIME_LIBRARY MultiThreaded$<${DBG}:Debug>) # Use static CRT
     target_compile_options(${target} PRIVATE /Zc:__cplusplus) # Fixes the __cplusplus macro
-    target_compile_options(${target} PRIVATE /MP) # Use multiple cores
+    # Keep debug builds memory-friendly on MSVC (paired with Ninja job pools above).
+    target_compile_options(${target} PRIVATE $<$<CONFIG:Debug>:/MP1> $<$<NOT:$<CONFIG:Debug>>:/MP>)
     target_compile_options(${target} PRIVATE /EHsc) # Only catch C++ exceptions with catch.
     target_compile_options(${target} PRIVATE /GS) # Protect the stack pointer.
     target_compile_options(${target} PRIVATE /wd4996) # Use of non-_s functions.

@@ -128,8 +128,20 @@ CUIRect CHudEditor::GetFallbackModuleRect(HudLayout::EModule Module) const
 		Rect = {Width - 112.0f, 229.0f, 112.0f, 56.0f};
 		break;
 	case HudLayout::MODULE_MOVEMENT_INFO:
-		Rect = {Width - 62.0f, 205.0f, 62.0f, 76.0f};
+	{
+		const bool ShowPos = g_Config.m_ClShowhudPlayerPosition != 0;
+		const bool ShowSpeed = g_Config.m_ClShowhudPlayerSpeed != 0;
+		const bool ShowAngle = g_Config.m_ClShowhudPlayerAngle != 0;
+		float BoxHeight = 3.0f * 8.0f * ((ShowPos ? 1.0f : 0.0f) + (ShowSpeed ? 1.0f : 0.0f)) + 2.0f * 8.0f * (ShowAngle ? 1.0f : 0.0f);
+		if(g_Config.m_BcShowhudDummyCoordIndicator)
+			BoxHeight += 8.0f;
+		if(ShowPos || ShowSpeed || ShowAngle)
+			BoxHeight += 2.0f;
+		BoxHeight = maximum(BoxHeight, 12.0f);
+		const float StartY = 285.0f - BoxHeight - 4.0f - (g_Config.m_ClShowhudScore ? 56.0f : 0.0f);
+		Rect = {Width - 62.0f, StartY, 62.0f, BoxHeight};
 		break;
+	}
 	case HudLayout::MODULE_GAME_TIMER:
 		Rect = {Width * 0.5f - 32.0f, 2.0f, 64.0f, 12.0f};
 		break;
@@ -146,10 +158,17 @@ CUIRect CHudEditor::GetFallbackModuleRect(HudLayout::EModule Module) const
 		Rect = {Width - 120.0f, 141.0f, 118.0f, 16.0f};
 		break;
 	case HudLayout::MODULE_HOOK_COMBO:
-		Rect = {Width * 0.5f - 40.0f, 240.0f, 80.0f, 18.0f};
+	{
+		const auto Layout = HudLayout::Get(HudLayout::MODULE_HOOK_COMBO, Width, Height);
+		const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+		const float FontSize = 13.0f * Scale;
+		const float BoxWidth = TextRender()->TextWidth(FontSize, "fantastic (x7)", -1, -1.0f) + 8.0f * Scale;
+		const float BoxHeight = FontSize + 4.0f * Scale;
+		Rect = {Width * 0.5f - BoxWidth * 0.5f, Height * 0.84f, BoxWidth, BoxHeight};
 		break;
+	}
 	case HudLayout::MODULE_MINI_VOTE:
-		Rect = {0.0f, 60.0f, 145.0f, 95.0f};
+		Rect = {0.0f, 60.0f, 70.0f, 35.0f};
 		break;
 	case HudLayout::MODULE_FROZEN_HUD:
 		Rect = {Width - 180.0f, 0.0f, 176.0f, 34.0f};
@@ -255,10 +274,8 @@ void CHudEditor::CollectModuleVisuals(SModuleVisual *pOut, int &Count) const
 	AddModule(HudLayout::MODULE_LOCAL_TIME);
 	AddModule(HudLayout::MODULE_SPECTATOR_COUNT);
 	AddModule(HudLayout::MODULE_HOOK_COMBO);
-	AddModule(HudLayout::MODULE_MINI_VOTE);
 	AddModule(HudLayout::MODULE_NOTIFY_LAST);
 	AddModule(HudLayout::MODULE_FROZEN_HUD);
-	AddModule(HudLayout::MODULE_LOCK_CAM);
 	AddModule(HudLayout::MODULE_KILLFEED);
 }
 
@@ -426,7 +443,7 @@ void CHudEditor::RenderModuleLabel(const SModuleVisual &Visual) const
 	if(Visual.m_Editable)
 		str_format(aLabel, sizeof(aLabel), "%s", HudLayout::Name(Visual.m_Module));
 	else
-		str_format(aLabel, sizeof(aLabel), "%s (%s)", HudLayout::Name(Visual.m_Module), Localize("locked preview"));
+		str_format(aLabel, sizeof(aLabel), "%s (%s)", HudLayout::Name(Visual.m_Module), Localize("preview"));
 
 	const float Width = HudWidth();
 	const float Height = HudHeight();
@@ -600,9 +617,10 @@ void CHudEditor::RenderModulePreview(const SModuleVisual &Visual) const
 	}
 	if(Visual.m_Module == HudLayout::MODULE_LOCK_CAM)
 	{
-		CUIRect TextRect = Rect;
-		TextRect.Margin(2.0f, &TextRect);
-		Ui()->DoLabel(&TextRect, "LOCK", 5.6f, TEXTALIGN_MC);
+		CUIRect Inner = Rect;
+		Inner.Margin(2.0f, &Inner);
+		Graphics()->DrawRect(Inner.x + Inner.w * 0.15f, Inner.y + Inner.h * 0.35f, Inner.w * 0.70f, 1.8f, ColorRGBA(1.0f, 1.0f, 1.0f, 0.24f), IGraphics::CORNER_ALL, 1.0f);
+		Graphics()->DrawRect(Inner.x + Inner.w * 0.40f, Inner.y + Inner.h * 0.10f, Inner.w * 0.20f, Inner.h * 0.20f, ColorRGBA(1.0f, 1.0f, 1.0f, 0.24f), IGraphics::CORNER_ALL, 1.0f);
 		return;
 	}
 	if(Visual.m_Module == HudLayout::MODULE_KILLFEED)
