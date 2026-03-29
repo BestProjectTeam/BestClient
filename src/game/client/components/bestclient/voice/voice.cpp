@@ -919,8 +919,8 @@ void CVoiceChat::RenderMenuSettingsBlock(const CUIRect &View, float RevealPhase)
 	if(!g_Config.m_BcVoiceChatEnable || RevealPhase <= 0.0f)
 		return;
 
-	const int ServerCount = (int)m_vServerEntries.size();
-	const float ExpandedTargetHeight = VoiceMenuExpandedHeightForServerCount(ServerCount);
+	const int InitialServerCount = (int)m_vServerEntries.size();
+	const float ExpandedTargetHeight = VoiceMenuExpandedHeightForServerCount(InitialServerCount);
 	const float ExpandedVisibleHeight = ExpandedTargetHeight * RevealPhase;
 
 	CUIRect ExpandedVisible;
@@ -989,6 +989,7 @@ void CVoiceChat::RenderMenuSettingsBlock(const CUIRect &View, float RevealPhase)
 		Ui()->DoLabel(&Row, Localize("Available servers"), 14.0f, TEXTALIGN_ML);
 	AddExpandedSpacing(2.0f);
 
+	const int ServerCount = (int)m_vServerEntries.size();
 	const int VisibleRows = std::clamp(ServerCount > 0 ? ServerCount : 1, 1, 2);
 	const int RowsToRender = minimum(ServerCount, VisibleRows);
 	const float ServerListHeight = 2.0f + VisibleRows * kVoiceMenuServerRowHeight + maximum(0, VisibleRows - 1) * kVoiceMenuServerRowGap;
