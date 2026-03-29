@@ -3,6 +3,9 @@
 
 #include <base/vmath.h>
 
+#include <engine/shared/protocol.h>
+
+#include <array>
 #include <memory>
 
 class CGameClient;
@@ -21,9 +24,11 @@ public:
 	explicit CRJelly(CGameClient *pClient);
 
 	void Reset();
-	JellyTee GetDeform(int ClientId, vec2 PrevVel, vec2 Vel, vec2 LookDir, bool InAir, bool WantOtherDir, float DeltaTime);
+	JellyTee GetDeform(int ClientId, vec2 PrevVel, vec2 Vel, vec2 LookDir, bool InAir, bool WantOtherDir, float DeltaTime, vec2 ExtraDeformImpulse = vec2(0.0f, 0.0f), float ExtraCompression = 0.0f);
 
 private:
+	static constexpr int MAX_JELLY_CLIENTS = MAX_CLIENTS;
+
 	struct CState
 	{
 		vec2 m_Deform = vec2(0.0f, 0.0f);
@@ -36,9 +41,10 @@ private:
 	};
 
 	CGameClient *m_pClient = nullptr;
-	CState m_State;
+	std::array<CState, MAX_JELLY_CLIENTS> m_aStates{};
 
 	bool IsEnabledFor(int ClientId) const;
+	CState *StateFor(int ClientId);
 };
 
 extern std::unique_ptr<CRJelly> rJelly;

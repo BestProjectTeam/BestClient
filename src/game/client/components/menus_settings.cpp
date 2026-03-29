@@ -4564,7 +4564,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			static CButtonContainer s_JellyTeeResetButton;
 			const bool JellyTeeEnabled = g_Config.m_BcJellyTee != 0;
 			UpdateRevealPhase(s_JellyTeePhase, JellyTeeEnabled);
-			const float ExtraTargetHeight = 2.0f * LineSize;
+			const float ExtraTargetHeight = 3.0f * LineSize;
 			const float ContentHeight = LineSize + MarginSmall + LineSize + ExtraTargetHeight * s_JellyTeePhase;
 			CUIRect Content, Label, Row, Visible;
 			BeginBlock(Column, ContentHeight, Content);
@@ -4577,6 +4577,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			GameClient()->m_Tooltips.DoToolTip(&s_JellyTeeResetButton, &ResetHitbox, Localize("Reset to defaults"));
 			if(JellyTeeResetClicked)
 			{
+				g_Config.m_BcJellyTeeOthers = DefaultConfig::BcJellyTeeOthers;
 				g_Config.m_BcJellyTeeStrength = DefaultConfig::BcJellyTeeStrength;
 				g_Config.m_BcJellyTeeDuration = DefaultConfig::BcJellyTeeDuration;
 			}
@@ -4597,6 +4598,8 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				} ClipGuard{Ui()};
 
 				CUIRect Expand = {Visible.x, Visible.y, Visible.w, ExtraTargetHeight};
+
+				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcJellyTeeOthers, Localize("Jelly Others"), &g_Config.m_BcJellyTeeOthers, &Expand, LineSize);
 
 				Expand.HSplitTop(LineSize, &Row, &Expand);
 				Ui()->DoScrollbarOption(&g_Config.m_BcJellyTeeStrength, &g_Config.m_BcJellyTeeStrength, &Row, Localize("Jelly strength"), 0, 1000);

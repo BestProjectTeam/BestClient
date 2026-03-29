@@ -23,6 +23,7 @@
 #include <game/client/components/sounds.h>
 #include <game/client/components/bestclient/r_jelly.h>
 #include <game/client/gameclient.h>
+#include <game/collision.h>
 #include <game/gamecore.h>
 #include <game/mapitems.h>
 
@@ -51,6 +52,75 @@ static vec2 CalculateHandPosition(vec2 CenterPos, vec2 Dir, vec2 PostRotOffset)
 		DirY = -DirY;
 	}
 	return CenterPos + Dir + Dir * PostRotOffset.x + DirY * PostRotOffset.y;
+}
+
+static int LocalDummyIndexForClient(const CGameClient *pGameClient, int ClientId)
+{
+	for(int Dummy = 0; Dummy < NUM_DUMMIES; ++Dummy)
+	{
+		if(pGameClient->m_aLocalIds[Dummy] == ClientId)
+			return Dummy;
+	}
+	return -1;
+}
+
+static bool HasJellyHammerImpact(const CGameClient *pGameClient, int ClientId)
+{
+	const int LocalDummy = LocalDummyIndexForClient(pGameClient, ClientId);
+	return LocalDummy >= 0 && pGameClient->m_aPredictedHammerHitEvent[LocalDummy];
+}
+
+static bool IsSolidAt(const CCollision *pCollision, vec2 Pos)
+{
+	if(pCollision == nullptr)
+		return false;
+	return pCollision->CheckPoint(Pos.x, Pos.y);
+}
+
+static float DetectJellyWallImpact(const CCollision *pCollision, vec2 Position, vec2 PrevVel, vec2 Vel, bool InAir)
+{
+	if(InAir)
+		return 0.0f;
+
+	const float PrevSpeedX = absolute(PrevVel.x);
+	const float CurSpeedX = absolute(Vel.x);
+	const float SpeedDrop = PrevSpeedX - CurSpeedX;
+	if(PrevSpeedX < 4.0f || SpeedDrop < 1.2f)
+		return 0.0f;
+
+	const float Side = PrevVel.x >= 0.0f ? 1.0f : -1.0f;
+	const float ProbeX = Position.x + Side * 16.0f;
+	const bool TouchingWall =
+		IsSolidAt(pCollision, vec2(ProbeX, Position.y - 10.0f)) ||
+		IsSolidAt(pCollision, vec2(ProbeX, Position.y)) ||
+		IsSolidAt(pCollision, vec2(ProbeX, Position.y + 10.0f));
+
+	if(!TouchingWall)
+		return 0.0f;
+
+	return std::clamp(SpeedDrop / 7.0f, 0.0f, 1.8f);
+}
+
+static void BuildJellyExtraImpulse(const CGameClient *pGameClient, const CCollision *pCollision, int ClientId, vec2 Position, vec2 PrevVel, vec2 Vel, vec2 LookDir, bool InAir, vec2 &OutExtraDeformImpulse, float &OutExtraCompression)
+{
+	OutExtraDeformImpulse = vec2(0.0f, 0.0f);
+	OutExtraCompression = 0.0f;
+
+	const float WallImpact = DetectJellyWallImpact(pCollision, Position, PrevVel, Vel, InAir);
+	if(WallImpact > 0.0f)
+	{
+		const float BounceDir = PrevVel.x >= 0.0f ? -1.0f : 1.0f;
+		OutExtraDeformImpulse.x += BounceDir * WallImpact * 0.95f;
+		OutExtraCompression += WallImpact * 1.20f;
+	}
+
+	if(HasJellyHammerImpact(pGameClient, ClientId))
+	{
+		const float HitImpact = 1.05f;
+		const float HorizontalKick = absolute(Vel.x - PrevVel.x) > 0.05f ? std::clamp(Vel.x - PrevVel.x, -1.0f, 1.0f) : -LookDir.x;
+		OutExtraDeformImpulse.x += HorizontalKick * 0.80f * HitImpact;
+		OutExtraCompression += HitImpact;
+	}
 }
 
 void CPlayers::RenderHand(const CTeeRenderInfo *pInfo, vec2 CenterPos, vec2 Dir, float AngleOffset, vec2 PostRotOffset, float Alpha)
@@ -700,7 +770,10 @@ void CPlayers::RenderPlayer(
 	bool WantOtherDir = (Player.m_Direction == -1 && Vel.x > 0) || (Player.m_Direction == 1 && Vel.x < 0);
 	bool Inactive = ClientId >= 0 && (GameClient()->m_aClients[ClientId].m_Afk || GameClient()->m_aClients[ClientId].m_Paused);
 	const bool JellyEnabled = !GameClient()->m_BestClient.IsComponentDisabled(CBestClient::COMPONENT_VISUALS_JELLY_TEE);
-	const JellyTee JellyDeform = (JellyEnabled && rJelly) ? rJelly->GetDeform(ClientId, PrevVel, Vel, Direction, InAir, WantOtherDir, Client()->RenderFrameTime()) : JellyTee();
+	vec2 JellyExtraDeformImpulse;
+	float JellyExtraCompression = 0.0f;
+	BuildJellyExtraImpulse(GameClient(), Collision(), ClientId, Position, PrevVel, Vel, Direction, InAir, JellyExtraDeformImpulse, JellyExtraCompression);
+	const JellyTee JellyDeform = (JellyEnabled && rJelly) ? rJelly->GetDeform(ClientId, PrevVel, Vel, Direction, InAir, WantOtherDir, Client()->RenderFrameTime(), JellyExtraDeformImpulse, JellyExtraCompression) : JellyTee();
 
 	// evaluate animation
 	float WalkTime = std::fmod(Position.x, 100.0f) / 100.0f;
@@ -1233,7 +1306,10 @@ void CPlayers::RenderPlayerGhost(
 	bool WantOtherDir = (Player.m_Direction == -1 && Vel.x > 0) || (Player.m_Direction == 1 && Vel.x < 0);
 	bool Inactive = GameClient()->m_aClients[ClientId].m_Afk || GameClient()->m_aClients[ClientId].m_Paused;
 	const bool JellyEnabled = !GameClient()->m_BestClient.IsComponentDisabled(CBestClient::COMPONENT_VISUALS_JELLY_TEE);
-	const JellyTee JellyDeform = (JellyEnabled && rJelly) ? rJelly->GetDeform(ClientId, PrevVel, Vel, Direction, InAir, WantOtherDir, Client()->RenderFrameTime()) : JellyTee();
+	vec2 JellyExtraDeformImpulse;
+	float JellyExtraCompression = 0.0f;
+	BuildJellyExtraImpulse(GameClient(), Collision(), ClientId, Position, PrevVel, Vel, Direction, InAir, JellyExtraDeformImpulse, JellyExtraCompression);
+	const JellyTee JellyDeform = (JellyEnabled && rJelly) ? rJelly->GetDeform(ClientId, PrevVel, Vel, Direction, InAir, WantOtherDir, Client()->RenderFrameTime(), JellyExtraDeformImpulse, JellyExtraCompression) : JellyTee();
 
 	// evaluate animation
 	float WalkTime = std::fmod(Position.x, 100.0f) / 100.0f;
