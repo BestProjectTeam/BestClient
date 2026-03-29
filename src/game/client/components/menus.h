@@ -810,7 +810,10 @@ protected:
 	int64_t m_MenuSfxLastHoverTick = 0;
 	int64_t m_MenuSfxLastClickTick = 0;
 	bool m_MenuSfxLoaded = false;
+	bool m_MenuSfxOpenPlayed = false;
 	bool m_MenuSfxExitPlayed = false;
+	bool m_MenuSfxQuitPending = false;
+	int64_t m_MenuSfxQuitAt = 0;
 
 	IGraphics::CTextureHandle m_TextureBlob;
 	IGraphics::CTextureHandle m_MainMenuLogoTexture;
@@ -1018,6 +1021,7 @@ public:
 	void ForceRefreshLanPage();
 	void SetShowStart(bool ShowStart);
 	void ShowQuitPopup();
+	void QuitWithMenuSfx();
 	void JoinTutorial();
 
 private:

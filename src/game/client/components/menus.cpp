@@ -531,7 +531,7 @@ void CMenus::RenderMenubar(CUIRect Box, IClient::EClientState ClientState)
 		}
 		else
 		{
-			Client()->Quit();
+			QuitWithMenuSfx();
 		}
 	}
 	GameClient()->m_Tooltips.DoToolTip(&s_QuitButton, &Button, Localize("Quit"));
@@ -864,7 +864,7 @@ void CMenus::RenderLoading(const char *pCaption, const char *pContent, int Incre
 
 		if(Ui()->ConsumeHotkey(CUi::HOTKEY_ESCAPE))
 		{
-			Client()->Quit();
+			QuitWithMenuSfx();
 		}
 	}
 
@@ -877,6 +877,11 @@ void CMenus::FinishLoading()
 {
 	m_LoadingState.m_Current = 0;
 	m_LoadingState.m_Total = 0;
+	if(!m_MenuSfxOpenPlayed)
+	{
+		PlayMenuSfxSample(m_MenuSfxOpenSample);
+		m_MenuSfxOpenPlayed = true;
+	}
 }
 
 void CMenus::RenderNews(CUIRect MainView)
@@ -1001,8 +1006,10 @@ void CMenus::OnInit()
 	Graphics()->QuadContainerUpload(m_DirectionQuadContainerIndex);
 
 	LoadMenuSfx();
-	PlayMenuSfxSample(m_MenuSfxOpenSample);
+	m_MenuSfxOpenPlayed = false;
 	m_MenuSfxExitPlayed = false;
+	m_MenuSfxQuitPending = false;
+	m_MenuSfxQuitAt = 0;
 }
 
 void CMenus::ConchainBackgroundEntities(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData)
@@ -1646,7 +1653,7 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 			else
 			{
 				m_Popup = POPUP_NONE;
-				Client()->Quit();
+				QuitWithMenuSfx();
 			}
 		}
 	}
@@ -2746,6 +2753,8 @@ void CMenus::OnStateChange(int NewState, int OldState)
 		PlayMenuSfxSample(m_MenuSfxExitSample);
 		m_MenuSfxExitPlayed = true;
 	}
+	if(NewState == IClient::STATE_QUITTING || NewState == IClient::STATE_RESTARTING)
+		m_MenuSfxQuitPending = false;
 
 	if(OldState == IClient::STATE_ONLINE || OldState == IClient::STATE_OFFLINE)
 		TextRender()->DeleteTextContainer(m_MotdTextContainerIndex);
@@ -2790,6 +2799,13 @@ void CMenus::OnWindowResize()
 
 void CMenus::OnRender()
 {
+	if(m_MenuSfxQuitPending && time_get() >= m_MenuSfxQuitAt)
+	{
+		m_MenuSfxQuitPending = false;
+		Client()->Quit();
+		return;
+	}
+
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		SetActive(true);
 
@@ -3119,6 +3135,35 @@ void CMenus::SetShowStart(bool ShowStart)
 void CMenus::ShowQuitPopup()
 {
 	m_Popup = POPUP_QUIT;
+}
+
+void CMenus::QuitWithMenuSfx()
+{
+	if(Client()->State() == IClient::STATE_QUITTING || Client()->State() == IClient::STATE_RESTARTING)
+		return;
+
+	if(!m_MenuSfxLoaded)
+		LoadMenuSfx();
+
+	const bool CanDelayQuitForSfx = g_Config.m_SndEnable && g_Config.m_BcMenuSfx && m_MenuSfxExitSample >= 0;
+	if(CanDelayQuitForSfx)
+	{
+		if(!m_MenuSfxExitPlayed)
+		{
+			PlayMenuSfxSample(m_MenuSfxExitSample);
+			m_MenuSfxExitPlayed = true;
+		}
+
+		if(!m_MenuSfxQuitPending)
+		{
+			const float DelaySeconds = std::clamp(Sound()->GetSampleTotalTime(m_MenuSfxExitSample), 0.08f, 0.35f);
+			m_MenuSfxQuitAt = time_get() + (int64_t)(DelaySeconds * time_freq());
+			m_MenuSfxQuitPending = true;
+		}
+		return;
+	}
+
+	Client()->Quit();
 }
 
 void CMenus::JoinTutorial()

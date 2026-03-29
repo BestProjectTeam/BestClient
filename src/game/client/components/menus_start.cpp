@@ -97,7 +97,7 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 		}
 		else
 		{
-			Client()->Quit();
+			GameClient()->m_Menus.QuitWithMenuSfx();
 		}
 	}
 	ResetIconMode();
