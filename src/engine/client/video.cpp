@@ -19,6 +19,7 @@ extern "C" {
 #include <libswscale/swscale.h>
 };
 
+#include <algorithm>
 #include <chrono>
 #include <memory>
 #include <mutex>
@@ -33,6 +34,13 @@ static const enum AVColorSpace COLOR_SPACE = AVCOL_SPC_BT709;
 // wants an SWS_CS_* macro. Both sets of constants follow H.273 numbering
 // and hence agree, but we assert that they're equal here to be sure.
 static_assert(COLOR_SPACE == SWS_CS_ITU709);
+
+static int64_t DefaultVideoBitrate(int Width, int Height, int Fps)
+{
+	// Keep enough bitrate for sharp 2D content while avoiding extreme output sizes.
+	const int64_t RawBitrate = (int64_t)((double)Width * Height * Fps * 0.14 + 0.5);
+	return std::clamp<int64_t>(RawBitrate, 2'000'000, 50'000'000);
+}
 
 static LEVEL AvLevelToLogLevel(int Level)
 {
@@ -944,9 +952,9 @@ bool CVideo::AddStream(COutputStream *pStream, AVFormatContext *pFormatContext, 
 	}
 
 	case AVMEDIA_TYPE_VIDEO:
+	{
 		pContext->codec_id = CodecId;
 
-		pContext->bit_rate = 400000;
 		/* Resolution must be a multiple of two. */
 		pContext->width = m_Width;
 		pContext->height = m_Height % 2 == 0 ? m_Height : m_Height - 1;
@@ -973,14 +981,24 @@ bool CVideo::AddStream(COutputStream *pStream, AVFormatContext *pFormatContext, 
 			 * the motion of the chroma plane does not match the luma plane. */
 			pContext->mb_decision = 2;
 		}
-		if(CodecId == AV_CODEC_ID_H264)
+
+		const bool IsLibx264 = (*ppCodec)->name != nullptr && (str_comp((*ppCodec)->name, "libx264") == 0 || str_comp((*ppCodec)->name, "libx264rgb") == 0);
+		if(CodecId == AV_CODEC_ID_H264 && IsLibx264)
 		{
+			// CRF controls quality for x264, so don't constrain it with a fixed target bitrate.
+			pContext->bit_rate = 0;
+
 			static const char *s_apPresets[10] = {"ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow", "placebo"};
 			dbg_assert(g_Config.m_ClVideoX264Preset < (int)std::size(s_apPresets), "preset index invalid: %d", g_Config.m_ClVideoX264Preset);
 			dbg_assert(av_opt_set(pContext->priv_data, "preset", s_apPresets[g_Config.m_ClVideoX264Preset], 0) == 0, "invalid option");
 			dbg_assert(av_opt_set_int(pContext->priv_data, "crf", g_Config.m_ClVideoX264Crf, 0) == 0, "invalid option");
 		}
+		else
+		{
+			pContext->bit_rate = DefaultVideoBitrate(pContext->width, pContext->height, m_FPS);
+		}
 		break;
+	}
 
 	default:
 		break;
