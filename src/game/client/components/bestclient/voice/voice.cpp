@@ -781,16 +781,16 @@ constexpr float kVoiceMenuEnableRowHeight = 22.0f;
 constexpr float kVoiceMenuServerRowHeight = 22.0f;
 constexpr float kVoiceMenuServerRowGap = 3.0f;
 
-float VoiceMenuExpandedHeightForServerCount(int ServerCount)
+float VoiceMenuExpandedHeightForServerCount(int ServerCount, bool RadiusFilterEnabled)
 {
 	const int VisibleRows = std::clamp(ServerCount > 0 ? ServerCount : 1, 1, 2);
 	const float ServerListHeight = 2.0f + VisibleRows * kVoiceMenuServerRowHeight + maximum(0, VisibleRows - 1) * kVoiceMenuServerRowGap;
 	return
 		4.0f + 20.0f + // In-Game only checkbox row.
+		4.0f + 20.0f + // Radius filter checkbox row.
+		(RadiusFilterEnabled ? (3.0f + 20.0f) : 0.0f) + // Radius slider row.
 		4.0f + 18.0f + // Activation mode label.
 		3.0f + 22.0f + // Activation mode segmented control.
-		4.0f + 20.0f + // Radius filter checkbox row.
-		3.0f + 20.0f + // Radius slider row.
 		5.0f + 20.0f + 2.0f + 24.0f + // Microphone.
 		5.0f + 20.0f + 2.0f + 24.0f + // Headphones.
 		6.0f + 16.0f + // Status.
@@ -809,7 +809,8 @@ float CVoiceChat::GetMenuSettingsBlockHeight(float RevealPhase) const
 		kVoiceMenuTitleToEnableSpacing +
 		kVoiceMenuEnableRowHeight;
 	const int ServerCount = (int)m_vServerEntries.size();
-	const float ExpandedHeight = VoiceMenuExpandedHeightForServerCount(ServerCount);
+	const bool RadiusFilterEnabled = g_Config.m_BcVoiceChatRadiusEnabled != 0;
+	const float ExpandedHeight = VoiceMenuExpandedHeightForServerCount(ServerCount, RadiusFilterEnabled);
 	return HeaderHeight + ExpandedHeight * RevealPhase + kVoiceMenuOuterMargin * 2.0f;
 }
 
@@ -932,7 +933,8 @@ void CVoiceChat::RenderMenuSettingsBlock(const CUIRect &View, float RevealPhase)
 		return;
 
 	const int InitialServerCount = (int)m_vServerEntries.size();
-	const float ExpandedTargetHeight = VoiceMenuExpandedHeightForServerCount(InitialServerCount);
+	const bool RadiusFilterEnabled = g_Config.m_BcVoiceChatRadiusEnabled != 0;
+	const float ExpandedTargetHeight = VoiceMenuExpandedHeightForServerCount(InitialServerCount, RadiusFilterEnabled);
 	const float ExpandedVisibleHeight = ExpandedTargetHeight * RevealPhase;
 
 	CUIRect ExpandedVisible;
@@ -962,6 +964,22 @@ void CVoiceChat::RenderMenuSettingsBlock(const CUIRect &View, float RevealPhase)
 	}
 
 	AddExpandedSpacing(4.0f);
+	if(AddExpandedRow(20.0f, Row))
+	{
+		if(GameClient()->m_Menus.DoButton_CheckBox(&m_RadiusFilterButton, Localize("Radius filter"), g_Config.m_BcVoiceChatRadiusEnabled, &Row))
+			g_Config.m_BcVoiceChatRadiusEnabled ^= 1;
+	}
+
+	if(g_Config.m_BcVoiceChatRadiusEnabled)
+	{
+		AddExpandedSpacing(3.0f);
+		if(AddExpandedRow(20.0f, Row))
+		{
+			Ui()->DoScrollbarOption(&g_Config.m_BcVoiceChatRadiusTiles, &g_Config.m_BcVoiceChatRadiusTiles, &Row, Localize("Radius (tiles)"), 1, 500);
+		}
+	}
+
+	AddExpandedSpacing(4.0f);
 	if(AddExpandedRow(18.0f, Row))
 		Ui()->DoLabel(&Row, Localize("Activation mode"), 14.0f, TEXTALIGN_ML);
 	AddExpandedSpacing(3.0f);
@@ -977,19 +995,6 @@ void CVoiceChat::RenderMenuSettingsBlock(const CUIRect &View, float RevealPhase)
 			g_Config.m_BcVoiceChatActivationMode = 0;
 		if(GameClient()->m_Menus.DoButton_Menu(&s_ModePttButton, Localize("Push-to-talk"), Ptt, &Right, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
 			g_Config.m_BcVoiceChatActivationMode = 1;
-	}
-
-	AddExpandedSpacing(4.0f);
-	if(AddExpandedRow(20.0f, Row))
-	{
-		if(GameClient()->m_Menus.DoButton_CheckBox(&m_RadiusFilterButton, Localize("Radius filter"), g_Config.m_BcVoiceChatRadiusEnabled, &Row))
-			g_Config.m_BcVoiceChatRadiusEnabled ^= 1;
-	}
-
-	AddExpandedSpacing(3.0f);
-	if(AddExpandedRow(20.0f, Row))
-	{
-		Ui()->DoScrollbarOption(&g_Config.m_BcVoiceChatRadiusTiles, &g_Config.m_BcVoiceChatRadiusTiles, &Row, Localize("Radius (tiles)"), 1, 500);
 	}
 
 	AddExpandedSpacing(5.0f);
@@ -3842,7 +3847,15 @@ void CVoiceChat::RenderSettingsSection(CUIRect View)
 	// Simplified settings: enable, mode, devices (+ server list below).
 	{
 		CUIRect OptionsCard;
-		const float OptionsInnerHeight = 28.0f + 4.0f + 24.0f + 4.0f + 28.0f + 4.0f + 24.0f + 4.0f + 20.0f + 4.0f + 24.0f + 4.0f + 24.0f;
+		const bool RadiusFilterEnabled = g_Config.m_BcVoiceChatRadiusEnabled != 0;
+		const float OptionsInnerHeight =
+			28.0f + 4.0f + // Voice on/off.
+			24.0f + 4.0f + // In-Game Only.
+			24.0f + // Radius checkbox.
+			(RadiusFilterEnabled ? (4.0f + 20.0f) : 0.0f) + // Radius slider.
+			4.0f + 28.0f + // Mode.
+			4.0f + 24.0f + // Microphone.
+			4.0f + 24.0f; // Headphones.
 		const float OptionsHeight = OptionsInnerHeight + 20.0f;
 		View.HSplitTop(OptionsHeight, &OptionsCard, &View);
 		OptionsCard.Draw(VoiceCardBgColor(), IGraphics::CORNER_ALL, 6.0f);
@@ -3913,18 +3926,21 @@ void CVoiceChat::RenderSettingsSection(CUIRect View)
 			g_Config.m_BcVoiceChatInGameOnly ^= 1;
 
 		AddSpacing(4.0f);
-		Options.HSplitTop(28.0f, &Row, &Options);
-		if(GameClient()->m_Menus.DoButton_Menu(&m_ActivationModeButton, g_Config.m_BcVoiceChatActivationMode == 1 ? Localize("Mode: Push-to-talk") : Localize("Mode: Automatic activation"), 0, &Row))
-			g_Config.m_BcVoiceChatActivationMode = g_Config.m_BcVoiceChatActivationMode == 1 ? 0 : 1;
-
-		AddSpacing(4.0f);
 		Options.HSplitTop(24.0f, &Row, &Options);
 		if(GameClient()->m_Menus.DoButton_CheckBox(&m_RadiusFilterButton, Localize("Radius filter"), g_Config.m_BcVoiceChatRadiusEnabled, &Row))
 			g_Config.m_BcVoiceChatRadiusEnabled ^= 1;
 
+		if(g_Config.m_BcVoiceChatRadiusEnabled)
+		{
+			AddSpacing(4.0f);
+			Options.HSplitTop(20.0f, &Row, &Options);
+			Ui()->DoScrollbarOption(&g_Config.m_BcVoiceChatRadiusTiles, &g_Config.m_BcVoiceChatRadiusTiles, &Row, Localize("Radius (tiles)"), 1, 500);
+		}
+
 		AddSpacing(4.0f);
-		Options.HSplitTop(20.0f, &Row, &Options);
-		Ui()->DoScrollbarOption(&g_Config.m_BcVoiceChatRadiusTiles, &g_Config.m_BcVoiceChatRadiusTiles, &Row, Localize("Radius (tiles)"), 1, 500);
+		Options.HSplitTop(28.0f, &Row, &Options);
+		if(GameClient()->m_Menus.DoButton_Menu(&m_ActivationModeButton, g_Config.m_BcVoiceChatActivationMode == 1 ? Localize("Mode: Push-to-talk") : Localize("Mode: Automatic activation"), 0, &Row))
+			g_Config.m_BcVoiceChatActivationMode = g_Config.m_BcVoiceChatActivationMode == 1 ? 0 : 1;
 
 		AddSpacing(4.0f);
 		Options.HSplitTop(24.0f, &Row, &Options);
