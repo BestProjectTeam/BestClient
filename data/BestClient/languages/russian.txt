@@ -338,12 +338,6 @@ Reset position of mouse when opening bindwheel
 Warlist
 == Список войн
 
-Name
-== Игрок
-
-Clan
-== Клан
-
 War Entries
 == Игроки & Кланы
 
@@ -941,13 +935,13 @@ Backward
 == Назад
 
 Dynamic FOV
-== Динамический FOV
+== Динамический угол обзора
 
 Dynamic FOV amount
-== Сила динамического FOV
+== Сила динамического угла обзора
 
 Dynamic FOV smoothness
-== Плавность динамического FOV
+== Плавность динамического угла обзора
 
 [[red]] This feature is disabled on this server
 == [[red]] На этих серверах это запрещено
@@ -1036,14 +1030,8 @@ Mixed
 Size
 == Размер
 
-Speed
-== Скорость
-
 Alpha
 == Прозрачность
-
-Color
-== Цвет
 
 Glow
 == Свечение

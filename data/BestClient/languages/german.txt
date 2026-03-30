@@ -562,7 +562,7 @@ Tee
 == 
 
 Speed
-== 
+== Geschwindigkeit
 
 Tee trail color
 == 
@@ -580,7 +580,7 @@ Background Draw
 == 
 
 Color
-== 
+== Farbe
 
 Time until strokes disappear
 == 
@@ -784,7 +784,7 @@ Remove Item
 == 
 
 BestClient Links
-== 
+== BestClient-Links
 
 Discord
 == 
@@ -799,19 +799,19 @@ Support ♥
 == 
 
 Config Files
-== 
+== Konfigurationsdateien
 
 BestClient Settings
-== 
+== BestClient-Einstellungen
 
 Profiles
 == 
 
 BestClient Developers
-== 
+== BestClient-Entwickler
 
 Hide Settings Tabs
-== 
+== Einstellungs-Tabs ausblenden
 
 Integration
 == 
@@ -1044,14 +1044,8 @@ Mixed
 Size
 == Größe
 
-Speed
-== Geschwindigkeit
-
 Alpha
 == Alpha
-
-Color
-== Farbe
 
 Glow
 == Leuchten
