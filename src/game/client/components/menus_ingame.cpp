@@ -371,6 +371,120 @@ void CMenus::RenderGame(CUIRect MainView)
 			}
 		}
 	}
+
+	if(!g_Config.m_ClTouchControls || !GameClient()->m_TouchControls.IsEditingActive())
+	{
+		RenderEscPlayersCarousel(MainView);
+	}
+}
+
+void CMenus::RenderEscPlayersCarousel(CUIRect MainView)
+{
+	CUIRect Panel = MainView;
+	const float PanelHeight = minimum(118.0f, MainView.h);
+	if(PanelHeight <= 0.0f)
+		return;
+	Panel.HSplitTop(PanelHeight, &Panel, nullptr);
+	Panel.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.8f), IGraphics::CORNER_B, 10.0f);
+	Panel.Margin(10.0f, &Panel);
+
+	int aPlayerIds[MAX_CLIENTS];
+	int NumPlayers = 0;
+	for(const auto &pInfoByName : GameClient()->m_Snap.m_apInfoByName)
+	{
+		if(!pInfoByName)
+			continue;
+
+		const int ClientId = pInfoByName->m_ClientId;
+		if(ClientId < 0 || ClientId >= MAX_CLIENTS || !GameClient()->m_aClients[ClientId].m_Active)
+			continue;
+
+		aPlayerIds[NumPlayers] = ClientId;
+		NumPlayers++;
+	}
+
+	if(NumPlayers == 0)
+	{
+		Ui()->DoLabel(&Panel, Localize("No players"), 12.0f, TEXTALIGN_MC);
+		return;
+	}
+
+	CUIRect NamesRow, SkinsRow, SliderRow;
+	Panel.HSplitTop(16.0f, &NamesRow, &Panel);
+	Panel.HSplitTop(70.0f, &SkinsRow, &Panel);
+	Panel.HSplitTop(6.0f, nullptr, &Panel);
+	Panel.HSplitTop(12.0f, &SliderRow, nullptr);
+
+	const float ItemWidth = 72.0f;
+	const float ItemSpacing = 8.0f;
+	const float ItemStep = ItemWidth + ItemSpacing;
+	const float ContentWidth = NumPlayers * ItemWidth + maximum(0, NumPlayers - 1) * ItemSpacing;
+	const float MaxScrollPx = maximum(0.0f, ContentWidth - SkinsRow.w);
+	m_EscPlayersCarouselScroll = std::clamp(m_EscPlayersCarouselScroll, 0.0f, 1.0f);
+	if(MaxScrollPx <= 0.0f)
+		m_EscPlayersCarouselScroll = 0.0f;
+	const float ScrollPx = m_EscPlayersCarouselScroll * MaxScrollPx;
+
+	for(int i = 0; i < NumPlayers; i++)
+	{
+		const int ClientId = aPlayerIds[i];
+		const float ItemX = SkinsRow.x + i * ItemStep - ScrollPx;
+		if(ItemX + ItemWidth < SkinsRow.x || ItemX > SkinsRow.x + SkinsRow.w)
+			continue;
+
+		CUIRect NameRect = {ItemX, NamesRow.y, ItemWidth, NamesRow.h};
+		SLabelProperties LabelProps;
+		LabelProps.m_MaxWidth = NameRect.w;
+		LabelProps.m_EllipsisAtEnd = true;
+		Ui()->DoLabel(&NameRect, GameClient()->m_aClients[ClientId].m_aName, 10.0f, TEXTALIGN_MC, LabelProps);
+
+		CUIRect SkinSlot = {ItemX, SkinsRow.y, ItemWidth, SkinsRow.h};
+		CUIRect SkinButton = SkinSlot;
+		const float CircleSize = minimum(SkinSlot.w, SkinSlot.h - 4.0f);
+		SkinButton.w = CircleSize;
+		SkinButton.h = CircleSize;
+		SkinButton.x = SkinSlot.x + (SkinSlot.w - CircleSize) / 2.0f;
+		SkinButton.y = SkinSlot.y + (SkinSlot.h - CircleSize) / 2.0f;
+
+		const bool IsLocal =
+			GameClient()->m_aLocalIds[0] == ClientId ||
+			(Client()->DummyConnected() && GameClient()->m_aLocalIds[1] == ClientId);
+
+		const int ButtonResult = Ui()->DoButtonLogic(&m_aEscPlayersCarouselButtons[ClientId], 0, &SkinButton, BUTTONFLAG_LEFT | BUTTONFLAG_RIGHT);
+		const bool Hot = Ui()->HotItem() == &m_aEscPlayersCarouselButtons[ClientId];
+		SkinButton.Draw(IsLocal ? ColorRGBA(0.35f, 0.55f, 0.35f, 0.5f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.22f), IGraphics::CORNER_ALL, SkinButton.h / 2.0f);
+		if(Hot)
+		{
+			SkinButton.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.25f), IGraphics::CORNER_ALL, SkinButton.h / 2.0f);
+		}
+
+		CTeeRenderInfo TeeInfo = GameClient()->m_aClients[ClientId].m_RenderInfo;
+		if(TeeInfo.Valid())
+		{
+			TeeInfo.m_Size = SkinButton.h * 0.88f;
+			vec2 OffsetToMid;
+			CRenderTools::GetRenderTeeOffsetToRenderedTee(CAnimState::GetIdle(), &TeeInfo, OffsetToMid);
+			const vec2 TeeRenderPos = vec2(SkinButton.Center().x, SkinButton.Center().y + OffsetToMid.y);
+			RenderTools()->RenderTee(CAnimState::GetIdle(), &TeeInfo, EMOTE_NORMAL, vec2(1.0f, 0.0f), TeeRenderPos);
+		}
+
+		if(ButtonResult != 0)
+		{
+			const CNetObj_PlayerInfo *pPlayerInfo = GameClient()->m_Snap.m_apPlayerInfos[ClientId];
+			const bool IsSpectating = pPlayerInfo && pPlayerInfo->m_Team == TEAM_SPECTATORS;
+			GameClient()->m_Scoreboard.OpenPlayerPopup(ClientId, IsSpectating, Ui()->MouseX(), Ui()->MouseY());
+		}
+	}
+
+	if(MaxScrollPx > 0.0f)
+	{
+		const float NewRel = Ui()->DoScrollbarH(&m_EscPlayersCarouselSlider, &SliderRow, m_EscPlayersCarouselScroll);
+		m_EscPlayersCarouselScroll = std::clamp(NewRel, 0.0f, 1.0f);
+	}
+	else
+	{
+		SliderRow.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.2f), IGraphics::CORNER_ALL, SliderRow.h / 2.0f);
+	}
 }
 
 void CMenus::PopupConfirmDisconnect()

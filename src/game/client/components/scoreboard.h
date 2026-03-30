@@ -108,6 +108,7 @@ public:
 	bool OnInput(const IInput::CEvent &Event) override;
 
 	bool IsActive() const;
+	void OpenPlayerPopup(int ClientId, bool IsSpectating, float PopupX, float PopupY);
 };
 
 #endif

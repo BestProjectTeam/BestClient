@@ -433,6 +433,9 @@ protected:
 	CLineInputBuffered<VOTE_REASON_LENGTH> m_CallvoteReasonInput;
 	CLineInputBuffered<64> m_FilterInput;
 	bool m_ControlPageOpening;
+	float m_EscPlayersCarouselScroll = 0.0f;
+	CButtonContainer m_EscPlayersCarouselSlider;
+	CButtonContainer m_aEscPlayersCarouselButtons[MAX_CLIENTS];
 
 	// demo
 	enum
@@ -680,6 +683,7 @@ protected:
 	void PopupCancelChangeSelectedButton();
 	void PopupConfirmTurnOffEditor();
 	void PopupConfirmOpenWiki();
+	void RenderEscPlayersCarousel(CUIRect MainView);
 	void RenderPlayers(CUIRect MainView);
 	void RenderServerInfo(CUIRect MainView);
 	void RenderServerInfoMotd(CUIRect Motd);

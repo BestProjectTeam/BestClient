@@ -128,6 +128,22 @@ float CScoreboard::GetPopupHeight(int ClientId, bool IsLocal, bool IsSpectating)
 	return Height;
 }
 
+void CScoreboard::OpenPlayerPopup(int ClientId, bool IsSpectating, float PopupX, float PopupY)
+{
+	if(ClientId < 0 || ClientId >= MAX_CLIENTS || !GameClient()->m_aClients[ClientId].m_Active)
+		return;
+
+	m_ScoreboardPopupContext.m_pScoreboard = this;
+	m_ScoreboardPopupContext.m_ClientId = ClientId;
+	m_ScoreboardPopupContext.m_IsLocal = GameClient()->m_aLocalIds[0] == ClientId ||
+					     (Client()->DummyConnected() && GameClient()->m_aLocalIds[1] == ClientId);
+	m_ScoreboardPopupContext.m_IsSpectating = IsSpectating;
+
+	Ui()->DoPopupMenu(&m_ScoreboardPopupContext, PopupX, PopupY, 110.0f,
+		GetPopupHeight(m_ScoreboardPopupContext.m_ClientId, m_ScoreboardPopupContext.m_IsLocal, m_ScoreboardPopupContext.m_IsSpectating),
+		&m_ScoreboardPopupContext, CScoreboardPopupContext::Render);
+}
+
 void CScoreboard::SetUiMousePos(vec2 Pos)
 {
 	const vec2 WindowSize = vec2(Graphics()->WindowWidth(), Graphics()->WindowHeight());
@@ -504,15 +520,7 @@ void CScoreboard::RenderSpectators(CUIRect Spectators)
 			}
 			if(ButtonResult != 0)
 			{
-				m_ScoreboardPopupContext.m_pScoreboard = this;
-				m_ScoreboardPopupContext.m_ClientId = pInfo->m_ClientId;
-				m_ScoreboardPopupContext.m_IsLocal = GameClient()->m_aLocalIds[0] == pInfo->m_ClientId ||
-								     (Client()->DummyConnected() && GameClient()->m_aLocalIds[1] == pInfo->m_ClientId);
-				m_ScoreboardPopupContext.m_IsSpectating = true;
-
-				Ui()->DoPopupMenu(&m_ScoreboardPopupContext, Ui()->MouseX(), Ui()->MouseY(), 110.0f,
-					GetPopupHeight(m_ScoreboardPopupContext.m_ClientId, m_ScoreboardPopupContext.m_IsLocal, m_ScoreboardPopupContext.m_IsSpectating),
-					&m_ScoreboardPopupContext, CScoreboardPopupContext::Render);
+				OpenPlayerPopup(pInfo->m_ClientId, true, Ui()->MouseX(), Ui()->MouseY());
 			}
 
 			if(Ui()->HotItem() == &m_aPlayers[pInfo->m_ClientId].m_PlayerButtonId ||
@@ -758,15 +766,7 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 				const int ButtonResult = Ui()->DoButtonLogic(&m_aPlayers[pInfo->m_ClientId].m_PlayerButtonId, 0, &Row, BUTTONFLAG_LEFT | BUTTONFLAG_RIGHT);
 				if(ButtonResult != 0)
 				{
-					m_ScoreboardPopupContext.m_pScoreboard = this;
-					m_ScoreboardPopupContext.m_ClientId = pInfo->m_ClientId;
-					m_ScoreboardPopupContext.m_IsLocal = GameClient()->m_aLocalIds[0] == pInfo->m_ClientId ||
-									     (Client()->DummyConnected() && GameClient()->m_aLocalIds[1] == pInfo->m_ClientId);
-					m_ScoreboardPopupContext.m_IsSpectating = false;
-
-					Ui()->DoPopupMenu(&m_ScoreboardPopupContext, Ui()->MouseX(), Ui()->MouseY(), 110.0f,
-						GetPopupHeight(m_ScoreboardPopupContext.m_ClientId, m_ScoreboardPopupContext.m_IsLocal, m_ScoreboardPopupContext.m_IsSpectating),
-						&m_ScoreboardPopupContext, CScoreboardPopupContext::Render);
+					OpenPlayerPopup(pInfo->m_ClientId, false, Ui()->MouseX(), Ui()->MouseY());
 				}
 
 				if(Ui()->HotItem() == &m_aPlayers[pInfo->m_ClientId].m_PlayerButtonId ||
