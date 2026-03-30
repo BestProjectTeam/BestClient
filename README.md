@@ -15,8 +15,8 @@
 
 ## About
 
-BestClient is a customized DDNet client focused on comfort, utility and visual control.
-It extends the base client with extra HUD tools, prediction tweaks, bind helpers, profile features and interface improvements that are useful in both everyday play and more competitive situations.
+BestClient is a customized DDNet client focused on comfort, utility and full control over gameplay and visuals.
+It extends the base client with native BestClient systems like Camera Drift, Dynamic FOV, Jelly Tee, 3D/Magic particles, Afterimage, Hook Combo, Fast Input/Low Delta, Snap Tap, Focus Mode, Voice Chat, Chat Media, Client Indicator, plus built-in Editors, Shop and Fun tabs.
 
 ## Links
 
