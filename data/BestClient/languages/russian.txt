@@ -338,12 +338,6 @@ Reset position of mouse when opening bindwheel
 Warlist
 == Список войн
 
-Name
-== Игрок
-
-Clan
-== Клан
-
 War Entries
 == Игроки & Кланы
 
@@ -941,13 +935,13 @@ Backward
 == Назад
 
 Dynamic FOV
-== Динамический FOV
+== Динамический угол обзора
 
 Dynamic FOV amount
-== Сила динамического FOV
+== Сила динамического угла обзора
 
 Dynamic FOV smoothness
-== Плавность динамического FOV
+== Плавность динамического угла обзора
 
 Afterimage
 == Афтеримедж
@@ -1033,14 +1027,8 @@ Mixed
 Size
 == Размер
 
-Speed
-== Скорость
-
 Alpha
 == Прозрачность
-
-Color
-== Цвет
 
 Glow
 == Свечение
@@ -1109,7 +1097,7 @@ Gameplay
 == Геймплей
 
 Others
-== Другое
+== Прочее
 
 Fun
 == Игры
@@ -1119,12 +1107,6 @@ Shop
 
 Editors
 == Редакторы
-
-Info
-== Инфо
-
-BestClient Links
-== Ссылки BestClient
 
 Telegram
 == Телеграм
@@ -1143,18 +1125,6 @@ Update downloaded
 
 Update failed
 == Ошибка обновления
-
-Config Files
-== Файлы конфигурации
-
-BestClient Settings
-== Настройки BestClient
-
-BestClient Developers
-== Разработчики BestClient
-
-Hide Settings Tabs
-== Скрыть вкладки настроек
 
 Search
 == Поиск
@@ -1355,7 +1325,7 @@ Close
 == Закрыть
 
 Color mode
-== Режим цвета
+== Цветовой режим
 
 Components editor
 == Редактор компонентов
@@ -1436,7 +1406,7 @@ Enable
 == Включить
 
 Enable Jelly Tee
-== Включить Jelly Tee
+== Включить желейного тии
 
 Enable animations
 == Включить анимации
@@ -1445,7 +1415,7 @@ Enable fullscreen media viewer in chat
 == Включить полноэкранный просмотр медиа в чате
 
 Enable gores mode
-== Включить режим gores
+== Включить режим кровавых эффектов
 
 Enable music player
 == Включить музыкальный плеер
@@ -1514,7 +1484,7 @@ Glow offset
 == Смещение свечения
 
 Gores mode
-== Режим gores
+== Режим кровавых эффектов
 
 Grid Size
 == Размер сетки
@@ -1541,10 +1511,10 @@ Hook combo
 == Хук-комбо
 
 Hook combo size
-== Размер hook combo
+== Размер хук-комбо
 
 Hook combo sound volume
-== Громкость звука hook combo
+== Громкость звука хук-комбо
 
 Hours
 == Часы
@@ -1559,16 +1529,16 @@ Installed and applied
 == Установлено и применено
 
 Jelly Others
-== Jelly для других
+== Желе для других
 
 Jelly Tee
 == Желейный тии
 
 Jelly duration
-== Длительность jelly
+== Длительность желе
 
 Jelly strength
-== Сила jelly
+== Сила желе
 
 Killfeed animation
 == Анимация киллфида
@@ -1646,7 +1616,7 @@ No assets found on this page
 == На этой странице ассеты не найдены
 
 No media files in backgrounds folder
-== В папке backgrounds нет медиафайлов
+== В папке фонов нет медиафайлов
 
 No space for blocks
 == Нет места для блоков
@@ -1660,15 +1630,6 @@ Object Balls
 Open a dedicated component toggles page.
 == Открыть отдельную страницу переключения компонентов.
 
-Hook combo
-== Хук-комбо
-
-Jelly Tee
-== Желейный тии
-
-Command
-== Команда
-
 Snap Tap
 == Снэп-тап
 
@@ -1679,128 +1640,26 @@ eco-freeze chimera
 == Эко-фриз химера
 
 true low delta
-== Истинная low delta
+== Настоящая низкая дельта
 
 Visuals
 == Отображение
-
-Others
-== Прочее
-
-Enable Jelly Tee
-== Включить желейного тии
 
 Sub-Tick aiming
 == Субтиковое наведение
 
 low delta others
 == Низкая дельта для остальных
-
-true low delta
-== Настоящая низкая дельта
-
-Visuals
-== Отображение
-
-Others
-== Прочее
-
-Enable Jelly Tee
-== Включить желейного тии
-
-Sub-Tick aiming
-== Субтиковое наведение
-
-low delta others
-== Низкая дельта для остальных
-
-true low delta
-== Настоящая низкая дельта
 
 ##### bestclient terminal overrides #####
 
-Visuals
-== Отображение
-
-Others
-== Прочее
-
-Enable Jelly Tee
-== Включить желейного тии
-
-No media files in backgrounds folder
-== В папке фонов нет медиафайлов
-
-Sub-Tick aiming
-== Субтиковое наведение
-
-low delta others
-== Низкая дельта для остальных
-
-true low delta
-== Настоящая низкая дельта
-
 ##### bestclient final overrides #####
-
-Visuals
-== Отображение
-
-Others
-== Прочее
-
-Info
-== Информация
-
-Hook combo
-== Хук-комбо
-
-Hook combo size
-== Размер хук-комбо
-
-Hook combo sound volume
-== Громкость звука хук-комбо
-
-Jelly Tee
-== Желейный тии
-
-Enable Jelly Tee
-== Включить желейного тии
-
-Jelly Others
-== Желе для других
-
-Jelly strength
-== Сила желе
-
-Jelly duration
-== Длительность желе
-
-Music Player
-== Музыкальный плеер
-
-Color mode
-== Цветовой режим
 
 Static color
 == Статичный цвет
 
-Cover accent color
-== Акцентный цвет обложки
-
-Dominant cover color
-== Доминирующий цвет обложки
-
-Enable visualizer
-== Включить визуализатор
-
 Visualizer mode
 == Режим визуализатора
-
-Center
-== По центру
-
-Map offset
-== Смещение карты
 
 Disabled.
 == Отключено.
@@ -1813,36 +1672,6 @@ hammer
 
 hook&hammer
 == хук и молоток
-
-Dynamic FOV
-== Динамический угол обзора
-
-Dynamic FOV amount
-== Сила динамического угла обзора
-
-Dynamic FOV smoothness
-== Плавность динамического угла обзора
-
-Gores mode
-== Режим кровавых эффектов
-
-Enable gores mode
-== Включить режим кровавых эффектов
-
-Command
-== Команда
-
-Snap Tap
-== Снэп-тап
-
-low delta others
-== Низкая дельта для остальных
-
-true low delta
-== Настоящая низкая дельта
-
-Sub-Tick aiming
-== Субтиковое наведение
 
 UI scale
 == Масштаб интерфейса
@@ -1906,9 +1735,6 @@ No media selected.
 
 Failed while decoding video.
 == Ошибка при декодировании видео.
-
-Disabled.
-== Отключено.
 
 Save asset before closing?
 == Сохранить ассет перед закрытием?
@@ -2009,20 +1835,8 @@ Exported to %s
 %s from %s
 == %s из %s
 
-Emoticons
-== Эмотиконы
-
-Entities
-== Сущности
-
-Particles
-== Частицы
-
 Extras
 == Дополнения
-
-Game
-== Игра
 
 Optimizer
 == Оптимизатор
@@ -2132,9 +1946,6 @@ Show real hitbox
 Simplified UNO: colors and numbers 0-9
 == Упрощённое UNO: цвета и числа 0-9
 
-Snap Tap
-== Snap Tap
-
 Solved
 == Решено
 
@@ -2149,15 +1960,6 @@ Start Level
 
 Start Speed
 == Стартовая скорость
-
-Static color
-== Статичный цвет
-
-Sub-Tick aiming
-== Sub-Tick наведение
-
-Sweat Weapon
-== Sweat Weapon
 
 Table cleared
 == Стол очищен
@@ -2180,9 +1982,6 @@ Turn: X
 Turn: Yellow
 == Ход: жёлтые
 
-UI scale
-== Масштаб UI
-
 Unable to install asset
 == Не удалось установить ассет
 
@@ -2201,17 +2000,11 @@ Viewer max zoom
 Visible area (%)
 == Видимая область (%)
 
-Visualizer mode
-== Режим визуализатора
-
 Visualizer sensitivity
 == Чувствительность визуализатора
 
 Visualizer smoothing
 == Сглаживание визуализатора
-
-Visuals
-== Визуал
 
 Voice panel
 == Голосовая панель
@@ -2245,42 +2038,3 @@ You hit a cactus
 
 You win
 == Вы победили
-
-eco-freeze chimera
-== eco-freeze chimera
-
-low delta others
-== low delta для остальных
-
-true low delta
-== true low delta
-
-Snap Tap
-== Снэп-тап
-
-Sweat Weapon
-== Потное оружие
-
-eco-freeze chimera
-== Эко-фриз химера
-
-true low delta
-== Истинная low delta
-
-Visuals
-== Отображение
-
-Others
-== Прочее
-
-Enable Jelly Tee
-== Включить желейного тии
-
-Sub-Tick aiming
-== Субтиковое наведение
-
-low delta others
-== Низкая дельта для остальных
-
-true low delta
-== Настоящая низкая дельта
