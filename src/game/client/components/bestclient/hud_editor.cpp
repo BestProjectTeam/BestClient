@@ -32,14 +32,12 @@ bool IsEditorModule(HudLayout::EModule Module)
 	return Module == HudLayout::MODULE_CHAT ||
 	       Module == HudLayout::MODULE_VOICE_TALKERS ||
 	       Module == HudLayout::MODULE_VOICE_STATUS ||
-	       Module == HudLayout::MODULE_VOTES ||
-	       Module == HudLayout::MODULE_MUSIC_PLAYER;
+	       Module == HudLayout::MODULE_VOTES;
 }
 
 bool IsLivePreviewModule(HudLayout::EModule Module)
 {
-	return Module == HudLayout::MODULE_MUSIC_PLAYER ||
-		Module == HudLayout::MODULE_CHAT ||
+	return Module == HudLayout::MODULE_CHAT ||
 		Module == HudLayout::MODULE_VOTES ||
 		Module == HudLayout::MODULE_VOICE_TALKERS ||
 		Module == HudLayout::MODULE_VOICE_STATUS;
@@ -282,7 +280,6 @@ void CHudEditor::CollectModuleVisuals(SModuleVisual *pOut, int &Count) const
 		pOut[Count++] = GetModuleVisual(Module);
 	};
 
-	AddModule(HudLayout::MODULE_MUSIC_PLAYER);
 	AddModule(HudLayout::MODULE_CHAT);
 	AddModule(HudLayout::MODULE_VOTES);
 	AddModule(HudLayout::MODULE_VOICE_TALKERS);
@@ -450,12 +447,10 @@ void CHudEditor::RenderModuleOutline(const SModuleVisual &Visual, bool Hovered, 
 void CHudEditor::RenderModuleLabel(const SModuleVisual &Visual) const
 {
 	char aLabel[96];
-	const bool MusicDisabled = Visual.m_Module == HudLayout::MODULE_MUSIC_PLAYER && !IsMusicPlayerEnabled(GameClient());
-	const char *pName = MusicDisabled ? "Game Timer" : HudLayout::Name(Visual.m_Module);
 	if(Visual.m_Editable)
-		str_format(aLabel, sizeof(aLabel), "%s", pName);
+		str_format(aLabel, sizeof(aLabel), "%s", HudLayout::Name(Visual.m_Module));
 	else
-		str_format(aLabel, sizeof(aLabel), "%s (%s)", pName, Localize("preview"));
+		str_format(aLabel, sizeof(aLabel), "%s (%s)", HudLayout::Name(Visual.m_Module), Localize("preview"));
 
 	const float Width = HudWidth();
 	const float Height = HudHeight();
@@ -509,9 +504,7 @@ void CHudEditor::RenderModulePreview(const SModuleVisual &Visual) const
 	if(Rect.w <= 0.0f || Rect.h <= 0.0f)
 		return;
 
-	const bool MusicEnabled = IsMusicPlayerEnabled(GameClient());
-	const bool LivePreview = IsLivePreviewModule(Visual.m_Module) &&
-				 !(Visual.m_Module == HudLayout::MODULE_MUSIC_PLAYER && !MusicEnabled);
+	const bool LivePreview = IsLivePreviewModule(Visual.m_Module);
 	ColorRGBA Fill = Visual.m_Editable ? ColorRGBA(0.22f, 0.37f, 0.56f, 0.26f) : ColorRGBA(0.25f, 0.25f, 0.25f, 0.22f);
 	if(LivePreview)
 		Fill = Visual.m_Editable ? ColorRGBA(0.22f, 0.37f, 0.56f, 0.10f) : ColorRGBA(0.25f, 0.25f, 0.25f, 0.08f);
@@ -537,12 +530,6 @@ void CHudEditor::RenderModulePreview(const SModuleVisual &Visual) const
 	if(Visual.m_Module == HudLayout::MODULE_CHAT)
 	{
 		RenderChatExtraPreview(Visual);
-		return;
-	}
-	if(Visual.m_Module == HudLayout::MODULE_MUSIC_PLAYER && !MusicEnabled)
-	{
-		CUIRect TimerRect = Rect;
-		Ui()->DoLabel(&TimerRect, "00:37", 8.0f, TEXTALIGN_MC);
 		return;
 	}
 	if(Visual.m_Module == HudLayout::MODULE_VOTES)
@@ -669,10 +656,6 @@ void CHudEditor::RenderOverlay(vec2 MousePos)
 	Graphics()->DrawRect(0.0f, 0.0f, Width, Height, ColorRGBA(0.0f, 0.0f, 0.0f, 0.38f), IGraphics::CORNER_ALL, 0.0f);
 
 	// Draw true HUD previews first, then add interactive editor overlays on top.
-	const bool MusicEnabled = IsMusicPlayerEnabled(GameClient());
-	if(MusicEnabled)
-		GameClient()->m_MusicPlayer.RenderHudEditor(false);
-
 	GameClient()->m_Chat.RenderHud(true);
 	GameClient()->m_Voting.RenderHud(true);
 	GameClient()->m_VoiceChat.RenderHudTalkingIndicator(Width, Height, true);

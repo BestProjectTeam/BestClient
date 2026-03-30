@@ -90,14 +90,7 @@ SModuleLayout ConfigLayout(EModule Module)
 	switch(Module)
 	{
 	case MODULE_MUSIC_PLAYER:
-	{
-		// Keep old default configs visually centered after the music HUD width scaling adjustments.
-		const bool LegacyDefault = g_Config.m_BcHudMusicPlayerX == 184 &&
-			g_Config.m_BcHudMusicPlayerY == 2 &&
-			g_Config.m_BcHudMusicPlayerScale == 100;
-		const float X = LegacyDefault ? gs_aModuleLayouts[Module].m_X : (float)g_Config.m_BcHudMusicPlayerX;
-		return {X, (float)g_Config.m_BcHudMusicPlayerY, g_Config.m_BcHudMusicPlayerScale, 0, gs_aModuleLayouts[Module].m_BackgroundEnabled, gs_aModuleLayouts[Module].m_BackgroundColor};
-	}
+		return gs_aModuleLayouts[Module];
 	case MODULE_VOICE_TALKERS:
 		return {(float)g_Config.m_BcHudVoiceHudX, (float)g_Config.m_BcHudVoiceHudY, g_Config.m_BcHudVoiceHudScale, 0, gs_aModuleLayouts[Module].m_BackgroundEnabled, gs_aModuleLayouts[Module].m_BackgroundColor};
 	case MODULE_VOICE_STATUS:
@@ -210,6 +203,8 @@ void ConHudLayoutSet(IConsole::IResult *pResult, void *pUserData)
 	const int ModuleIndex = pResult->GetInteger(0);
 	if(ModuleIndex < 0 || ModuleIndex >= MODULE_COUNT)
 		return;
+	if(ModuleIndex == MODULE_MUSIC_PLAYER || ModuleIndex == MODULE_GAME_TIMER)
+		return;
 
 	const EModule Module = (EModule)ModuleIndex;
 	SModuleLayout Layout = ConfigLayout(Module);
@@ -230,6 +225,8 @@ void ConfigSaveCallback(IConfigManager *pConfigManager, void *pUserData)
 	char aLine[256];
 	for(int Module = 0; Module < MODULE_COUNT; ++Module)
 	{
+		if(Module == MODULE_MUSIC_PLAYER || Module == MODULE_GAME_TIMER)
+			continue;
 		const EModule ModuleId = (EModule)Module;
 		const SModuleLayout Layout = ConfigLayout(ModuleId);
 		str_format(

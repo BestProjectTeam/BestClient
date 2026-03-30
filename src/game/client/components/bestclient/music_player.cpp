@@ -3561,9 +3561,10 @@ public:
 		const vec2 UiToHudScale(Width / UiScreen.w, Height / UiScreen.h);
 		const vec2 MousePos = UiMousePos * UiToHudScale;
 		const bool ChatActive = pOwner->GameClient()->m_Chat.IsActive();
-		const bool FreezeNonChatLayout = !ChatActive &&
+		const bool HudEditorActive = pOwner->GameClient()->m_HudEditor.IsActive();
+		const bool AllowInteraction = ChatActive || HudEditorActive;
+		const bool FreezeNonChatLayout = !AllowInteraction &&
 			(pOwner->GameClient()->m_GameConsole.IsActive() || pOwner->GameClient()->m_Menus.IsActive());
-		const bool AllowInteraction = ChatActive;
 
 		const float ProbeT = EaseInOutCubic(m_ExpandAnim);
 		const SMusicPlayerMetrics ProbeMetrics = ComputeMusicPlayerMetrics(Layout, Width, Height, ProbeT, CompactTextSlotWidth);
@@ -3838,7 +3839,7 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	const vec2 UiMousePos = Ui()->UpdatedMousePos() * vec2(UiScreen.w, UiScreen.h) / WindowSize;
 	const vec2 UiToHudScale(Width / maximum(UiScreen.w, 1.0f), Height / maximum(UiScreen.h, 1.0f));
 	const vec2 MousePos = UiMousePos * UiToHudScale;
-	const bool AllowInteraction = !ForcePreview && GameClient()->m_Chat.IsActive();
+	const bool AllowInteraction = !ForcePreview && (GameClient()->m_Chat.IsActive() || GameClient()->m_HudEditor.IsActive());
 
 	const float ExpandT = ForcePreview ? 1.0f : EaseInOutCubic(m_pImpl->m_ExpandAnim);
 	const float TextT = EaseOutCubic(std::clamp((ExpandT - 0.04f) / 0.96f, 0.0f, 1.0f));
