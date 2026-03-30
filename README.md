@@ -26,11 +26,10 @@ It extends the base client with extra HUD tools, prediction tweaks, bind helpers
 
 ## Highlights
 
-- BestClient delivers deep visual tuning for freeze states, outlines, ghosts, cursors, indicators and nameplates.
-- BestClient gives full control over HUD layout, notifications, frozen tee display and spectator utilities.
-- BestClient improves input and mouse handling for smoother, faster and more precise gameplay.
-- BestClient includes profiles, bindwheel tools and automation helpers for quick in-game setup.
-- BestClient adds chat filtering, join actions and practical quality-of-life commands built for everyday play.
+- BestClient focuses on its own visual stack: Camera Drift, Dynamic FOV, Jelly Tee, Magic/Orbit/3D particles, Afterimage, Crystal Laser, Aspect Ratio and Media Background.
+- BestClient gameplay tools include Fast Input/Low Delta, Snap Tap, Hook Combo, Gores Mode, Auto Team Lock, Speedrun Timer and Focus Mode.
+- BestClient utility features cover Chat Media, integrated Voice Chat and Client Indicator.
+- BestClient comes with native tooling and content flow: Assets Editor, Components Editor, HUD Editor, in-client Shop and Fun tab.
 
 ## Installation
 
