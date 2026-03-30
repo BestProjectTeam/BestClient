@@ -572,28 +572,68 @@ find_package(ZLIB)
 find_package(Crypto)
 find_package(Curl)
 if(CLIENT AND VIDEORECORDER)
+  set(FFMPEG_FOUND FALSE)
+  set(FFMPEG_BUNDLED FALSE)
+  set(FFMPEG_COPY_FILES)
+  set(FFMPEG_LIBRARIES "")
+  set(FFMPEG_INCLUDE_DIRS "")
+
   if(TARGET_OS STREQUAL "windows")
-    # Prefer the FFmpeg build used by the working BestClient variant on Windows.
-    set(FFMPEG_CUSTOM_ROOT "${PROJECT_SOURCE_DIR}/bestclient/noxy-libs/ffmpeg-msvc")
-    if(EXISTS "${FFMPEG_CUSTOM_ROOT}/include/libavcodec/avcodec.h" AND
-       EXISTS "${FFMPEG_CUSTOM_ROOT}/lib/avformat.lib" AND
-       EXISTS "${FFMPEG_CUSTOM_ROOT}/lib/avcodec.lib" AND
-       EXISTS "${FFMPEG_CUSTOM_ROOT}/lib/avutil.lib" AND
-       EXISTS "${FFMPEG_CUSTOM_ROOT}/lib/swscale.lib" AND
-       EXISTS "${FFMPEG_CUSTOM_ROOT}/lib/swresample.lib")
-      set(FFMPEG_INCLUDE_DIRS
-        "${FFMPEG_CUSTOM_ROOT}/include"
-        CACHE PATH "Custom FFmpeg include dir" FORCE)
-      set(FFMPEG_LIBRARIES
-        "${FFMPEG_CUSTOM_ROOT}/lib/avformat.lib;${FFMPEG_CUSTOM_ROOT}/lib/avcodec.lib;${FFMPEG_CUSTOM_ROOT}/lib/avutil.lib;${FFMPEG_CUSTOM_ROOT}/lib/swscale.lib;${FFMPEG_CUSTOM_ROOT}/lib/swresample.lib"
-        CACHE STRING "Custom FFmpeg libs" FORCE)
-      set(FFMPEG_FOUND TRUE CACHE BOOL "Custom FFmpeg present" FORCE)
-      set(FFMPEG_BUNDLED FALSE CACHE BOOL "Using bundled FFmpeg" FORCE)
-      message(STATUS "Using custom FFmpeg from ${FFMPEG_CUSTOM_ROOT}")
-    else()
-      find_package(FFMPEG)
-    endif()
-  else()
+    # Prefer standalone FFmpeg SDK path, keep legacy BestClient path as fallback.
+    set(FFMPEG_CUSTOM_ROOTS
+      "${PROJECT_SOURCE_DIR}/noxy-libs/ffmpeg-msvc"
+      "${PROJECT_SOURCE_DIR}/bestclient/noxy-libs/ffmpeg-msvc")
+    foreach(FFMPEG_CUSTOM_ROOT IN LISTS FFMPEG_CUSTOM_ROOTS)
+      if(EXISTS "${FFMPEG_CUSTOM_ROOT}/include/libavcodec/avcodec.h" AND
+         EXISTS "${FFMPEG_CUSTOM_ROOT}/lib/avformat.lib" AND
+         EXISTS "${FFMPEG_CUSTOM_ROOT}/lib/avcodec.lib" AND
+         EXISTS "${FFMPEG_CUSTOM_ROOT}/lib/avutil.lib" AND
+         EXISTS "${FFMPEG_CUSTOM_ROOT}/lib/swscale.lib" AND
+         EXISTS "${FFMPEG_CUSTOM_ROOT}/lib/swresample.lib")
+        set(FFMPEG_INCLUDE_DIRS "${FFMPEG_CUSTOM_ROOT}/include")
+        set(FFMPEG_LIBRARIES
+          "${FFMPEG_CUSTOM_ROOT}/lib/avformat.lib"
+          "${FFMPEG_CUSTOM_ROOT}/lib/avcodec.lib"
+          "${FFMPEG_CUSTOM_ROOT}/lib/avutil.lib"
+          "${FFMPEG_CUSTOM_ROOT}/lib/swscale.lib"
+          "${FFMPEG_CUSTOM_ROOT}/lib/swresample.lib")
+        set(FFMPEG_FOUND TRUE)
+        message(STATUS "Using custom FFmpeg from ${FFMPEG_CUSTOM_ROOT}")
+
+        if(EXISTS "${FFMPEG_CUSTOM_ROOT}/bin/avcodec-61.dll" AND
+           EXISTS "${FFMPEG_CUSTOM_ROOT}/bin/avformat-61.dll" AND
+           EXISTS "${FFMPEG_CUSTOM_ROOT}/bin/avutil-59.dll" AND
+           EXISTS "${FFMPEG_CUSTOM_ROOT}/bin/swresample-5.dll" AND
+           EXISTS "${FFMPEG_CUSTOM_ROOT}/bin/swscale-8.dll")
+          set(FFMPEG_COPY_FILES
+            "${FFMPEG_CUSTOM_ROOT}/bin/avcodec-61.dll"
+            "${FFMPEG_CUSTOM_ROOT}/bin/avformat-61.dll"
+            "${FFMPEG_CUSTOM_ROOT}/bin/avutil-59.dll"
+            "${FFMPEG_CUSTOM_ROOT}/bin/swresample-5.dll"
+            "${FFMPEG_CUSTOM_ROOT}/bin/swscale-8.dll")
+        endif()
+        break()
+      endif()
+    endforeach()
+  endif()
+
+  if(NOT FFMPEG_FOUND)
+    # Drop stale cache entries so deleted legacy paths cannot stick around.
+    unset(FFMPEG_LIBRARIES CACHE)
+    unset(FFMPEG_INCLUDE_DIRS CACHE)
+    unset(FFMPEG_FOUND CACHE)
+    unset(FFMPEG_BUNDLED CACHE)
+    unset(AVCODEC_LIBRARY CACHE)
+    unset(AVFORMAT_LIBRARY CACHE)
+    unset(AVUTIL_LIBRARY CACHE)
+    unset(SWSCALE_LIBRARY CACHE)
+    unset(SWRESAMPLE_LIBRARY CACHE)
+    unset(AVCODEC_INCLUDEDIR CACHE)
+    unset(AVFORMAT_INCLUDEDIR CACHE)
+    unset(AVUTIL_INCLUDEDIR CACHE)
+    unset(SWSCALE_INCLUDEDIR CACHE)
+    unset(SWRESAMPLE_INCLUDEDIR CACHE)
+
     find_package(FFMPEG)
   endif()
 

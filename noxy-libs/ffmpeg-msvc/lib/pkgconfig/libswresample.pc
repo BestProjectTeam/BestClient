@@ -1,0 +1,14 @@
+prefix=/c/ffmpeg-msvc
+exec_prefix=${prefix}
+libdir=/c/ffmpeg-msvc/lib
+includedir=/c/ffmpeg-msvc/include
+
+Name: libswresample
+Description: FFmpeg audio resampling library
+Version: 6.2.100
+Requires: libavutil >= 60.19.101
+Requires.private: 
+Conflicts:
+Libs: -L${libdir}  -lswresample 
+Libs.private: 
+Cflags: -I${includedir}
