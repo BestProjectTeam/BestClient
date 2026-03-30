@@ -1,0 +1,929 @@
+[35mCMakeLists.txt[m[36m:[m# <Bes[1;31mBESbest[mclient>
+[35mCMakeLists.txt[m[36m:[mfile(STRINGS src/game/version.h Bes[1;31mBESbest[mclient_VERSION_LINE
+[35mCMakeLists.txt[m[36m:[m  REGEX "^#define Bes[1;31mBESbest[mclient_VERSION "
+[35mCMakeLists.txt[m[36m:[mif(Bes[1;31mBESbest[mclient_VERSION_LINE MATCHES "([0-9]+)\\.([0-9]+)\\.([0-9]+)")
+[35mCMakeLists.txt[m[36m:[m  set(Bes[1;31mBESbest[mclient_VERSION_MAJOR ${CMAKE_MATCH_1})
+[35mCMakeLists.txt[m[36m:[m  set(Bes[1;31mBESbest[mclient_VERSION_MINOR ${CMAKE_MATCH_2})
+[35mCMakeLists.txt[m[36m:[m  set(Bes[1;31mBESbest[mclient_VERSION_PATCH ${CMAKE_MATCH_3})
+[35mCMakeLists.txt[m[36m:[melseif(Bes[1;31mBESbest[mclient_VERSION_LINE MATCHES "([0-9]+)\\.([0-9]+)")
+[35mCMakeLists.txt[m[36m:[m  set(Bes[1;31mBESbest[mclient_VERSION_MAJOR ${CMAKE_MATCH_1})
+[35mCMakeLists.txt[m[36m:[m  set(Bes[1;31mBESbest[mclient_VERSION_MINOR ${CMAKE_MATCH_2})
+[35mCMakeLists.txt[m[36m:[m  set(Bes[1;31mBESbest[mclient_VERSION_PATCH "0")
+[35mCMakeLists.txt[m[36m:[m  message(FATAL_ERROR "Couldn't parse Bes[1;31mBESbest[mclient version from src/game/version.h")
+[35mCMakeLists.txt[m[36m:[mif(Bes[1;31mBESbest[mclient_VERSION_PATCH STREQUAL "0")
+[35mCMakeLists.txt[m[36m:[m  project(Bes[1;31mBESbest[mclient VERSION ${Bes[1;31mBESbest[mclient_VERSION_MAJOR}.${Bes[1;31mBESbest[mclient_VERSION_MINOR})
+[35mCMakeLists.txt[m[36m:[m  project(Bes[1;31mBESbest[mclient VERSION ${Bes[1;31mBESbest[mclient_VERSION_MAJOR}.${Bes[1;31mBESbest[mclient_VERSION_MINOR}.${Bes[1;31mBESbest[mclient_VERSION_PATCH})
+[35mCMakeLists.txt[m[36m:[mfile(APPEND "${DATA_VERSION_FILE}" "Bes[1;31mBESbest[mclient ${Bes[1;31mBESbest[mclient_VERSION_MAJOR}.${Bes[1;31mBESbest[mclient_VERSION_MINOR}.${Bes[1;31mBESbest[mclient_VERSION_PATCH}\n")
+[35mCMakeLists.txt[m[36m:[m# </Bes[1;31mBESbest[mclient>
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/builtinscripts/sayemoticon.chai
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/fonts/Cabin-Regular.ttf
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/fonts/FreeSansBold.ttf
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/fonts/GoogleSans-Regular.ttf
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/fonts/Inter_24pt-Regular.ttf
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/fonts/Inter_24pt-SemiBold.ttf
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/fonts/Montserrat-Regular.ttf
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/fonts/Nunito-Black.ttf
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/fonts/Rubik-Regular.ttf
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/fonts/minecraft_font.ttf
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/gui_logo.png
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/arabic.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/azerbaijani.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/belarusian.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/bosnian.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/brazilian_portuguese.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/bulgarian.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/catalan.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/chuvash.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/czech.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/danish.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/dutch.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/esperanto.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/estonian.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/finnish.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/french.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/galician.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/german.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/greek.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/hungarian.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/index.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/italian.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/japanese.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/korean.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/kyrgyz.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/license.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/norwegian.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/persian.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/polish.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/portuguese.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/romanian.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/russian.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/serbian.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/serbian_cyrillic.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/simplified_chinese.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/slovak.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/spanish.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/swedish.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/traditional_chinese.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/turkish.txt
+[35mCMakeLists.txt[m[36m:[m  Bes[1;31mBESbest[mclient/languages/ukrainian.txt
+[35mCMakeLists.txt[m[36m:[m  config_variables_Bes[1;31mBESbest[mclient.h
+[35mCMakeLists.txt[m[36m:[m# ChaiScript for Bes[1;31mBESbest[mclient
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/bg_draw.cpp
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/bg_draw.h
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/bg_draw_file.cpp
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/bg_draw_file.h
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/bindchat.cpp
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/bindchat.h
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/bindwheel.cpp
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/bindwheel.h
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/colored_parts.h
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/custom_communities.cpp
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/custom_communities.h
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/data_version.h
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/menus_Bes[1;31mBESbest[mclient.cpp
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/mod.cpp
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/mod.h
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/outlines.cpp
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/outlines.h
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/pet.cpp
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/pet.h
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/player_indicator.cpp
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/player_indicator.h
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/rainbow.cpp
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/rainbow.h
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/scripting.cpp
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/scripting.h
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/scripting/impl.cpp
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/scripting/impl.h
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/skinprofiles.cpp
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/skinprofiles.h
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/statusbar.cpp
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/statusbar.h
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/Bes[1;31mBESbest[mclient.cpp
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/Bes[1;31mBESbest[mclient.h
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/trails.cpp
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/trails.h
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/translate.cpp
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/translate.h
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/warlist.cpp
+[35mCMakeLists.txt[m[36m:[m    components/Bes[1;31mBESbest[mclient/warlist.h
+[35mCMakeLists.txt[m[36m:[m    target_compile_options(game-client PRIVATE /bigobj) # Bes[1;31mBESbest[mclient, required for ChaiScript
+[35mCMakeLists.txt[m[36m:[m    target_compile_options(game-client PRIVATE -Wa,-mbig-obj) # Bes[1;31mBESbest[mclient, required for ChaiScript
+[35mREADME.md[m[36m:[m[![DDraceNetwork](docs/assets/Bes[1;31mBESbest[mclient_Logo_Horizontal.svg)](https://Bes[1;31mBESbest[mclient.app) 
+[35mREADME.md[m[36m:[m[![Build status](https://github.com/BestClient/Bes[1;31mBESbest[mclient/workflows/Build/badge.svg)](https://github.com/BestClient/Bes[1;31mBESbest[mclient/actions/workflows/build.yaml)
+[35mREADME.md[m[36m:[m<!-- [![Code coverage](https://github.com/BestClient/Bes[1;31mBESbest[mclient/branch/master/graph/badge.svg)](https://codecov.io/gh/BestClient/Bes[1;31mBESbest[mclient/branch/master) -->
+[35mREADME.md[m[36m:[m[Website](https://Bes[1;31mBESbest[mclient.app)
+[35mREADME.md[m[36m:[mBes[1;31mBESbest[mclient supports the [ChaiScript](https://chaiscript.com/) language for simple tasks
+[35mdata/tclient/languages/arabic.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/arabic.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/arabic.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/arabic.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/arabic.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/azerbaijani.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/azerbaijani.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/azerbaijani.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/azerbaijani.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/azerbaijani.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/belarusian.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/belarusian.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/belarusian.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/belarusian.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/belarusian.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/bosnian.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/bosnian.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/bosnian.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/bosnian.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/bosnian.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/brazilian_portuguese.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/brazilian_portuguese.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/brazilian_portuguese.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/brazilian_portuguese.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/brazilian_portuguese.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/bulgarian.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/bulgarian.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/bulgarian.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/bulgarian.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/bulgarian.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/catalan.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/catalan.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/catalan.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/catalan.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/catalan.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/chuvash.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/chuvash.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/chuvash.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/chuvash.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/chuvash.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/czech.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/czech.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/czech.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/czech.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/czech.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/danish.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/danish.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/danish.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/danish.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/danish.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/dutch.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/dutch.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/dutch.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/dutch.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/dutch.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/esperanto.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/esperanto.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/esperanto.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/esperanto.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/esperanto.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/estonian.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/estonian.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/estonian.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/estonian.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/estonian.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/finnish.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/finnish.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/finnish.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/finnish.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/finnish.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/french.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/french.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/french.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/french.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/french.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/galician.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/galician.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/galician.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/galician.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/galician.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/german.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/german.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/german.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/german.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/german.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/greek.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/greek.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/greek.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/greek.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/greek.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/hungarian.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/hungarian.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/hungarian.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/hungarian.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/hungarian.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/italian.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/italian.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/italian.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/italian.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/italian.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/japanese.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/japanese.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/japanese.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/japanese.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/japanese.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/korean.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/korean.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/korean.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/korean.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/korean.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/kyrgyz.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/kyrgyz.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/kyrgyz.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/kyrgyz.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/kyrgyz.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/norwegian.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/norwegian.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/norwegian.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/norwegian.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/norwegian.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/persian.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/persian.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/persian.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/persian.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/persian.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/polish.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/polish.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/polish.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/polish.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/polish.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/portuguese.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/portuguese.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/portuguese.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/portuguese.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/portuguese.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/romanian.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/romanian.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/romanian.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/romanian.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/romanian.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/russian.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/russian.txt[m[36m:[m== Ссылки Bes[1;31mBESbest[mclient
+[35mdata/tclient/languages/russian.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/russian.txt[m[36m:[m== Настройки Bes[1;31mBESbest[mclient
+[35mdata/tclient/languages/russian.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/russian.txt[m[36m:[m== Разработчики Bes[1;31mBESbest[mclient
+[35mdata/tclient/languages/russian.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/russian.txt[m[36m:[m== Bes[1;31mBESbest[mclient
+[35mdata/tclient/languages/russian.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/serbian.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/serbian.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/serbian.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/serbian.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/serbian.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/serbian_cyrillic.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/serbian_cyrillic.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/serbian_cyrillic.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/serbian_cyrillic.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/serbian_cyrillic.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/simplified_chinese.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/simplified_chinese.txt[m[36m:[m== Bes[1;31mBESbest[mclient 链接
+[35mdata/tclient/languages/simplified_chinese.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/simplified_chinese.txt[m[36m:[m== Bes[1;31mBESbest[mclient 设置
+[35mdata/tclient/languages/simplified_chinese.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/simplified_chinese.txt[m[36m:[m== Bes[1;31mBESbest[mclient 开发人员
+[35mdata/tclient/languages/simplified_chinese.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/simplified_chinese.txt[m[36m:[m== Bes[1;31mBESbest[mclient
+[35mdata/tclient/languages/simplified_chinese.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/slovak.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/slovak.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/slovak.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/slovak.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/slovak.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/spanish.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/spanish.txt[m[36m:[m== Bes[1;31mBESbest[mclient
+[35mdata/tclient/languages/spanish.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/spanish.txt[m[36m:[m== Enlaces Bes[1;31mBESbest[mclient
+[35mdata/tclient/languages/spanish.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/spanish.txt[m[36m:[m== Ajustes de Bes[1;31mBESbest[mclient
+[35mdata/tclient/languages/spanish.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/spanish.txt[m[36m:[m== Desarrolladores de Bes[1;31mBESbest[mclient
+[35mdata/tclient/languages/spanish.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/swedish.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/swedish.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/swedish.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/swedish.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/swedish.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/traditional_chinese.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/traditional_chinese.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/traditional_chinese.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/traditional_chinese.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/traditional_chinese.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/turkish.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/turkish.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/turkish.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/turkish.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/turkish.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdata/tclient/languages/ukrainian.txt[m[36m:[mBes[1;31mBESbest[mclient Links
+[35mdata/tclient/languages/ukrainian.txt[m[36m:[m== Посилання Bes[1;31mBESbest[mclient
+[35mdata/tclient/languages/ukrainian.txt[m[36m:[mBes[1;31mBESbest[mclient Settings
+[35mdata/tclient/languages/ukrainian.txt[m[36m:[m== Налаштування Bes[1;31mBESbest[mclient
+[35mdata/tclient/languages/ukrainian.txt[m[36m:[mBes[1;31mBESbest[mclient Developers
+[35mdata/tclient/languages/ukrainian.txt[m[36m:[m== Розробники Bes[1;31mBESbest[mclient
+[35mdata/tclient/languages/ukrainian.txt[m[36m:[mBes[1;31mBESbest[mclient
+[35mdata/tclient/languages/ukrainian.txt[m[36m:[m== Bes[1;31mBESbest[mclient
+[35mdata/tclient/languages/ukrainian.txt[m[36m:[mYou have probably only installed the Bes[1;31mBESbest[mclient DDNet.exe which is not supported, please use the entire Bes[1;31mBESbest[mclient folder
+[35mdocs/faq/faq.json[m[36m:[m            "question": "How do I install Bes[1;31mBESbest[mclient?",
+[35msrc/engine/client.h[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/engine/client.h[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/engine/client.h[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/engine/client/client.cpp[m[36m:[m		m_aNeBes[1;31mBESbest[mclient[Conn].Send(&Packet);
+[35msrc/engine/client/client.cpp[m[36m:[mvoid CClient::SendBes[1;31mBESbest[mclientInfo(int Conn)
+[35msrc/engine/client/client.cpp[m[36m:[m	Msg.AddString(Bes[1;31mBESbest[mclient_VERSION " built on " __DATE__ ", " __TIME__);
+[35msrc/engine/client/client.cpp[m[36m:[m	SendBes[1;31mBESbest[mclientInfo(Conn);
+[35msrc/engine/client/client.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/engine/client/client.cpp[m[36m:[m	return m_aNeBes[1;31mBESbest[mclient[g_Config.m_ClDummy].GotProblems(MaxLatencyTicks() * time_freq() / GameTickSpeed());
+[35msrc/engine/client/client.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/engine/client/client.cpp[m[36m:[m		if(net_host_lookup(aHost, &NextAddr, m_aNeBes[1;31mBESbest[mclient[CONN_MAIN].NetType()) != 0)
+[35msrc/engine/client/client.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/engine/client/client.cpp[m[36m:[m		m_aNeBes[1;31mBESbest[mclient[CONN_MAIN].Connect7(aConnectAddrs, NumConnectAddrs);
+[35msrc/engine/client/client.cpp[m[36m:[m		m_aNeBes[1;31mBESbest[mclient[CONN_MAIN].Connect(aConnectAddrs, NumConnectAddrs);
+[35msrc/engine/client/client.cpp[m[36m:[m	m_aNeBes[1;31mBESbest[mclient[CONN_MAIN].RefreshStun();
+[35msrc/engine/client/client.cpp[m[36m:[m	m_aNeBes[1;31mBESbest[mclient[CONN_MAIN].Disconnect(pReason);
+[35msrc/engine/client/client.cpp[m[36m:[m	if(m_aNeBes[1;31mBESbest[mclient[CONN_MAIN].State() != NETSTATE_ONLINE)
+[35msrc/engine/client/client.cpp[m[36m:[m		m_aNeBes[1;31mBESbest[mclient[CONN_DUMMY].Connect7(m_aNeBes[1;31mBESbest[mclient[CONN_MAIN].ServerAddress(), 1);
+[35msrc/engine/client/client.cpp[m[36m:[m		m_aNeBes[1;31mBESbest[mclient[CONN_DUMMY].Connect(m_aNeBes[1;31mBESbest[mclient[CONN_MAIN].ServerAddress(), 1);
+[35msrc/engine/client/client.cpp[m[36m:[m	m_aNeBes[1;31mBESbest[mclient[CONN_DUMMY].Disconnect(pReason);
+[35msrc/engine/client/client.cpp[m[36m:[m	for(size_t Conn = 0; Conn < std::size(m_aNeBes[1;31mBESbest[mclient); Conn++)
+[35msrc/engine/client/client.cpp[m[36m:[m	return m_aNeBes[1;31mBESbest[mclient[CONN_MAIN].ErrorString();
+[35msrc/engine/client/client.cpp[m[36m:[m#ifndef Bes[1;31mBESbest[mclient_CHECKSUM_SALT
+[35msrc/engine/client/client.cpp[m[36m:[m#define Bes[1;31mBESbest[mclient_CHECKSUM_SALT \
+[35msrc/engine/client/client.cpp[m[36m:[m			CUuid Salt = Bes[1;31mBESbest[mclient_CHECKSUM_SALT;
+[35msrc/engine/client/client.cpp[m[36m:[m					// Bes[1;31mBESbest[mclient
+[35msrc/engine/client/client.cpp[m[36m:[m			m_aNeBes[1;31mBESbest[mclient[CONN_MAIN].FeedStunServer(Addr);
+[35msrc/engine/client/client.cpp[m[36m:[m			m_aNeBes[1;31mBESbest[mclient[CONN_MAIN].FeedStunServer(Addr);
+[35msrc/engine/client/client.cpp[m[36m:[m	m_aNeBes[1;31mBESbest[mclient[CONN_MAIN].ConnectAddresses(&pConnectAddrs, &NumConnectAddrs);
+[35msrc/engine/client/client.cpp[m[36m:[m	for(auto &NeBes[1;31mBESbest[mclient : m_aNeBes[1;31mBESbest[mclient)
+[35msrc/engine/client/client.cpp[m[36m:[m		NeBes[1;31mBESbest[mclient.Update();
+[35msrc/engine/client/client.cpp[m[36m:[m			if(m_aNeBes[1;31mBESbest[mclient[CONN_MAIN].State() == NETSTATE_OFFLINE)
+[35msrc/engine/client/client.cpp[m[36m:[m				str_format(aBuf, sizeof(aBuf), "offline error='%s'", m_aNeBes[1;31mBESbest[mclient[CONN_MAIN].ErrorString());
+[35msrc/engine/client/client.cpp[m[36m:[m			else if((DummyConnecting() || DummyConnected()) && m_aNeBes[1;31mBESbest[mclient[CONN_DUMMY].State() == NETSTATE_OFFLINE)
+[35msrc/engine/client/client.cpp[m[36m:[m				str_format(aBuf, sizeof(aBuf), "offline dummy error='%s'", m_aNeBes[1;31mBESbest[mclient[CONN_DUMMY].ErrorString());
+[35msrc/engine/client/client.cpp[m[36m:[m					str_format(aBuf, sizeof(aBuf), "%s: %s", Localize("Could not connect dummy"), m_aNeBes[1;31mBESbest[mclient[CONN_DUMMY].ErrorString());
+[35msrc/engine/client/client.cpp[m[36m:[m		if(State() == IClient::STATE_CONNECTING && m_aNeBes[1;31mBESbest[mclient[CONN_MAIN].State() == NETSTATE_ONLINE)
+[35msrc/engine/client/client.cpp[m[36m:[m		if(m_DummySendConnInfo && m_aNeBes[1;31mBESbest[mclient[CONN_DUMMY].State() == NETSTATE_ONLINE)
+[35msrc/engine/client/client.cpp[m[36m:[m			m_aNeBes[1;31mBESbest[mclient[CONN_DUMMY].Update();
+[35msrc/engine/client/client.cpp[m[36m:[m		while(m_aNeBes[1;31mBESbest[mclient[Conn].Recv(&Packet, &ResponseToken, IsSixup()))
+[35msrc/engine/client/client.cpp[m[36m:[m	m_ServerBrowser.SetBaseInfo(&m_aNeBes[1;31mBESbest[mclient[CONN_CONTACT], m_pGameClient->NetVersion());
+[35msrc/engine/client/client.cpp[m[36m:[m				net_socket_read_wait(m_aNeBes[1;31mBESbest[mclient[CONN_MAIN].m_Socket, SleepTimeInNanoSecondsInner);
+[35msrc/engine/client/client.cpp[m[36m:[m	for(unsigned int i = 0; i < std::size(m_aNeBes[1;31mBESbest[mclient); i++)
+[35msrc/engine/client/client.cpp[m[36m:[m		m_aNeBes[1;31mBESbest[mclient[i].Close();
+[35msrc/engine/client/client.cpp[m[36m:[m	for(size_t i = 0; i < std::size(m_aNeBes[1;31mBESbest[mclient); i++)
+[35msrc/engine/client/client.cpp[m[36m:[m	if(m_aNeBes[1;31mBESbest[mclient[Conn].State() != NETSTATE_OFFLINE)
+[35msrc/engine/client/client.cpp[m[36m:[m	while(!m_aNeBes[1;31mBESbest[mclient[Conn].Open(BindAddr))
+[35msrc/engine/client/client.cpp[m[36m:[m	m_aNeBes[1;31mBESbest[mclient[CONN_MAIN].ResetErrorString();
+[35msrc/engine/client/client.cpp[m[36m:[m		switch(m_aNeBes[1;31mBESbest[mclient[CONN_MAIN].GetConnectivity(PossibleNetType, &GlobalUdpAddr))
+[35msrc/engine/client/client.h[m[36m:[m	CNeBes[1;31mBESbest[mclient m_aNeBes[1;31mBESbest[mclient[NUM_CONNS];
+[35msrc/engine/client/client.h[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/engine/client/client.h[m[36m:[m	void SendBes[1;31mBESbest[mclientInfo(int Conn);
+[35msrc/engine/client/client.h[m[36m:[m	const NETADDR &ServerAddress() const override { return *m_aNeBes[1;31mBESbest[mclient[CONN_MAIN].ServerAddress(); }
+[35msrc/engine/client/discord.cpp[m[36m:[m		Params.client_id = 1325361453988970527; // Bes[1;31mBESbest[mclient
+[35msrc/engine/client/discord.cpp[m[36m:[m		str_copy(m_Activity.assets.large_image, "Bes[1;31mBESbest[mclient_logo", sizeof(m_Activity.assets.large_image));
+[35msrc/engine/client/discord.cpp[m[36m:[m		str_copy(m_Activity.assets.large_text, "Bes[1;31mBESbest[mclient logo", sizeof(m_Activity.assets.large_text));
+[35msrc/engine/client/discord.cpp[m[36m:[m		str_copy(m_Activity.assets.large_image, "Bes[1;31mBESbest[mclient_logo", sizeof(m_Activity.assets.large_image));
+[35msrc/engine/client/discord.cpp[m[36m:[m		str_copy(m_Activity.assets.large_text, "Bes[1;31mBESbest[mclient logo", sizeof(m_Activity.assets.large_text));
+[35msrc/engine/client/graphics_threaded.cpp[m[36m:[m// Bes[1;31mBESbest[mclient
+[35msrc/engine/client/graphics_threaded.h[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/engine/client/serverbrowser.cpp[m[36m:[mvoid CServerBrowser::SetBaseInfo(class CNeBes[1;31mBESbest[mclient *pClient, const char *pNetVersion)
+[35msrc/engine/client/serverbrowser.cpp[m[36m:[m	m_pNeBes[1;31mBESbest[mclient = pClient;
+[35msrc/engine/client/serverbrowser.cpp[m[36m:[m		Broadcast.type = (m_pNeBes[1;31mBESbest[mclient->NetType() & ~(NETTYPE_WEBSOCKET_IPV4 | NETTYPE_WEBSOCKET_IPV6)) | NETTYPE_LINK_BROADCAST;
+[35msrc/engine/client/serverbrowser.cpp[m[36m:[m		Packet.m_Address.type = (m_pNeBes[1;31mBESbest[mclient->NetType() & ~(NETTYPE_WEBSOCKET_IPV4 | NETTYPE_WEBSOCKET_IPV6)) | NETTYPE_LINK_BROADCAST;
+[35msrc/engine/client/serverbrowser.cpp[m[36m:[m		Packet7.m_Address.type = (m_pNeBes[1;31mBESbest[mclient->NetType() & ~(NETTYPE_WEBSOCKET_IPV4 | NETTYPE_WEBSOCKET_IPV6)) | NETTYPE_TW7 | NETTYPE_LINK_BROADCAST;
+[35msrc/engine/client/serverbrowser.cpp[m[36m:[m			m_pNeBes[1;31mBESbest[mclient->Send(&Packet);
+[35msrc/engine/client/serverbrowser.cpp[m[36m:[m			m_pNeBes[1;31mBESbest[mclient->Send(&Packet7);
+[35msrc/engine/client/serverbrowser.cpp[m[36m:[m		m_pNeBes[1;31mBESbest[mclient->Send(&Packet);
+[35msrc/engine/client/serverbrowser.cpp[m[36m:[m		m_pNeBes[1;31mBESbest[mclient->Send(&Packet);
+[35msrc/engine/client/serverbrowser.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/engine/client/serverbrowser.h[m[36m:[mclass CNeBes[1;31mBESbest[mclient;
+[35msrc/engine/client/serverbrowser.h[m[36m:[m	void SetBaseInfo(class CNeBes[1;31mBESbest[mclient *pClient, const char *pNetVersion);
+[35msrc/engine/client/serverbrowser.h[m[36m:[m	CNeBes[1;31mBESbest[mclient *m_pNeBes[1;31mBESbest[mclient = nullptr;
+[35msrc/engine/client/serverbrowser.h[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/engine/client/smooth_time.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/engine/client/text.cpp[m[36m:[m// Bes[1;31mBESbest[mclient
+[35msrc/engine/client/text.cpp[m[36m:[m			// Bes[1;31mBESbest[mclient
+[35msrc/engine/client/text.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/engine/client/text.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/engine/client/text.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/engine/client/text.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/engine/client/text.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/engine/client/text.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/engine/client/text.cpp[m[36m:[m		Storage()->ListDirectory(IStorage::TYPE_ALL, "Bes[1;31mBESbest[mclient/fonts", LaziestFileCallback, &vCustomFonts);
+[35msrc/engine/client/text.cpp[m[36m:[m			str_format(aFontName, sizeof(aFontName), "Bes[1;31mBESbest[mclient/fonts/%s", FilePath.c_str());
+[35msrc/engine/client/text.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/engine/client/text.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/engine/client/text.cpp[m[36m:[m		// Bes[1;31mBESbest[mclient
+[35msrc/engine/client/updater.cpp[m[36m:[m	str_format(pBuf, BufSize, "https://update.Bes[1;31mBESbest[mclient.app/%s", aBuf);
+[35msrc/engine/client/updater.cpp[m[36m:[m		if(str_comp(pVersion, Bes[1;31mBESbest[mclient_VERSION) == 0)
+[35msrc/engine/external/glew/GL/eglew.h[m[36m:[mtypedef EGLBoolean  ( * PFNEGLWAIBes[1;31mBESbest[mclientPROC) ( void );
+[35msrc/engine/external/glew/GL/eglew.h[m[36m:[m#define eglWaiBes[1;31mBESbest[mclient EGLEW_GET_FUN(__eglewWaiBes[1;31mBESbest[mclient)
+[35msrc/engine/external/glew/GL/eglew.h[m[36m:[mEGLEW_FUN_EXPORT PFNEGLWAIBes[1;31mBESbest[mclientPROC __eglewWaiBes[1;31mBESbest[mclient;
+[35msrc/engine/external/glew/GL/glew.h[m[36m:[mtypedef void (GLAPIENTRY * PFNGLDISABLEVARIANBes[1;31mBESbest[mclientSTATEEXTPROC) (GLuint id);
+[35msrc/engine/external/glew/GL/glew.h[m[36m:[mtypedef void (GLAPIENTRY * PFNGLENABLEVARIANBes[1;31mBESbest[mclientSTATEEXTPROC) (GLuint id);
+[35msrc/engine/external/glew/GL/glew.h[m[36m:[m#define glDisableVarianBes[1;31mBESbest[mclientStateEXT GLEW_GET_FUN(__glewDisableVarianBes[1;31mBESbest[mclientStateEXT)
+[35msrc/engine/external/glew/GL/glew.h[m[36m:[m#define glEnableVarianBes[1;31mBESbest[mclientStateEXT GLEW_GET_FUN(__glewEnableVarianBes[1;31mBESbest[mclientStateEXT)
+[35msrc/engine/external/glew/GL/glew.h[m[36m:[mGLEW_FUN_EXPORT PFNGLDISABLEVARIANBes[1;31mBESbest[mclientSTATEEXTPROC __glewDisableVarianBes[1;31mBESbest[mclientStateEXT;
+[35msrc/engine/external/glew/GL/glew.h[m[36m:[mGLEW_FUN_EXPORT PFNGLENABLEVARIANBes[1;31mBESbest[mclientSTATEEXTPROC __glewEnableVarianBes[1;31mBESbest[mclientStateEXT;
+[35msrc/engine/external/glew/GL/glxew.h[m[36m:[mextern const char* glXGeBes[1;31mBESbest[mclientString (Display *dpy, int name);
+[35msrc/engine/external/glew/glew.c[m[36m:[mPFNGLDISABLEVARIANBes[1;31mBESbest[mclientSTATEEXTPROC __glewDisableVarianBes[1;31mBESbest[mclientStateEXT = NULL;
+[35msrc/engine/external/glew/glew.c[m[36m:[mPFNGLENABLEVARIANBes[1;31mBESbest[mclientSTATEEXTPROC __glewEnableVarianBes[1;31mBESbest[mclientStateEXT = NULL;
+[35msrc/engine/external/glew/glew.c[m[36m:[m  r = ((glDisableVarianBes[1;31mBESbest[mclientStateEXT = (PFNGLDISABLEVARIANBes[1;31mBESbest[mclientSTATEEXTPROC)glewGetProcAddress((const GLubyte*)"glDisableVarianBes[1;31mBESbest[mclientStateEXT")) == NULL) || r;
+[35msrc/engine/external/glew/glew.c[m[36m:[m  r = ((glEnableVarianBes[1;31mBESbest[mclientStateEXT = (PFNGLENABLEVARIANBes[1;31mBESbest[mclientSTATEEXTPROC)glewGetProcAddress((const GLubyte*)"glEnableVarianBes[1;31mBESbest[mclientStateEXT")) == NULL) || r;
+[35msrc/engine/external/glew/glew.c[m[36m:[mPFNEGLWAIBes[1;31mBESbest[mclientPROC __eglewWaiBes[1;31mBESbest[mclient = NULL;
+[35msrc/engine/external/glew/glew.c[m[36m:[m  r = ((eglWaiBes[1;31mBESbest[mclient = (PFNEGLWAIBes[1;31mBESbest[mclientPROC)glewGetProcAddress((const GLubyte*)"eglWaiBes[1;31mBESbest[mclient")) == NULL) || r;
+[35msrc/engine/external/glew/glew.c[m[36m:[m  start = (const GLubyte*)glXGeBes[1;31mBESbest[mclientString(glXGetCurrentDisplay(), GLX_EXTENSIONS);
+[35msrc/engine/external/glew/glew.c[m[36m:[m    extStart = (const GLubyte*)glXGeBes[1;31mBESbest[mclientString(display, GLX_EXTENSIONS);
+[35msrc/engine/graphics.h[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/engine/server.h[m[36m:[m	virtual int DistincBes[1;31mBESbest[mclientCount() const = 0;
+[35msrc/engine/server.h[m[36m:[m	virtual bool GeBes[1;31mBESbest[mclientInfo(int ClientId, CClientInfo *pInfo) const = 0;
+[35msrc/engine/server.h[m[36m:[m	virtual void SeBes[1;31mBESbest[mclientDDNetVersion(int ClientId, int DDNetVersion) = 0;
+[35msrc/engine/server.h[m[36m:[m	virtual int GeBes[1;31mBESbest[mclientVersion(int ClientId) const = 0;
+[35msrc/engine/server.h[m[36m:[m		if(GeBes[1;31mBESbest[mclientVersion(Client) >= VERSION_DDNET_OLD)
+[35msrc/engine/server.h[m[36m:[m		if(GeBes[1;31mBESbest[mclientVersion(Client) >= VERSION_DDNET_OLD)
+[35msrc/engine/server.h[m[36m:[m	virtual void SeBes[1;31mBESbest[mclientName(int ClientId, const char *pName) = 0;
+[35msrc/engine/server.h[m[36m:[m	virtual void SeBes[1;31mBESbest[mclientClan(int ClientId, const char *pClan) = 0;
+[35msrc/engine/server.h[m[36m:[m	virtual void SeBes[1;31mBESbest[mclientCountry(int ClientId, int Country) = 0;
+[35msrc/engine/server.h[m[36m:[m	virtual void SeBes[1;31mBESbest[mclientScore(int ClientId, std::optional<int> Score) = 0;
+[35msrc/engine/server.h[m[36m:[m	virtual void SeBes[1;31mBESbest[mclientFlags(int ClientId, int Flags) = 0;
+[35msrc/engine/server.h[m[36m:[m	virtual void RedirecBes[1;31mBESbest[mclient(int ClientId, int Port) = 0;
+[35msrc/engine/server.h[m[36m:[m	// Has the size of the return value of `PersistenBes[1;31mBESbest[mclientDataSize()`.
+[35msrc/engine/server.h[m[36m:[m	virtual void PreInpuBes[1;31mBESbest[mclients(int ClientId, bool *pClients) = 0;
+[35msrc/engine/server.h[m[36m:[m	virtual int PersistenBes[1;31mBESbest[mclientDataSize() const = 0;
+[35msrc/engine/server/server.cpp[m[36m:[mbool CServer::SeBes[1;31mBESbest[mclientNameImpl(int ClientId, const char *pNameRequest, bool Set)
+[35msrc/engine/server/server.cpp[m[36m:[mbool CServer::SeBes[1;31mBESbest[mclientClanImpl(int ClientId, const char *pClanRequest, bool Set)
+[35msrc/engine/server/server.cpp[m[36m:[m	return SeBes[1;31mBESbest[mclientNameImpl(ClientId, pNameRequest, false);
+[35msrc/engine/server/server.cpp[m[36m:[m	return SeBes[1;31mBESbest[mclientClanImpl(ClientId, pClanRequest, false);
+[35msrc/engine/server/server.cpp[m[36m:[mvoid CServer::SeBes[1;31mBESbest[mclientName(int ClientId, const char *pName)
+[35msrc/engine/server/server.cpp[m[36m:[m	SeBes[1;31mBESbest[mclientNameImpl(ClientId, pName, true);
+[35msrc/engine/server/server.cpp[m[36m:[mvoid CServer::SeBes[1;31mBESbest[mclientClan(int ClientId, const char *pClan)
+[35msrc/engine/server/server.cpp[m[36m:[m	SeBes[1;31mBESbest[mclientClanImpl(ClientId, pClan, true);
+[35msrc/engine/server/server.cpp[m[36m:[mvoid CServer::SeBes[1;31mBESbest[mclientCountry(int ClientId, int Country)
+[35msrc/engine/server/server.cpp[m[36m:[mvoid CServer::SeBes[1;31mBESbest[mclientScore(int ClientId, std::optional<int> Score)
+[35msrc/engine/server/server.cpp[m[36m:[mvoid CServer::SeBes[1;31mBESbest[mclientFlags(int ClientId, int Flags)
+[35msrc/engine/server/server.cpp[m[36m:[mvoid CServer::ReconnecBes[1;31mBESbest[mclient(int ClientId)
+[35msrc/engine/server/server.cpp[m[36m:[m	if(GeBes[1;31mBESbest[mclientVersion(ClientId) < VERSION_DDNET_RECONNECT)
+[35msrc/engine/server/server.cpp[m[36m:[m		RedirecBes[1;31mBESbest[mclient(ClientId, m_NetServer.Address().port);
+[35msrc/engine/server/server.cpp[m[36m:[mvoid CServer::RedirecBes[1;31mBESbest[mclient(int ClientId, int Port)
+[35msrc/engine/server/server.cpp[m[36m:[m	bool SupportsRedirect = GeBes[1;31mBESbest[mclientVersion(ClientId) >= VERSION_DDNET_REDIRECT;
+[35msrc/engine/server/server.cpp[m[36m:[mbool CServer::GeBes[1;31mBESbest[mclientInfo(int ClientId, CClientInfo *pInfo) const
+[35msrc/engine/server/server.cpp[m[36m:[mvoid CServer::SeBes[1;31mBESbest[mclientDDNetVersion(int ClientId, int DDNetVersion)
+[35msrc/engine/server/server.cpp[m[36m:[mint CServer::DistincBes[1;31mBESbest[mclientCount() const
+[35msrc/engine/server/server.cpp[m[36m:[mint CServer::GeBes[1;31mBESbest[mclientVersion(int ClientId) const
+[35msrc/engine/server/server.cpp[m[36m:[m	if(GeBes[1;31mBESbest[mclientInfo(ClientId, &Info))
+[35msrc/engine/server/server.cpp[m[36m:[m				bool aPreInpuBes[1;31mBESbest[mclients[MAX_CLIENTS] = {};
+[35msrc/engine/server/server.cpp[m[36m:[m				GameServer()->PreInpuBes[1;31mBESbest[mclients(ClientId, aPreInpuBes[1;31mBESbest[mclients);
+[35msrc/engine/server/server.cpp[m[36m:[m						if(!aPreInpuBes[1;31mBESbest[mclients[Id])
+[35msrc/engine/server/server.cpp[m[36m:[m		int Size = GameServer()->PersistenBes[1;31mBESbest[mclientDataSize();
+[35msrc/engine/server/server.cpp[m[36m:[m		pServer->LogouBes[1;31mBESbest[mclient(pServer->m_RconClientId, "");
+[35msrc/engine/server/server.cpp[m[36m:[mvoid CServer::LogouBes[1;31mBESbest[mclient(int ClientId, const char *pReason)
+[35msrc/engine/server/server.cpp[m[36m:[m			LogouBes[1;31mBESbest[mclient(i, pReason);
+[35msrc/engine/server/server.cpp[m[36m:[m		LogouBes[1;31mBESbest[mclient(OrigId, "Timeout Protection");
+[35msrc/engine/server/server.h[m[36m:[m	bool SeBes[1;31mBESbest[mclientNameImpl(int ClientId, const char *pNameRequest, bool Set);
+[35msrc/engine/server/server.h[m[36m:[m	bool SeBes[1;31mBESbest[mclientClanImpl(int ClientId, const char *pClanRequest, bool Set);
+[35msrc/engine/server/server.h[m[36m:[m	void SeBes[1;31mBESbest[mclientName(int ClientId, const char *pName) override;
+[35msrc/engine/server/server.h[m[36m:[m	void SeBes[1;31mBESbest[mclientClan(int ClientId, const char *pClan) override;
+[35msrc/engine/server/server.h[m[36m:[m	void SeBes[1;31mBESbest[mclientCountry(int ClientId, int Country) override;
+[35msrc/engine/server/server.h[m[36m:[m	void SeBes[1;31mBESbest[mclientScore(int ClientId, std::optional<int> Score) override;
+[35msrc/engine/server/server.h[m[36m:[m	void SeBes[1;31mBESbest[mclientFlags(int ClientId, int Flags) override;
+[35msrc/engine/server/server.h[m[36m:[m	void ReconnecBes[1;31mBESbest[mclient(int ClientId);
+[35msrc/engine/server/server.h[m[36m:[m	void RedirecBes[1;31mBESbest[mclient(int ClientId, int Port) override;
+[35msrc/engine/server/server.h[m[36m:[m	bool GeBes[1;31mBESbest[mclientInfo(int ClientId, CClientInfo *pInfo) const override;
+[35msrc/engine/server/server.h[m[36m:[m	void SeBes[1;31mBESbest[mclientDDNetVersion(int ClientId, int DDNetVersion) override;
+[35msrc/engine/server/server.h[m[36m:[m	int DistincBes[1;31mBESbest[mclientCount() const override;
+[35msrc/engine/server/server.h[m[36m:[m	int GeBes[1;31mBESbest[mclientVersion(int ClientId) const override;
+[35msrc/engine/server/server.h[m[36m:[m	void LogouBes[1;31mBESbest[mclient(int ClientId, const char *pReason);
+[35msrc/engine/shared/config_domains.h[m[36m:[mCONFIG_DOMAIN(Bes[1;31mBESbest[mclient, "settings_Bes[1;31mBESbest[mclient.cfg", true)
+[35msrc/engine/shared/config_domains.h[m[36m:[mCONFIG_DOMAIN(Bes[1;31mBESbest[mclientPROFILES, "Bes[1;31mBESbest[mclient_profiles.cfg", false)
+[35msrc/engine/shared/config_domains.h[m[36m:[mCONFIG_DOMAIN(Bes[1;31mBESbest[mclientCHATBINDS, "Bes[1;31mBESbest[mclient_chatbinds.cfg", false)
+[35msrc/engine/shared/config_domains.h[m[36m:[mCONFIG_DOMAIN(Bes[1;31mBESbest[mclientWARLIST, "Bes[1;31mBESbest[mclient_warlist.cfg", false)
+[35msrc/engine/shared/config_includes.h[m[36m:[mSET_CONFIG_DOMAIN(ConfigDomain::Bes[1;31mBESbest[mclient)
+[35msrc/engine/shared/config_includes.h[m[36m:[m#include "config_variables_Bes[1;31mBESbest[mclient.h"
+[35msrc/engine/shared/network.h[m[36m:[m	// Needed for GotProblems in NeBes[1;31mBESbest[mclient
+[35msrc/engine/shared/network.h[m[36m:[m	bool ClientExists(const NETADDR &Addr) { return GeBes[1;31mBESbest[mclientSlot(Addr) != -1; }
+[35msrc/engine/shared/network.h[m[36m:[m	int GeBes[1;31mBESbest[mclientSlot(const NETADDR &Addr);
+[35msrc/engine/shared/network.h[m[36m:[m	int TryAccepBes[1;31mBESbest[mclient(NETADDR &Addr, SECURITY_TOKEN SecurityToken, bool VanillaAuth = false, bool Sixup = false, SECURITY_TOKEN Token = 0);
+[35msrc/engine/shared/network.h[m[36m:[m	int AccepBes[1;31mBESbest[mclient(NETSOCKET Socket, const NETADDR *pAddr);
+[35msrc/engine/shared/network.h[m[36m:[mclass CNeBes[1;31mBESbest[mclient
+[35msrc/engine/shared/network_client.cpp[m[36m:[mbool CNeBes[1;31mBESbest[mclient::Open(NETADDR BindAddr)
+[35msrc/engine/shared/network_client.cpp[m[36m:[m	*this = CNeBes[1;31mBESbest[mclient{};
+[35msrc/engine/shared/network_client.cpp[m[36m:[mvoid CNeBes[1;31mBESbest[mclient::Close()
+[35msrc/engine/shared/network_client.cpp[m[36m:[mvoid CNeBes[1;31mBESbest[mclient::Disconnect(const char *pReason)
+[35msrc/engine/shared/network_client.cpp[m[36m:[mvoid CNeBes[1;31mBESbest[mclient::Update()
+[35msrc/engine/shared/network_client.cpp[m[36m:[mvoid CNeBes[1;31mBESbest[mclient::Connect(const NETADDR *pAddr, int NumAddrs)
+[35msrc/engine/shared/network_client.cpp[m[36m:[mvoid CNeBes[1;31mBESbest[mclient::Connect7(const NETADDR *pAddr, int NumAddrs)
+[35msrc/engine/shared/network_client.cpp[m[36m:[mvoid CNeBes[1;31mBESbest[mclient::ResetErrorString()
+[35msrc/engine/shared/network_client.cpp[m[36m:[mint CNeBes[1;31mBESbest[mclient::Recv(CNetChunk *pChunk, SECURITY_TOKEN *pResponseToken, bool Sixup)
+[35msrc/engine/shared/network_client.cpp[m[36m:[mint CNeBes[1;31mBESbest[mclient::Send(CNetChunk *pChunk)
+[35msrc/engine/shared/network_client.cpp[m[36m:[m		dbg_msg("neBes[1;31mBESbest[mclient", "chunk payload too big. %d. dropping chunk", pChunk->m_DataSize);
+[35msrc/engine/shared/network_client.cpp[m[36m:[mint CNeBes[1;31mBESbest[mclient::State()
+[35msrc/engine/shared/network_client.cpp[m[36m:[mint CNeBes[1;31mBESbest[mclient::Flush()
+[35msrc/engine/shared/network_client.cpp[m[36m:[mbool CNeBes[1;31mBESbest[mclient::GotProblems(int64_t MaxLatency) const
+[35msrc/engine/shared/network_client.cpp[m[36m:[mconst char *CNeBes[1;31mBESbest[mclient::ErrorString() const
+[35msrc/engine/shared/network_client.cpp[m[36m:[mvoid CNeBes[1;31mBESbest[mclient::FeedStunServer(NETADDR StunServer)
+[35msrc/engine/shared/network_client.cpp[m[36m:[mvoid CNeBes[1;31mBESbest[mclient::RefreshStun()
+[35msrc/engine/shared/network_client.cpp[m[36m:[mCONNECTIVITY CNeBes[1;31mBESbest[mclient::GetConnectivity(int NetType, NETADDR *pGlobalAddr)
+[35msrc/engine/shared/network_console.cpp[m[36m:[mint CNetConsole::AccepBes[1;31mBESbest[mclient(NETSOCKET Socket, const NETADDR *pAddr)
+[35msrc/engine/shared/network_console.cpp[m[36m:[m		AccepBes[1;31mBESbest[mclient(Socket, &Addr);
+[35msrc/engine/shared/network_server.cpp[m[36m:[mint CNetServer::TryAccepBes[1;31mBESbest[mclient(NETADDR &Addr, SECURITY_TOKEN SecurityToken, bool VanillaAuth, bool Sixup, SECURITY_TOKEN Token)
+[35msrc/engine/shared/network_server.cpp[m[36m:[m			TryAccepBes[1;31mBESbest[mclient(Addr, NET_SECURITY_TOKEN_UNSUPPORTED);
+[35msrc/engine/shared/network_server.cpp[m[36m:[m				TryAccepBes[1;31mBESbest[mclient(Addr, NET_SECURITY_TOKEN_UNSUPPORTED, true);
+[35msrc/engine/shared/network_server.cpp[m[36m:[m			TryAccepBes[1;31mBESbest[mclient(Addr, Token);
+[35msrc/engine/shared/network_server.cpp[m[36m:[m			TryAccepBes[1;31mBESbest[mclient(Addr, ResponseToken, false, true, Token);
+[35msrc/engine/shared/network_server.cpp[m[36m:[mint CNetServer::GeBes[1;31mBESbest[mclientSlot(const NETADDR &Addr)
+[35msrc/engine/shared/network_server.cpp[m[36m:[m		int Slot = (*Flags & NET_PACKETFLAG_CONNLESS) == 0 ? GeBes[1;31mBESbest[mclientSlot(Addr) : -1;
+[35msrc/engine/textrender.h[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/engine/textrender.h[m[36m:[m	virtual std::vector<std::string> *GetCustomFaces() = 0; // Bes[1;31mBESbest[mclient
+[35msrc/engine/textrender.h[m[36m:[m	virtual void SetCustomFace(const char *pFace) = 0; // Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/chat.cpp[m[36m:[m#include <game/client/components/Bes[1;31mBESbest[mclient/colored_parts.h>
+[35msrc/game/client/components/chat.cpp[m[36m:[m		else if(GameClient()->m_Bes[1;31mBESbest[mclient.ChatDoSpecId(m_Input.GetString()))
+[35msrc/game/client/components/chat.cpp[m[36m:[m		auto &Re = GameClient()->m_Bes[1;31mBESbest[mclient.m_RegexChatIgnore;
+[35msrc/game/client/components/chat.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/chat.cpp[m[36m:[m	if(ClientId == CLIENT_MSG && !g_Config.m_TcShowChaBes[1;31mBESbest[mclient)
+[35msrc/game/client/components/chat.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/chat.cpp[m[36m:[m			GameClient()->FormaBes[1;31mBESbest[mclientId(Line.m_ClientId, aClientId, EClientIdFormat::INDENT_AUTO);
+[35msrc/game/client/components/chat.cpp[m[36m:[m		else if(Line.m_ClientId >= 0 && g_Config.m_TcWarList && g_Config.m_TcWarListChat && GameClient()->m_WarList.GetAnyWar(Line.m_ClientId)) // Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/chat.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/chat.cpp[m[36m:[m		// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/chat.h[m[36m:[m	friend class CBes[1;31mBESbest[mclient;
+[35msrc/game/client/components/console.cpp[m[36m:[m#include <game/client/components/Bes[1;31mBESbest[mclient/colored_parts.h>
+[35msrc/game/client/components/console.cpp[m[36m:[m			bool ParseColors = false; // Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/console.cpp[m[36m:[m			TextRender()->TextEx(&EntryCursor, pText, -1); // Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/console.cpp[m[36m:[m		// Bes[1;31mBESbest[mclient: render client version
+[35msrc/game/client/components/console.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/controls.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/emoticon.h[m[36m:[m#include <game/client/components/Bes[1;31mBESbest[mclient/bindwheel.h>
+[35msrc/game/client/components/hud.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/hud.cpp[m[36m:[m	const bool Seconds = g_Config.m_TcShowLocalTimeSeconds; // Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/hud.cpp[m[36m:[m		GameClient()->m_Bes[1;31mBESbest[mclient.RenderCenterLines();
+[35msrc/game/client/components/items.h[m[36m:[m	friend class CBes[1;31mBESbest[mclient;
+[35msrc/game/client/components/maplayers.h[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/menus.cpp[m[36m:[m	else // Bes[1;31mBESbest[mclient, why was this not here? ig they never use "checked" anywhere important
+[35msrc/game/client/components/menus.h[m[36m:[m#include <game/client/components/Bes[1;31mBESbest[mclient/warlist.h>
+[35msrc/game/client/components/menus.h[m[36m:[m		CFriendItem(const CServerInfo::CClient &CurrenBes[1;31mBESbest[mclient, const CServerInfo *pServerInfo) :
+[35msrc/game/client/components/menus.h[m[36m:[m			m_FriendState(CurrenBes[1;31mBESbest[mclient.m_FriendState),
+[35msrc/game/client/components/menus.h[m[36m:[m			m_IsPlayer(CurrenBes[1;31mBESbest[mclient.m_Player),
+[35msrc/game/client/components/menus.h[m[36m:[m			m_IsAfk(CurrenBes[1;31mBESbest[mclient.m_Afk),
+[35msrc/game/client/components/menus.h[m[36m:[m			m_CustomSkinColors(CurrenBes[1;31mBESbest[mclient.m_CustomSkinColors),
+[35msrc/game/client/components/menus.h[m[36m:[m			m_CustomSkinColorBody(CurrenBes[1;31mBESbest[mclient.m_CustomSkinColorBody),
+[35msrc/game/client/components/menus.h[m[36m:[m			m_CustomSkinColorFeet(CurrenBes[1;31mBESbest[mclient.m_CustomSkinColorFeet)
+[35msrc/game/client/components/menus.h[m[36m:[m			str_copy(m_aName, CurrenBes[1;31mBESbest[mclient.m_aName);
+[35msrc/game/client/components/menus.h[m[36m:[m			str_copy(m_aClan, CurrenBes[1;31mBESbest[mclient.m_aClan);
+[35msrc/game/client/components/menus.h[m[36m:[m			str_copy(m_aSkin, CurrenBes[1;31mBESbest[mclient.m_aSkin);
+[35msrc/game/client/components/menus.h[m[36m:[m				str_copy(m_aaSkin7[Part], CurrenBes[1;31mBESbest[mclient.m_aaSkin7[Part]);
+[35msrc/game/client/components/menus.h[m[36m:[m				m_aUseCustomSkinColor7[Part] = CurrenBes[1;31mBESbest[mclient.m_aUseCustomSkinColor7[Part];
+[35msrc/game/client/components/menus.h[m[36m:[m				m_aCustomSkinColor7[Part] = CurrenBes[1;31mBESbest[mclient.m_aCustomSkinColor7[Part];
+[35msrc/game/client/components/menus.h[m[36m:[m		SETTINGS_Bes[1;31mBESbest[mclient,
+[35msrc/game/client/components/menus.h[m[36m:[m	// found in menus_Bes[1;31mBESbest[mclient.cpp
+[35msrc/game/client/components/menus.h[m[36m:[m	void RenderSettingsBes[1;31mBESbest[mclient(CUIRect MainView);
+[35msrc/game/client/components/menus.h[m[36m:[m	void RenderSettingsBes[1;31mBESbest[mclientSettings(CUIRect MainView);
+[35msrc/game/client/components/menus.h[m[36m:[m	void RenderSettingsBes[1;31mBESbest[mclientBindWheel(CUIRect MainView);
+[35msrc/game/client/components/menus.h[m[36m:[m	void RenderSettingsBes[1;31mBESbest[mclientChatBinds(CUIRect MainView);
+[35msrc/game/client/components/menus.h[m[36m:[m	void RenderSettingsBes[1;31mBESbest[mclientWarList(CUIRect MainView);
+[35msrc/game/client/components/menus.h[m[36m:[m	void RenderSettingsBes[1;31mBESbest[mclientInfo(CUIRect MainView);
+[35msrc/game/client/components/menus.h[m[36m:[m	void RenderSettingsBes[1;31mBESbest[mclientStatusBar(CUIRect MainView);
+[35msrc/game/client/components/menus.h[m[36m:[m	void RenderSettingsBes[1;31mBESbest[mclientProfiles(CUIRect MainView);
+[35msrc/game/client/components/menus.h[m[36m:[m	void RenderSettingsBes[1;31mBESbest[mclientConfigs(CUIRect MainView);
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m	g_Config.m_BrFilterLogin = false; // Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m		const CServerInfo::CClient &CurrenBes[1;31mBESbest[mclient = pSelectedServer->m_aClients[i];
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m		const CListboxItem Item = s_ListBox.DoNextItem(&CurrenBes[1;31mBESbest[mclient);
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m		const ColorRGBA Color = PlayerBackgroundColor(CurrenBes[1;31mBESbest[mclient.m_FriendState == IFriends::FRIEND_PLAYER, CurrenBes[1;31mBESbest[mclient.m_FriendState == IFriends::FRIEND_CLAN, CurrenBes[1;31mBESbest[mclient.m_Afk, false);
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m		if(!CurrenBes[1;31mBESbest[mclient.m_Player)
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m			str_format(aTemp, sizeof(aTemp), "%d", CurrenBes[1;31mBESbest[mclient.m_Score);
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m				const int TempTime = absolute(CurrenBes[1;31mBESbest[mclient.m_Score);
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m				if(CurrenBes[1;31mBESbest[mclient.m_Score >= 0)
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m					Time = CurrenBes[1;31mBESbest[mclient.m_Score;
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m		if(CurrenBes[1;31mBESbest[mclient.m_aSkin[0] != '\0')
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m			const CTeeRenderInfo TeeInfo = GetTeeRenderInfo(vec2(Skin.w, Skin.h), CurrenBes[1;31mBESbest[mclient.m_aSkin, CurrenBes[1;31mBESbest[mclient.m_CustomSkinColors, CurrenBes[1;31mBESbest[mclient.m_CustomSkinColorBody, CurrenBes[1;31mBESbest[mclient.m_CustomSkinColorFeet);
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m			RenderTools()->RenderTee(pIdleState, &TeeInfo, CurrenBes[1;31mBESbest[mclient.m_Afk ? EMOTE_BLINK : EMOTE_NORMAL, vec2(1.0f, 0.0f), TeeRenderPos);
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m			Ui()->DoButtonLogic(&CurrenBes[1;31mBESbest[mclient.m_aSkin, 0, &Skin, BUTTONFLAG_NONE);
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m			GameClient()->m_Tooltips.DoToolTip(&CurrenBes[1;31mBESbest[mclient.m_aSkin, &Skin, CurrenBes[1;31mBESbest[mclient.m_aSkin);
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m		else if(CurrenBes[1;31mBESbest[mclient.m_aaSkin7[protocol7::SKINPART_BODY][0] != '\0')
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m				GameClient()->m_Skins7.FindSkinPart(Part, CurrenBes[1;31mBESbest[mclient.m_aaSkin7[Part], true)->ApplyTo(TeeInfo.m_aSixup[g_Config.m_ClDummy]);
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m				GameClient()->m_Skins7.ApplyColorTo(TeeInfo.m_aSixup[g_Config.m_ClDummy], CurrenBes[1;31mBESbest[mclient.m_aUseCustomSkinColor7[Part], CurrenBes[1;31mBESbest[mclient.m_aCustomSkinColor7[Part], Part);
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m			RenderTools()->RenderTee(pIdleState, &TeeInfo, CurrenBes[1;31mBESbest[mclient.m_Afk ? EMOTE_BLINK : EMOTE_NORMAL, vec2(1.0f, 0.0f), TeeRenderPos);
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m		const char *pName = CurrenBes[1;31mBESbest[mclient.m_aName;
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m		const char *pClan = CurrenBes[1;31mBESbest[mclient.m_aClan;
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m		GameClient()->m_CountryFlags.Render(CurrenBes[1;31mBESbest[mclient.m_Country, ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f), Flag.x, Flag.y, Flag.w, Flag.h);
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m			const CServerInfo::CClient &CurrenBes[1;31mBESbest[mclient = pEntry->m_aClients[ClientIndex];
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m			if(CurrenBes[1;31mBESbest[mclient.m_FriendState == IFriends::FRIEND_NO)
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m			const int FriendIndex = CurrenBes[1;31mBESbest[mclient.m_FriendState == IFriends::FRIEND_PLAYER ? FRIEND_PLAYER_ON : FRIEND_CLAN_ON;
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m			m_avFriends[FriendIndex].emplace_back(CurrenBes[1;31mBESbest[mclient, pEntry);
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m			const auto &&RemovalPredicate = [CurrenBes[1;31mBESbest[mclient](const CFriendItem &Friend) {
+[35msrc/game/client/components/menus_browser.cpp[m[36m:[m				return (Friend.Name()[0] == '\0' || str_comp(Friend.Name(), CurrenBes[1;31mBESbest[mclient.m_aName) == 0) && ((Friend.Name()[0] != '\0' && g_Config.m_ClFriendsIgnoreClan) || str_comp(Friend.Clan(), CurrenBes[1;31mBESbest[mclient.m_aClan) == 0);
+[35msrc/game/client/components/menus_ingame.cpp[m[36m:[m		CGameClient::CClientData &CurrenBes[1;31mBESbest[mclient = GameClient()->m_aClients[Index];
+[35msrc/game/client/components/menus_ingame.cpp[m[36m:[m		const CListboxItem Item = s_ListBox.DoNextItem(&CurrenBes[1;31mBESbest[mclient);
+[35msrc/game/client/components/menus_ingame.cpp[m[36m:[m		CTeeRenderInfo TeeInfo = CurrenBes[1;31mBESbest[mclient.m_RenderInfo;
+[35msrc/game/client/components/menus_ingame.cpp[m[36m:[m		GameClient()->m_Tooltips.DoToolTip(&s_aPlayerIds[Index][3], &Button, CurrenBes[1;31mBESbest[mclient.m_aSkinName);
+[35msrc/game/client/components/menus_ingame.cpp[m[36m:[m		Ui()->DoLabel(&Player, CurrenBes[1;31mBESbest[mclient.m_aName, 14.0f, TEXTALIGN_ML);
+[35msrc/game/client/components/menus_ingame.cpp[m[36m:[m		Ui()->DoLabel(&Button, CurrenBes[1;31mBESbest[mclient.m_aClan, 14.0f, TEXTALIGN_ML);
+[35msrc/game/client/components/menus_ingame.cpp[m[36m:[m		GameClient()->m_CountryFlags.Render(CurrenBes[1;31mBESbest[mclient.m_Country, ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f),
+[35msrc/game/client/components/menus_ingame.cpp[m[36m:[m		if(g_Config.m_ClShowChatFriends && !CurrenBes[1;31mBESbest[mclient.m_Friend)
+[35msrc/game/client/components/menus_ingame.cpp[m[36m:[m		else if(DoButton_Toggle(&s_aPlayerIds[Index][0], CurrenBes[1;31mBESbest[mclient.m_ChatIgnore, &Button, true))
+[35msrc/game/client/components/menus_ingame.cpp[m[36m:[m			CurrenBes[1;31mBESbest[mclient.m_ChatIgnore ^= 1;
+[35msrc/game/client/components/menus_ingame.cpp[m[36m:[m		if(g_Config.m_ClShowChatFriends && !CurrenBes[1;31mBESbest[mclient.m_Friend)
+[35msrc/game/client/components/menus_ingame.cpp[m[36m:[m		else if(DoButton_Toggle(&s_aPlayerIds[Index][1], CurrenBes[1;31mBESbest[mclient.m_EmoticonIgnore, &Button, true))
+[35msrc/game/client/components/menus_ingame.cpp[m[36m:[m			CurrenBes[1;31mBESbest[mclient.m_EmoticonIgnore ^= 1;
+[35msrc/game/client/components/menus_ingame.cpp[m[36m:[m		if(DoButton_Toggle(&s_aPlayerIds[Index][2], CurrenBes[1;31mBESbest[mclient.m_Friend, &Button, true))
+[35msrc/game/client/components/menus_ingame.cpp[m[36m:[m			if(CurrenBes[1;31mBESbest[mclient.m_Friend)
+[35msrc/game/client/components/menus_ingame.cpp[m[36m:[m				GameClient()->Friends()->RemoveFriend(CurrenBes[1;31mBESbest[mclient.m_aName, CurrenBes[1;31mBESbest[mclient.m_aClan);
+[35msrc/game/client/components/menus_ingame.cpp[m[36m:[m				GameClient()->Friends()->AddFriend(CurrenBes[1;31mBESbest[mclient.m_aName, CurrenBes[1;31mBESbest[mclient.m_aClan);
+[35msrc/game/client/components/menus_settings.cpp[m[36m:[m		TCLocalize("Bes[1;31mBESbest[mclient"),
+[35msrc/game/client/components/menus_settings.cpp[m[36m:[m	else if(g_Config.m_UiSettingsPage == SETTINGS_Bes[1;31mBESbest[mclient)
+[35msrc/game/client/components/menus_settings.cpp[m[36m:[m		RenderSettingsBes[1;31mBESbest[mclient(MainView);
+[35msrc/game/client/components/menus_settings.cpp[m[36m:[m		RenderSettingsBes[1;31mBESbest[mclientProfiles(MainView);
+[35msrc/game/client/components/menus_settings.cpp[m[36m:[m		RenderSettingsBes[1;31mBESbest[mclientConfigs(MainView);
+[35msrc/game/client/components/menus_settings.cpp[m[36m:[m		RightView.HSplitTop(MarginSmall, nullptr, &RightView); // Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/menus_settings.cpp[m[36m:[m		RightView.HSplitTop(MarginSmall, nullptr, &RightView); // Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/menus_settings.cpp[m[36m:[m		RightView.HSplitTop(MarginSmall, nullptr, &RightView); // Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/menus_settings.cpp[m[36m:[m		// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/menus_settings.cpp[m[36m:[m		DoLine_ColorPicker(&s_ClientMessageColor, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &RightView, aBuf, &g_Config.m_ClMessageClientColor, ColorRGBA(0.5f, 0.78f, 1.0f), true, &g_Config.m_TcShowChaBes[1;31mBESbest[mclient);
+[35msrc/game/client/components/menus_settings.cpp[m[36m:[m				GameClient()->FormaBes[1;31mBESbest[mclientId(Line.m_ClientId, aClientId, EClientIdFormat::INDENT_FORCE);
+[35msrc/game/client/components/menus_settings.cpp[m[36m:[m			if(g_Config.m_TcShowChaBes[1;31mBESbest[mclient)
+[35msrc/game/client/components/menus_settings.cpp[m[36m:[m		if(g_Config.m_TcShowChaBes[1;31mBESbest[mclient)
+[35msrc/game/client/components/menus_settings.cpp[m[36m:[m		const bool NeedUpdate = GameClient()->m_Bes[1;31mBESbest[mclient.NeedUpdate();
+[35msrc/game/client/components/menus_settings.cpp[m[36m:[m			str_format(aBuf, sizeof(aBuf), Localize("Bes[1;31mBESbest[mclient %s is available:"), GameClient()->m_Bes[1;31mBESbest[mclient.m_aVersionStr);
+[35msrc/game/client/components/menus_settings.cpp[m[36m:[m			str_copy(aBuf, Localize("Bes[1;31mBESbest[mclient Client updated!"));
+[35msrc/game/client/components/menus_settings.cpp[m[36m:[m				GameClient()->m_Bes[1;31mBESbest[mclient.FetchBes[1;31mBESbest[mclientInfo();
+[35msrc/game/client/components/menus_start.cpp[m[36m:[m	CUIRect Bes[1;31mBESbest[mclientVersion;
+[35msrc/game/client/components/menus_start.cpp[m[36m:[m	MainView.HSplitTop(15.0f, &Bes[1;31mBESbest[mclientVersion, &MainView);
+[35msrc/game/client/components/menus_start.cpp[m[36m:[m	Bes[1;31mBESbest[mclientVersion.VSplitRight(40.0f, &Bes[1;31mBESbest[mclientVersion, nullptr);
+[35msrc/game/client/components/menus_start.cpp[m[36m:[m	Ui()->DoLabel(&Bes[1;31mBESbest[mclientVersion, aTBuf, 14.0f, TEXTALIGN_MR);
+[35msrc/game/client/components/menus_start.cpp[m[36m:[m	if(!GameClient()->m_Bes[1;31mBESbest[mclient.NeedUpdate() && GameClient()->m_Bes[1;31mBESbest[mclient.m_FetchedBes[1;31mBESbest[mclientInfo)
+[35msrc/game/client/components/menus_start.cpp[m[36m:[m	const bool NeedUpdate = GameClient()->m_Bes[1;31mBESbest[mclient.NeedUpdate();
+[35msrc/game/client/components/menus_start.cpp[m[36m:[m		str_format(aBuf, sizeof(aBuf), Localize("Bes[1;31mBESbest[mclient %s is out!"), GameClient()->m_Bes[1;31mBESbest[mclient.m_aVersionStr);
+[35msrc/game/client/components/nameplates.cpp[m[36m:[m	bool m_Local; // Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/nameplates.cpp[m[36m:[mclass CNamePlateParBes[1;31mBESbest[mclientId : public CNamePlatePartText
+[35msrc/game/client/components/nameplates.cpp[m[36m:[m	CNamePlateParBes[1;31mBESbest[mclientId(CGameClient &This, bool ClientIdSeparateLine) :
+[35msrc/game/client/components/nameplates.cpp[m[36m:[m		// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/nameplates.cpp[m[36m:[m		// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/nameplates.cpp[m[36m:[m// ***** Bes[1;31mBESbest[mclient Parts *****
+[35msrc/game/client/components/nameplates.cpp[m[36m:[m		AddPart<CNamePlatePartCountry>(This); // Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/nameplates.cpp[m[36m:[m		AddPart<CNamePlatePartPing>(This); // Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/nameplates.cpp[m[36m:[m		AddPart<CNamePlatePartIgnoreMark>(This); // Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/nameplates.cpp[m[36m:[m		AddPart<CNamePlateParBes[1;31mBESbest[mclientId>(This, false);
+[35msrc/game/client/components/nameplates.cpp[m[36m:[m		AddPart<CNamePlatePartReason>(This); // Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/nameplates.cpp[m[36m:[m		AddPart<CNamePlatePartNewLine>(This); // Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/nameplates.cpp[m[36m:[m		AddPart<CNamePlatePartSkin>(This); // Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/nameplates.cpp[m[36m:[m		AddPart<CNamePlatePartNewLine>(This); // Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/nameplates.cpp[m[36m:[m		AddPart<CNamePlateParBes[1;31mBESbest[mclientId>(This, true);
+[35msrc/game/client/components/nameplates.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/nameplates.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/nameplates.cpp[m[36m:[m			// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/players.cpp[m[36m:[m// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/players.cpp[m[36m:[m#include <game/client/components/Bes[1;31mBESbest[mclient/rainbow.h>
+[35msrc/game/client/components/players.cpp[m[36m:[m	if(!g_Config.m_TcRainbowTees) // Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/players.cpp[m[36m:[m		// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/players.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/players.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/players.cpp[m[36m:[m	RenderTools()->m_LocalTeeRender = Local; // Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/players.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/players.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/players.cpp[m[36m:[m		GameClient()->m_Bes[1;31mBESbest[mclient.RenderCtfFlag(Position, Alpha);
+[35msrc/game/client/components/players.cpp[m[36m:[m			// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/players.cpp[m[36m:[m// Bes[1;31mBESbest[mclient: TODO remove this
+[35msrc/game/client/components/players.cpp[m[36m:[m	RenderTools()->m_LocalTeeRender = Local; // Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/players.cpp[m[36m:[m		// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/scoreboard.cpp[m[36m:[m			GameClient()->FormaBes[1;31mBESbest[mclientId(pInfo->m_ClientId, aClientId, EClientIdFormat::NO_INDENT);
+[35msrc/game/client/components/scoreboard.cpp[m[36m:[m					GameClient()->FormaBes[1;31mBESbest[mclientId(pInfo->m_ClientId, aClientId, EClientIdFormat::INDENT_AUTO);
+[35msrc/game/client/components/scoreboard.cpp[m[36m:[m				// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/scoreboard.cpp[m[36m:[m				// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/spectator.cpp[m[36m:[m			GameClient()->FormaBes[1;31mBESbest[mclientId(GameClient()->m_Snap.m_apInfoByDDTeamName[i]->m_ClientId, aClientId, EClientIdFormat::INDENT_AUTO);
+[35msrc/game/client/components/spectator.cpp[m[36m:[m		// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/tclient/bg_draw.cpp[m[36m:[m#include <game/client/components/Bes[1;31mBESbest[mclient/bg_draw_file.h>
+[35msrc/game/client/components/tclient/bg_draw.h[m[36m:[m#ifndef GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_BG_DRAW_H
+[35msrc/game/client/components/tclient/bg_draw.h[m[36m:[m#define GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_BG_DRAW_H
+[35msrc/game/client/components/tclient/bg_draw_file.h[m[36m:[m#ifndef GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_BG_DRAW_FILE_H
+[35msrc/game/client/components/tclient/bg_draw_file.h[m[36m:[m#define GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_BG_DRAW_FILE_H
+[35msrc/game/client/components/tclient/bindchat.cpp[m[36m:[m					   {TCLocalizable("Shrug:"), {"!shrug", "chai Bes[1;31mBESbest[mclient/builtinscripts/sayemoticon.chai ¯\\_(ツ)_/¯D"}},
+[35msrc/game/client/components/tclient/bindchat.cpp[m[36m:[m					   {TCLocalizable("Flip:"), {"!flip", "chai Bes[1;31mBESbest[mclient/builtinscripts/sayemoticon.chai (╯°□°)╯︵ ┻━┻D"}},
+[35msrc/game/client/components/tclient/bindchat.cpp[m[36m:[m					   {TCLocalizable("Unflip:"), {"!unflip", "chai Bes[1;31mBESbest[mclient/builtinscripts/sayemoticon.chai ┬─┬ノ( º _ ºノ)D"}},
+[35msrc/game/client/components/tclient/bindchat.cpp[m[36m:[m					   {TCLocalizable("Cute:"), {"!cute", "chai Bes[1;31mBESbest[mclient/builtinscripts/sayemoticon.chai ૮ ˶ᵔ ᵕ ᵔ˶ აD"}},
+[35msrc/game/client/components/tclient/bindchat.cpp[m[36m:[m					   {TCLocalizable("Lenny:"), {"!lenny", "chai Bes[1;31mBESbest[mclient/builtinscripts/sayemoticon.chai ( ͡° ͜ʖ ͡°)D"}},
+[35msrc/game/client/components/tclient/bindchat.cpp[m[36m:[m		pConfigManager->RegisterCallback(ConfigSaveCallback, this, ConfigDomain::Bes[1;31mBESbest[mclientCHATBINDS);
+[35msrc/game/client/components/tclient/bindchat.cpp[m[36m:[m		pConfigManager->WriteLine(aBuf, ConfigDomain::Bes[1;31mBESbest[mclientCHATBINDS);
+[35msrc/game/client/components/tclient/bindchat.cpp[m[36m:[m		pConfigManager->WriteLine(aBuf, ConfigDomain::Bes[1;31mBESbest[mclientCHATBINDS);
+[35msrc/game/client/components/tclient/bindchat.h[m[36m:[m#ifndef GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_BINDCHAT_H
+[35msrc/game/client/components/tclient/bindchat.h[m[36m:[m#define GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_BINDCHAT_H
+[35msrc/game/client/components/tclient/bindwheel.cpp[m[36m:[m		pConfigManager->RegisterCallback(ConfigSaveCallback, this, ConfigDomain::Bes[1;31mBESbest[mclient);
+[35msrc/game/client/components/tclient/bindwheel.cpp[m[36m:[m		pConfigManager->WriteLine(aBuf, ConfigDomain::Bes[1;31mBESbest[mclient);
+[35msrc/game/client/components/tclient/bindwheel.h[m[36m:[m#ifndef GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_BINDWHEEL_H
+[35msrc/game/client/components/tclient/bindwheel.h[m[36m:[m#define GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_BINDWHEEL_H
+[35msrc/game/client/components/tclient/colored_parts.h[m[36m:[m#ifndef GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_COLORED_PARTS_H
+[35msrc/game/client/components/tclient/colored_parts.h[m[36m:[m#define GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_COLORED_PARTS_H
+[35msrc/game/client/components/tclient/custom_communities.h[m[36m:[m#ifndef GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_CUSTOM_COMMUNITIES_H
+[35msrc/game/client/components/tclient/custom_communities.h[m[36m:[m#define GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_CUSTOM_COMMUNITIES_H
+[35msrc/game/client/components/tclient/data_version.h[m[36m:[m#ifndef GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_DATA_VERSION_H
+[35msrc/game/client/components/tclient/data_version.h[m[36m:[m#define GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_DATA_VERSION_H
+[35msrc/game/client/components/tclient/data_version.h[m[36m:[m// 	{"Bes[1;31mBESbest[mclient", Bes[1;31mBESbest[mclient_VERSION},
+[35msrc/game/client/components/tclient/mod.cpp[m[36m:[m	const CGameClient::CClientData *pBesBes[1;31mBESbest[mclient = nullptr;
+[35msrc/game/client/components/tclient/mod.cpp[m[36m:[m	float BesBes[1;31mBESbest[mclientScore = -INFINITY;
+[35msrc/game/client/components/tclient/mod.cpp[m[36m:[m			if(Score > BesBes[1;31mBESbest[mclientScore)
+[35msrc/game/client/components/tclient/mod.cpp[m[36m:[m				BesBes[1;31mBESbest[mclientScore = Score;
+[35msrc/game/client/components/tclient/mod.cpp[m[36m:[m				pBesBes[1;31mBESbest[mclient = &Other;
+[35msrc/game/client/components/tclient/mod.cpp[m[36m:[m			if(Score > BesBes[1;31mBESbest[mclientScore)
+[35msrc/game/client/components/tclient/mod.cpp[m[36m:[m				BesBes[1;31mBESbest[mclientScore = Score;
+[35msrc/game/client/components/tclient/mod.cpp[m[36m:[m				pBesBes[1;31mBESbest[mclient = &Other;
+[35msrc/game/client/components/tclient/mod.cpp[m[36m:[m	if(!pBesBes[1;31mBESbest[mclient)
+[35msrc/game/client/components/tclient/mod.cpp[m[36m:[m	m_ModWeaponActiveId = pBesBes[1;31mBESbest[mclient->ClientId();
+[35msrc/game/client/components/tclient/mod.h[m[36m:[m#ifndef GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_MOD_H
+[35msrc/game/client/components/tclient/mod.h[m[36m:[m#define GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_MOD_H
+[35msrc/game/client/components/tclient/outlines.h[m[36m:[m#ifndef GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_OUTLINES_H
+[35msrc/game/client/components/tclient/outlines.h[m[36m:[m#define GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_OUTLINES_H
+[35msrc/game/client/components/tclient/pet.h[m[36m:[m#ifndef GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_PET_H
+[35msrc/game/client/components/tclient/pet.h[m[36m:[m#define GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_PET_H
+[35msrc/game/client/components/tclient/player_indicator.h[m[36m:[m#ifndef GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_PLAYER_INDICATOR_H
+[35msrc/game/client/components/tclient/player_indicator.h[m[36m:[m#define GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_PLAYER_INDICATOR_H
+[35msrc/game/client/components/tclient/rainbow.h[m[36m:[m#ifndef GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_RAINBOW_H
+[35msrc/game/client/components/tclient/rainbow.h[m[36m:[m#define GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_RAINBOW_H
+[35msrc/game/client/components/tclient/scripting.h[m[36m:[m#ifndef GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_CHAISCRIPT_COMPONENT_H
+[35msrc/game/client/components/tclient/scripting.h[m[36m:[m#define GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_CHAISCRIPT_COMPONENT_H
+[35msrc/game/client/components/tclient/scripting/impl.h[m[36m:[m#ifndef GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_SCRIPTING_SCRIPTING_H
+[35msrc/game/client/components/tclient/scripting/impl.h[m[36m:[m#define GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_SCRIPTING_SCRIPTING_H
+[35msrc/game/client/components/tclient/skinprofiles.cpp[m[36m:[m		pConfigManager->RegisterCallback(ConfigSaveCallback, this, ConfigDomain::Bes[1;31mBESbest[mclientPROFILES);
+[35msrc/game/client/components/tclient/skinprofiles.cpp[m[36m:[m		pConfigManager->WriteLine(aBuf, ConfigDomain::Bes[1;31mBESbest[mclientPROFILES);
+[35msrc/game/client/components/tclient/skinprofiles.h[m[36m:[m#ifndef GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_SKINPROFILES_H
+[35msrc/game/client/components/tclient/skinprofiles.h[m[36m:[m#define GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_SKINPROFILES_H
+[35msrc/game/client/components/tclient/statusbar.h[m[36m:[m#ifndef GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_STATUSBAR_H
+[35msrc/game/client/components/tclient/statusbar.h[m[36m:[m#define GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_STATUSBAR_H
+[35msrc/game/client/components/tclient/trails.h[m[36m:[m#ifndef GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_TRAILS_H
+[35msrc/game/client/components/tclient/trails.h[m[36m:[m#define GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_TRAILS_H
+[35msrc/game/client/components/tclient/translate.h[m[36m:[m#ifndef GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_TRANSLATE_H
+[35msrc/game/client/components/tclient/translate.h[m[36m:[m#define GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_TRANSLATE_H
+[35msrc/game/client/components/tclient/warlist.cpp[m[36m:[m		pConfigManager->RegisterCallback(ConfigSaveCallback, this, ConfigDomain::Bes[1;31mBESbest[mclientWARLIST);
+[35msrc/game/client/components/tclient/warlist.cpp[m[36m:[m		pConfigManager->WriteLine(aBuf, ConfigDomain::Bes[1;31mBESbest[mclientWARLIST);
+[35msrc/game/client/components/tclient/warlist.cpp[m[36m:[m		pConfigManager->WriteLine(aBuf, ConfigDomain::Bes[1;31mBESbest[mclientWARLIST);
+[35msrc/game/client/components/tclient/warlist.h[m[36m:[m#ifndef GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_WARLIST_H
+[35msrc/game/client/components/tclient/warlist.h[m[36m:[m#define GAME_CLIENT_COMPONENTS_Bes[1;31mBESbest[mclient_WARLIST_H
+[35msrc/game/client/components/tooltips.cpp[m[36m:[m// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/tooltips.h[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/voting.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/game/client/components/voting.cpp[m[36m:[m		GameClient()->m_Bes[1;31mBESbest[mclient.RenderMiniVoteHud();
+[35msrc/game/client/components/voting.h[m[36m:[m	friend class CBes[1;31mBESbest[mclient; // Bes[1;31mBESbest[mclient
+[35msrc/game/client/gameclient.cpp[m[36m:[m					      &m_Bes[1;31mBESbest[mclient, // Must be before chat and players
+[35msrc/game/client/gameclient.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/game/client/gameclient.cpp[m[36m:[m	str_format(aBuf, sizeof(aBuf), "Bes[1;31mBESbest[mclient/%s", g_Config.m_ClLanguagefile);
+[35msrc/game/client/gameclient.cpp[m[36m:[m	m_RenderTools.Init(Graphics(), TextRender(), this); // Bes[1;31mBESbest[mclient
+[35msrc/game/client/gameclient.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/game/client/gameclient.cpp[m[36m:[mvoid CGameClient::FormaBes[1;31mBESbest[mclientId(int ClientId, char (&aClientId)[16], EClientIdFormat Format) const
+[35msrc/game/client/gameclient.cpp[m[36m:[m		const int HighesBes[1;31mBESbest[mclientId = Format == EClientIdFormat::INDENT_AUTO ? m_Snap.m_HighesBes[1;31mBESbest[mclientId : 64;
+[35msrc/game/client/gameclient.cpp[m[36m:[m		if(ClientId < 100 && HighesBes[1;31mBESbest[mclientId >= 100)
+[35msrc/game/client/gameclient.cpp[m[36m:[m		if(ClientId < 10 && HighesBes[1;31mBESbest[mclientId >= 10)
+[35msrc/game/client/gameclient.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/game/client/gameclient.cpp[m[36m:[m	str_format(aBuf, sizeof(aBuf), "Bes[1;31mBESbest[mclient/%s", g_Config.m_ClLanguagefile);
+[35msrc/game/client/gameclient.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/game/client/gameclient.cpp[m[36m:[m					m_Snap.m_HighesBes[1;31mBESbest[mclientId = maximum(m_Snap.m_HighesBes[1;31mBESbest[mclientId, pInfo->m_ClientId);
+[35msrc/game/client/gameclient.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/game/client/gameclient.cpp[m[36m:[m		// Bes[1;31mBESbest[mclient
+[35msrc/game/client/gameclient.cpp[m[36m:[m// Bes[1;31mBESbest[mclient
+[35msrc/game/client/gameclient.h[m[36m:[m#include "components/Bes[1;31mBESbest[mclient/bg_draw.h"
+[35msrc/game/client/gameclient.h[m[36m:[m#include "components/Bes[1;31mBESbest[mclient/bindchat.h"
+[35msrc/game/client/gameclient.h[m[36m:[m#include "components/Bes[1;31mBESbest[mclient/bindwheel.h"
+[35msrc/game/client/gameclient.h[m[36m:[m#include "components/Bes[1;31mBESbest[mclient/custom_communities.h"
+[35msrc/game/client/gameclient.h[m[36m:[m#include "components/Bes[1;31mBESbest[mclient/mod.h"
+[35msrc/game/client/gameclient.h[m[36m:[m#include "components/Bes[1;31mBESbest[mclient/outlines.h"
+[35msrc/game/client/gameclient.h[m[36m:[m#include "components/Bes[1;31mBESbest[mclient/pet.h"
+[35msrc/game/client/gameclient.h[m[36m:[m#include "components/Bes[1;31mBESbest[mclient/player_indicator.h"
+[35msrc/game/client/gameclient.h[m[36m:[m#include "components/Bes[1;31mBESbest[mclient/rainbow.h"
+[35msrc/game/client/gameclient.h[m[36m:[m#include "components/Bes[1;31mBESbest[mclient/scripting.h"
+[35msrc/game/client/gameclient.h[m[36m:[m#include "components/Bes[1;31mBESbest[mclient/skinprofiles.h"
+[35msrc/game/client/gameclient.h[m[36m:[m#include "components/Bes[1;31mBESbest[mclient/statusbar.h"
+[35msrc/game/client/gameclient.h[m[36m:[m#include "components/Bes[1;31mBESbest[mclient/Bes[1;31mBESbest[mclient.h"
+[35msrc/game/client/gameclient.h[m[36m:[m#include "components/Bes[1;31mBESbest[mclient/trails.h"
+[35msrc/game/client/gameclient.h[m[36m:[m#include "components/Bes[1;31mBESbest[mclient/translate.h"
+[35msrc/game/client/gameclient.h[m[36m:[m#include "components/Bes[1;31mBESbest[mclient/warlist.h"
+[35msrc/game/client/gameclient.h[m[36m:[m	friend class CBes[1;31mBESbest[mclient;
+[35msrc/game/client/gameclient.h[m[36m:[m	// Bes[1;31mBESbest[mclient Components
+[35msrc/game/client/gameclient.h[m[36m:[m	CBes[1;31mBESbest[mclient m_Bes[1;31mBESbest[mclient;
+[35msrc/game/client/gameclient.h[m[36m:[m		int m_HighesBes[1;31mBESbest[mclientId;
+[35msrc/game/client/gameclient.h[m[36m:[m		// Bes[1;31mBESbest[mclient
+[35msrc/game/client/gameclient.h[m[36m:[m	void FormaBes[1;31mBESbest[mclientId(int ClientId, char (&aClientId)[16], EClientIdFormat Format) const;
+[35msrc/game/client/gameclient.h[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/game/client/gameclient.h[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/game/client/prediction/entities/character.h[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/game/client/prediction/entities/dragger.cpp[m[36m:[m			const int &TargeBes[1;31mBESbest[mclientId = pTarget->GetCid();
+[35msrc/game/client/prediction/entities/dragger.cpp[m[36m:[m				ClosestTargetId = TargeBes[1;31mBESbest[mclientId;
+[35msrc/game/client/prediction/entities/dragger.cpp[m[36m:[m			if(TargeBes[1;31mBESbest[mclientId == m_TargetId)
+[35msrc/game/client/prediction/gameworld.h[m[36m:[m	void CopyWorldClean(CGameWorld *pFrom); // Bes[1;31mBESbest[mclient
+[35msrc/game/client/render.h[m[36m:[m	bool m_LocalTeeRender = false; // Bes[1;31mBESbest[mclient
+[35msrc/game/client/ui.cpp[m[36m:[m		// Bes[1;31mBESbest[mclient
+[35msrc/game/client/ui.cpp[m[36m:[m	// Bes[1;31mBESbest[mclient
+[35msrc/game/client/ui.h[m[36m:[m	int LastMouseButton(int Index) const { return (m_LastMouseButtons >> Index) & 1; } // Bes[1;31mBESbest[mclient
+[35msrc/game/client/ui.h[m[36m:[m		bool m_SpecialFontRenderMode = false; // Bes[1;31mBESbest[mclient
+[35msrc/game/client/ui_scrollregion.cpp[m[36m:[m		// Bes[1;31mBESbest[mclient: Hack to allow slider scroll adjustment
+[35msrc/game/client/ui_scrollregion.cpp[m[36m:[m	if(m_AnimTime > 0.0f && !Input()->ModifierIsPressed()) // Bes[1;31mBESbest[mclient: Hack to allow slider scroll adjustment
+[35msrc/game/localization.cpp[m[36m:[m// Bes[1;31mBESbest[mclient
+[35msrc/game/server/ddracechat.cpp[m[36m:[m	int TargeBes[1;31mBESbest[mclientId = -1;
+[35msrc/game/server/ddracechat.cpp[m[36m:[m				TargeBes[1;31mBESbest[mclientId = i;
+[35msrc/game/server/ddracechat.cpp[m[36m:[m				TargeBes[1;31mBESbest[mclientId = i;
+[35msrc/game/server/ddracechat.cpp[m[36m:[m			TargeBes[1;31mBESbest[mclientId = -1;
+[35msrc/game/server/ddracechat.cpp[m[36m:[m	if(TargeBes[1;31mBESbest[mclientId < 0)
+[35msrc/game/server/ddracechat.cpp[m[36m:[m	if(TargeBes[1;31mBESbest[mclientId == pResult->m_ClientId)
+[35msrc/game/server/ddracechat.cpp[m[36m:[m	int TargetTeam = Teams.m_Core.Team(TargeBes[1;31mBESbest[mclientId);
+[35msrc/game/server/ddracechat.cpp[m[36m:[m	CPlayer *pSwapPlayer = pSelf->m_apPlayers[TargeBes[1;31mBESbest[mclientId];
+[35msrc/game/server/ddracechat.cpp[m[36m:[m	if(pSelf->m_World.m_Core.m_apCharacters[pResult->m_ClientId] == nullptr || pSelf->m_World.m_Core.m_apCharacters[TargeBes[1;31mBESbest[mclientId] == nullptr)
+[35msrc/game/server/ddracechat.cpp[m[36m:[m		pController->Teams().SeBes[1;31mBESbest[mclientInvited(Team, Target, true);
+[35msrc/game/server/ddracecommands.cpp[m[36m:[m	pController->Teams().SeBes[1;31mBESbest[mclientInvited(pResult->GetInteger(1), pResult->GetVictim(), false);
+[35msrc/game/server/ddracecommands.cpp[m[36m:[m		pNewEntry->m_ClientVersion = Server()->GeBes[1;31mBESbest[mclientVersion(ClientId);
+[35msrc/game/server/entities/character.cpp[m[36m:[m	int SnappingClientVersion = GameServer()->GeBes[1;31mBESbest[mclientVersion(SnappingClient);
+[35msrc/game/server/entities/character.cpp[m[36m:[m		if(m_pPlayer->GeBes[1;31mBESbest[mclientVersion() < VERSION_DDNET_NEW_HUD)
+[35msrc/game/server/entities/character.cpp[m[36m:[m	if(m_DDRaceState == ERaceState::STARTED && m_pPlayer->GeBes[1;31mBESbest[mclientVersion() == VERSION_VANILLA && !Server()->IsSixup(m_pPlayer->GetCid()) &&
+[35msrc/game/server/entities/character.cpp[m[36m:[m		if(m_pPlayer->GeBes[1;31mBESbest[mclientVersion() >= VERSION_DDRACE || Server()->IsSixup(m_pPlayer->GetCid()))
+[35msrc/game/server/entities/door.cpp[m[36m:[m	int SnappingClientVersion = GameServer()->GeBes[1;31mBESbest[mclientVersion(SnappingClient);
+[35msrc/game/server/entities/dragger.cpp[m[36m:[m			const int &TargeBes[1;31mBESbest[mclientId = pTarget->GetPlayer()->GetCid();
+[35msrc/game/server/entities/dragger.cpp[m[36m:[m			if(pTarget->Teams()->m_Core.GetSolo(TargeBes[1;31mBESbest[mclientId))
+[35msrc/game/server/entities/dragger.cpp[m[36m:[m				aIsTarget[TargeBes[1;31mBESbest[mclientId] = true;
+[35msrc/game/server/entities/dragger.cpp[m[36m:[m					aClosestTargetIdInTeam[TargetTeam] = TargeBes[1;31mBESbest[mclientId;
+[35msrc/game/server/entities/dragger.cpp[m[36m:[m				aCanStillBeTeamTarget[TargeBes[1;31mBESbest[mclientId] = true;
+[35msrc/game/server/entities/dragger.cpp[m[36m:[mbool CDragger::WillDraggerBeamUseDraggerId(int TargeBes[1;31mBESbest[mclientId, int SnappingClientId)
+[35msrc/game/server/entities/dragger.cpp[m[36m:[m	CCharacter *pTargetChar = GameServer()->GetPlayerChar(TargeBes[1;31mBESbest[mclientId);
+[35msrc/game/server/entities/dragger.cpp[m[36m:[m	if(pTargetChar && pSnapChar && m_apDraggerBeam[TargeBes[1;31mBESbest[mclientId] != nullptr)
+[35msrc/game/server/entities/dragger.cpp[m[36m:[m				return SnappingClientId == TargeBes[1;31mBESbest[mclientId;
+[35msrc/game/server/entities/dragger.cpp[m[36m:[m				return m_aTargetIdInTeam[SnapTeam] == TargeBes[1;31mBESbest[mclientId;
+[35msrc/game/server/entities/dragger.cpp[m[36m:[m	int SnappingClientVersion = GameServer()->GeBes[1;31mBESbest[mclientVersion(SnappingClient);
+[35msrc/game/server/entities/dragger.h[m[36m:[m	bool WillDraggerBeamUseDraggerId(int TargeBes[1;31mBESbest[mclientId, int SnappingClientId);
+[35msrc/game/server/entities/dragger_beam.cpp[m[36m:[m	int SnappingClientVersion = GameServer()->GeBes[1;31mBESbest[mclientVersion(SnappingClient);
+[35msrc/game/server/entities/gun.cpp[m[36m:[m		const int &TargeBes[1;31mBESbest[mclientId = pTarget->GetPlayer()->GetCid();
+[35msrc/game/server/entities/gun.cpp[m[36m:[m		const bool &TargetIsSolo = pTarget->Teams()->m_Core.GetSolo(TargeBes[1;31mBESbest[mclientId);
+[35msrc/game/server/entities/gun.cpp[m[36m:[m			   m_aLastFireSolo[TargeBes[1;31mBESbest[mclientId] + Server()->TickSpeed() / g_Config.m_SvPlasmaPerSec > Server()->Tick()) ||
+[35msrc/game/server/entities/gun.cpp[m[36m:[m				aIsTarget[TargeBes[1;31mBESbest[mclientId] = true;
+[35msrc/game/server/entities/gun.cpp[m[36m:[m				m_aLastFireSolo[TargeBes[1;31mBESbest[mclientId] = Server()->Tick();
+[35msrc/game/server/entities/gun.cpp[m[36m:[m					aTargetIdInTeam[TargetTeam] = TargeBes[1;31mBESbest[mclientId;
+[35msrc/game/server/entities/gun.cpp[m[36m:[m	int SnappingClientVersion = GameServer()->GeBes[1;31mBESbest[mclientVersion(SnappingClient);
+[35msrc/game/server/entities/laser.cpp[m[36m:[m	int SnappingClientVersion = GameServer()->GeBes[1;31mBESbest[mclientVersion(SnappingClient);
+[35msrc/game/server/entities/light.cpp[m[36m:[m	int SnappingClientVersion = GameServer()->GeBes[1;31mBESbest[mclientVersion(SnappingClient);
+[35msrc/game/server/entities/pickup.cpp[m[36m:[m	int SnappingClientVersion = GameServer()->GeBes[1;31mBESbest[mclientVersion(SnappingClient);
+[35msrc/game/server/entities/plasma.cpp[m[36m:[m	int SnappingClientVersion = GameServer()->GeBes[1;31mBESbest[mclientVersion(SnappingClient);
+[35msrc/game/server/entities/projectile.cpp[m[36m:[m	int SnappingClientVersion = GameServer()->GeBes[1;31mBESbest[mclientVersion(SnappingClient);
+[35msrc/game/server/gamecontext.cpp[m[36m:[m	if(Context.GeBes[1;31mBESbest[mclientVersion() >= VERSION_DDNET_MULTI_LASER)
+[35msrc/game/server/gamecontext.cpp[m[36m:[m	else if(Context.GeBes[1;31mBESbest[mclientVersion() >= VERSION_DDNET_ENTITY_NETOBJS)
+[35msrc/game/server/gamecontext.cpp[m[36m:[m		if(Context.GeBes[1;31mBESbest[mclientVersion() < VERSION_DDNET_WEAPON_SHIELDS)
+[35msrc/game/server/gamecontext.cpp[m[36m:[mvoid CGameContext::SendEmoticon(int ClientId, int Emoticon, int TargeBes[1;31mBESbest[mclientId) const
+[35msrc/game/server/gamecontext.cpp[m[36m:[m	Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, TargeBes[1;31mBESbest[mclientId);
+[35msrc/game/server/gamecontext.cpp[m[36m:[m		if(m_apPlayers[ClientId]->GeBes[1;31mBESbest[mclientVersion() >= VERSION_DDNET_IMPORTANT_ALERT)
+[35msrc/game/server/gamecontext.cpp[m[36m:[m	if(m_apPlayers[ToClientId]->GeBes[1;31mBESbest[mclientVersion() >= VERSION_DDNET_IMPORTANT_ALERT)
+[35msrc/game/server/gamecontext.cpp[m[36m:[m	if(Total > VANILLA_MAX_CLIENTS && m_apPlayers[ClientId] && m_apPlayers[ClientId]->GeBes[1;31mBESbest[mclientVersion() <= VERSION_DDRACE)
+[35msrc/game/server/gamecontext.cpp[m[36m:[mvoid CGameContext::PreInpuBes[1;31mBESbest[mclients(int ClientId, bool *pClients)
+[35msrc/game/server/gamecontext.cpp[m[36m:[m		if(Server()->GeBes[1;31mBESbest[mclientVersion(Id) < VERSION_DDNET_PREINPUT)
+[35msrc/game/server/gamecontext.cpp[m[36m:[m	if(Server()->GeBes[1;31mBESbest[mclientInfo(ClientId, &Info) && Info.m_GotDDNetVersion)
+[35msrc/game/server/gamecontext.cpp[m[36m:[m	CPersistenBes[1;31mBESbest[mclientData *pPersistent = (CPersistenBes[1;31mBESbest[mclientData *)pData;
+[35msrc/game/server/gamecontext.cpp[m[36m:[m	CPersistenBes[1;31mBESbest[mclientData *pPersistentData = (CPersistenBes[1;31mBESbest[mclientData *)pData;
+[35msrc/game/server/gamecontext.cpp[m[36m:[m	dbg_assert(Server()->GeBes[1;31mBESbest[mclientInfo(ClientId, &Info), "failed to get client info");
+[35msrc/game/server/gamecontext.cpp[m[36m:[m	if(Server()->GeBes[1;31mBESbest[mclientInfo(ClientId, &Info) && Info.m_GotDDNetVersion)
+[35msrc/game/server/gamecontext.cpp[m[36m:[m	Server()->SeBes[1;31mBESbest[mclientDDNetVersion(ClientId, DDNetVersion);
+[35msrc/game/server/gamecontext.cpp[m[36m:[m		Server()->SeBes[1;31mBESbest[mclientName(ClientId, pMsg->m_pName);
+[35msrc/game/server/gamecontext.cpp[m[36m:[m		Server()->SeBes[1;31mBESbest[mclientClan(ClientId, pMsg->m_pClan);
+[35msrc/game/server/gamecontext.cpp[m[36m:[m	Server()->SeBes[1;31mBESbest[mclientCountry(ClientId, pMsg->m_Country);
+[35msrc/game/server/gamecontext.cpp[m[36m:[m	Server()->SeBes[1;31mBESbest[mclientName(ClientId, pMsg->m_pName);
+[35msrc/game/server/gamecontext.cpp[m[36m:[m	Server()->SeBes[1;31mBESbest[mclientClan(ClientId, pMsg->m_pClan);
+[35msrc/game/server/gamecontext.cpp[m[36m:[m	Server()->SeBes[1;31mBESbest[mclientCountry(ClientId, pMsg->m_Country);
+[35msrc/game/server/gamecontext.cpp[m[36m:[m		if(Server()->GeBes[1;31mBESbest[mclientVersion(i) >= VERSION_DDNET_OLD)
+[35msrc/game/server/gamecontext.cpp[m[36m:[m	if(!Server()->IsSixup(ClientId) && GeBes[1;31mBESbest[mclientVersion(ClientId) < VERSION_DDNET_MSG_LEGACY)
+[35msrc/game/server/gamecontext.cpp[m[36m:[m	int ClientVersion = m_apPlayers[ClientId]->GeBes[1;31mBESbest[mclientVersion();
+[35msrc/game/server/gamecontext.cpp[m[36m:[m		if(GeBes[1;31mBESbest[mclientVersion(MemberId) >= VERSION_DDNET_SAVE_CODE)
+[35msrc/game/server/gamecontext.cpp[m[36m:[m	else if(GeBes[1;31mBESbest[mclientVersion(ClientId) >= VERSION_DDNET_WHISPER)
+[35msrc/game/server/gamecontext.cpp[m[36m:[m	else if(GeBes[1;31mBESbest[mclientVersion(VictimId) >= VERSION_DDNET_WHISPER)
+[35msrc/game/server/gamecontext.cpp[m[36m:[mint CGameContext::GeBes[1;31mBESbest[mclientVersion(int ClientId) const
+[35msrc/game/server/gamecontext.cpp[m[36m:[m	return Server()->GeBes[1;31mBESbest[mclientVersion(ClientId);
+[35msrc/game/server/gamecontext.cpp[m[36m:[m		if(GeBes[1;31mBESbest[mclientVersion(i) >= Version)
+[35msrc/game/server/gamecontext.cpp[m[36m:[m	if(g_Config.m_SvDnsblVote && Server()->DistincBes[1;31mBESbest[mclientCount() > 1)
+[35msrc/game/server/gamecontext.h[m[36m:[m	int GeBes[1;31mBESbest[mclientVersion() const { return m_ClientVersion; }
+[35msrc/game/server/gamecontext.h[m[36m:[m	struct CPersistenBes[1;31mBESbest[mclientData
+[35msrc/game/server/gamecontext.h[m[36m:[m	void SendEmoticon(int ClientId, int Emoticon, int TargeBes[1;31mBESbest[mclientId) const;
+[35msrc/game/server/gamecontext.h[m[36m:[m	void PreInpuBes[1;31mBESbest[mclients(int ClientId, bool *pClients) override;
+[35msrc/game/server/gamecontext.h[m[36m:[m	int PersistenBes[1;31mBESbest[mclientDataSize() const override { return sizeof(CPersistenBes[1;31mBESbest[mclientData); }
+[35msrc/game/server/gamecontext.h[m[36m:[m	int GeBes[1;31mBESbest[mclientVersion(int ClientId) const;
+[35msrc/game/server/gamecontroller.cpp[m[36m:[m				if(GameServer()->m_apPlayers[i] && GameServer()->m_apPlayers[i]->GeBes[1;31mBESbest[mclientVersion() >= VERSION_DDRACE)
+[35msrc/game/server/gamecontroller.cpp[m[36m:[m	if(pPlayer && (pPlayer->m_TimerType == CPlayer::TIMERTYPE_GAMETIMER || pPlayer->m_TimerType == CPlayer::TIMERTYPE_GAMETIMER_AND_BROADCAST) && pPlayer->GeBes[1;31mBESbest[mclientVersion() >= VERSION_DDNET_GAMETICK)
+[35msrc/game/server/gamemodes/DDRace.cpp[m[36m:[m			Teams().SeBes[1;31mBESbest[mclientInvited(Team, ClientId, false);
+[35msrc/game/server/player.cpp[m[36m:[m	Server()->SeBes[1;31mBESbest[mclientScore(m_ClientId, m_Score);
+[35msrc/game/server/player.cpp[m[36m:[m		if(Server()->GeBes[1;31mBESbest[mclientInfo(m_ClientId, &Info))
+[35msrc/game/server/player.cpp[m[36m:[m	int SnappingClientVersion = GameServer()->GeBes[1;31mBESbest[mclientVersion(SnappingClient);
+[35msrc/game/server/player.cpp[m[36m:[m	if(GeBes[1;31mBESbest[mclientVersion() >= VERSION_DDNET_OLD)
+[35msrc/game/server/player.cpp[m[36m:[m	if(m_NumInputs == 20 && g_Config.m_SvClientSuggestion[0] != '\0' && GeBes[1;31mBESbest[mclientVersion() <= VERSION_DDNET_OLD)
+[35msrc/game/server/player.cpp[m[36m:[m	Server()->SeBes[1;31mBESbest[mclientFlags(m_ClientId, pNewInput->m_PlayerFlags);
+[35msrc/game/server/player.cpp[m[36m:[m	if(((pNewInput->m_PlayerFlags & PLAYERFLAG_SPEC_CAM) || GeBes[1;31mBESbest[mclientVersion() < VERSION_DDNET_PLAYERFLAG_SPEC_CAM) && ((!m_pCharacter && m_Team == TEAM_SPECTATORS) || m_Paused) && m_SpectatorId == SPEC_FREEVIEW)
+[35msrc/game/server/player.cpp[m[36m:[mint CPlayer::GeBes[1;31mBESbest[mclientVersion() const
+[35msrc/game/server/player.cpp[m[36m:[m	return m_pGameServer->GeBes[1;31mBESbest[mclientVersion(m_ClientId);
+[35msrc/game/server/player.cpp[m[36m:[m		if(GeBes[1;31mBESbest[mclientVersion() >= VERSION_DDNET_GAMETICK)
+[35msrc/game/server/player.cpp[m[36m:[m		if(GeBes[1;31mBESbest[mclientVersion() >= VERSION_DDNET_GAMETICK)
+[35msrc/game/server/player.h[m[36m:[m	int GeBes[1;31mBESbest[mclientVersion() const;
+[35msrc/game/server/save.cpp[m[36m:[m			if(m_HookedPlayer == pTeam->m_pSavedTees[n].GeBes[1;31mBESbest[mclientId())
+[35msrc/game/server/save.cpp[m[36m:[m	m_HookedPlayer = pTeam->m_pSavedTees[m_HookedPlayer].GeBes[1;31mBESbest[mclientId();
+[35msrc/game/server/save.cpp[m[36m:[m			int ClientId = m_pSavedTees[i].GeBes[1;31mBESbest[mclientId();
+[35msrc/game/server/save.cpp[m[36m:[m				CCharacter *pChr = MatchCharacter(pGameServer, m_pSavedTees[i].GeBes[1;31mBESbest[mclientId(), i, KeepCurrentWeakStrong);
+[35msrc/game/server/save.cpp[m[36m:[m				m_pSavedTees[i].SeBes[1;31mBESbest[mclientId(pClientId[j]);
+[35msrc/game/server/save.h[m[36m:[m	int GeBes[1;31mBESbest[mclientId() const { return m_ClientId; }
+[35msrc/game/server/save.h[m[36m:[m	void SeBes[1;31mBESbest[mclientId(int ClientId) { m_ClientId = ClientId; }
+[35msrc/game/server/teams.cpp[m[36m:[m	int ClientVersion = m_pGameContext->m_apPlayers[ClientId]->GeBes[1;31mBESbest[mclientVersion();
+[35msrc/game/server/teams.cpp[m[36m:[m			if(GameServer()->m_apPlayers[i] && GameServer()->m_apPlayers[i]->GeBes[1;31mBESbest[mclientVersion() >= VERSION_DDRACE)
+[35msrc/game/server/teams.cpp[m[36m:[m	if(!NeedToSendNewServerRecord && NeedToSendNewPersonalRecord && Player->GeBes[1;31mBESbest[mclientVersion() >= VERSION_DDRACE)
+[35msrc/game/server/teams.cpp[m[36m:[m					int ClientId = m_apSaveTeamResult[Team]->m_SavedTeam.m_pSavedTees->GeBes[1;31mBESbest[mclientId();
+[35msrc/game/server/teams.cpp[m[36m:[mvoid CGameTeams::SeBes[1;31mBESbest[mclientInvited(int Team, int ClientId, bool Invited)
+[35msrc/game/server/teams.h[m[36m:[m	void SeBes[1;31mBESbest[mclientInvited(int Team, int ClientId, bool Invited);
+[35msrc/game/version.h[m[36m:[m// Bes[1;31mBESbest[mclient
+[35msrc/game/version.h[m[36m:[m#ifndef Bes[1;31mBESbest[mclient_VERSION
+[35msrc/game/version.h[m[36m:[m#define Bes[1;31mBESbest[mclient_VERSION "1.0.1"
+[35msrc/game/version.h[m[36m:[m#define CLIENT_NAME "BesBes[1;31mBESbest[mclient"
+[35msrc/test/gameworld_test.cpp[m[36m:[m			int Size = GameServer()->PersistenBes[1;31mBESbest[mclientDataSize();
+[35msrc/tools/twping.cpp[m[36m:[m	CNeBes[1;31mBESbest[mclient NeBes[1;31mBESbest[mclient;
+[35msrc/tools/twping.cpp[m[36m:[m	NeBes[1;31mBESbest[mclient.Open(BindAddr);
+[35msrc/tools/twping.cpp[m[36m:[m	NeBes[1;31mBESbest[mclient.Send(&Packet);
+[35msrc/tools/twping.cpp[m[36m:[m	net_socket_read_wait(NeBes[1;31mBESbest[mclient.m_Socket, Timeout);
+[35msrc/tools/twping.cpp[m[36m:[m	NeBes[1;31mBESbest[mclient.Update();
+[35msrc/tools/twping.cpp[m[36m:[m	while(NeBes[1;31mBESbest[mclient.Recv(&Packet, &ResponseToken, false))

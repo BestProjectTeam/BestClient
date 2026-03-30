@@ -1,0 +1,137 @@
+[
+	{
+		"server_address": "152.89.254.27:8310",
+		"players": [
+			{
+				"name": "karahanlili",
+				"client_id": 16,
+				"instance_id": "89070876-faff-455a-87c7-45c2dbe94f34",
+				"last_seen": 1773952768
+			}
+		]
+	},
+	{
+		"server_address": "193.70.37.160:8303",
+		"players": [
+			{
+				"name": "ioptioni",
+				"client_id": 57,
+				"instance_id": "17f60c4c-356e-4477-91ea-6ea389380e9a",
+				"last_seen": 1773952768
+			}
+		]
+	},
+	{
+		"server_address": "194.93.2.170:8502",
+		"players": [
+			{
+				"name": "(1)Sharki♥",
+				"client_id": 2,
+				"instance_id": "4295ba77-6023-4437-ba15-3df8ad62b316",
+				"last_seen": 1773952771
+			},
+			{
+				"name": "Pedrilla",
+				"client_id": 18,
+				"instance_id": "79f7e0d8-f567-45a8-b02d-2a8fc51acb96",
+				"last_seen": 1773952768
+			},
+			{
+				"name": "penis",
+				"client_id": 20,
+				"instance_id": "79f7e0d8-f567-45a8-b02d-2a8fc51acb96",
+				"last_seen": 1773952768
+			},
+			{
+				"name": "тишечка",
+				"client_id": 13,
+				"instance_id": "88b4646d-e2a6-4075-bb05-4bd6d0b6b056",
+				"last_seen": 1773952769
+			},
+			{
+				"name": "тишка",
+				"client_id": 1,
+				"instance_id": "88b4646d-e2a6-4075-bb05-4bd6d0b6b056",
+				"last_seen": 1773952769
+			}
+		]
+	},
+	{
+		"server_address": "45.141.57.22:8333",
+		"players": [
+			{
+				"name": "refyp",
+				"client_id": 4,
+				"instance_id": "ebd32c83-faaa-4462-9a6c-b34050c6b057",
+				"last_seen": 1773952770
+			}
+		]
+	},
+	{
+		"server_address": "45.141.57.22:8368",
+		"players": [
+			{
+				"name": "واو",
+				"client_id": 7,
+				"instance_id": "c25921b6-58ae-4736-8a48-59131f4fb729",
+				"last_seen": 1773952771
+			}
+		]
+	},
+	{
+		"server_address": "45.141.57.45:8309",
+		"players": [
+			{
+				"name": "TERAN",
+				"client_id": 6,
+				"instance_id": "fc5f24b7-af70-4c0a-99b6-5bf4ae090b41",
+				"last_seen": 1773952769
+			}
+		]
+	},
+	{
+		"server_address": "46.174.54.240:8312",
+		"players": [
+			{
+				"name": "wx1ty",
+				"client_id": 50,
+				"instance_id": "4e6735d1-e63a-410a-a7bc-adc4bc5b79ae",
+				"last_seen": 1773952768
+			}
+		]
+	},
+	{
+		"server_address": "46.174.54.240:8322",
+		"players": [
+			{
+				"name": "Fencor",
+				"client_id": 4,
+				"instance_id": "ec1d5627-e555-4252-a1f7-29c52cf0e360",
+				"last_seen": 1773952769
+			},
+			{
+				"name": "Fencore",
+				"client_id": 5,
+				"instance_id": "ec1d5627-e555-4252-a1f7-29c52cf0e360",
+				"last_seen": 1773952769
+			}
+		]
+	},
+	{
+		"server_address": "46.174.54.240:8336",
+		"players": [
+			{
+				"name": "L E O Z Q Z H <",
+				"client_id": 38,
+				"instance_id": "ce8f2fc8-bd86-407d-8fe9-0203acd3007c",
+				"last_seen": 1773952769
+			},
+			{
+				"name": "PCHELKA",
+				"client_id": 39,
+				"instance_id": "e02a65a6-7786-4168-8eab-d6fbcc8a9849",
+				"last_seen": 1773952768
+			}
+		]
+	}
+]

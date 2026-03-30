@@ -1,0 +1,9 @@
+{
+  "name": "mastervoice",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BestClient voice servers master list service",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

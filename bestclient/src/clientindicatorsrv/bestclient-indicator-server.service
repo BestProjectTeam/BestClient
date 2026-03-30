@@ -1,0 +1,15 @@
+[Unit]
+Description=BestClient Indicator Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/BestClient
+ExecStart=/root/BestClient/src/clientindicatorsrv/run.sh run
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

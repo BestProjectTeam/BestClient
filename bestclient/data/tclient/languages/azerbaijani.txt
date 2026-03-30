@@ -1,0 +1,874 @@
+##### authors #####
+
+##### /authors #####
+
+##### translated strings #####
+
+Translated text hidden due to streamer mode
+== 
+
+TClient
+== 
+
+(On Latest)
+== 
+
+(Fetching Update Info)
+== 
+
+[bgdraw]
+Failed to create bgdraw folder
+== 
+
+[bgdraw]
+No items to write
+== 
+
+[bgdraw]
+No changes since last save
+== 
+
+[bgdraw]
+Writing item %d failed
+== 
+
+[bgdraw]
+Written %d items
+== 
+
+[bgdraw]
+Loaded %d items
+== 
+
+[bgdraw]
+Loaded %d items (discarded %d items)
+== 
+
+Kaomoji
+== 
+
+Shrug:
+== 
+
+Flip:
+== 
+
+Unflip:
+== 
+
+Cute:
+== 
+
+Lenny:
+== 
+
+Warlist
+== 
+
+Add war name:
+== 
+
+Add war clan:
+== 
+
+Add team name:
+== 
+
+Add team clan:
+== 
+
+Remove war name:
+== 
+
+Remove war clan:
+== 
+
+Remove team name:
+== 
+
+Remove team clan:
+== 
+
+Add [group] [name] [reason]:
+== 
+
+Add [group] [clan] [reason]:
+== 
+
+Remove [group] [name]:
+== 
+
+Remove [group] [clan]:
+== 
+
+Other
+== 
+
+Translate:
+== 
+
+Translate ID:
+== 
+
+Mute:
+== 
+
+Unmute:
+== 
+
+Settings
+== 
+
+Bind Wheel
+== 
+
+War List
+== 
+
+Chat Binds
+== 
+
+Status Bar
+== 
+
+Info
+== 
+
+Visual
+== 
+
+Custom Font: 
+== 
+
+[Hammer Mode]
+Normal
+== 
+
+[Hammer Mode]
+Rotate with cursor
+== 
+
+[Hammer Mode]
+Rotate with cursor like gun
+== 
+
+Hammer Mode: 
+== 
+
+Ingame cursor scale
+== 
+
+Wheel animate
+== 
+
+Show ping colored circle in nameplates
+== 
+
+Show country flags in nameplates
+== 
+
+Hide nameplates in spec
+== 
+
+Show skin names in nameplate
+== 
+
+Freeze stars
+== 
+
+Color frozen tee skins
+== 
+
+Show katan on frozen players
+== 
+
+Render all custom colored feet as white feet skin
+== 
+
+Tiny Tees
+== 
+
+Tiny Tee Size
+== 
+
+Fake CTF flags
+== 
+
+Input
+== 
+
+Fast Inputs (-20ms visual delay)
+== 
+
+Extra tick other tees (increases other tees latency, \nmakes dragging slightly easier when using fast input)
+== 
+
+Anti Latency Tools
+== 
+
+Prediction Margin
+== 
+
+Remove prediction & antiping in freeze
+== 
+
+Amount
+== 
+
+Delay
+== 
+
+Dont predict other players if you are frozen
+== 
+
+Adjust your prediction margin while frozen
+== 
+
+Frozen Margin
+== 
+
+Anti Ping Smoothing
+== 
+
+Use new smoothing algorithm
+== 
+
+Optimistic prediction along stable direction
+== 
+
+Negative stability buffer (for Gores)
+== 
+
+Uncertainty duration
+== 
+
+Auto execute
+== 
+
+Voting
+== 
+
+Auto vote no to map changes when far
+== 
+
+Minimum Time
+== 
+
+Message to send in chat:
+== 
+
+Leave empty to disable
+== 
+
+Auto Reply
+== 
+
+Auto reply to muted players
+== 
+
+Auto reply when tabbed out
+== 
+
+Player Indicator
+== 
+
+Show any enabled Indicators
+== 
+
+Hide indicator for tees on your screen
+== 
+
+Show only freeze Players
+== 
+
+Only show after joining a team
+== 
+
+Render tiny tees instead of circles
+== 
+
+Use warlist groups for indicator
+== 
+
+Indicator size
+== 
+
+Indicator opacity
+== 
+
+Change indicator offset based on distance to other tees
+== 
+
+Indicator min offset
+== 
+
+Indicator max offset
+== 
+
+Indicator max distance
+== 
+
+Indicator offset
+== 
+
+Use warlist colors instead of regular colors
+== 
+
+Show all warlist groups
+== 
+
+Indicator alive color
+== 
+
+Indicator in freeze color
+== 
+
+Indicator safe color
+== 
+
+Pet
+== 
+
+Show the pet
+== 
+
+Pet size
+== 
+
+Pet alpha
+== 
+
+Pet Skin:
+== 
+
+HUD
+== 
+
+Show mini vote HUD
+== 
+
+Show position and angle (mini debug)
+== 
+
+Show your cursor when in free spectate
+== 
+
+Spectate cursor alpha
+== 
+
+Show when you are the last alive
+== 
+
+Last!
+== 
+
+Horizontal Position
+== 
+
+Vertical Position
+== 
+
+Font Size
+== 
+
+Show screen center lines
+== 
+
+Screen center line color
+== 
+
+Screen center line width
+== 
+
+Frozen Tee Display
+== 
+
+Show frozen tee display
+== 
+
+Use skins instead of ninja tees
+== 
+
+Max Rows
+== 
+
+Tee Size
+== 
+
+Tees left alive text
+== 
+
+Count frozen tees
+== 
+
+Tile Outlines
+== 
+
+Show any enabled outlines
+== 
+
+Only show outlines in entities
+== 
+
+[Outlines]
+Width
+== 
+
+Unhook & hook
+== 
+
+Freeze & deep
+== 
+
+Unfreeze & undeep
+== 
+
+Kill
+== 
+
+Tele
+== 
+
+Outline freeze & deep
+== 
+
+Outline walls
+== 
+
+Outline teleporter
+== 
+
+Outline unfreeze & undeep
+== 
+
+Outline kill
+== 
+
+Outline width
+== 
+
+Outline alpha
+== 
+
+Outline Alpha (walls)
+== 
+
+Freeze outline color
+== 
+
+Walls outline color
+== 
+
+Teleporter outline color
+== 
+
+Unfreeze outline color
+== 
+
+Kill outline color
+== 
+
+Ghost Tools
+== 
+
+Show unpredicted ghosts for other players
+== 
+
+Swap ghosts and normal players
+== 
+
+Predicted alpha
+== 
+
+Unpredicted alpha
+== 
+
+Hide ghosts of frozen players
+== 
+
+Render ghosts as circles
+== 
+
+Toggle ghosts key
+== 
+
+Rainbow
+== 
+
+Rainbow Tees
+== 
+
+Rainbow weapons
+== 
+
+Rainbow hook
+== 
+
+Rainbow others
+== 
+
+Pulse
+== 
+
+Black
+== 
+
+Random
+== 
+
+Rainbow speed
+== 
+
+Tee Trails
+== 
+
+Enable tee trails
+== 
+
+Show other tees' trails
+== 
+
+Fade trail alpha
+== 
+
+Taper trail width
+== 
+
+Solid
+== 
+
+Tee
+== 
+
+Speed
+== 
+
+Tee trail color
+== 
+
+Trail width
+== 
+
+Trail length
+== 
+
+Trail alpha
+== 
+
+Background Draw
+== 
+
+Color
+== 
+
+Time until strokes disappear
+== 
+
+ seconds (never)
+== 
+
+ seconds
+== 
+
+Width
+== 
+
+Draw where mouse is
+== 
+
+Finish Name
+== 
+
+Attempt to change your name when near finish
+== 
+
+Finish Name:
+== 
+
+Name:
+== 
+
+Name
+== 
+
+Command:
+== 
+
+Command
+== 
+
+Override Selected
+== 
+
+Add Bind
+== 
+
+Remove Bind
+== 
+
+The command is ran in console not chat
+== 
+
+Use left mouse to select
+== 
+
+Use right mouse to swap with selected
+== 
+
+Use middle mouse select without copy
+== 
+
+Bind Wheel Key
+== 
+
+Reset position of mouse when opening bindwheel
+== 
+
+War Entries
+== 
+
+Edit Entry
+== 
+
+Clan
+== 
+
+Reason
+== 
+
+Override Entry
+== 
+
+Add Entry
+== 
+
+Allow Duplicate Entries
+== 
+
+Enable warlist
+== 
+
+Colors in chat
+== 
+
+Colors in scoreboard
+== 
+
+Colors in spectate select
+== 
+
+Show clan if war
+== 
+
+War Groups
+== 
+
+Are you sure that you want to remove '%s' from your war groups?
+== 
+
+Remove War Group
+== 
+
+Yes
+== 
+
+No
+== 
+
+Override Group
+== 
+
+Add Group
+== 
+
+Online Players
+== 
+
+Show status bar
+== 
+
+Show labels on status bar items
+== 
+
+Status bar height
+== 
+
+Local Time
+== 
+
+Use 12 hour clock
+== 
+
+Show seconds on clock
+== 
+
+Colors
+== 
+
+Status bar color
+== 
+
+Text color
+== 
+
+Status bar alpha
+== 
+
+Text alpha
+== 
+
+Status Bar Codes:
+== 
+
+a = Angle
+== 
+
+p = Ping
+== 
+
+d = Prediction
+== 
+
+c = Position
+== 
+
+l = Local Time
+== 
+
+r = Race Time
+== 
+
+f = FPS
+== 
+
+v = Velocity
+== 
+
+z = Zoom
+== 
+
+_ or ' ' = Space
+== 
+
+Apply
+== 
+
+Status Scheme:
+== 
+
+Add Item
+== 
+
+Remove Item
+== 
+
+TClient Links
+== 
+
+Discord
+== 
+
+Website
+== 
+
+Github
+== 
+
+Support ♥
+== 
+
+Config Files
+== 
+
+TClient Settings
+== 
+
+Profiles
+== 
+
+TClient Developers
+== 
+
+Hide Settings Tabs
+== 
+
+Integration
+== 
+
+Enable Discord Integration
+== 
+
+Name: %s
+== 
+
+Clan: %s
+== 
+
+Skin: %s
+== 
+
+Your profile
+== 
+
+After Load
+== 
+
+Save/Load Skin
+== 
+
+Save/Load Colors
+== 
+
+Save/Load Emote
+== 
+
+Save/Load Name
+== 
+
+Save/Load Clan
+== 
+
+Save/Load Flag
+== 
+
+Load
+== 
+
+Save
+== 
+
+Delete
+== 
+
+Override
+== 
+
+Dummy
+== 
+
+Custom colors
+== 
+
+Overwrite clan even if empty
+== 
+
+Profiles file
+== 
+
+Activating mod weapon on %d: %s\n
+== 
+
+[data_version.h]
+You have probably only installed the TClient DDNet.exe which is not supported, please use the entire TClient folder
+== 
+
+Changing name to %s near finish
+== 
+
+[translate]
+%s translating to %s
+== 
+
+[translate]
+%s to %s failed: %s
+== 

@@ -1,0 +1,9 @@
+{
+  "name": "clientindicatorsrv-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BestClient client indicator web frontend",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
