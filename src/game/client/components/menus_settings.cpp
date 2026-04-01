@@ -4353,7 +4353,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 
 			const float StaticColorTargetHeight = ColorPickerLineSize + ColorPickerSpacing;
 			const float VisualizerSliderHeight = LineSize + 4.0f;
-			const float ExtraTargetHeight = LineSize * 2.0f + VisualizerSliderHeight + StaticColorTargetHeight * s_MusicPlayerStaticColorPhase;
+			const float ExtraTargetHeight = LineSize * 3.0f + VisualizerSliderHeight * 2.0f + StaticColorTargetHeight * s_MusicPlayerStaticColorPhase;
 			const float ContentHeight = LineSize + MarginSmall + LineSize + ExtraTargetHeight * s_MusicPlayerPhase;
 			CUIRect Content, Label, Row, Visible;
 			BeginBlock(Column, ContentHeight, Content);
