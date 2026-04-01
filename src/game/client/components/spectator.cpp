@@ -9,6 +9,7 @@
 #include <engine/shared/config.h>
 #include <engine/textrender.h>
 
+#include <generated/client_data.h>
 #include <generated/protocol.h>
 
 #include <game/client/animstate.h>
@@ -16,6 +17,20 @@
 #include <game/localization.h>
 
 #include <limits>
+
+namespace
+{
+void RenderBestClientIcon(IGraphics *pGraphics, const CUIRect &Rect)
+{
+	pGraphics->TextureSet(g_pData->m_aImages[IMAGE_BCICON].m_Id);
+	pGraphics->QuadsBegin();
+	pGraphics->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
+	pGraphics->QuadsSetSubset(0.0f, 0.0f, 1.0f, 1.0f);
+	const IGraphics::CQuadItem Quad(Rect.x, Rect.y, Rect.w, Rect.h);
+	pGraphics->QuadsDrawTL(&Quad, 1);
+	pGraphics->QuadsEnd();
+}
+}
 
 bool CSpectator::CanChangeSpectatorId()
 {
@@ -519,10 +534,30 @@ void CSpectator::OnRender()
 			TeeAlpha = 1.0f;
 		}
 		CTextCursor NameCursor;
-		NameCursor.SetPosition(vec2(Width / 2.0f + x + 50.0f, Height / 2.0f + y + BoxMove + (LineHeight - FontSize) / 2.f));
+		const bool ShowBestClientIndicator = g_Config.m_BcClientIndicatorInScoreboard &&
+						     pInfo->m_ClientId >= 0 &&
+						     GameClient()->m_ClientIndicator.IsPlayerBestClient(pInfo->m_ClientId);
+		const float BestClientIconSize = FontSize * (0.8f + 0.3f * g_Config.m_BcClientIndicatorInSoreboardSize / 100.0f);
+		const float BestClientIconSpacing = 4.0f;
+		const float BestClientIconReserve = ShowBestClientIndicator ? BestClientIconSize + BestClientIconSpacing : 0.0f;
+		const float NameX = Width / 2.0f + x + 50.0f + BestClientIconReserve;
+		const float NameY = Height / 2.0f + y + BoxMove + (LineHeight - FontSize) / 2.f;
+		NameCursor.SetPosition(vec2(NameX, NameY));
 		NameCursor.m_FontSize = FontSize;
 		NameCursor.m_Flags |= TEXTFLAG_ELLIPSIS_AT_END;
-		NameCursor.m_LineWidth = 180.0f;
+		NameCursor.m_LineWidth = 180.0f - BestClientIconReserve;
+		if(NameCursor.m_LineWidth < 0.0f)
+			NameCursor.m_LineWidth = 0.0f;
+
+		if(ShowBestClientIndicator)
+		{
+			const CUIRect IconRect = {
+				NameX - BestClientIconReserve,
+				Height / 2.0f + y + BoxMove + (LineHeight - BestClientIconSize) / 2.0f,
+				BestClientIconSize,
+				BestClientIconSize};
+			RenderBestClientIcon(Graphics(), IconRect);
+		}
 		if(g_Config.m_ClShowIds)
 		{
 			char aClientId[16];
