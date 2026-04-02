@@ -5049,7 +5049,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			UpdateRevealPhase(s_FastInputPhase, FastInputExpanded);
 
 			const float FastInputExtraTargetHeight = MarginSmall * 3.0f + LineSize * 3.0f;
-			const float ContentHeight = LineSize + MarginSmall + LineSize * 2.0f +
+			const float ContentHeight = LineSize + MarginSmall + LineSize * 3.0f +
 				FastInputExtraTargetHeight * s_FastInputPhase;
 
 			CUIRect Content, Label, Button, Visible;
@@ -5136,10 +5136,11 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				if(g_Config.m_BcFastInputMode == 0)
 					DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcFastInputOthers, Localize("Fast Input others"), &g_Config.m_TcFastInputOthers, &Expand, LineSize);
 				else
-					DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcLowDeltaOthers, Localize("low delta others"), &g_Config.m_BcLowDeltaOthers, &Expand, LineSize);
+					DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcLowDeltaOthers, Localize("Low delta others"), &g_Config.m_BcLowDeltaOthers, &Expand, LineSize);
 			}
 
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClSubTickAiming, Localize("Sub-Tick aiming"), &g_Config.m_ClSubTickAiming, &Content, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcFastInputAutoMargin, Localize("Auto margin"), &g_Config.m_BcFastInputAutoMargin, &Content, LineSize);
 			Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
 
 			static float s_SnapTapPhase = 0.0f;

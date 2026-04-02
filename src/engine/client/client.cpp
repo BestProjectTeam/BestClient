@@ -5648,7 +5648,26 @@ int CClient::MaxLatencyTicks() const
 
 int CClient::PredictionMargin() const
 {
-	return m_ServerCapabilities.m_SyncWeaponInput ? g_Config.m_ClPredictionMargin : 10;
+	if(!m_ServerCapabilities.m_SyncWeaponInput)
+		return 10;
+
+	int PredictionMargin = g_Config.m_ClPredictionMargin;
+	if(!g_Config.m_BcFastInputAutoMargin || !g_Config.m_TcFastInput)
+		return PredictionMargin;
+
+	int FastInputMargin = 0;
+	if(g_Config.m_BcFastInputMode == 0)
+	{
+		FastInputMargin = std::max(0, g_Config.m_TcFastInputAmount);
+	}
+	else
+	{
+		const int LowDeltaAmount = std::max(0, g_Config.m_BcFastInputLowDelta);
+		// low delta is measured in 0.01 ticks, convert it to milliseconds.
+		FastInputMargin = (LowDeltaAmount + 2) / 5;
+	}
+
+	return std::max(PredictionMargin, FastInputMargin);
 }
 
 int CClient::UdpConnectivity(int NetType)

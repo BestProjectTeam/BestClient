@@ -77,6 +77,7 @@ MACRO_CONFIG_INT(BcUseShortKogServerName, bc_use_short_kog_server_name, 0, 0, 1,
 // Fast input
 MACRO_CONFIG_INT(BcFastInputMode, bc_fast_input_mode, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fast input mode (0 = fast input, 1 = low delta)")
 MACRO_CONFIG_INT(BcFastInputLowDelta, bc_fast_input_low_delta, 0, 0, 500, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fast input amount for low delta mode in 0.01 ticks (0-5)")
+MACRO_CONFIG_INT(BcFastInputAutoMargin, bc_fast_input_auto_margin, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically raises prediction margin to fit fast input amount")
 MACRO_CONFIG_INT(BcLowDeltaOthers, bc_low_delta_others, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Apply low delta to other tees")
 MACRO_CONFIG_INT(BcSnapTap, bc_snap_tap, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable Snap Tap for opposite left/right inputs")
 MACRO_CONFIG_INT(BcSnapTapDelay, bc_snap_tap_delay, 0, 0, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Snap Tap direction switch delay in milliseconds (0 = off)")
