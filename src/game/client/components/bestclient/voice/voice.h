@@ -179,17 +179,25 @@ private:
 	};
 
 	NETSOCKET m_Socket = nullptr;
+	NETSOCKET m_SecondarySocket = nullptr;
 	NETSOCKET m_ServerListPingSocket = nullptr;
 	NETADDR m_ServerAddr = NETADDR_ZEROED;
 	bool m_HasServerAddr = false;
 	bool m_Registered = false;
+	bool m_SecondaryRegistered = false;
 	uint16_t m_ClientVoiceId = 0;
+	uint16_t m_SecondaryClientVoiceId = 0;
 	int64_t m_LastHelloTick = 0;
+	int64_t m_SecondaryLastHelloTick = 0;
 	int64_t m_LastServerPacketTick = 0;
+	int64_t m_SecondaryLastServerPacketTick = 0;
 	int64_t m_LastHeartbeatTick = 0;
+	int64_t m_SecondaryLastHeartbeatTick = 0;
 	uint16_t m_SendSequence = 0;
+	uint16_t m_SecondarySendSequence = 0;
 	int m_LastBitrate = -1;
 	bool m_HelloResetPending = false;
+	bool m_SecondaryHelloResetPending = false;
 	ERuntimeState m_RuntimeState = RUNTIME_STOPPED;
 	ESubsystemRuntimeState m_SubsystemState = ESubsystemRuntimeState::DISABLED;
 
@@ -255,6 +263,9 @@ private:
 	std::string m_AdvertisedRoomKey;
 	int m_AdvertisedGameClientId = BestClientVoice::INVALID_GAME_CLIENT_ID - 1;
 	int m_AdvertisedTeam = std::numeric_limits<int>::min();
+	std::string m_SecondaryAdvertisedRoomKey;
+	int m_SecondaryAdvertisedGameClientId = BestClientVoice::INVALID_GAME_CLIENT_ID - 1;
+	int m_SecondaryAdvertisedTeam = std::numeric_limits<int>::min();
 	float m_EnableYourGroupRevealPhase = 0.0f;
 	bool m_LastUseTeam0Mode = false;
 	bool m_LastEnableYourGroup = false;
@@ -298,10 +309,13 @@ private:
 	void StopVoice();
 	bool ShouldStartVoicePipeline(bool Online) const;
 	bool ShouldKeepVoicePipelineActive() const;
+	bool ShouldUseSecondaryTeamConnection() const;
 	bool HasPendingPlaybackAudio() const;
 	bool HasRecentVoiceActivity(int64_t Now) const;
 	bool OpenNetworking();
+	bool OpenSecondaryNetworking();
 	void CloseNetworking();
+	void CloseSecondaryNetworking();
 	bool OpenAudioDevices();
 	void CloseAudioDevices();
 	bool CreateEncoder();
@@ -309,9 +323,14 @@ private:
 	void TuneEncoderForNetwork();
 	void ClearPeerState();
 	void SendHello();
+	void SendHelloSecondary();
 	void SendGoodbye();
+	void SendGoodbyeSecondary();
 	void SendVoiceFrame(const uint8_t *pOpusData, int OpusSize, int Team, vec2 Position);
+	void SendVoiceFrameSecondary(const uint8_t *pOpusData, int OpusSize, int Team, vec2 Position);
 	void ProcessNetwork();
+	void ProcessSecondaryNetwork();
+	void ProcessVoiceRelayPacket(const uint8_t *pRawData, int DataSize, int Offset, uint16_t SelfVoiceId);
 	void ProcessServerListPing();
 	void ProcessCapture();
 	void ProcessPlayback();
@@ -323,7 +342,6 @@ private:
 	int LocalOwnVoiceTeam() const;
 	bool IsUseTeam0Mode() const;
 	bool IsEnableYourGroupMode() const;
-	bool ShouldTransmitToOwnGroupAlongsideTeam0() const;
 	bool IsVoiceTeamAudible(int Team) const;
 	vec2 LocalPosition() const;
 	std::string CurrentRoomKey() const;

@@ -563,8 +563,15 @@ void CVoiceChat::OnReset()
 	m_VadLastActivationLevel = 0.0f;
 	m_WasTransmitActive = false;
 	m_LastHelloTick = 0;
+	m_SecondaryLastHelloTick = 0;
 	m_LastServerPacketTick = 0;
+	m_SecondaryLastServerPacketTick = 0;
 	m_LastHeartbeatTick = 0;
+	m_SecondaryLastHeartbeatTick = 0;
+	m_SecondarySendSequence = 0;
+	m_SecondaryRegistered = false;
+	m_SecondaryClientVoiceId = 0;
+	m_SecondaryHelloResetPending = false;
 	m_LastBitrate = -1;
 	m_LastEncoderTuneTick = 0;
 	m_LastEncoderLossPerc = -1;
@@ -575,6 +582,9 @@ void CVoiceChat::OnReset()
 	m_AdvertisedRoomKey.clear();
 	m_AdvertisedGameClientId = BestClientVoice::INVALID_GAME_CLIENT_ID - 1;
 	m_AdvertisedTeam = std::numeric_limits<int>::min();
+	m_SecondaryAdvertisedRoomKey.clear();
+	m_SecondaryAdvertisedGameClientId = BestClientVoice::INVALID_GAME_CLIENT_ID - 1;
+	m_SecondaryAdvertisedTeam = std::numeric_limits<int>::min();
 	m_EnableYourGroupRevealPhase = g_Config.m_BcVoiceChatUseTeam0 ? 1.0f : 0.0f;
 	m_LastUseTeam0Mode = g_Config.m_BcVoiceChatUseTeam0 != 0;
 	m_LastEnableYourGroup = g_Config.m_BcVoiceChatUseTeam0 != 0 && g_Config.m_BcVoiceChatEnableYourGroup != 0;
@@ -823,6 +833,43 @@ void CVoiceChat::OnUpdate()
 		m_HelloResetPending = true;
 	if(NeedsRegistrationHello || NeedsHeartbeatHello)
 		SendHello();
+
+	const bool UseSecondaryConnection = ShouldUseSecondaryTeamConnection();
+	if(!UseSecondaryConnection)
+	{
+		if(m_SecondarySocket)
+		{
+			SendGoodbyeSecondary();
+			CloseSecondaryNetworking();
+		}
+	}
+	else
+	{
+		if(!m_SecondarySocket)
+			OpenSecondaryNetworking();
+
+		if(m_SecondarySocket)
+		{
+			if(m_SecondaryRegistered && m_SecondaryLastServerPacketTick > 0 && Now - m_SecondaryLastServerPacketTick > VOICE_SERVER_STALE_SECONDS * time_freq())
+			{
+				CloseSecondaryNetworking();
+				OpenSecondaryNetworking();
+			}
+
+			ProcessSecondaryNetwork();
+
+			const int SecondaryTeam = LocalOwnVoiceTeam();
+			const bool SecondaryRoomChanged = RoomKey != m_SecondaryAdvertisedRoomKey;
+			const bool SecondaryTeamChanged = SecondaryTeam != m_SecondaryAdvertisedTeam;
+			const bool SecondaryIdentityChanged = SecondaryRoomChanged || GameClientId != m_SecondaryAdvertisedGameClientId || SecondaryTeamChanged;
+			const bool SecondaryNeedsRegistrationHello = !m_SecondaryRegistered && (m_SecondaryLastHelloTick == 0 || Now - m_SecondaryLastHelloTick > time_freq());
+			const bool SecondaryNeedsHeartbeatHello = m_SecondaryRegistered && (SecondaryIdentityChanged || m_SecondaryLastHeartbeatTick == 0 || Now - m_SecondaryLastHeartbeatTick > VOICE_HEARTBEAT_SECONDS * time_freq());
+			if(SecondaryIdentityChanged)
+				m_SecondaryHelloResetPending = true;
+			if(SecondaryNeedsRegistrationHello || SecondaryNeedsHeartbeatHello)
+				SendHelloSecondary();
+		}
+	}
 
 	ProcessCapture();
 	ProcessPlayback();
@@ -1978,6 +2025,7 @@ void CVoiceChat::StopVoice()
 {
 	DestroyEncoder();
 	CloseAudioDevices();
+	SendGoodbyeSecondary();
 	SendGoodbye();
 	CloseNetworking();
 	OnReset();
@@ -2009,14 +2057,25 @@ bool CVoiceChat::OpenNetworking()
 	m_LastHelloTick = 0;
 	m_LastServerPacketTick = 0;
 	m_LastHeartbeatTick = 0;
+	m_SecondaryLastHelloTick = 0;
+	m_SecondaryLastServerPacketTick = 0;
+	m_SecondaryLastHeartbeatTick = 0;
+	m_SecondaryRegistered = false;
+	m_SecondaryClientVoiceId = 0;
+	m_SecondarySendSequence = 0;
+	m_SecondaryHelloResetPending = false;
 	m_vOnlineServers.clear();
 	m_SelectedServerIndex = -1;
 	m_AdvertisedTeam = std::numeric_limits<int>::min();
+	m_SecondaryAdvertisedTeam = std::numeric_limits<int>::min();
+	m_SecondaryAdvertisedRoomKey.clear();
+	m_SecondaryAdvertisedGameClientId = BestClientVoice::INVALID_GAME_CLIENT_ID - 1;
 	return true;
 }
 
 void CVoiceChat::CloseNetworking()
 {
+	CloseSecondaryNetworking();
 	if(m_Socket)
 	{
 		net_udp_close(m_Socket);
@@ -2030,6 +2089,56 @@ void CVoiceChat::CloseNetworking()
 	m_AdvertisedRoomKey.clear();
 	m_AdvertisedGameClientId = BestClientVoice::INVALID_GAME_CLIENT_ID - 1;
 	m_AdvertisedTeam = std::numeric_limits<int>::min();
+}
+
+bool CVoiceChat::OpenSecondaryNetworking()
+{
+	if(!m_HasServerAddr)
+		return false;
+	if(m_SecondarySocket)
+		return true;
+
+	NETADDR Bind = NETADDR_ZEROED;
+	Bind.type = NETTYPE_ALL;
+	Bind.port = 0;
+	m_SecondarySocket = net_udp_create(Bind);
+	if(!m_SecondarySocket)
+	{
+		dbg_msg("voice", "failed to open secondary UDP socket");
+		return false;
+	}
+	net_set_non_blocking(m_SecondarySocket);
+
+	m_SecondaryRegistered = false;
+	m_SecondaryClientVoiceId = 0;
+	m_SecondaryLastHelloTick = 0;
+	m_SecondaryLastServerPacketTick = 0;
+	m_SecondaryLastHeartbeatTick = 0;
+	m_SecondarySendSequence = 0;
+	m_SecondaryHelloResetPending = true;
+	m_SecondaryAdvertisedRoomKey.clear();
+	m_SecondaryAdvertisedGameClientId = BestClientVoice::INVALID_GAME_CLIENT_ID - 1;
+	m_SecondaryAdvertisedTeam = std::numeric_limits<int>::min();
+	return true;
+}
+
+void CVoiceChat::CloseSecondaryNetworking()
+{
+	if(m_SecondarySocket)
+	{
+		net_udp_close(m_SecondarySocket);
+		m_SecondarySocket = nullptr;
+	}
+	m_SecondaryRegistered = false;
+	m_SecondaryClientVoiceId = 0;
+	m_SecondaryLastHelloTick = 0;
+	m_SecondaryLastServerPacketTick = 0;
+	m_SecondaryLastHeartbeatTick = 0;
+	m_SecondarySendSequence = 0;
+	m_SecondaryHelloResetPending = false;
+	m_SecondaryAdvertisedRoomKey.clear();
+	m_SecondaryAdvertisedGameClientId = BestClientVoice::INVALID_GAME_CLIENT_ID - 1;
+	m_SecondaryAdvertisedTeam = std::numeric_limits<int>::min();
 }
 
 void CVoiceChat::CloseServerListPingSocket()
@@ -2355,6 +2464,31 @@ void CVoiceChat::SendHello()
 	m_AdvertisedTeam = VoiceTeam;
 }
 
+void CVoiceChat::SendHelloSecondary()
+{
+	if(!m_SecondarySocket || !m_HasServerAddr)
+		return;
+
+	const std::string RoomKey = CurrentRoomKey();
+	const int LocalClientId = LocalGameClientId();
+	const int VoiceTeam = LocalOwnVoiceTeam();
+	std::vector<uint8_t> vPacket;
+	const uint16_t RoomKeySize = (uint16_t)minimum<size_t>(RoomKey.size(), BestClientVoice::MAX_ROOM_KEY_LENGTH);
+	vPacket.reserve(24 + RoomKeySize);
+	BestClientVoice::WriteHeader(vPacket, BestClientVoice::PACKET_HELLO);
+	BestClientVoice::WriteU16(vPacket, 1);
+	BestClientVoice::WriteU16(vPacket, RoomKeySize);
+	vPacket.insert(vPacket.end(), RoomKey.begin(), RoomKey.begin() + RoomKeySize);
+	BestClientVoice::WriteS16(vPacket, (int16_t)LocalClientId);
+	BestClientVoice::WriteS16(vPacket, (int16_t)VoiceTeam);
+	net_udp_send(m_SecondarySocket, &m_ServerAddr, vPacket.data(), (int)vPacket.size());
+	m_SecondaryLastHelloTick = time_get();
+	m_SecondaryLastHeartbeatTick = m_SecondaryLastHelloTick;
+	m_SecondaryAdvertisedRoomKey.assign(RoomKey.begin(), RoomKey.begin() + RoomKeySize);
+	m_SecondaryAdvertisedGameClientId = LocalClientId;
+	m_SecondaryAdvertisedTeam = VoiceTeam;
+}
+
 void CVoiceChat::SendGoodbye()
 {
 	if(!m_Socket || !m_HasServerAddr)
@@ -2364,6 +2498,17 @@ void CVoiceChat::SendGoodbye()
 	vPacket.reserve(8);
 	BestClientVoice::WriteHeader(vPacket, BestClientVoice::PACKET_GOODBYE);
 	net_udp_send(m_Socket, &m_ServerAddr, vPacket.data(), (int)vPacket.size());
+}
+
+void CVoiceChat::SendGoodbyeSecondary()
+{
+	if(!m_SecondarySocket || !m_HasServerAddr)
+		return;
+
+	std::vector<uint8_t> vPacket;
+	vPacket.reserve(8);
+	BestClientVoice::WriteHeader(vPacket, BestClientVoice::PACKET_GOODBYE);
+	net_udp_send(m_SecondarySocket, &m_ServerAddr, vPacket.data(), (int)vPacket.size());
 }
 
 void CVoiceChat::SendVoiceFrame(const uint8_t *pOpusData, int OpusSize, int Team, vec2 Position)
@@ -2383,6 +2528,191 @@ void CVoiceChat::SendVoiceFrame(const uint8_t *pOpusData, int OpusSize, int Team
 	BestClientVoice::WriteU16(vPacket, (uint16_t)OpusSize);
 	vPacket.insert(vPacket.end(), pOpusData, pOpusData + OpusSize);
 	net_udp_send(m_Socket, &m_ServerAddr, vPacket.data(), (int)vPacket.size());
+}
+
+void CVoiceChat::SendVoiceFrameSecondary(const uint8_t *pOpusData, int OpusSize, int Team, vec2 Position)
+{
+	if(!m_SecondarySocket || !m_SecondaryRegistered || !m_HasServerAddr)
+		return;
+	if(OpusSize <= 0 || OpusSize > BestClientVoice::MAX_OPUS_PACKET_SIZE)
+		return;
+
+	std::vector<uint8_t> vPacket;
+	vPacket.reserve(32 + OpusSize);
+	BestClientVoice::WriteHeader(vPacket, BestClientVoice::PACKET_VOICE);
+	BestClientVoice::WriteS16(vPacket, (int16_t)Team);
+	BestClientVoice::WriteS32(vPacket, round_to_int(Position.x));
+	BestClientVoice::WriteS32(vPacket, round_to_int(Position.y));
+	BestClientVoice::WriteU16(vPacket, m_SecondarySendSequence++);
+	BestClientVoice::WriteU16(vPacket, (uint16_t)OpusSize);
+	vPacket.insert(vPacket.end(), pOpusData, pOpusData + OpusSize);
+	net_udp_send(m_SecondarySocket, &m_ServerAddr, vPacket.data(), (int)vPacket.size());
+}
+
+void CVoiceChat::ProcessVoiceRelayPacket(const uint8_t *pRawData, int DataSize, int Offset, uint16_t SelfVoiceId)
+{
+	uint16_t SenderId = 0;
+	int16_t Team = 0;
+	int32_t PosX = 0;
+	int32_t PosY = 0;
+	uint16_t Sequence = 0;
+	uint16_t OpusSize = 0;
+	if(!BestClientVoice::ReadU16(pRawData, DataSize, Offset, SenderId) ||
+		!BestClientVoice::ReadS16(pRawData, DataSize, Offset, Team) ||
+		!BestClientVoice::ReadS32(pRawData, DataSize, Offset, PosX) ||
+		!BestClientVoice::ReadS32(pRawData, DataSize, Offset, PosY) ||
+		!BestClientVoice::ReadU16(pRawData, DataSize, Offset, Sequence) ||
+		!BestClientVoice::ReadU16(pRawData, DataSize, Offset, OpusSize))
+	{
+		return;
+	}
+	if(Offset + OpusSize > DataSize || OpusSize == 0 || OpusSize > BestClientVoice::MAX_OPUS_PACKET_SIZE)
+		return;
+	if(SenderId == SelfVoiceId)
+		return;
+
+	auto ItPeer = m_Peers.find(SenderId);
+	if(ItPeer == m_Peers.end())
+	{
+		// Recover quickly even if peer-list packets are delayed/lost for a while.
+		CRemotePeer &NewPeer = m_Peers[SenderId];
+		NewPeer.m_LastReceiveTick = time_get();
+		m_PeerVolumePercent.emplace(SenderId, 100);
+		InvalidatePeerCaches();
+		ItPeer = m_Peers.find(SenderId);
+		if(ItPeer == m_Peers.end())
+			return;
+	}
+	CRemotePeer &Peer = ItPeer->second;
+	if(m_PeerVolumePercent.find(SenderId) == m_PeerVolumePercent.end())
+		m_PeerVolumePercent[SenderId] = 100;
+	Peer.m_Team = Team;
+	Peer.m_Position = vec2((float)PosX, (float)PosY);
+	if(!IsVoiceTeamAudible(Team))
+	{
+		// Ignore packets from channels we are not subscribed to, but keep decoder state for
+		// the active channel to avoid breaking dual-stream team0 + own-team reception.
+		return;
+	}
+
+	const int64_t Now = time_get();
+	if(Peer.m_LastArrivalTick > 0)
+	{
+		const float DeltaMs = (float)((Now - Peer.m_LastArrivalTick) * 1000.0 / (double)time_freq());
+		const float Deviation = std::fabs(DeltaMs - 20.0f);
+		Peer.m_JitterMs = Peer.m_JitterMs <= 0.0f ? Deviation : (0.9f * Peer.m_JitterMs + 0.1f * Deviation);
+	}
+	Peer.m_LastArrivalTick = Now;
+	Peer.m_LastReceiveTick = Now;
+	if(!IsPositionWithinRadiusFilter(Peer.m_Position))
+	{
+		const bool HadBufferedAudio = Peer.m_DecodedPcm.Size() > 0;
+		const bool WasTalking = Peer.m_LastVoiceTick > 0;
+		Peer.m_LastVoiceTick = 0;
+		if(HadBufferedAudio)
+			Peer.m_DecodedPcm.Clear();
+		if(Peer.m_HasSequence)
+		{
+			Peer.m_HasSequence = false;
+			if(Peer.m_pDecoder)
+				opus_decoder_ctl(Peer.m_pDecoder, OPUS_RESET_STATE);
+		}
+		if(WasTalking || HadBufferedAudio)
+			m_TalkingStateDirty = true;
+		return;
+	}
+
+	if(!Peer.m_pDecoder)
+	{
+		int Error = 0;
+		Peer.m_pDecoder = opus_decoder_create(BestClientVoice::SAMPLE_RATE, BestClientVoice::CHANNELS, &Error);
+		if(Error != OPUS_OK || !Peer.m_pDecoder)
+		{
+			Peer.m_pDecoder = nullptr;
+			return;
+		}
+	}
+
+	int16_t aDecoded[BestClientVoice::FRAME_SIZE];
+	if(Peer.m_HasSequence)
+	{
+		if(!IsForwardSequence(Peer.m_LastSequence, Sequence))
+			return;
+
+		const uint16_t Expected = (uint16_t)(Peer.m_LastSequence + 1);
+		const uint16_t MissingPackets = (uint16_t)(Sequence - Expected);
+		const int DeltaPackets = (int)MissingPackets + 1;
+		const float LossRatio = std::clamp(MissingPackets / (float)maximum(DeltaPackets, 1), 0.0f, 1.0f);
+		Peer.m_LossEwma = Peer.m_LossEwma <= 0.0f ? LossRatio : (0.9f * Peer.m_LossEwma + 0.1f * LossRatio);
+		if(MissingPackets > 0)
+		{
+			if(MissingPackets > MAX_PACKET_GAP_FOR_PLC)
+			{
+				Peer.m_DecodedPcm.Clear();
+				if(Peer.m_pDecoder)
+					opus_decoder_ctl(Peer.m_pDecoder, OPUS_RESET_STATE);
+				Peer.m_HasSequence = false;
+			}
+			else
+			{
+				// If only one packet is missing, attempt Opus in-band FEC from the current packet.
+				if(MissingPackets == 1)
+				{
+					const int FecSamples = opus_decode(Peer.m_pDecoder, pRawData + Offset, OpusSize, aDecoded, BestClientVoice::FRAME_SIZE, 1);
+					if(FecSamples > 0)
+					{
+						const size_t Dropped = Peer.m_DecodedPcm.PushBack(aDecoded, (size_t)FecSamples);
+						if(Dropped > 0 && Peer.m_DecodedPcm.Size() > PLAYBACK_MAX_RESYNC_FRAMES)
+							Peer.m_DecodedPcm.DiscardFront(Peer.m_DecodedPcm.Size() - PLAYBACK_MAX_RESYNC_FRAMES);
+					}
+					else
+					{
+						const int PlcSamples = opus_decode(Peer.m_pDecoder, nullptr, 0, aDecoded, BestClientVoice::FRAME_SIZE, 0);
+						if(PlcSamples > 0)
+						{
+							const size_t Dropped = Peer.m_DecodedPcm.PushBack(aDecoded, (size_t)PlcSamples);
+							if(Dropped > 0 && Peer.m_DecodedPcm.Size() > PLAYBACK_MAX_RESYNC_FRAMES)
+								Peer.m_DecodedPcm.DiscardFront(Peer.m_DecodedPcm.Size() - PLAYBACK_MAX_RESYNC_FRAMES);
+						}
+					}
+				}
+				else
+				{
+					for(uint16_t Missing = 0; Missing < MissingPackets; ++Missing)
+					{
+						const int PlcSamples = opus_decode(Peer.m_pDecoder, nullptr, 0, aDecoded, BestClientVoice::FRAME_SIZE, 0);
+						if(PlcSamples <= 0)
+							break;
+						const size_t Dropped = Peer.m_DecodedPcm.PushBack(aDecoded, (size_t)PlcSamples);
+						if(Dropped > 0 && Peer.m_DecodedPcm.Size() > PLAYBACK_MAX_RESYNC_FRAMES)
+							Peer.m_DecodedPcm.DiscardFront(Peer.m_DecodedPcm.Size() - PLAYBACK_MAX_RESYNC_FRAMES);
+					}
+				}
+			}
+		}
+	}
+
+	const int DecodedSamples = opus_decode(Peer.m_pDecoder, pRawData + Offset, OpusSize, aDecoded, BestClientVoice::FRAME_SIZE, 0);
+	if(DecodedSamples <= 0)
+	{
+		++Peer.m_ConsecutiveDecodeFails;
+		if(Peer.m_ConsecutiveDecodeFails >= 3 && Peer.m_pDecoder)
+		{
+			opus_decoder_ctl(Peer.m_pDecoder, OPUS_RESET_STATE);
+			Peer.m_ConsecutiveDecodeFails = 0;
+		}
+		return;
+	}
+
+	Peer.m_ConsecutiveDecodeFails = 0;
+	Peer.m_LastSequence = Sequence;
+	Peer.m_HasSequence = true;
+	Peer.m_LastVoiceTick = Now;
+	m_TalkingStateDirty = true;
+
+	const size_t Dropped = Peer.m_DecodedPcm.PushBack(aDecoded, (size_t)DecodedSamples);
+	if(Dropped > 0 && Peer.m_DecodedPcm.Size() > PLAYBACK_MAX_RESYNC_FRAMES)
+		Peer.m_DecodedPcm.DiscardFront(Peer.m_DecodedPcm.Size() - PLAYBACK_MAX_RESYNC_FRAMES);
 }
 
 void CVoiceChat::ProcessNetwork()
@@ -2797,179 +3127,56 @@ void CVoiceChat::ProcessNetwork()
 		if(IsInGameOnlyBlocked())
 			continue;
 
-		uint16_t SenderId = 0;
-		int16_t Team = 0;
-		int32_t PosX = 0;
-		int32_t PosY = 0;
-		uint16_t Sequence = 0;
-		uint16_t OpusSize = 0;
-		if(!BestClientVoice::ReadU16(pRawData, DataSize, Offset, SenderId) ||
-			!BestClientVoice::ReadS16(pRawData, DataSize, Offset, Team) ||
-			!BestClientVoice::ReadS32(pRawData, DataSize, Offset, PosX) ||
-			!BestClientVoice::ReadS32(pRawData, DataSize, Offset, PosY) ||
-			!BestClientVoice::ReadU16(pRawData, DataSize, Offset, Sequence) ||
-			!BestClientVoice::ReadU16(pRawData, DataSize, Offset, OpusSize))
-		{
+		ProcessVoiceRelayPacket(pRawData, DataSize, Offset, m_ClientVoiceId);
+	}
+}
+
+void CVoiceChat::ProcessSecondaryNetwork()
+{
+	if(!m_SecondarySocket)
+		return;
+
+	for(int PacketCount = 0; PacketCount < MAX_RECEIVE_PACKETS_PER_TICK; ++PacketCount)
+	{
+		NETADDR From = NETADDR_ZEROED;
+		unsigned char *pRawData = nullptr;
+		const int DataSize = net_udp_recv(m_SecondarySocket, &From, &pRawData);
+		if(DataSize <= 0 || !pRawData)
+			break;
+
+		if(net_addr_comp(&From, &m_ServerAddr) != 0)
 			continue;
-		}
-		if(Offset + OpusSize > DataSize || OpusSize == 0 || OpusSize > BestClientVoice::MAX_OPUS_PACKET_SIZE)
+
+		int Offset = 0;
+		BestClientVoice::EPacketType Type;
+		if(!BestClientVoice::ReadHeader(pRawData, DataSize, Type, Offset))
 			continue;
-		if(SenderId == m_ClientVoiceId)
-			continue;
+		m_SecondaryLastServerPacketTick = time_get();
 
-		auto ItPeer = m_Peers.find(SenderId);
-		if(ItPeer == m_Peers.end())
+		if(Type == BestClientVoice::PACKET_HELLO_ACK)
 		{
-			// Recover quickly even if peer-list packets are delayed/lost for a while.
-			CRemotePeer &NewPeer = m_Peers[SenderId];
-			NewPeer.m_LastReceiveTick = time_get();
-			m_PeerVolumePercent.emplace(SenderId, 100);
-			InvalidatePeerCaches();
-			ItPeer = m_Peers.find(SenderId);
-			if(ItPeer == m_Peers.end())
-				continue;
-		}
-		CRemotePeer &Peer = ItPeer->second;
-		if(m_PeerVolumePercent.find(SenderId) == m_PeerVolumePercent.end())
-			m_PeerVolumePercent[SenderId] = 100;
-		Peer.m_Team = Team;
-		Peer.m_Position = vec2((float)PosX, (float)PosY);
-		if(!IsVoiceTeamAudible(Team))
-		{
-			const bool HadBufferedAudio = Peer.m_DecodedPcm.Size() > 0;
-			const bool WasTalking = Peer.m_LastVoiceTick > 0;
-			Peer.m_LastVoiceTick = 0;
-			if(HadBufferedAudio)
-				Peer.m_DecodedPcm.Clear();
-			if(Peer.m_HasSequence)
+			uint16_t VoiceId = 0;
+			if(BestClientVoice::ReadU16(pRawData, DataSize, Offset, VoiceId))
 			{
-				Peer.m_HasSequence = false;
-				if(Peer.m_pDecoder)
-					opus_decoder_ctl(Peer.m_pDecoder, OPUS_RESET_STATE);
-			}
-			if(WasTalking || HadBufferedAudio)
-				m_TalkingStateDirty = true;
-			continue;
-		}
-
-		const int64_t Now = time_get();
-		if(Peer.m_LastArrivalTick > 0)
-		{
-			const float DeltaMs = (float)((Now - Peer.m_LastArrivalTick) * 1000.0 / (double)time_freq());
-			const float Deviation = std::fabs(DeltaMs - 20.0f);
-			Peer.m_JitterMs = Peer.m_JitterMs <= 0.0f ? Deviation : (0.9f * Peer.m_JitterMs + 0.1f * Deviation);
-		}
-		Peer.m_LastArrivalTick = Now;
-		Peer.m_LastReceiveTick = Now;
-		if(!IsPositionWithinRadiusFilter(Peer.m_Position))
-		{
-			const bool HadBufferedAudio = Peer.m_DecodedPcm.Size() > 0;
-			const bool WasTalking = Peer.m_LastVoiceTick > 0;
-			Peer.m_LastVoiceTick = 0;
-			if(HadBufferedAudio)
-				Peer.m_DecodedPcm.Clear();
-			if(Peer.m_HasSequence)
-			{
-				Peer.m_HasSequence = false;
-				if(Peer.m_pDecoder)
-					opus_decoder_ctl(Peer.m_pDecoder, OPUS_RESET_STATE);
-			}
-			if(WasTalking || HadBufferedAudio)
-				m_TalkingStateDirty = true;
-			continue;
-		}
-
-		if(!Peer.m_pDecoder)
-		{
-			int Error = 0;
-			Peer.m_pDecoder = opus_decoder_create(BestClientVoice::SAMPLE_RATE, BestClientVoice::CHANNELS, &Error);
-			if(Error != OPUS_OK || !Peer.m_pDecoder)
-			{
-				Peer.m_pDecoder = nullptr;
-				continue;
-			}
-		}
-
-		int16_t aDecoded[BestClientVoice::FRAME_SIZE];
-		if(Peer.m_HasSequence)
-		{
-			if(!IsForwardSequence(Peer.m_LastSequence, Sequence))
-				continue;
-
-			const uint16_t Expected = (uint16_t)(Peer.m_LastSequence + 1);
-			const uint16_t MissingPackets = (uint16_t)(Sequence - Expected);
-			const int DeltaPackets = (int)MissingPackets + 1;
-			const float LossRatio = std::clamp(MissingPackets / (float)maximum(DeltaPackets, 1), 0.0f, 1.0f);
-			Peer.m_LossEwma = Peer.m_LossEwma <= 0.0f ? LossRatio : (0.9f * Peer.m_LossEwma + 0.1f * LossRatio);
-			if(MissingPackets > 0)
-			{
-				if(MissingPackets > MAX_PACKET_GAP_FOR_PLC)
-				{
-					Peer.m_DecodedPcm.Clear();
-					if(Peer.m_pDecoder)
-						opus_decoder_ctl(Peer.m_pDecoder, OPUS_RESET_STATE);
-					Peer.m_HasSequence = false;
-				}
-				else
-				{
-					// If only one packet is missing, attempt Opus in-band FEC from the current packet.
-					if(MissingPackets == 1)
-					{
-						const int FecSamples = opus_decode(Peer.m_pDecoder, pRawData + Offset, OpusSize, aDecoded, BestClientVoice::FRAME_SIZE, 1);
-						if(FecSamples > 0)
-						{
-							const size_t Dropped = Peer.m_DecodedPcm.PushBack(aDecoded, (size_t)FecSamples);
-							if(Dropped > 0 && Peer.m_DecodedPcm.Size() > PLAYBACK_MAX_RESYNC_FRAMES)
-								Peer.m_DecodedPcm.DiscardFront(Peer.m_DecodedPcm.Size() - PLAYBACK_MAX_RESYNC_FRAMES);
-						}
-						else
-						{
-							const int PlcSamples = opus_decode(Peer.m_pDecoder, nullptr, 0, aDecoded, BestClientVoice::FRAME_SIZE, 0);
-							if(PlcSamples > 0)
-							{
-								const size_t Dropped = Peer.m_DecodedPcm.PushBack(aDecoded, (size_t)PlcSamples);
-								if(Dropped > 0 && Peer.m_DecodedPcm.Size() > PLAYBACK_MAX_RESYNC_FRAMES)
-									Peer.m_DecodedPcm.DiscardFront(Peer.m_DecodedPcm.Size() - PLAYBACK_MAX_RESYNC_FRAMES);
-							}
-						}
-					}
-					else
-					{
-						for(uint16_t Missing = 0; Missing < MissingPackets; ++Missing)
-						{
-							const int PlcSamples = opus_decode(Peer.m_pDecoder, nullptr, 0, aDecoded, BestClientVoice::FRAME_SIZE, 0);
-							if(PlcSamples <= 0)
-								break;
-							const size_t Dropped = Peer.m_DecodedPcm.PushBack(aDecoded, (size_t)PlcSamples);
-							if(Dropped > 0 && Peer.m_DecodedPcm.Size() > PLAYBACK_MAX_RESYNC_FRAMES)
-								Peer.m_DecodedPcm.DiscardFront(Peer.m_DecodedPcm.Size() - PLAYBACK_MAX_RESYNC_FRAMES);
-						}
-					}
-				}
-			}
-		}
-
-		const int DecodedSamples = opus_decode(Peer.m_pDecoder, pRawData + Offset, OpusSize, aDecoded, BestClientVoice::FRAME_SIZE, 0);
-		if(DecodedSamples <= 0)
-		{
-			++Peer.m_ConsecutiveDecodeFails;
-			if(Peer.m_ConsecutiveDecodeFails >= 3 && Peer.m_pDecoder)
-			{
-				opus_decoder_ctl(Peer.m_pDecoder, OPUS_RESET_STATE);
-				Peer.m_ConsecutiveDecodeFails = 0;
+				const bool FullReset = m_SecondaryHelloResetPending || !m_SecondaryRegistered || (m_SecondaryClientVoiceId != 0 && m_SecondaryClientVoiceId != VoiceId);
+				if(FullReset)
+					m_SecondarySendSequence = 0;
+				m_SecondaryClientVoiceId = VoiceId;
+				m_SecondaryRegistered = true;
+				m_SecondaryHelloResetPending = false;
 			}
 			continue;
 		}
 
-		Peer.m_ConsecutiveDecodeFails = 0;
-		Peer.m_LastSequence = Sequence;
-		Peer.m_HasSequence = true;
-		Peer.m_LastVoiceTick = Now;
-		m_TalkingStateDirty = true;
+		if(Type != BestClientVoice::PACKET_VOICE_RELAY)
+			continue;
 
-		const size_t Dropped = Peer.m_DecodedPcm.PushBack(aDecoded, (size_t)DecodedSamples);
-		if(Dropped > 0 && Peer.m_DecodedPcm.Size() > PLAYBACK_MAX_RESYNC_FRAMES)
-			Peer.m_DecodedPcm.DiscardFront(Peer.m_DecodedPcm.Size() - PLAYBACK_MAX_RESYNC_FRAMES);
+		if(!m_SecondaryRegistered || m_SecondaryClientVoiceId == 0)
+			continue;
+		if(IsInGameOnlyBlocked())
+			continue;
+
+		ProcessVoiceRelayPacket(pRawData, DataSize, Offset, m_SecondaryClientVoiceId);
 	}
 }
 
@@ -3254,11 +3461,10 @@ void CVoiceChat::ProcessCapture()
 			const int PrimaryTeam = LocalVoiceTeam();
 			SendVoiceFrame(aEncoded, EncodedSize, PrimaryTeam, Position);
 
-			if(ShouldTransmitToOwnGroupAlongsideTeam0())
+			if(ShouldUseSecondaryTeamConnection())
 			{
 				const int OwnTeam = LocalOwnVoiceTeam();
-				if(OwnTeam != PrimaryTeam)
-					SendVoiceFrame(aEncoded, EncodedSize, OwnTeam, Position);
+				SendVoiceFrameSecondary(aEncoded, EncodedSize, OwnTeam, Position);
 			}
 		}
 	}
@@ -3585,6 +3791,11 @@ bool CVoiceChat::ShouldKeepVoicePipelineActive() const
 	return g_Config.m_BcVoiceChatEnable != 0;
 }
 
+bool CVoiceChat::ShouldUseSecondaryTeamConnection() const
+{
+	return IsEnableYourGroupMode() && LocalOwnVoiceTeam() > 0;
+}
+
 int CVoiceChat::LocalTeam() const
 {
 	if(GameClient()->m_Snap.m_LocalClientId < 0)
@@ -3610,11 +3821,6 @@ bool CVoiceChat::IsUseTeam0Mode() const
 bool CVoiceChat::IsEnableYourGroupMode() const
 {
 	return IsUseTeam0Mode() && g_Config.m_BcVoiceChatEnableYourGroup != 0;
-}
-
-bool CVoiceChat::ShouldTransmitToOwnGroupAlongsideTeam0() const
-{
-	return IsEnableYourGroupMode() && LocalOwnVoiceTeam() > 0;
 }
 
 bool CVoiceChat::IsVoiceTeamAudible(int Team) const
