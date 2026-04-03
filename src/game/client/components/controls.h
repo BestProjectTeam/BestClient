@@ -50,6 +50,13 @@ public:
 	int64_t m_aSnapTapLastPressedTime[NUM_DUMMIES];
 	int m_aSnapTapPrevLeft[NUM_DUMMIES];
 	int m_aSnapTapPrevRight[NUM_DUMMIES];
+	int m_aHookPredictorActive[NUM_DUMMIES];
+	int m_aHookPredictorPeakLocked[NUM_DUMMIES];
+	int m_aHookPredictorLastTrend[NUM_DUMMIES];
+	int m_aHookPredictorPeakTick[NUM_DUMMIES];
+	float m_aHookPredictorStartDistance[NUM_DUMMIES];
+	float m_aHookPredictorBestDistance[NUM_DUMMIES];
+	float m_aHookPredictorPrevDistance[NUM_DUMMIES];
 
 	CControls();
 	int Sizeof() const override { return sizeof(*this); }
@@ -71,6 +78,8 @@ private:
 	void UpdateSnapTapState(int Dummy, bool LeftPressed, bool RightPressed);
 	int ResolveSnapTapDirection(int Dummy, bool LeftPressed, bool RightPressed);
 	bool IsSnapTapActive() const;
+	void ResetHookPredictorState(int Dummy);
+	void ApplyHookTrajectoryPredictor(int Dummy);
 	static void ConKeyInputState(IConsole::IResult *pResult, void *pUserData);
 	static void ConKeyInputCounter(IConsole::IResult *pResult, void *pUserData);
 	static void ConKeyInputSet(IConsole::IResult *pResult, void *pUserData);

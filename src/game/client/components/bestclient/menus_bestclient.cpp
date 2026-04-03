@@ -1841,6 +1841,27 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			}
 
 			Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
+
+			const bool HookPredictorEnabled = g_Config.m_BcHookTrajectoryPredictor != 0;
+			float HookPredictorContentHeight = LineSize + MarginSmall + LineSize;
+			if(HookPredictorEnabled)
+				HookPredictorContentHeight += MarginSmall + LineSize + MarginSmall + LineSize;
+			BeginBlock(Column, HookPredictorContentHeight, Content);
+			Content.HSplitTop(LineSize, &Label, &Content);
+			Ui()->DoLabel(&Label, BCLocalize("Hook Predictor"), HeadlineFontSize, TEXTALIGN_ML);
+			Content.HSplitTop(MarginSmall, nullptr, &Content);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcHookTrajectoryPredictor, BCLocalize("Enable"), &g_Config.m_BcHookTrajectoryPredictor, &Content, LineSize);
+			if(g_Config.m_BcHookTrajectoryPredictor)
+			{
+				Content.HSplitTop(MarginSmall, nullptr, &Content);
+				Content.HSplitTop(LineSize, &Button, &Content);
+				DoSliderWithScaledValue(&g_Config.m_BcHookTrajectoryPredictorReleaseOffset, &g_Config.m_BcHookTrajectoryPredictorReleaseOffset, &Button, BCLocalize("Release offset"), 0, 250, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "ms");
+				Content.HSplitTop(MarginSmall, nullptr, &Content);
+				Content.HSplitTop(LineSize, &Button, &Content);
+				DoSliderWithScaledValue(&g_Config.m_BcHookTrajectoryPredictorReleaseWindow, &g_Config.m_BcHookTrajectoryPredictorReleaseWindow, &Button, BCLocalize("Release window"), 5, 250, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "ms");
+			}
+
+			Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
 		}
 		if(!GameClient()->m_BestClient.IsComponentDisabled(CBestClient::COMPONENT_VISUALS_OPTIMIZER))
 		{
