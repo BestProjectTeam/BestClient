@@ -191,6 +191,8 @@ void NormalizeDetectedLanguage(char *pLanguage, size_t Size)
 		{"english", "en"},
 		{"de", "de"},
 		{"german", "de"},
+		{"fr", "fr"},
+		{"french", "fr"},
 		{"zh", "zh"},
 		{"chinese", "zh"},
 		{"pt", "pt"},
