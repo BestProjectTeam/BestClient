@@ -65,9 +65,9 @@ float EffectiveFastInputOffsetTicks()
 		return g_Config.m_TcFastInputAmount / 20.0f;
 	}
 
-	if(g_Config.m_BcFastInputLowDelta <= 0)
+	if(g_Config.m_BcFastInputDeltaInput <= 0)
 		return 0.0f;
-	return g_Config.m_BcFastInputLowDelta / 100.0f;
+	return g_Config.m_BcFastInputDeltaInput / 100.0f;
 }
 
 int FastInputPredictionTicks(float OffsetTicks)
@@ -79,7 +79,7 @@ int FastInputPredictionTicks(float OffsetTicks)
 
 bool EffectiveFastInputOthers()
 {
-	return g_Config.m_BcFastInputMode == 0 ? g_Config.m_TcFastInputOthers != 0 : g_Config.m_BcLowDeltaOthers != 0;
+	return g_Config.m_BcFastInputMode == 0 ? g_Config.m_TcFastInputOthers != 0 : g_Config.m_BcDeltaInputOthers != 0;
 }
 
 bool IsFrozenState(const CCharacter *pChar)

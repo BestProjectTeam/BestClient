@@ -12,7 +12,7 @@
 ## About
 
 BestClient is a customized DDNet client focused on comfort, utility and full control over gameplay and visuals.
-It extends the base client with native BestClient systems like Camera Drift, Dynamic FOV, Jelly Tee, 3D/Magic particles, Afterimage, Hook Combo, Fast Input/Low Delta, Snap Tap, Focus Mode, Voice Chat, Chat Media, Client Indicator, plus built-in Editors, Shop and Fun tabs.
+It extends the base client with native BestClient systems like Camera Drift, Dynamic FOV, Jelly Tee, 3D/Magic particles, Afterimage, Hook Combo, Fast Input/Delta Input, Snap Tap, Focus Mode, Voice Chat, Chat Media, Client Indicator, plus built-in Editors, Shop and Fun tabs.
 
 ## Links
 
@@ -23,7 +23,7 @@ It extends the base client with native BestClient systems like Camera Drift, Dyn
 ## Highlights
 
 - BestClient focuses on its own visual stack: Camera Drift, Dynamic FOV, Jelly Tee, Magic/Orbit/3D particles, Afterimage, Crystal Laser, Aspect Ratio and Media Background.
-- BestClient gameplay tools include Fast Input/Low Delta, Snap Tap, Hook Combo, Gores Mode, Auto Team Lock, Speedrun Timer and Focus Mode.
+- BestClient gameplay tools include Fast Input/Delta Input, Snap Tap, Hook Combo, Gores Mode, Auto Team Lock, Speedrun Timer and Focus Mode.
 - BestClient utility features cover Chat Media, integrated Voice Chat and Client Indicator.
 - BestClient comes with native tooling and content flow: Assets Editor, Components Editor, HUD Editor, in-client Shop and Fun tab.
 
@@ -204,7 +204,7 @@ bc_dynamic_fov_amount
 bc_dynamic_fov_smoothness
 bc_emoticon_shadow
 bc_esc_player_list
-bc_fast_input_low_delta
+bc_fast_input_delta_input
 bc_fast_input_mode
 bc_game_media_background
 bc_game_media_background_offset
@@ -239,7 +239,7 @@ bc_jelly_tee_others
 bc_jelly_tee_strength
 bc_killfeed_animation
 bc_killfeed_animation_ms
-bc_low_delta_others
+bc_delta_input_others
 bc_magic_particles
 bc_magic_particles_alpha_delay
 bc_magic_particles_count

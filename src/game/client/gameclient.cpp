@@ -118,26 +118,26 @@ float EffectiveFastInputOffsetTicksFastMode(IClient *pClient, IServerBrowser *pS
 	return g_Config.m_TcFastInputAmount / 20.0f;
 }
 
-float EffectiveFastInputOffsetTicksLowDeltaMode(IClient *pClient, IServerBrowser *pServerBrowser)
+float EffectiveFastInputOffsetTicksDeltaInputMode(IClient *pClient, IServerBrowser *pServerBrowser)
 {
 	(void)pClient;
 	(void)pServerBrowser;
 
-	// Mode 1: low delta (saiko-input style, tick based, stored in 0.01 ticks)
+	// Mode 1: delta input (saiko-input style, tick based, stored in 0.01 ticks)
 	if(!g_Config.m_TcFastInput ||
 		g_Config.m_BcFastInputMode != 1 ||
 		IsGameplayInputComponentDisabled())
 		return 0.0f;
-	if(g_Config.m_BcFastInputLowDelta <= 0)
+	if(g_Config.m_BcFastInputDeltaInput <= 0)
 		return 0.0f;
-	return g_Config.m_BcFastInputLowDelta / 100.0f;
+	return g_Config.m_BcFastInputDeltaInput / 100.0f;
 }
 
 float EffectiveFastInputOffsetTicks(IClient *pClient, IServerBrowser *pServerBrowser)
 {
 	if(g_Config.m_BcFastInputMode == 0)
 		return EffectiveFastInputOffsetTicksFastMode(pClient, pServerBrowser);
-	return EffectiveFastInputOffsetTicksLowDeltaMode(pClient, pServerBrowser);
+	return EffectiveFastInputOffsetTicksDeltaInputMode(pClient, pServerBrowser);
 }
 
 int FastInputPredictionTicks(float OffsetTicks)
@@ -169,10 +169,10 @@ bool EffectiveFastInputOthers()
 		!IsGameplayInputComponentDisabled();
 }
 
-bool EffectiveLowDeltaOthers()
+bool EffectiveDeltaInputOthers()
 {
 	return g_Config.m_BcFastInputMode == 1 &&
-		g_Config.m_BcLowDeltaOthers != 0 &&
+		g_Config.m_BcDeltaInputOthers != 0 &&
 		!IsGameplayInputComponentDisabled();
 }
 } // namespace
@@ -3184,7 +3184,7 @@ void CGameClient::OnPredict()
 
 	const float FastInputOffsetTicks = EffectiveFastInputOffsetTicks(Client(), ServerBrowser());
 	const int FastInputTicks = FastInputPredictionTicks(FastInputOffsetTicks);
-	const bool FastInputOthers = EffectiveFastInputOthers() || EffectiveLowDeltaOthers();
+	const bool FastInputOthers = EffectiveFastInputOthers() || EffectiveDeltaInputOthers();
 	int FinalTickRegular = Client()->PredGameTick(g_Config.m_ClDummy); // The vanilla final tick disregarding fast input
 
 	int FinalTickSelf = FinalTickRegular + FastInputTicks; // the final tick for just our local tee
@@ -4644,7 +4644,7 @@ void CGameClient::UpdateRenderedCharacters()
 	const float FastInputOffsetTicks = EffectiveFastInputOffsetTicks(Client(), ServerBrowser());
 	const int FastInputTicks = FastInputPredictionTicks(FastInputOffsetTicks);
 	const bool HasFastInput = FastInputTicks > 0;
-	const bool FastInputOthers = EffectiveFastInputOthers() || EffectiveLowDeltaOthers();
+	const bool FastInputOthers = EffectiveFastInputOthers() || EffectiveDeltaInputOthers();
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
 		if(!m_Snap.m_aCharacters[i].m_Active)
@@ -4708,8 +4708,8 @@ void CGameClient::UpdateRenderedCharacters()
 				if(g_Config.m_ClAntiPingSmooth)
 					Pos = GetSmoothPos(i);
 
-				// Low-delta others should feel immediate: prefer direct fast-input position over smoothing layers.
-				if(HasFastInput && EffectiveLowDeltaOthers())
+				// Delta-input others should feel immediate: prefer direct fast-input position over smoothing layers.
+				if(HasFastInput && EffectiveDeltaInputOthers())
 					Pos = GetFastInputPos(i);
 				else if(g_Config.m_TcAntiPingImproved && m_aClients[i].m_ValidAntipingSmooth)
 					Pos = mix(m_aClients[i].m_PrevImprovedPredPos, m_aClients[i].m_ImprovedPredPos, Client()->PredIntraGameTick(g_Config.m_ClDummy));
@@ -4868,11 +4868,11 @@ vec2 CGameClient::GetSmoothPos(int ClientId)
 {
 	const float FastInputOffsetTicks = EffectiveFastInputOffsetTicks(Client(), ServerBrowser());
 	const int FastInputTicks = FastInputPredictionTicks(FastInputOffsetTicks);
-	if(ClientId != m_Snap.m_LocalClientId && FastInputTicks > 0 && EffectiveLowDeltaOthers())
+	if(ClientId != m_Snap.m_LocalClientId && FastInputTicks > 0 && EffectiveDeltaInputOthers())
 		return GetFastInputPos(ClientId);
 	vec2 Pos = mix(m_aClients[ClientId].m_PrevPredicted.m_Pos, m_aClients[ClientId].m_Predicted.m_Pos, Client()->PredIntraGameTick(g_Config.m_ClDummy));
 	int64_t Now = time_get();
-	const bool FastInputOthers = EffectiveFastInputOthers() || EffectiveLowDeltaOthers();
+	const bool FastInputOthers = EffectiveFastInputOthers() || EffectiveDeltaInputOthers();
 	for(int i = 0; i < 2; i++)
 	{
 		int64_t Len = std::clamp(m_aClients[ClientId].m_aSmoothLen[i], (int64_t)1, time_freq());
@@ -4921,9 +4921,9 @@ vec2 CGameClient::GetFreezePos(int ClientId)
 {
 	const float FastInputOffsetTicks = EffectiveFastInputOffsetTicks(Client(), ServerBrowser());
 	const int FastInputTicks = FastInputPredictionTicks(FastInputOffsetTicks);
-	if(ClientId != m_Snap.m_LocalClientId && FastInputTicks > 0 && EffectiveLowDeltaOthers())
+	if(ClientId != m_Snap.m_LocalClientId && FastInputTicks > 0 && EffectiveDeltaInputOthers())
 		return GetFastInputPos(ClientId);
-	const bool FastInputOthers = EffectiveFastInputOthers() || EffectiveLowDeltaOthers();
+	const bool FastInputOthers = EffectiveFastInputOthers() || EffectiveDeltaInputOthers();
 	vec2 Pos = mix(m_aClients[ClientId].m_PrevPredicted.m_Pos, m_aClients[ClientId].m_Predicted.m_Pos, Client()->PredIntraGameTick(g_Config.m_ClDummy));
 	// int64_t Now = time_get();
 	CCharacter *pChar = m_PredictedWorld.GetCharacterById(m_Snap.m_LocalClientId);

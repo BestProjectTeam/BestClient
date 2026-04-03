@@ -117,7 +117,7 @@ bc_dynamic_fov_amount
 bc_dynamic_fov_smoothness
 bc_emoticon_shadow
 bc_esc_player_list
-bc_fast_input_low_delta
+bc_fast_input_delta_input
 bc_fast_input_mode
 bc_game_media_background
 bc_game_media_background_offset
@@ -152,7 +152,7 @@ bc_jelly_tee_others
 bc_jelly_tee_strength
 bc_killfeed_animation
 bc_killfeed_animation_ms
-bc_low_delta_others
+bc_delta_input_others
 bc_magic_particles
 bc_magic_particles_alpha_delay
 bc_magic_particles_count

@@ -2927,7 +2927,7 @@ void CClient::Update()
 				const bool HasFastInput =
 					g_Config.m_TcFastInput &&
 					((g_Config.m_BcFastInputMode == 0 && g_Config.m_TcFastInputAmount > 0) ||
-						(g_Config.m_BcFastInputMode == 1 && g_Config.m_BcFastInputLowDelta > 0));
+						(g_Config.m_BcFastInputMode == 1 && g_Config.m_BcFastInputDeltaInput > 0));
 				if(HasFastInput && GameClient()->CheckNewInput())
 				{
 					Repredict = true;
@@ -5662,9 +5662,9 @@ int CClient::PredictionMargin() const
 	}
 	else
 	{
-		const int LowDeltaAmount = std::max(0, g_Config.m_BcFastInputLowDelta);
-		// low delta is measured in 0.01 ticks, convert it to milliseconds.
-		FastInputMargin = (LowDeltaAmount + 2) / 5;
+		const int DeltaInputAmount = std::max(0, g_Config.m_BcFastInputDeltaInput);
+		// delta input is measured in 0.01 ticks, convert it to milliseconds.
+		FastInputMargin = (DeltaInputAmount + 2) / 5;
 	}
 
 	return std::max(PredictionMargin, FastInputMargin);
