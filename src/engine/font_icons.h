@@ -59,6 +59,7 @@ namespace FontIcon
 	inline const char *const KEY = "\uF084";
 	inline const char *const KEYBOARD = "\u2328";
 	inline const char *const LAYER_GROUP = "\uF5FD";
+	inline const char *const LANGUAGE = "\uF1AB";
 	inline const char *const LIST_UL = "\uF0CA";
 	inline const char *const LOCK = "\uF023";
 	inline const char *const MAGNIFYING_GLASS = "\uF002";
