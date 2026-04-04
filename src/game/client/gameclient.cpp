@@ -43,6 +43,7 @@
 #include "race.h"
 #include "render.h"
 #include "components/bestclient/r_jelly.h"
+#include "components/bestclient/r_trail.h"
 
 #include <base/log.h>
 #include <base/math.h>
@@ -579,6 +580,7 @@ void CGameClient::OnConsoleInit()
 		pComponent->OnConsoleInit();
 
 	rJelly = std::make_unique<CRJelly>(this);
+	rTrail = std::make_unique<CRTrail>(this);
 
 	Console()->Chain("cl_languagefile", ConchainLanguageUpdate, this);
 
@@ -1121,6 +1123,8 @@ void CGameClient::OnReset()
 
 	if(rJelly)
 		rJelly->Reset();
+	if(rTrail)
+		rTrail->Reset();
 
 	for(auto &pComponent : m_vpAll)
 		pComponent->OnReset();

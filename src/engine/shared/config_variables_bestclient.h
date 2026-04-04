@@ -192,6 +192,11 @@ MACRO_CONFIG_INT(BcJellyTeeOthers, bc_jelly_tee_others, 0, 0, 1, CFGFLAG_CLIENT 
 MACRO_CONFIG_INT(BcJellyTeeStrength, bc_jelly_tee_strength, 500, 0, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Strength of jelly tee deformation")
 MACRO_CONFIG_INT(BcJellyTeeDuration, bc_jelly_tee_duration, 30, 1, 500, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Duration of jelly tee deformation")
 
+// Player trail
+MACRO_CONFIG_INT(BcTrail, bc_trail, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable player trail effect")
+MACRO_CONFIG_INT(BcTrailOthers, bc_trail_others, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show player trail for other players")
+MACRO_CONFIG_INT(BcTrailMode, bc_trail_mode, 0, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Player trail mode (0=grenade, 1=invisible, 2=ninja)")
+
 // Chat bubbles
 MACRO_CONFIG_INT(BcChatBubbles, bc_chat_bubbles, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Toggle Chatbubbles")
 MACRO_CONFIG_INT(BcChatBubblesSelf, bc_chat_bubbles_self, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show Chatbubbles above you")
