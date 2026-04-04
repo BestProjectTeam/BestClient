@@ -5078,27 +5078,50 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 
 				static CButtonContainer s_FastInputModeFast;
 				static CButtonContainer s_FastInputModeDeltaInput;
+				static CButtonContainer s_FastInputModeGammaInput;
 				const int OldMode = g_Config.m_BcFastInputMode;
 
 				Expand.HSplitTop(LineSize, &Button, &Expand);
 				{
-					CUIRect Left, Right;
-					Button.VSplitMid(&Left, &Right, 2.0f);
+					CUIRect Left, RightRest, Middle, Right;
+					Button.VSplitLeft((Button.w - 4.0f) / 3.0f, &Left, &RightRest);
+					RightRest.VSplitLeft(2.0f, nullptr, &RightRest);
+					RightRest.VSplitLeft((RightRest.w - 2.0f) / 2.0f, &Middle, &Right);
+					Right.VSplitLeft(2.0f, nullptr, &Right);
 					Left.HMargin(2.0f, &Left);
+					Middle.HMargin(2.0f, &Middle);
 					Right.HMargin(2.0f, &Right);
 
 					if(DoButton_Menu(&s_FastInputModeFast, Localize("Fast input"), g_Config.m_BcFastInputMode == 0, &Left, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_L))
 						g_Config.m_BcFastInputMode = 0;
-					if(DoButton_Menu(&s_FastInputModeDeltaInput, Localize("Delta input"), g_Config.m_BcFastInputMode == 1, &Right, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
+					if(DoButton_Menu(&s_FastInputModeDeltaInput, Localize("Delta input"), g_Config.m_BcFastInputMode == 1, &Middle, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_NONE))
 						g_Config.m_BcFastInputMode = 1;
+					if(DoButton_Menu(&s_FastInputModeGammaInput, Localize("Gamma input"), g_Config.m_BcFastInputMode == 2, &Right, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
+						g_Config.m_BcFastInputMode = 2;
 				}
 
 				if(g_Config.m_BcFastInputMode != OldMode)
 				{
-					if(g_Config.m_BcFastInputMode == 1 && g_Config.m_BcFastInputDeltaInput <= 0 && g_Config.m_TcFastInputAmount > 0)
-						g_Config.m_BcFastInputDeltaInput = std::clamp(g_Config.m_TcFastInputAmount * 5, 0, 500);
-					if(g_Config.m_BcFastInputMode == 0 && g_Config.m_TcFastInputAmount <= 0 && g_Config.m_BcFastInputDeltaInput > 0)
-						g_Config.m_TcFastInputAmount = std::clamp((g_Config.m_BcFastInputDeltaInput + 2) / 5, 0, 40);
+					if(g_Config.m_BcFastInputMode == 1 && g_Config.m_BcFastInputDeltaInput <= 0)
+					{
+						if(OldMode == 2 && g_Config.m_BcFastInputGammaInput > 0)
+							g_Config.m_BcFastInputDeltaInput = std::clamp(g_Config.m_BcFastInputGammaInput, 0, 500);
+						else if(g_Config.m_TcFastInputAmount > 0)
+							g_Config.m_BcFastInputDeltaInput = std::clamp(g_Config.m_TcFastInputAmount * 5, 0, 500);
+					}
+					else if(g_Config.m_BcFastInputMode == 2 && g_Config.m_BcFastInputGammaInput <= 0)
+					{
+						if(OldMode == 1 && g_Config.m_BcFastInputDeltaInput > 0)
+							g_Config.m_BcFastInputGammaInput = std::clamp(g_Config.m_BcFastInputDeltaInput, 0, 1200);
+						else if(g_Config.m_TcFastInputAmount > 0)
+							g_Config.m_BcFastInputGammaInput = std::clamp(g_Config.m_TcFastInputAmount * 5, 0, 1200);
+					}
+					else if(g_Config.m_BcFastInputMode == 0 && g_Config.m_TcFastInputAmount <= 0)
+					{
+						const int SourceAmount = OldMode == 2 ? g_Config.m_BcFastInputGammaInput : g_Config.m_BcFastInputDeltaInput;
+						if(SourceAmount > 0)
+							g_Config.m_TcFastInputAmount = std::clamp((SourceAmount + 2) / 5, 0, 40);
+					}
 				}
 
 				Expand.HSplitTop(MarginSmall, nullptr, &Expand);
@@ -5110,8 +5133,10 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				else
 				{
 					const int Min = 0;
-					const int Max = 500;
-					int Value = std::clamp(g_Config.m_BcFastInputDeltaInput, Min, Max);
+					const bool GammaMode = g_Config.m_BcFastInputMode == 2;
+					const int Max = GammaMode ? 1200 : 500;
+					int *pAmountValue = GammaMode ? &g_Config.m_BcFastInputGammaInput : &g_Config.m_BcFastInputDeltaInput;
+					int Value = std::clamp(*pAmountValue, Min, Max);
 
 					const int Increment = std::max(1, (Max - Min) / 35);
 					if(Input()->ModifierIsPressed() && Input()->KeyPress(KEY_MOUSE_WHEEL_UP) && Ui()->MouseInside(&Button))
@@ -5120,7 +5145,9 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 						Value = std::clamp(Value - Increment, Min, Max);
 
 					char aBuf[256];
-					str_format(aBuf, sizeof(aBuf), "%s: %.2fA", Localize("Amount"), Value / 100.0f);
+					const char *pAmountLabel = GammaMode ? Localize("Gamma amount") : Localize("Amount");
+					const char Suffix = GammaMode ? 'M' : 'A';
+					str_format(aBuf, sizeof(aBuf), "%s: %.2f%c", pAmountLabel, Value / 100.0f, Suffix);
 
 					CUIRect AmountLabel, ScrollBar;
 					Button.VSplitMid(&AmountLabel, &ScrollBar, minimum(10.0f, Button.w * 0.05f));
@@ -5128,16 +5155,18 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 					Ui()->DoLabel(&AmountLabel, aBuf, LabelFontSize, TEXTALIGN_ML);
 
 					const float Rel = (Value - Min) / (float)(Max - Min);
-					const float NewRel = Ui()->DoScrollbarH(&g_Config.m_BcFastInputDeltaInput, &ScrollBar, Rel);
+					const float NewRel = Ui()->DoScrollbarH(pAmountValue, &ScrollBar, Rel);
 					Value = (int)(Min + NewRel * (Max - Min) + 0.5f);
-					g_Config.m_BcFastInputDeltaInput = std::clamp(Value, Min, Max);
+					*pAmountValue = std::clamp(Value, Min, Max);
 				}
 
 				Expand.HSplitTop(MarginSmall, nullptr, &Expand);
 				if(g_Config.m_BcFastInputMode == 0)
 					DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcFastInputOthers, Localize("Fast Input others"), &g_Config.m_TcFastInputOthers, &Expand, LineSize);
-				else
+				else if(g_Config.m_BcFastInputMode == 1)
 					DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcDeltaInputOthers, Localize("Delta input others"), &g_Config.m_BcDeltaInputOthers, &Expand, LineSize);
+				else
+					DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcGammaInputOthers, Localize("Gamma input others"), &g_Config.m_BcGammaInputOthers, &Expand, LineSize);
 			}
 
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClSubTickAiming, Localize("Sub-Tick aiming"), &g_Config.m_ClSubTickAiming, &Content, LineSize);

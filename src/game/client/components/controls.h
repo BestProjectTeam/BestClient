@@ -75,6 +75,7 @@ public:
 	void GoresMode();
 
 private:
+	bool UseGammaInputMovement() const;
 	void UpdateSnapTapState(int Dummy, bool LeftPressed, bool RightPressed);
 	int ResolveSnapTapDirection(int Dummy, bool LeftPressed, bool RightPressed);
 	bool IsSnapTapActive() const;
