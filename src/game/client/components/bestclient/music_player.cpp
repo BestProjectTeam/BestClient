@@ -1291,8 +1291,10 @@ static float ComputeCompactTextSlotWidth(ITextRender *pTextRender, const SGameTi
 	if(pTextRender == nullptr)
 		return 28.8f * Scale * WidthScale;
 
-	const bool WideTimer = GameTimer.m_Valid && GameTimer.m_Text.size() > 5;
-	const char *pReference = WideTimer ? "00:00:00" : "00:00";
+	const bool HasTimerFormat = GameTimer.m_Valid && GameTimer.m_Text.find(':') != std::string::npos;
+	const bool HasDayPrefix = HasTimerFormat && GameTimer.m_Text.find('d') != std::string::npos;
+	const bool WideTimer = GameTimer.m_Valid && (GameTimer.m_Text.size() > 5 || HasTimerFormat);
+	const char *pReference = HasDayPrefix ? "88d 88:88:88" : (HasTimerFormat ? "88:88:88" : (WideTimer ? "00:00:00" : "00:00"));
 	const float TextWidth = pTextRender->TextWidth(TitleFont, pReference, -1, -1.0f);
 	const float Padding = (WideTimer ? 4.2f : 5.4f) * Scale * WidthScale;
 	return TextWidth + Padding;
