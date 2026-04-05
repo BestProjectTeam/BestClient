@@ -1063,7 +1063,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 					VisualizerExpand.HSplitTop(VisualizerSliderHeight, &SliderRow, &VisualizerExpand);
 					SliderRow.VSplitLeft(120.0f, &SliderLabel, &SliderButton);
 					Ui()->DoLabel(&SliderLabel, BCLocalize("Visualizer sensitivity"), 14.0f, TEXTALIGN_ML);
-					Ui()->DoScrollbarOption(&g_Config.m_BcMusicPlayerVisualizerSensitivity, &g_Config.m_BcMusicPlayerVisualizerSensitivity, &SliderButton, "", 50, 2000, &CUi::ms_LinearScrollbarScale, 0u, "%");
+					Ui()->DoScrollbarOption(&g_Config.m_BcMusicPlayerVisualizerSensitivity, &g_Config.m_BcMusicPlayerVisualizerSensitivity, &SliderButton, "", 50, 300, &CUi::ms_LinearScrollbarScale, 0u, "%");
 
 					VisualizerExpand.HSplitTop(VisualizerSliderHeight, &SliderRow, &VisualizerExpand);
 					SliderRow.VSplitLeft(120.0f, &SliderLabel, &SliderButton);

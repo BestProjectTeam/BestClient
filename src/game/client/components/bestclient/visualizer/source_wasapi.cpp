@@ -42,6 +42,8 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 		WAVEFORMATEX *m_pFormat = nullptr;
 		int m_Channels = 0;
 		int m_BitsPerSample = 0;
+		int m_ContainerBitsPerSample = 0;
+		int m_BlockAlign = 0;
 		bool m_Float = false;
 	};
 
@@ -58,6 +60,8 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 			return false;
 		Out.m_pFormat = const_cast<WAVEFORMATEX *>(pFormat);
 		Out.m_Channels = maximum<int>(1, pFormat->nChannels);
+		Out.m_BlockAlign = maximum<int>(pFormat->nBlockAlign, pFormat->nChannels);
+		Out.m_ContainerBitsPerSample = pFormat->wBitsPerSample;
 		Out.m_BitsPerSample = pFormat->wBitsPerSample;
 		Out.m_Float = pFormat->wFormatTag == WAVE_FORMAT_IEEE_FLOAT;
 		if(pFormat->wFormatTag == WAVE_FORMAT_EXTENSIBLE)
@@ -100,6 +104,35 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 			}
 			return (int)FrameCount;
 		}
+		if(!Format.m_Float && Format.m_BitsPerSample == 24)
+		{
+			const int BytesPerSample = maximum(1, Format.m_BlockAlign / Channels);
+			const uint8_t *pSamples = reinterpret_cast<const uint8_t *>(pData);
+			for(UINT32 Frame = 0; Frame < FrameCount; ++Frame)
+			{
+				float Sum = 0.0f;
+				const uint8_t *pFrame = pSamples + Frame * Format.m_BlockAlign;
+				for(int Ch = 0; Ch < Channels; ++Ch)
+				{
+					const uint8_t *pSample = pFrame + Ch * BytesPerSample;
+					int32_t Sample = 0;
+					if(BytesPerSample >= 4 || Format.m_ContainerBitsPerSample >= 32)
+					{
+						Sample = (int32_t)((uint32_t)pSample[0] | ((uint32_t)pSample[1] << 8) | ((uint32_t)pSample[2] << 16) | ((uint32_t)pSample[3] << 24));
+						Sample >>= 8;
+					}
+					else if(BytesPerSample >= 3)
+					{
+						Sample = (int32_t)((uint32_t)pSample[0] | ((uint32_t)pSample[1] << 8) | ((uint32_t)pSample[2] << 16));
+						if((Sample & 0x00800000) != 0)
+							Sample |= ~0x00FFFFFF;
+					}
+					Sum += Sample / 8388608.0f;
+				}
+				vOut[Frame] = std::clamp(Sum / Channels, -1.0f, 1.0f);
+			}
+			return (int)FrameCount;
+		}
 		if(!Format.m_Float && Format.m_BitsPerSample == 32)
 		{
 			const int32_t *pSamples = reinterpret_cast<const int32_t *>(pData);
@@ -135,6 +168,7 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 		SWaveFormatInfo FormatInfo;
 		int SampleRate = 48000;
 		std::vector<float> vMonoBuffer;
+		std::vector<float> vIdleSilenceBuffer;
 		CVisualizerAnalyzer Analyzer;
 		CVisualizerSmoother Smoother;
 		int64_t AppliedConfigRevision = -1;
@@ -143,6 +177,8 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 		int SilentReads = 0;
 		bool LatchedSignal = false;
 		bool ValidatedLive = false;
+		auto LastPacketAt = std::chrono::steady_clock::now();
+		auto LastSyntheticSilenceAt = LastPacketAt;
 
 		auto Cleanup = [&]() {
 			if(pAudioClient)
@@ -162,6 +198,8 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 			SilentReads = 0;
 			LatchedSignal = false;
 			ValidatedLive = false;
+			LastPacketAt = std::chrono::steady_clock::now();
+			LastSyntheticSilenceAt = LastPacketAt;
 		};
 
 		auto ApplyConfig = [&](const SVisualizerConfig &Config) {
@@ -169,6 +207,43 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 			RuntimeConfig.m_SampleRate = SampleRate;
 			Analyzer.Configure(RuntimeConfig);
 			Smoother.Configure(RuntimeConfig);
+		};
+
+		auto StoreAnalyzerFrame = [&]() {
+			SVisualizerFrame RawFrame;
+			Analyzer.Analyze(RawFrame);
+			if(RawFrame.m_HasRealtimeSignal)
+			{
+				ValidatedReads++;
+				ActiveSignalReads = minimum(ActiveSignalReads + 1, 32);
+				SilentReads = 0;
+			}
+			else
+			{
+				ActiveSignalReads = 0;
+				SilentReads++;
+			}
+			if(!ValidatedLive && ValidatedReads >= 2)
+				ValidatedLive = true;
+			if(!LatchedSignal && ActiveSignalReads >= 1)
+				LatchedSignal = true;
+			else if(LatchedSignal && SilentReads >= 6)
+				LatchedSignal = false;
+			RawFrame.m_HasRealtimeSignal = LatchedSignal;
+			RawFrame.m_BackendStatus = ValidatedLive ? (LatchedSignal ? EVisualizerBackendStatus::LIVE : EVisualizerBackendStatus::SILENT) : EVisualizerBackendStatus::SILENT;
+			RawFrame.m_IsPassiveFallback = false;
+			SVisualizerFrame SmoothedFrame;
+			Smoother.Process(RawFrame, SmoothedFrame);
+			for(size_t Band = 0; Band < SmoothedFrame.m_aBands.size(); ++Band)
+			{
+				if(RawFrame.m_aBands[Band] > SmoothedFrame.m_aBands[Band])
+					SmoothedFrame.m_aBands[Band] = mix(SmoothedFrame.m_aBands[Band], RawFrame.m_aBands[Band], 0.75f);
+			}
+			SmoothedFrame.m_Peak = maximum(SmoothedFrame.m_Peak, RawFrame.m_Peak * 0.9f);
+			SmoothedFrame.m_Rms = maximum(SmoothedFrame.m_Rms, RawFrame.m_Rms * 0.9f);
+			SmoothedFrame.m_BackendStatus = RawFrame.m_BackendStatus;
+			SmoothedFrame.m_IsPassiveFallback = false;
+			StoreFrame(SmoothedFrame);
 		};
 
 		auto EnsureCapture = [&]() -> bool {
@@ -198,6 +273,8 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 				ConfigSnapshot = m_Config;
 			}
 			ApplyConfig(ConfigSnapshot);
+			LastPacketAt = std::chrono::steady_clock::now();
+			LastSyntheticSilenceAt = LastPacketAt;
 			return true;
 		};
 
@@ -241,6 +318,7 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 				}
 
 				HadPacket = true;
+				LastPacketAt = std::chrono::steady_clock::now();
 				if((Flags & AUDCLNT_BUFFERFLAGS_SILENT) != 0)
 				{
 					vMonoBuffer.assign(NumFrames, 0.0f);
@@ -263,38 +341,24 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 
 			if(!HadPacket)
 			{
-				float aSilence[256] = {};
-				Analyzer.PushMonoSamples(aSilence, 256);
+				const auto Now = std::chrono::steady_clock::now();
+				const bool CaptureIdle = Now - LastPacketAt >= std::chrono::milliseconds(20);
+				const bool SilenceStepDue = Now - LastSyntheticSilenceAt >= std::chrono::milliseconds(8);
+				if(CaptureIdle && SilenceStepDue)
+				{
+					const int SilenceFrames = std::clamp(SampleRate / 100, 128, 1024);
+					vIdleSilenceBuffer.assign(SilenceFrames, 0.0f);
+					Analyzer.PushMonoSamples(vIdleSilenceBuffer.data(), SilenceFrames);
+					LastSyntheticSilenceAt = Now;
+					StoreAnalyzerFrame();
+				}
+				std::this_thread::sleep_for(std::chrono::milliseconds(1));
+				continue;
 			}
 
-			SVisualizerFrame RawFrame;
-			Analyzer.Analyze(RawFrame);
-			if(RawFrame.m_HasRealtimeSignal)
-			{
-				ValidatedReads++;
-				ActiveSignalReads = minimum(ActiveSignalReads + 1, 32);
-				SilentReads = 0;
-			}
-			else
-			{
-				ActiveSignalReads = 0;
-				SilentReads++;
-			}
-			if(!ValidatedLive && ValidatedReads >= 3)
-				ValidatedLive = true;
-			if(!LatchedSignal && ActiveSignalReads >= 2)
-				LatchedSignal = true;
-			else if(LatchedSignal && SilentReads >= 10)
-				LatchedSignal = false;
-			RawFrame.m_HasRealtimeSignal = LatchedSignal;
-			RawFrame.m_BackendStatus = ValidatedLive ? (LatchedSignal ? EVisualizerBackendStatus::LIVE : EVisualizerBackendStatus::SILENT) : EVisualizerBackendStatus::SILENT;
-			RawFrame.m_IsPassiveFallback = false;
-			SVisualizerFrame SmoothedFrame;
-			Smoother.Process(RawFrame, SmoothedFrame);
-			SmoothedFrame.m_BackendStatus = RawFrame.m_BackendStatus;
-			SmoothedFrame.m_IsPassiveFallback = false;
-			StoreFrame(SmoothedFrame);
-			std::this_thread::sleep_for(std::chrono::milliseconds(HadPacket ? 12 : 24));
+			LastSyntheticSilenceAt = LastPacketAt;
+			StoreAnalyzerFrame();
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
 		}
 
 		Cleanup();

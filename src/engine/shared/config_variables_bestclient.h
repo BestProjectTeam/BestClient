@@ -127,7 +127,7 @@ MACRO_CONFIG_INT(BcMusicPlayer, bc_music_player, 1, 0, 1, CFGFLAG_CLIENT | CFGFL
 MACRO_CONFIG_INT(BcMusicPlayerShowWhenPaused, bc_music_player_show_when_paused, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Keep Music Player visible while playback is paused")
 MACRO_CONFIG_INT(BcMusicPlayerVisualizer, bc_music_player_visualizer, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable music player visualizer")
 MACRO_CONFIG_INT(BcMusicPlayerVisualizerMode, bc_music_player_visualizer_mode, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player visualizer mode (0=bottom, 1=center)")
-MACRO_CONFIG_INT(BcMusicPlayerVisualizerSensitivity, bc_music_player_visualizer_sensitivity, 100, 50, 2000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player visualizer sensitivity in percent (higher catches quieter audio)")
+MACRO_CONFIG_INT(BcMusicPlayerVisualizerSensitivity, bc_music_player_visualizer_sensitivity, 300, 50, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player visualizer sensitivity in percent (higher catches quieter audio)")
 MACRO_CONFIG_INT(BcMusicPlayerVisualizerSmoothing, bc_music_player_visualizer_smoothing, 62, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player visualizer smoothing (0-100)")
 MACRO_CONFIG_INT(BcMusicPlayerColorMode, bc_music_player_color_mode, 2, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player color mode (0=static color, 1=cover accent color, 2=dominant cover color)")
 MACRO_CONFIG_COL(BcMusicPlayerStaticColor, bc_music_player_static_color, 128, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Static color for the music player when static color mode is selected")

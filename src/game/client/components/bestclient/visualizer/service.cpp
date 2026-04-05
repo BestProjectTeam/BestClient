@@ -35,7 +35,7 @@ void CRealtimeMusicVisualizer::RefreshConfig()
 	Config.m_HighCutHz = 10000;
 	Config.m_BassSplitHz = 100;
 	Config.m_NoiseReduction = std::clamp(g_Config.m_BcMusicPlayerVisualizerSmoothing / 100.0f, 0.0f, 0.99f);
-	const float RawSensitivity = std::clamp(g_Config.m_BcMusicPlayerVisualizerSensitivity / 100.0f, 0.5f, 20.0f);
+	const float RawSensitivity = std::clamp(g_Config.m_BcMusicPlayerVisualizerSensitivity / 100.0f, 0.5f, 3.0f);
 	Config.m_Sensitivity = powf(RawSensitivity, 1.35f);
 	m_Config = Config;
 	m_ConfigInitialized = true;
