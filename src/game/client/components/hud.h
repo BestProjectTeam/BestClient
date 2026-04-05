@@ -9,6 +9,7 @@
 #include <generated/protocol.h>
 
 #include <game/client/component.h>
+#include <game/client/ui_rect.h>
 
 struct SScoreInfo
 {
@@ -104,7 +105,8 @@ class CHud : public CComponent
 
 	void RenderSpectatorHud();
 	void RenderWarmupTimer();
-	void RenderLocalTime(float x);
+	void RenderLocalTime(bool ForcePreview = false);
+	CUIRect GetLocalTimeRect(bool ForcePreview) const;
 
 	static constexpr float MOVEMENT_INFORMATION_LINE_HEIGHT = 8.0f;
 
@@ -118,6 +120,8 @@ public:
 	void OnRender() override;
 	void OnInit() override;
 	void OnNewSnapshot() override;
+	CUIRect GetLocalTimeHudEditorRect() const;
+	void RenderLocalTimePreview();
 
 	// DDRace
 

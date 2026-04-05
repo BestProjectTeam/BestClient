@@ -37,13 +37,15 @@ bool IsEditorModule(HudLayout::EModule Module)
 	return Module == HudLayout::MODULE_CHAT ||
 	       Module == HudLayout::MODULE_VOICE_TALKERS ||
 	       Module == HudLayout::MODULE_VOICE_STATUS ||
-	       Module == HudLayout::MODULE_VOTES;
+	       Module == HudLayout::MODULE_VOTES ||
+	       Module == HudLayout::MODULE_LOCAL_TIME;
 }
 
 bool IsLivePreviewModule(HudLayout::EModule Module)
 {
 	return Module == HudLayout::MODULE_CHAT ||
 		Module == HudLayout::MODULE_VOTES ||
+		Module == HudLayout::MODULE_LOCAL_TIME ||
 		Module == HudLayout::MODULE_VOICE_TALKERS ||
 		Module == HudLayout::MODULE_VOICE_STATUS;
 }
@@ -141,19 +143,6 @@ float ChatInputBottomExtra(const CChat &Chat)
 {
 	const float ScaledFontSize = Chat.FontSize() * (8.0f / 6.0f);
 	return maximum(2.25f * ScaledFontSize, maximum(ScaledFontSize + 4.0f, 16.0f));
-}
-
-int *ScaleConfigForModule(HudLayout::EModule Module)
-{
-	switch(Module)
-	{
-	case HudLayout::MODULE_MUSIC_PLAYER: return &g_Config.m_BcHudMusicPlayerScale;
-	case HudLayout::MODULE_VOICE_TALKERS: return &g_Config.m_BcHudVoiceHudScale;
-	case HudLayout::MODULE_VOICE_STATUS: return &g_Config.m_BcHudVoiceMuteIconsScale;
-	case HudLayout::MODULE_CHAT: return &g_Config.m_BcHudChatScale;
-	case HudLayout::MODULE_VOTES: return &g_Config.m_BcHudVotesScale;
-	default: return nullptr;
-	}
 }
 } // namespace
 
@@ -276,8 +265,15 @@ CUIRect CHudEditor::GetFallbackModuleRect(HudLayout::EModule Module) const
 		Rect = {Layout.m_X, Layout.m_Y, 26.0f, 9.0f};
 		break;
 	case HudLayout::MODULE_LOCAL_TIME:
-		Rect = {Layout.m_X, Layout.m_Y, 56.0f, 12.0f};
+	{
+		const bool Seconds = g_Config.m_TcShowLocalTimeSeconds != 0;
+		const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+		const char *pPreviewText = Seconds ? "18:42.37" : "18:42";
+		const float FontSize = 5.0f * Scale;
+		const float Padding = 5.0f * Scale;
+		Rect = {Layout.m_X, Layout.m_Y, TextRender()->TextWidth(FontSize, pPreviewText, -1, -1.0f) + Padding * 2.0f, 12.5f * Scale};
 		break;
+	}
 	case HudLayout::MODULE_SPECTATOR_COUNT:
 		Rect = {Layout.m_X, Layout.m_Y, 118.0f, 16.0f};
 		break;
@@ -357,6 +353,10 @@ CHudEditor::SModuleVisual CHudEditor::GetModuleVisual(HudLayout::EModule Module)
 		Visual.m_Rect = GameClient()->m_Voting.GetHudRect(Width, Height, true);
 		Visual.m_Rounding = 3.0f;
 		break;
+	case HudLayout::MODULE_LOCAL_TIME:
+		Visual.m_Rect = GameClient()->m_Hud.GetLocalTimeHudEditorRect();
+		Visual.m_Rounding = 3.75f * std::clamp(HudLayout::Get(HudLayout::MODULE_LOCAL_TIME, Width, Height).m_Scale / 100.0f, 0.25f, 3.0f);
+		break;
 	default:
 		Visual.m_Rect = GetFallbackModuleRect(Module);
 		Visual.m_Rounding = 4.0f;
@@ -389,6 +389,7 @@ void CHudEditor::CollectModuleVisuals(SModuleVisual *pOut, int &Count) const
 
 	AddModule(HudLayout::MODULE_CHAT);
 	AddModule(HudLayout::MODULE_VOTES);
+	AddModule(HudLayout::MODULE_LOCAL_TIME);
 	AddModule(HudLayout::MODULE_VOICE_TALKERS);
 	AddModule(HudLayout::MODULE_VOICE_STATUS);
 }
@@ -428,6 +429,14 @@ void CHudEditor::ApplyDraggedPosition(HudLayout::EModule Module, const CUIRect &
 	{
 		const float BottomAnchor = Rect.y + Rect.h - ChatInputBottomExtra(GameClient()->m_Chat);
 		HudLayout::SetPosition(Module, CanvasX, BottomAnchor);
+	}
+	else if(Module == HudLayout::MODULE_LOCAL_TIME)
+	{
+		const auto Layout = HudLayout::Get(HudLayout::MODULE_LOCAL_TIME, HudWidth(), HudHeight());
+		const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+		const float Padding = 5.0f * Scale;
+		const float AnchorX = (Rect.x + Rect.w + Padding) * (HudLayout::CANVAS_WIDTH / maximum(HudWidth(), 1.0f));
+		HudLayout::SetPosition(Module, AnchorX, Rect.y);
 	}
 	else
 		HudLayout::SetPosition(Module, CanvasX, Rect.y);
@@ -514,17 +523,17 @@ CUi::EPopupMenuFunctionResult CHudEditor::PopupModuleSettings(void *pContext, CU
 	View.HSplitTop(8.0f, nullptr, &View);
 	View.HSplitTop(12.0f, &ScaleLabel, &View);
 
-	int *pScale = ScaleConfigForModule(pThis->m_SelectedModule);
-	if(pScale != nullptr)
+	if(pThis->IsEditableModule(pThis->m_SelectedModule))
 	{
+		const int Scale = HudLayout::Get(pThis->m_SelectedModule, pThis->HudWidth(), pThis->HudHeight()).m_Scale;
 		char aScale[32];
-		str_format(aScale, sizeof(aScale), "%s %d%%", Localize("Scale"), *pScale);
+		str_format(aScale, sizeof(aScale), "%s %d%%", Localize("Scale"), Scale);
 		pThis->Ui()->DoLabel(&ScaleLabel, aScale, 8.0f, TEXTALIGN_ML);
 
 		View.HSplitTop(14.0f, &ScaleSlider, &View);
-		const float Relative = CUi::ms_LinearScrollbarScale.ToRelative(*pScale, 25, 300);
-		const float NewRelative = pThis->Ui()->DoScrollbarH(pScale, &ScaleSlider, Relative);
-		*pScale = CUi::ms_LinearScrollbarScale.ToAbsolute(NewRelative, 25, 300);
+		const float Relative = CUi::ms_LinearScrollbarScale.ToRelative(Scale, 25, 300);
+		const float NewRelative = pThis->Ui()->DoScrollbarH(&pThis->m_SelectedModule, &ScaleSlider, Relative);
+		HudLayout::SetScale(pThis->m_SelectedModule, CUi::ms_LinearScrollbarScale.ToAbsolute(NewRelative, 25, 300));
 	}
 	else
 	{
@@ -807,6 +816,7 @@ void CHudEditor::RenderOverlay(vec2 MousePos)
 	// Draw true HUD previews first, then add interactive editor overlays on top.
 	GameClient()->m_Chat.RenderHud(true);
 	GameClient()->m_Voting.RenderHud(true);
+	GameClient()->m_Hud.RenderLocalTimePreview();
 	GameClient()->m_VoiceChat.RenderHudTalkingIndicator(Width, Height, true);
 	GameClient()->m_VoiceChat.RenderHudMuteStatusIndicator(Width, Height, true);
 

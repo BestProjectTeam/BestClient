@@ -145,7 +145,7 @@ void WriteConfigLayout(EModule Module, const SModuleLayout &Layout)
 
 bool IsLegacyModule(EModule Module)
 {
-	return Module >= MODULE_MINI_VOTE && Module <= MODULE_GAME_TIMER;
+	return Module >= MODULE_MINI_VOTE && Module <= MODULE_LOCAL_TIME;
 }
 
 SModuleLayout ResolveBaseLayout(EModule Module, float HudWidth, float HudHeight)
@@ -182,6 +182,10 @@ SModuleLayout ResolveBaseLayout(EModule Module, float HudWidth, float HudHeight)
 		case MODULE_GAME_TIMER:
 			Layout.m_X = (float)round_to_int(HudWidth * 0.5f - 22.0f);
 			Layout.m_Y = -2.0f;
+			break;
+		case MODULE_LOCAL_TIME:
+			Layout.m_X = HudWidth / 7.0f * 3.0f;
+			Layout.m_Y = 0.0f;
 			break;
 		default:
 			break;

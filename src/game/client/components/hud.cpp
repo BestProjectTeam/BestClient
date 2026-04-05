@@ -5,6 +5,7 @@
 #include "binds.h"
 #include "camera.h"
 #include "controls.h"
+#include "hud_layout.h"
 #include "voting.h"
 
 #include <base/color.h>
@@ -2144,38 +2145,75 @@ void CHud::RenderSpectatorHud()
 	}
 }
 
-void CHud::RenderLocalTime(float x)
+CUIRect CHud::GetLocalTimeRect(bool ForcePreview) const
 {
-	if(!g_Config.m_ClShowLocalTimeAlways && !GameClient()->m_Scoreboard.IsActive())
-		return;
+	if(!HudLayout::IsEnabled(HudLayout::MODULE_LOCAL_TIME))
+		return {0.0f, 0.0f, 0.0f, 0.0f};
+	if(!ForcePreview && !g_Config.m_ClShowLocalTimeAlways && !GameClient()->m_Scoreboard.IsActive())
+		return {0.0f, 0.0f, 0.0f, 0.0f};
 
+	const auto Layout = HudLayout::Get(HudLayout::MODULE_LOCAL_TIME, m_Width, m_Height);
+	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
 	const bool Seconds = g_Config.m_TcShowLocalTimeSeconds; // TClient
 
 	char aTimeStr[16];
 	str_timestamp_format(aTimeStr, sizeof(aTimeStr), Seconds ? "%H:%M.%S" : "%H:%M");
-	const float Width = std::round(TextRender()->TextBoundingBox(5.0f, aTimeStr).m_W);
-	const float ReferenceWidth = std::round(TextRender()->TextBoundingBox(5.0f, Seconds ? "88:88.88" : "88:88").m_W);
-	const float RectWidth = ReferenceWidth + 10.0f;
-	const float RectHeight = 12.5f;
-	float RectX = x - (RectWidth + 5.0f);
-	float TextX = RectX + (RectWidth - Width) * 0.5f;
+	const float FontSize = 5.0f * Scale;
+	const float Padding = 5.0f * Scale;
+	const float Width = std::round(TextRender()->TextBoundingBox(FontSize, aTimeStr).m_W);
+	const float RectWidth = Width + Padding * 2.0f;
+	const float RectHeight = 12.5f * Scale;
+	CUIRect Rect = {Layout.m_X - Width - Padding * 3.0f, Layout.m_Y, RectWidth, RectHeight};
 	const bool MusicPlayerComponentDisabled = GameClient()->m_BestClient.IsComponentDisabled(CBestClient::COMPONENT_VISUALS_MUSIC_PLAYER);
 	const CMusicPlayer::SHudReservation MusicReservation = GameClient()->m_MusicPlayer.HudReservation();
 	const bool MusicPlayerHudActive = !MusicPlayerComponentDisabled && g_Config.m_BcMusicPlayer != 0 && MusicReservation.m_Visible && MusicReservation.m_Active;
 	if(MusicPlayerHudActive)
 	{
-		CUIRect LocalTimeRect = {RectX, 0.0f, RectWidth, RectHeight};
-		const float Offset = GameClient()->m_MusicPlayer.GetHudPushOffsetForRect(LocalTimeRect, m_Width, 2.0f);
-		RectX += Offset;
-		RectX = std::clamp(RectX, 0.0f, maximum(0.0f, m_Width - RectWidth));
-		TextX = RectX + (RectWidth - Width) * 0.5f;
+		const float Offset = GameClient()->m_MusicPlayer.GetHudPushOffsetForRect(Rect, m_Width, 2.0f);
+		Rect.x += Offset;
 	}
 
-	Graphics()->DrawRect(RectX, 0.0f, RectWidth, RectHeight, ColorRGBA(0.0f, 0.0f, 0.0f, 0.4f), IGraphics::CORNER_B, 3.75f);
-	TextRender()->Text(TextX, (RectHeight - 5.f) / 2.f, 5.0f, aTimeStr, -1.0f);
+	Rect.x = std::clamp(Rect.x, 0.0f, maximum(0.0f, m_Width - Rect.w));
+	Rect.y = std::clamp(Rect.y, 0.0f, maximum(0.0f, m_Height - Rect.h));
+	return Rect;
+}
 
-	// Graphics()->DrawRect(x - 30.0f, 0.0f, 25.0f, 12.5f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.4f), IGraphics::CORNER_B, 3.75f);
-	// TextRender()->Text(x - 25.0f, (12.5f - 5.f) / 2.f, 5.0f, aTimeStr, -1.0f);
+void CHud::RenderLocalTime(bool ForcePreview)
+{
+	CUIRect Rect = GetLocalTimeRect(ForcePreview);
+	if(Rect.w <= 0.0f || Rect.h <= 0.0f)
+		return;
+
+	const auto Layout = HudLayout::Get(HudLayout::MODULE_LOCAL_TIME, m_Width, m_Height);
+	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	const bool BackgroundEnabled = Layout.m_BackgroundEnabled;
+	const ColorRGBA BackgroundColor = color_cast<ColorRGBA>(ColorHSLA(Layout.m_BackgroundColor, true));
+	const bool Seconds = g_Config.m_TcShowLocalTimeSeconds; // TClient
+
+	char aTimeStr[16];
+	str_timestamp_format(aTimeStr, sizeof(aTimeStr), Seconds ? "%H:%M.%S" : "%H:%M");
+	const float FontSize = 5.0f * Scale;
+	const float Padding = 5.0f * Scale;
+	const float RectX = Rect.x;
+	const float RectY = Rect.y;
+	const float RectWidth = Rect.w;
+	const float RectHeight = Rect.h;
+	const int Corners = HudLayout::BackgroundCorners(IGraphics::CORNER_ALL, RectX, RectY, RectWidth, RectHeight, m_Width, m_Height);
+
+	if(BackgroundEnabled)
+		Graphics()->DrawRect(RectX, RectY, RectWidth, RectHeight, BackgroundColor, Corners, 3.75f * Scale);
+
+	TextRender()->Text(RectX + Padding, RectY + (RectHeight - FontSize) * 0.5f, FontSize, aTimeStr, -1.0f);
+}
+
+CUIRect CHud::GetLocalTimeHudEditorRect() const
+{
+	return GetLocalTimeRect(true);
+}
+
+void CHud::RenderLocalTimePreview()
+{
+	RenderLocalTime(true);
 }
 
 void CHud::OnNewSnapshot()
@@ -2313,7 +2351,7 @@ void CHud::OnRender()
 		GameClient()->m_TClient.RenderCenterLines();
 		// Hide local time in focus mode
 		if(!(FocusModeActive && HideUIInFocusMode))
-			RenderLocalTime((m_Width / 7) * 3);
+			RenderLocalTime();
 		if(Client()->State() != IClient::STATE_DEMOPLAYBACK)
 			RenderConnectionWarning();
 		RenderTeambalanceWarning();
