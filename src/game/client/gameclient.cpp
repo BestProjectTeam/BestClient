@@ -143,9 +143,10 @@ float EffectiveFastInputOffsetTicksGammaInputMode(IClient *pClient, IServerBrows
 		g_Config.m_BcFastInputMode != 2 ||
 		IsGameplayInputComponentDisabled())
 		return 0.0f;
-	if(g_Config.m_BcFastInputGammaInput <= 0)
+	const int GammaInputAmount = BcFastInputGammaUiToEffectiveAmount(g_Config.m_BcFastInputGammaInput);
+	if(GammaInputAmount <= 0)
 		return 0.0f;
-	return g_Config.m_BcFastInputGammaInput / 100.0f;
+	return GammaInputAmount / 100.0f;
 }
 
 float EffectiveFastInputOffsetTicks(IClient *pClient, IServerBrowser *pServerBrowser)

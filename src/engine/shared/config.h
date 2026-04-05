@@ -60,6 +60,27 @@ public:
 
 extern CConfig g_Config;
 
+static constexpr int BC_FAST_INPUT_GAMMA_UI_MAX = 1200;
+static constexpr int BC_FAST_INPUT_GAMMA_EFFECTIVE_MAX = 500;
+
+constexpr int BcFastInputGammaUiToEffectiveAmount(int GammaUiAmount)
+{
+	if(GammaUiAmount <= 0)
+		return 0;
+	if(GammaUiAmount >= BC_FAST_INPUT_GAMMA_UI_MAX)
+		return BC_FAST_INPUT_GAMMA_EFFECTIVE_MAX;
+	return (GammaUiAmount * BC_FAST_INPUT_GAMMA_EFFECTIVE_MAX + BC_FAST_INPUT_GAMMA_UI_MAX / 2) / BC_FAST_INPUT_GAMMA_UI_MAX;
+}
+
+constexpr int BcFastInputGammaEffectiveToUiAmount(int EffectiveAmount)
+{
+	if(EffectiveAmount <= 0)
+		return 0;
+	if(EffectiveAmount >= BC_FAST_INPUT_GAMMA_EFFECTIVE_MAX)
+		return BC_FAST_INPUT_GAMMA_UI_MAX;
+	return (EffectiveAmount * BC_FAST_INPUT_GAMMA_UI_MAX + BC_FAST_INPUT_GAMMA_EFFECTIVE_MAX / 2) / BC_FAST_INPUT_GAMMA_EFFECTIVE_MAX;
+}
+
 /**
  * The default values of all config variables in @link CConfig @endlink.
  */

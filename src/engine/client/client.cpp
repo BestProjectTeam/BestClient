@@ -5669,8 +5669,8 @@ int CClient::PredictionMargin() const
 	}
 	else
 	{
-		const int GammaInputAmount = std::max(0, g_Config.m_BcFastInputGammaInput);
-		// gamma input is measured in 0.01 ticks, convert it to milliseconds.
+		const int GammaInputAmount = BcFastInputGammaUiToEffectiveAmount(g_Config.m_BcFastInputGammaInput);
+		// gamma input UI is stretched from the old 0-5 range to 0-12, so convert the effective amount to milliseconds.
 		FastInputMargin = (GammaInputAmount + 2) / 5;
 	}
 

@@ -1737,20 +1737,20 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 					if(g_Config.m_BcFastInputMode == 1 && g_Config.m_BcFastInputDeltaInput <= 0)
 					{
 						if(OldMode == 2 && g_Config.m_BcFastInputGammaInput > 0)
-							g_Config.m_BcFastInputDeltaInput = std::clamp(g_Config.m_BcFastInputGammaInput, 0, 500);
+							g_Config.m_BcFastInputDeltaInput = BcFastInputGammaUiToEffectiveAmount(g_Config.m_BcFastInputGammaInput);
 						else if(g_Config.m_TcFastInputAmount > 0)
 							g_Config.m_BcFastInputDeltaInput = std::clamp(g_Config.m_TcFastInputAmount * 5, 0, 500);
 					}
 					else if(g_Config.m_BcFastInputMode == 2 && g_Config.m_BcFastInputGammaInput <= 0)
 					{
 						if(OldMode == 1 && g_Config.m_BcFastInputDeltaInput > 0)
-							g_Config.m_BcFastInputGammaInput = std::clamp(g_Config.m_BcFastInputDeltaInput, 0, 1200);
+							g_Config.m_BcFastInputGammaInput = BcFastInputGammaEffectiveToUiAmount(g_Config.m_BcFastInputDeltaInput);
 						else if(g_Config.m_TcFastInputAmount > 0)
-							g_Config.m_BcFastInputGammaInput = std::clamp(g_Config.m_TcFastInputAmount * 5, 0, 1200);
+							g_Config.m_BcFastInputGammaInput = BcFastInputGammaEffectiveToUiAmount(g_Config.m_TcFastInputAmount * 5);
 					}
 					else if(g_Config.m_BcFastInputMode == 0 && g_Config.m_TcFastInputAmount <= 0)
 					{
-						const int SourceAmount = OldMode == 2 ? g_Config.m_BcFastInputGammaInput : g_Config.m_BcFastInputDeltaInput;
+						const int SourceAmount = OldMode == 2 ? BcFastInputGammaUiToEffectiveAmount(g_Config.m_BcFastInputGammaInput) : g_Config.m_BcFastInputDeltaInput;
 						if(SourceAmount > 0)
 							g_Config.m_TcFastInputAmount = std::clamp((SourceAmount + 2) / 5, 0, 40);
 					}

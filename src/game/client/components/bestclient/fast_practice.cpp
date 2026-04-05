@@ -72,9 +72,10 @@ float EffectiveFastInputOffsetTicks()
 		return g_Config.m_BcFastInputDeltaInput / 100.0f;
 	}
 
-	if(g_Config.m_BcFastInputGammaInput <= 0)
+	const int GammaInputAmount = BcFastInputGammaUiToEffectiveAmount(g_Config.m_BcFastInputGammaInput);
+	if(GammaInputAmount <= 0)
 		return 0.0f;
-	return g_Config.m_BcFastInputGammaInput / 100.0f;
+	return GammaInputAmount / 100.0f;
 }
 
 int FastInputPredictionTicks(float OffsetTicks)
