@@ -1,5 +1,8 @@
 /* Copyright © 2026 BestProject Team */
 #include "music_player.h"
+#include "visualizer/analyzer.h"
+#include "visualizer/service.h"
+#include "visualizer/source_priority.h"
 
 #include <base/color.h>
 #include <base/math.h>
@@ -47,18 +50,8 @@
 #define BC_MUSICPLAYER_HAS_DBUS 0
 #endif
 
-#if !defined(BC_MUSICPLAYER_HAS_PULSE)
-#define BC_MUSICPLAYER_HAS_PULSE 0
-#endif
-
 #if defined(CONF_PLATFORM_LINUX) && BC_MUSICPLAYER_HAS_DBUS
 #include <dbus/dbus.h>
-#endif
-
-#if defined(CONF_PLATFORM_LINUX) && BC_MUSICPLAYER_HAS_PULSE
-#include <pulse/error.h>
-#include <pulse/pulseaudio.h>
-#include <pulse/simple.h>
 #endif
 
 #if defined(CONF_FAMILY_WINDOWS) && __has_include(<winrt/Windows.Media.Control.h>)
@@ -68,19 +61,6 @@
 #include <winrt/Windows.Media.Control.h>
 #include <winrt/Windows.Storage.Streams.h>
 #include <winrt/base.h>
-#if !defined(NOBITMAP)
-#define BC_MUSICPLAYER_DEFINED_NOBITMAP
-#define NOBITMAP
-#endif
-#define IStorage BCMusicPlayerWin32IStorage
-#include <audioclient.h>
-#include <ksmedia.h>
-#include <mmdeviceapi.h>
-#undef IStorage
-#if defined(BC_MUSICPLAYER_DEFINED_NOBITMAP)
-#undef BC_MUSICPLAYER_DEFINED_NOBITMAP
-#undef NOBITMAP
-#endif
 #else
 #define BC_MUSICPLAYER_HAS_WINRT 0
 #endif
@@ -107,12 +87,6 @@ static bool MusicPlayerDebugEnabled(int Level)
 	return g_Config.m_DbgMusicPlayer >= Level;
 }
 
-static float MusicPlayerVisualizerSensitivity()
-{
-	const float Raw = std::clamp(g_Config.m_BcMusicPlayerVisualizerSensitivity / 100.0f, 0.5f, 20.0f);
-	return powf(Raw, 1.35f);
-}
-
 static void MusicPlayerDebugLog(int Level, const char *pSubsystem, const char *pFmt, ...)
 {
 	if(!MusicPlayerDebugEnabled(Level))
@@ -133,15 +107,6 @@ enum class EMusicPlaybackState
 	PLAYING,
 };
 
-enum class EMusicVisualizerBackendStatus
-{
-	UNAVAILABLE,
-	CONNECTING,
-	SILENT,
-	LIVE,
-	FALLBACK,
-};
-
 static const char *MusicPlaybackStateName(EMusicPlaybackState State)
 {
 	switch(State)
@@ -152,21 +117,6 @@ static const char *MusicPlaybackStateName(EMusicPlaybackState State)
 	}
 	return "unknown";
 }
-
-static const char *MusicVisualizerBackendStatusName(EMusicVisualizerBackendStatus Status)
-{
-	switch(Status)
-	{
-	case EMusicVisualizerBackendStatus::UNAVAILABLE: return "unavailable";
-	case EMusicVisualizerBackendStatus::CONNECTING: return "connecting";
-	case EMusicVisualizerBackendStatus::SILENT: return "silent";
-	case EMusicVisualizerBackendStatus::LIVE: return "live";
-	case EMusicVisualizerBackendStatus::FALLBACK: return "fallback";
-	}
-	return "unknown";
-}
-
-static constexpr int MUSIC_PLAYER_VISUALIZER_BINS = 16;
 
 struct SMusicArt
 {
@@ -183,24 +133,14 @@ struct SMusicArt
 	std::vector<unsigned char> m_vBytes;
 };
 
-struct SMusicVisualizerData
-{
-	bool m_HasRealtimeSignal = false;
-	bool m_IsPassiveFallback = true;
-	EMusicVisualizerBackendStatus m_BackendStatus = EMusicVisualizerBackendStatus::FALLBACK;
-	float m_Peak = 0.0f;
-	float m_Rms = 0.0f;
-	std::array<float, MUSIC_PLAYER_VISUALIZER_BINS> m_aBins{};
-};
-
-static std::string MusicVisualizerBinsSummary(const SMusicVisualizerData &Visualizer)
+static std::string MusicVisualizerBinsSummary(const BestClientVisualizer::SVisualizerFrame &Visualizer)
 {
 	char aBuf[128];
 	str_format(aBuf, sizeof(aBuf), "%.2f,%.2f,%.2f,%.2f",
-		Visualizer.m_aBins[0],
-		Visualizer.m_aBins[1],
-		Visualizer.m_aBins[2],
-		Visualizer.m_aBins[3]);
+		Visualizer.m_aBands[0],
+		Visualizer.m_aBands[1],
+		Visualizer.m_aBands[2],
+		Visualizer.m_aBands[3]);
 	return aBuf;
 }
 
@@ -219,15 +159,7 @@ struct SNowPlayingSnapshot
 	bool m_CanNext = false;
 	bool m_HasVisualizer = false;
 	SMusicArt m_Art;
-	SMusicVisualizerData m_Visualizer;
-};
-
-struct SMusicPlaybackHint
-{
-	std::string m_ServiceId;
-	std::string m_Title;
-	std::string m_Artist;
-	EMusicPlaybackState m_PlaybackState = EMusicPlaybackState::STOPPED;
+	BestClientVisualizer::SVisualizerFrame m_Visualizer;
 };
 
 static bool ShouldForceOrderedNavigation(const SNowPlayingSnapshot &Snapshot)
@@ -306,86 +238,6 @@ public:
 	virtual void Next() = 0;
 };
 
-class IMusicVisualizerSource
-{
-public:
-	virtual ~IMusicVisualizerSource() = default;
-
-	virtual bool Poll(SMusicVisualizerData &Out) = 0;
-	virtual void SetPlaybackHint(const SMusicPlaybackHint &Hint) { (void)Hint; }
-};
-
-static float VisualizerSampleWindow(size_t Index, size_t Count)
-{
-	if(Count <= 1)
-		return 1.0f;
-	const float Phase = (2.0f * pi * Index) / (float)(Count - 1);
-	return 0.5f * (1.0f - cosf(Phase));
-}
-
-static float VisualizerMagnitudeToUnit(float Magnitude)
-{
-	const float Db = 20.0f * log10f(maximum(Magnitude, 1.0e-5f));
-	return std::clamp((Db + 58.0f) / 58.0f, 0.0f, 1.0f);
-}
-
-static SMusicVisualizerData AnalyzeVisualizerSamples(const std::vector<float> &vSamples, int SampleRate)
-{
-	SMusicVisualizerData Result;
-	Result.m_IsPassiveFallback = false;
-	Result.m_BackendStatus = EMusicVisualizerBackendStatus::LIVE;
-	if(vSamples.empty() || SampleRate <= 0)
-		return Result;
-
-	const size_t WindowSize = minimum<size_t>(2048, vSamples.size());
-	const size_t Start = vSamples.size() - WindowSize;
-	float Peak = 0.0f;
-	double RmsAccum = 0.0;
-	std::vector<float> vWindowed(WindowSize);
-	for(size_t i = 0; i < WindowSize; ++i)
-	{
-		const float Sample = std::clamp(vSamples[Start + i], -1.0f, 1.0f);
-		Peak = maximum(Peak, absolute(Sample));
-		RmsAccum += (double)Sample * (double)Sample;
-		vWindowed[i] = Sample * VisualizerSampleWindow(i, WindowSize);
-	}
-	Result.m_Peak = Peak;
-	Result.m_Rms = sqrtf((float)(RmsAccum / WindowSize));
-
-	const size_t BinCount = Result.m_aBins.size();
-	const size_t Nyquist = WindowSize / 2;
-	if(Nyquist == 0)
-		return Result;
-	for(size_t Bin = 0; Bin < BinCount; ++Bin)
-	{
-		const float Norm0 = Bin / (float)BinCount;
-		const float Norm1 = (Bin + 1) / (float)BinCount;
-		const size_t Freq0 = maximum<size_t>(1, (size_t)powf((float)Nyquist, Norm0));
-		const size_t Freq1 = minimum<size_t>(Nyquist, maximum<size_t>(Freq0 + 1, (size_t)powf((float)Nyquist, Norm1)));
-		float SumMagnitude = 0.0f;
-		int Count = 0;
-		for(size_t K = Freq0; K < Freq1; ++K)
-		{
-			float Re = 0.0f;
-			float Im = 0.0f;
-			for(size_t N = 0; N < WindowSize; ++N)
-			{
-				const float Angle = 2.0f * pi * (float)K * (float)N / (float)WindowSize;
-				Re += vWindowed[N] * cosf(Angle);
-				Im -= vWindowed[N] * sinf(Angle);
-			}
-			const float Magnitude = sqrtf(Re * Re + Im * Im) / (float)WindowSize;
-			SumMagnitude += Magnitude;
-			Count++;
-		}
-		Result.m_aBins[Bin] = Count > 0 ? VisualizerMagnitudeToUnit(SumMagnitude / Count) : 0.0f;
-	}
-	const float Sensitivity = MusicPlayerVisualizerSensitivity();
-	const bool HasAudibleSignal = Result.m_Rms >= 0.0055f / Sensitivity || Result.m_Peak >= 0.014f / Sensitivity;
-	Result.m_HasRealtimeSignal = HasAudibleSignal;
-	return Result;
-}
-
 static bool IsUrlScheme(const std::string &Url, const char *pScheme)
 {
 	const int SchemeLength = str_length(pScheme);
@@ -453,6 +305,18 @@ static float EaseOutCubic(float t)
 static std::string BuildSnapshotTrackKey(const SNowPlayingSnapshot &Snapshot)
 {
 	return Snapshot.m_ServiceId + "|" + Snapshot.m_Title + "|" + Snapshot.m_Artist + "|" + std::to_string(Snapshot.m_DurationMs);
+}
+
+static int MusicServicePriorityScore(std::string_view ServiceId, bool IsCurrentService)
+{
+	const int Priority = BestClientVisualizer::PlayerSourcePriority(ServiceId);
+	if(Priority <= (int)BestClientVisualizer::EMediaSourcePriority::DISCORD)
+		return -100000;
+
+	int Score = Priority;
+	if(IsCurrentService)
+		Score += 1000;
+	return Score;
 }
 
 struct SGameTimerDisplay
@@ -734,7 +598,8 @@ class CLinuxNowPlayingProvider final : public IMusicPlaybackProvider
 			{
 				const char *pName = nullptr;
 				dbus_message_iter_get_basic(&ArrayIter, &pName);
-				if(pName != nullptr && str_startswith(pName, "org.mpris.MediaPlayer2."))
+				if(pName != nullptr && str_startswith(pName, "org.mpris.MediaPlayer2.") &&
+					!BestClientVisualizer::LooksLikeDiscordPlayer(pName))
 					vServices.emplace_back(pName);
 				if(!dbus_message_iter_next(&ArrayIter))
 					break;
@@ -743,10 +608,10 @@ class CLinuxNowPlayingProvider final : public IMusicPlaybackProvider
 		dbus_message_unref(pReply);
 
 		std::sort(vServices.begin(), vServices.end(), [&](const std::string &Left, const std::string &Right) {
-			if(Left == m_CurrentService)
-				return true;
-			if(Right == m_CurrentService)
-				return false;
+			const int LeftScore = MusicServicePriorityScore(Left, Left == m_CurrentService);
+			const int RightScore = MusicServicePriorityScore(Right, Right == m_CurrentService);
+			if(LeftScore != RightScore)
+				return LeftScore > RightScore;
 			return Left < Right;
 		});
 		return vServices;
@@ -917,8 +782,7 @@ public:
 				continue;
 
 			int Score = Candidate.m_PlaybackState == EMusicPlaybackState::PLAYING ? 20 : 10;
-			if(Service == m_CurrentService)
-				Score += 5;
+			Score += MusicServicePriorityScore(Service, Service == m_CurrentService);
 			if(!Candidate.m_Title.empty())
 				Score += 2;
 			if(!Candidate.m_Artist.empty())
@@ -1371,895 +1235,6 @@ public:
 	}
 };
 #endif
-
-#if defined(CONF_PLATFORM_LINUX) && BC_MUSICPLAYER_HAS_PULSE
-class CLinuxPulseVisualizer final : public IMusicVisualizerSource
-{
-	std::thread m_WorkerThread;
-	std::mutex m_Mutex;
-	bool m_Shutdown = false;
-	SMusicVisualizerData m_LatestFrame;
-	int m_ConsecutiveFailures = 0;
-	SMusicPlaybackHint m_PlaybackHint;
-	int64_t m_HintRevision = 0;
-	int64_t m_AppliedHintRevision = -1;
-
-	struct SPulseCaptureTarget
-	{
-		uint32_t m_SinkIndex = PA_INVALID_INDEX;
-		std::string m_DefaultSink;
-		std::string m_SinkName;
-		std::string m_SinkDescription;
-		std::string m_MonitorSource;
-		int m_SourceState = -1;
-		int m_SampleRate = 44100;
-		uint8_t m_Channels = 2;
-		int m_Score = 0;
-		bool m_FromActiveSinkInput = false;
-		bool m_MatchesPlaybackHint = false;
-		std::string m_AppName;
-		std::string m_AppBinary;
-		std::string m_MediaRole;
-	};
-
-	struct SPulseServerInfoRequest
-	{
-		bool m_Done = false;
-		std::string m_DefaultSink;
-	};
-
-	struct SPulseSinkInfo
-	{
-		uint32_t m_Index = PA_INVALID_INDEX;
-		std::string m_Name;
-		std::string m_Description;
-		std::string m_MonitorSource;
-		int m_SampleRate = 44100;
-		uint8_t m_Channels = 2;
-	};
-
-	struct SPulseSourceInfo
-	{
-		std::string m_Name;
-		uint32_t m_MonitorOfSink = PA_INVALID_INDEX;
-		int m_State = -1;
-	};
-
-	struct SPulseSinkInputInfo
-	{
-		uint32_t m_Index = PA_INVALID_INDEX;
-		uint32_t m_SinkIndex = PA_INVALID_INDEX;
-		std::string m_Name;
-		std::string m_AppName;
-		std::string m_AppBinary;
-		std::string m_MediaRole;
-		bool m_Corked = false;
-		bool m_Muted = false;
-	};
-
-	struct SPulseDiscoveryRequest
-	{
-		bool m_ServerDone = false;
-		bool m_SinksDone = false;
-		bool m_SourcesDone = false;
-		bool m_SinkInputsDone = false;
-		std::string m_DefaultSink;
-		std::vector<SPulseSinkInfo> m_vSinks;
-		std::vector<SPulseSourceInfo> m_vSources;
-		std::vector<SPulseSinkInputInfo> m_vSinkInputs;
-	};
-
-	static void PulseServerInfoCallback(pa_context *, const pa_server_info *pInfo, void *pUserData)
-	{
-		auto *pRequest = static_cast<SPulseDiscoveryRequest *>(pUserData);
-		if(pRequest == nullptr)
-			return;
-		pRequest->m_DefaultSink = (pInfo != nullptr && pInfo->default_sink_name != nullptr) ? pInfo->default_sink_name : "";
-		pRequest->m_ServerDone = true;
-	}
-
-	static void PulseSinkInfoCallback(pa_context *, const pa_sink_info *pInfo, int Eol, void *pUserData)
-	{
-		auto *pRequest = static_cast<SPulseDiscoveryRequest *>(pUserData);
-		if(pRequest == nullptr)
-			return;
-		if(Eol != 0)
-		{
-			pRequest->m_SinksDone = true;
-			return;
-		}
-		if(pInfo != nullptr && pInfo->monitor_source_name != nullptr)
-		{
-			SPulseSinkInfo Info;
-			Info.m_Index = pInfo->index;
-			Info.m_Name = pInfo->name != nullptr ? pInfo->name : "";
-			Info.m_Description = pInfo->description != nullptr ? pInfo->description : "";
-			Info.m_MonitorSource = pInfo->monitor_source_name;
-			Info.m_SampleRate = maximum(8000, (int)pInfo->sample_spec.rate);
-			Info.m_Channels = std::clamp<uint8_t>(pInfo->sample_spec.channels, 1, 8);
-			pRequest->m_vSinks.push_back(std::move(Info));
-		}
-	}
-
-	static void PulseSourceInfoCallback(pa_context *, const pa_source_info *pInfo, int Eol, void *pUserData)
-	{
-		auto *pRequest = static_cast<SPulseDiscoveryRequest *>(pUserData);
-		if(pRequest == nullptr)
-			return;
-		if(Eol != 0)
-		{
-			pRequest->m_SourcesDone = true;
-			return;
-		}
-		if(pInfo != nullptr && pInfo->name != nullptr && pInfo->monitor_of_sink != PA_INVALID_INDEX)
-		{
-			SPulseSourceInfo Info;
-			Info.m_Name = pInfo->name;
-			Info.m_MonitorOfSink = pInfo->monitor_of_sink;
-			Info.m_State = (int)pInfo->state;
-			pRequest->m_vSources.push_back(std::move(Info));
-		}
-	}
-
-	static void PulseSinkInputInfoCallback(pa_context *, const pa_sink_input_info *pInfo, int Eol, void *pUserData)
-	{
-		auto *pRequest = static_cast<SPulseDiscoveryRequest *>(pUserData);
-		if(pRequest == nullptr)
-			return;
-		if(Eol != 0)
-		{
-			pRequest->m_SinkInputsDone = true;
-			return;
-		}
-		if(pInfo != nullptr)
-		{
-			SPulseSinkInputInfo Info;
-			Info.m_Index = pInfo->index;
-			Info.m_SinkIndex = pInfo->sink;
-			Info.m_Name = pInfo->name != nullptr ? pInfo->name : "";
-			Info.m_Corked = pInfo->corked != 0;
-			Info.m_Muted = pInfo->mute != 0;
-			if(pInfo->proplist != nullptr)
-			{
-				if(const char *pValue = pa_proplist_gets(pInfo->proplist, PA_PROP_APPLICATION_NAME))
-					Info.m_AppName = pValue;
-				if(const char *pValue = pa_proplist_gets(pInfo->proplist, PA_PROP_APPLICATION_PROCESS_BINARY))
-					Info.m_AppBinary = pValue;
-				if(const char *pValue = pa_proplist_gets(pInfo->proplist, PA_PROP_MEDIA_ROLE))
-					Info.m_MediaRole = pValue;
-			}
-			pRequest->m_vSinkInputs.push_back(std::move(Info));
-		}
-	}
-
-	static bool WaitForPulseContext(pa_mainloop *pMainloop, pa_context *pContext)
-	{
-		while(true)
-		{
-			const pa_context_state_t State = pa_context_get_state(pContext);
-			if(State == PA_CONTEXT_READY)
-				return true;
-			if(State == PA_CONTEXT_FAILED || State == PA_CONTEXT_TERMINATED)
-				return false;
-			int Ret = 0;
-			if(pa_mainloop_iterate(pMainloop, 1, &Ret) < 0)
-				return false;
-		}
-	}
-
-	static bool WaitForPulseRequest(pa_mainloop *pMainloop, pa_operation *pOperation, bool &DoneFlag)
-	{
-		while(pOperation != nullptr && pa_operation_get_state(pOperation) == PA_OPERATION_RUNNING && !DoneFlag)
-		{
-			int Ret = 0;
-			if(pa_mainloop_iterate(pMainloop, 1, &Ret) < 0)
-			{
-				pa_operation_unref(pOperation);
-				return false;
-			}
-		}
-		if(pOperation != nullptr)
-			pa_operation_unref(pOperation);
-		return DoneFlag;
-	}
-
-	static bool ContainsI(std::string Haystack, std::string Needle)
-	{
-		if(Haystack.empty() || Needle.empty())
-			return false;
-		std::transform(Haystack.begin(), Haystack.end(), Haystack.begin(), [](unsigned char c) { return (char)std::tolower(c); });
-		std::transform(Needle.begin(), Needle.end(), Needle.begin(), [](unsigned char c) { return (char)std::tolower(c); });
-		return Haystack.find(Needle) != std::string::npos;
-	}
-
-	static bool LooksLikeMediaRole(const std::string &Role)
-	{
-		return ContainsI(Role, "music") || ContainsI(Role, "video") || ContainsI(Role, "movie") || ContainsI(Role, "multimedia");
-	}
-
-	static bool LooksLikePlaybackApp(const std::string &AppName, const std::string &AppBinary)
-	{
-		return
-			ContainsI(AppName, "spotify") || ContainsI(AppBinary, "spotify") ||
-			ContainsI(AppName, "vlc") || ContainsI(AppBinary, "vlc") ||
-			ContainsI(AppName, "chrom") || ContainsI(AppBinary, "chrom") ||
-			ContainsI(AppName, "firefox") || ContainsI(AppBinary, "firefox") ||
-			ContainsI(AppName, "mpv") || ContainsI(AppBinary, "mpv");
-	}
-
-	static std::vector<SPulseCaptureTarget> ResolveCaptureTargets(const SMusicPlaybackHint &Hint)
-	{
-		std::vector<SPulseCaptureTarget> vTargets;
-		pa_mainloop *pMainloop = pa_mainloop_new();
-		if(pMainloop == nullptr)
-			return vTargets;
-
-		pa_context *pContext = pa_context_new(pa_mainloop_get_api(pMainloop), "DDNet music visualizer");
-		if(pContext == nullptr)
-		{
-			pa_mainloop_free(pMainloop);
-			return vTargets;
-		}
-
-		if(pa_context_connect(pContext, nullptr, PA_CONTEXT_NOAUTOSPAWN, nullptr) < 0 || !WaitForPulseContext(pMainloop, pContext))
-		{
-			pa_context_unref(pContext);
-			pa_mainloop_free(pMainloop);
-			return vTargets;
-		}
-
-		SPulseDiscoveryRequest Discovery;
-		pa_operation *pServerOp = pa_context_get_server_info(pContext, PulseServerInfoCallback, &Discovery);
-		pa_operation *pSinksOp = pa_context_get_sink_info_list(pContext, PulseSinkInfoCallback, &Discovery);
-		pa_operation *pSourcesOp = pa_context_get_source_info_list(pContext, PulseSourceInfoCallback, &Discovery);
-		pa_operation *pSinkInputsOp = pa_context_get_sink_input_info_list(pContext, PulseSinkInputInfoCallback, &Discovery);
-		const bool ServerOk = WaitForPulseRequest(pMainloop, pServerOp, Discovery.m_ServerDone);
-		const bool SinksOk = WaitForPulseRequest(pMainloop, pSinksOp, Discovery.m_SinksDone);
-		const bool SourcesOk = WaitForPulseRequest(pMainloop, pSourcesOp, Discovery.m_SourcesDone);
-		const bool SinkInputsOk = WaitForPulseRequest(pMainloop, pSinkInputsOp, Discovery.m_SinkInputsDone);
-
-		pa_context_disconnect(pContext);
-		pa_context_unref(pContext);
-		pa_mainloop_free(pMainloop);
-		if(!ServerOk || !SinksOk || !SourcesOk || !SinkInputsOk)
-			return vTargets;
-
-		auto FindSourceState = [&](const SPulseSinkInfo &Sink) {
-			for(const auto &Source : Discovery.m_vSources)
-			{
-				if(Source.m_MonitorOfSink == Sink.m_Index || (!Sink.m_MonitorSource.empty() && Sink.m_MonitorSource == Source.m_Name))
-					return Source.m_State;
-			}
-			return -1;
-		};
-
-		auto UpsertTarget = [&](SPulseCaptureTarget Target) {
-			for(auto &Existing : vTargets)
-			{
-				if(Existing.m_MonitorSource == Target.m_MonitorSource)
-				{
-					if(Target.m_Score > Existing.m_Score)
-						Existing = std::move(Target);
-					return;
-				}
-			}
-			vTargets.push_back(std::move(Target));
-		};
-
-		for(const auto &Sink : Discovery.m_vSinks)
-		{
-			if(Sink.m_MonitorSource.empty())
-				continue;
-
-			const int SourceState = FindSourceState(Sink);
-			const bool SourceUsable = SourceState < 0 || PA_SOURCE_IS_OPENED((pa_source_state_t)SourceState);
-			if(!SourceUsable)
-				continue;
-
-			SPulseCaptureTarget BaseTarget;
-			BaseTarget.m_SinkIndex = Sink.m_Index;
-			BaseTarget.m_DefaultSink = Discovery.m_DefaultSink;
-			BaseTarget.m_SinkName = Sink.m_Name;
-			BaseTarget.m_SinkDescription = Sink.m_Description;
-			BaseTarget.m_MonitorSource = Sink.m_MonitorSource;
-			BaseTarget.m_SourceState = SourceState;
-			BaseTarget.m_SampleRate = Sink.m_SampleRate;
-			BaseTarget.m_Channels = Sink.m_Channels;
-			if(Sink.m_Name == Discovery.m_DefaultSink)
-				BaseTarget.m_Score += 30;
-
-			UpsertTarget(BaseTarget);
-		}
-
-		for(const auto &Input : Discovery.m_vSinkInputs)
-		{
-			if(Input.m_Corked || Input.m_Muted)
-				continue;
-			for(const auto &Sink : Discovery.m_vSinks)
-			{
-				if(Sink.m_Index != Input.m_SinkIndex || Sink.m_MonitorSource.empty())
-					continue;
-
-				const int SourceState = FindSourceState(Sink);
-				const bool SourceUsable = SourceState < 0 || PA_SOURCE_IS_OPENED((pa_source_state_t)SourceState);
-				if(!SourceUsable)
-					continue;
-
-				SPulseCaptureTarget Target;
-				Target.m_SinkIndex = Sink.m_Index;
-				Target.m_DefaultSink = Discovery.m_DefaultSink;
-				Target.m_SinkName = Sink.m_Name;
-				Target.m_SinkDescription = Sink.m_Description;
-				Target.m_MonitorSource = Sink.m_MonitorSource;
-				Target.m_SourceState = SourceState;
-				Target.m_SampleRate = Sink.m_SampleRate;
-				Target.m_Channels = Sink.m_Channels;
-				Target.m_FromActiveSinkInput = true;
-				Target.m_AppName = Input.m_AppName;
-				Target.m_AppBinary = Input.m_AppBinary;
-				Target.m_MediaRole = Input.m_MediaRole;
-				Target.m_Score = 60;
-				if(LooksLikeMediaRole(Input.m_MediaRole))
-					Target.m_Score += 30;
-				if(LooksLikePlaybackApp(Input.m_AppName, Input.m_AppBinary))
-					Target.m_Score += 20;
-				if(Sink.m_Name == Discovery.m_DefaultSink)
-					Target.m_Score += 10;
-				if(!Hint.m_ServiceId.empty())
-				{
-					const bool ChromiumHint = ContainsI(Hint.m_ServiceId, "chrom");
-					const bool SpotifyHint = ContainsI(Hint.m_ServiceId, "spotify");
-					const bool VlcHint = ContainsI(Hint.m_ServiceId, "vlc");
-					const bool FirefoxHint = ContainsI(Hint.m_ServiceId, "firefox");
-					if((ChromiumHint && (ContainsI(Input.m_AppBinary, "chrom") || ContainsI(Input.m_AppName, "chrom"))) ||
-						(SpotifyHint && (ContainsI(Input.m_AppBinary, "spotify") || ContainsI(Input.m_AppName, "spotify"))) ||
-						(VlcHint && (ContainsI(Input.m_AppBinary, "vlc") || ContainsI(Input.m_AppName, "vlc"))) ||
-						(FirefoxHint && (ContainsI(Input.m_AppBinary, "firefox") || ContainsI(Input.m_AppName, "firefox"))))
-					{
-						Target.m_MatchesPlaybackHint = true;
-						Target.m_Score += 80;
-					}
-				}
-				UpsertTarget(std::move(Target));
-			}
-		}
-
-		std::sort(vTargets.begin(), vTargets.end(), [](const SPulseCaptureTarget &A, const SPulseCaptureTarget &B) {
-			if(A.m_Score != B.m_Score)
-				return A.m_Score > B.m_Score;
-			return A.m_MonitorSource < B.m_MonitorSource;
-		});
-		return vTargets;
-	}
-
-	void StoreFrame(const SMusicVisualizerData &Frame)
-	{
-		std::lock_guard<std::mutex> Lock(m_Mutex);
-		m_LatestFrame = Frame;
-	}
-
-	void StoreBackendState(EMusicVisualizerBackendStatus Status)
-	{
-		SMusicVisualizerData Frame;
-		Frame.m_BackendStatus = Status;
-		Frame.m_IsPassiveFallback = Status == EMusicVisualizerBackendStatus::FALLBACK || Status == EMusicVisualizerBackendStatus::UNAVAILABLE;
-		StoreFrame(Frame);
-	}
-
-	void WorkerMain()
-	{
-		pa_simple *pSimple = nullptr;
-		std::vector<float> vSamples;
-		vSamples.reserve(8192);
-		std::vector<float> vReadBuffer;
-		SPulseCaptureTarget CurrentTarget;
-		size_t CurrentCandidateIndex = 0;
-		std::vector<SPulseCaptureTarget> vCandidates;
-		int CurrentSampleRate = 44100;
-		int CurrentChannels = 2;
-		int64_t NextReconnectCheckTick = 0;
-		int ValidatedReads = 0;
-		int SilentReads = 0;
-		bool ValidatedLive = false;
-
-		auto ReadPlaybackHint = [&]() {
-			std::lock_guard<std::mutex> Lock(m_Mutex);
-			return std::pair<SMusicPlaybackHint, int64_t>(m_PlaybackHint, m_HintRevision);
-		};
-
-		auto Cleanup = [&]() {
-			if(pSimple != nullptr)
-			{
-				pa_simple_free(pSimple);
-				pSimple = nullptr;
-			}
-			vSamples.clear();
-			CurrentTarget = SPulseCaptureTarget();
-			CurrentCandidateIndex = 0;
-			NextReconnectCheckTick = 0;
-			ValidatedReads = 0;
-			SilentReads = 0;
-			ValidatedLive = false;
-		};
-
-		auto EnsureCapture = [&]() -> bool {
-			if(pSimple != nullptr)
-				return true;
-			Cleanup();
-
-			const auto [Hint, HintRevision] = ReadPlaybackHint();
-			m_AppliedHintRevision = HintRevision;
-			vCandidates = ResolveCaptureTargets(Hint);
-			if(MusicPlayerDebugEnabled(1))
-			{
-				MusicPlayerDebugLog(1, "pulse", "candidate count=%d hint_service='%s' hint_state=%s",
-					(int)vCandidates.size(), Hint.m_ServiceId.c_str(), MusicPlaybackStateName(Hint.m_PlaybackState));
-				if(MusicPlayerDebugEnabled(2))
-				{
-					for(size_t i = 0; i < vCandidates.size(); ++i)
-					{
-						const auto &Candidate = vCandidates[i];
-						MusicPlayerDebugLog(2, "pulse", "candidate[%d]: score=%d sink='%s' monitor='%s' app='%s' binary='%s' role='%s' hint_match=%d active_input=%d",
-							(int)i, Candidate.m_Score, Candidate.m_SinkName.c_str(), Candidate.m_MonitorSource.c_str(),
-							Candidate.m_AppName.c_str(), Candidate.m_AppBinary.c_str(), Candidate.m_MediaRole.c_str(),
-							Candidate.m_MatchesPlaybackHint ? 1 : 0, Candidate.m_FromActiveSinkInput ? 1 : 0);
-					}
-				}
-			}
-			if(vCandidates.empty())
-			{
-				++m_ConsecutiveFailures;
-				MusicPlayerDebugLog(1, "pulse", "resolve target failed: no viable candidates failures=%d", m_ConsecutiveFailures);
-				StoreBackendState(m_ConsecutiveFailures >= 6 ? EMusicVisualizerBackendStatus::UNAVAILABLE : EMusicVisualizerBackendStatus::CONNECTING);
-				return false;
-			}
-
-			for(CurrentCandidateIndex = 0; CurrentCandidateIndex < vCandidates.size(); ++CurrentCandidateIndex)
-			{
-				CurrentTarget = vCandidates[CurrentCandidateIndex];
-				MusicPlayerDebugLog(1, "pulse", "trying candidate[%d]: score=%d sink='%s' monitor='%s' app='%s' binary='%s' role='%s'",
-					(int)CurrentCandidateIndex, CurrentTarget.m_Score, CurrentTarget.m_SinkName.c_str(), CurrentTarget.m_MonitorSource.c_str(),
-					CurrentTarget.m_AppName.c_str(), CurrentTarget.m_AppBinary.c_str(), CurrentTarget.m_MediaRole.c_str());
-
-				pa_sample_spec Spec;
-				Spec.format = PA_SAMPLE_FLOAT32LE;
-				Spec.rate = maximum(8000, CurrentTarget.m_SampleRate);
-				Spec.channels = CurrentTarget.m_Channels;
-
-				pa_buffer_attr Attr;
-				Attr.maxlength = (uint32_t)-1;
-				Attr.tlength = (uint32_t)-1;
-				Attr.prebuf = (uint32_t)-1;
-				Attr.minreq = (uint32_t)-1;
-				const size_t FramesPerRead = 1024;
-				vReadBuffer.assign(FramesPerRead * Spec.channels, 0.0f);
-				Attr.fragsize = (uint32_t)(sizeof(float) * vReadBuffer.size());
-
-				int Error = 0;
-				pSimple = pa_simple_new(nullptr, "DDNet", PA_STREAM_RECORD, CurrentTarget.m_MonitorSource.c_str(), "music visualizer", &Spec, nullptr, &Attr, &Error);
-				if(pSimple == nullptr)
-				{
-					MusicPlayerDebugLog(1, "pulse", "open candidate failed: monitor='%s' error=%d", CurrentTarget.m_MonitorSource.c_str(), Error);
-					continue;
-				}
-
-				CurrentSampleRate = Spec.rate;
-				CurrentChannels = maximum(1, (int)Spec.channels);
-				m_ConsecutiveFailures = 0;
-				MusicPlayerDebugLog(1, "pulse", "capture probing: monitor='%s' rate=%d channels=%d", CurrentTarget.m_MonitorSource.c_str(), CurrentSampleRate, CurrentChannels);
-				StoreBackendState(EMusicVisualizerBackendStatus::CONNECTING);
-				NextReconnectCheckTick = time_get() + time_freq() * 2;
-				return true;
-			}
-
-			++m_ConsecutiveFailures;
-			StoreBackendState(m_ConsecutiveFailures >= 6 ? EMusicVisualizerBackendStatus::UNAVAILABLE : EMusicVisualizerBackendStatus::CONNECTING);
-			return false;
-		};
-
-		StoreBackendState(EMusicVisualizerBackendStatus::CONNECTING);
-		while(true)
-		{
-			{
-				std::lock_guard<std::mutex> Lock(m_Mutex);
-				if(m_Shutdown)
-					break;
-			}
-
-			if(!EnsureCapture())
-			{
-				std::this_thread::sleep_for(std::chrono::milliseconds(350));
-				continue;
-			}
-
-			int Error = 0;
-			if(pa_simple_read(pSimple, vReadBuffer.data(), vReadBuffer.size() * sizeof(float), &Error) < 0)
-			{
-				Cleanup();
-				++m_ConsecutiveFailures;
-				MusicPlayerDebugLog(1, "pulse", "capture read failed: error=%d failures=%d", Error, m_ConsecutiveFailures);
-				StoreBackendState(m_ConsecutiveFailures >= 6 ? EMusicVisualizerBackendStatus::UNAVAILABLE : EMusicVisualizerBackendStatus::CONNECTING);
-				std::this_thread::sleep_for(std::chrono::milliseconds(120));
-				continue;
-			}
-
-			const int Channels = maximum(1, CurrentChannels);
-			const size_t FramesRead = vReadBuffer.size() / Channels;
-			for(size_t FrameIndex = 0; FrameIndex < FramesRead; ++FrameIndex)
-			{
-				float MonoSample = 0.0f;
-				for(int Channel = 0; Channel < Channels; ++Channel)
-					MonoSample += vReadBuffer[FrameIndex * Channels + Channel];
-				MonoSample /= Channels;
-				vSamples.push_back(std::clamp(MonoSample, -1.0f, 1.0f));
-			}
-			if(vSamples.size() > 8192)
-				vSamples.erase(vSamples.begin(), vSamples.end() - 8192);
-
-			SMusicVisualizerData Frame = AnalyzeVisualizerSamples(vSamples, CurrentSampleRate);
-			const float Sensitivity = MusicPlayerVisualizerSensitivity();
-			const bool NearSilence = Frame.m_Rms < 0.0048f / Sensitivity && Frame.m_Peak < 0.012f / Sensitivity;
-			if(NearSilence)
-			{
-				Frame.m_HasRealtimeSignal = false;
-				Frame.m_Peak = 0.0f;
-				Frame.m_Rms = 0.0f;
-				for(float &Bin : Frame.m_aBins)
-					Bin = 0.0f;
-			}
-			if(NearSilence)
-				SilentReads++;
-			else
-			{
-				ValidatedReads++;
-				SilentReads = 0;
-			}
-
-			if(!ValidatedLive && ValidatedReads >= 2)
-			{
-				ValidatedLive = true;
-				MusicPlayerDebugLog(1, "pulse", "candidate validated: monitor='%s' sink='%s'", CurrentTarget.m_MonitorSource.c_str(), CurrentTarget.m_SinkName.c_str());
-			}
-
-			Frame.m_BackendStatus = ValidatedLive ? EMusicVisualizerBackendStatus::LIVE : EMusicVisualizerBackendStatus::SILENT;
-			Frame.m_IsPassiveFallback = false;
-			StoreFrame(Frame);
-			static thread_local int64_t s_NextVerboseTick = 0;
-			if(MusicPlayerDebugEnabled(2) && time_get() >= s_NextVerboseTick)
-			{
-				s_NextVerboseTick = time_get() + time_freq();
-				MusicPlayerDebugLog(2, "pulse", "frame: signal=%d near_silence=%d peak=%.4f rms=%.4f bins=%s",
-					Frame.m_HasRealtimeSignal ? 1 : 0, NearSilence ? 1 : 0, Frame.m_Peak, Frame.m_Rms, MusicVisualizerBinsSummary(Frame).c_str());
-			}
-
-			const int64_t Now = time_get();
-			const bool PlaybackActive = ReadPlaybackHint().first.m_PlaybackState == EMusicPlaybackState::PLAYING;
-			if(!ValidatedLive && PlaybackActive && SilentReads >= 8)
-			{
-				MusicPlayerDebugLog(1, "pulse", "candidate silent, rotating: monitor='%s' sink='%s' silent_reads=%d",
-					CurrentTarget.m_MonitorSource.c_str(), CurrentTarget.m_SinkName.c_str(), SilentReads);
-				Cleanup();
-				StoreBackendState(EMusicVisualizerBackendStatus::CONNECTING);
-				std::this_thread::sleep_for(std::chrono::milliseconds(80));
-				continue;
-			}
-
-			if(NextReconnectCheckTick > 0 && Now >= NextReconnectCheckTick)
-			{
-				const auto [Hint, HintRevision] = ReadPlaybackHint();
-				const std::vector<SPulseCaptureTarget> vResolvedTargets = ResolveCaptureTargets(Hint);
-				NextReconnectCheckTick = Now + time_freq() * 2;
-				if(HintRevision != m_AppliedHintRevision)
-				{
-					MusicPlayerDebugLog(1, "pulse", "playback hint changed, re-resolving candidates");
-					Cleanup();
-					StoreBackendState(EMusicVisualizerBackendStatus::CONNECTING);
-					std::this_thread::sleep_for(std::chrono::milliseconds(80));
-				}
-				else if(!vResolvedTargets.empty() && vResolvedTargets.front().m_MonitorSource != CurrentTarget.m_MonitorSource)
-				{
-					MusicPlayerDebugLog(1, "pulse", "top candidate changed: old_monitor='%s' new_monitor='%s'",
-						CurrentTarget.m_MonitorSource.c_str(), vResolvedTargets.front().m_MonitorSource.c_str());
-					Cleanup();
-					StoreBackendState(EMusicVisualizerBackendStatus::CONNECTING);
-					std::this_thread::sleep_for(std::chrono::milliseconds(80));
-				}
-			}
-		}
-
-		Cleanup();
-	}
-
-public:
-	CLinuxPulseVisualizer()
-	{
-		m_WorkerThread = std::thread([this]() { WorkerMain(); });
-	}
-
-	~CLinuxPulseVisualizer() override
-	{
-		{
-			std::lock_guard<std::mutex> Lock(m_Mutex);
-			m_Shutdown = true;
-		}
-		if(m_WorkerThread.joinable())
-			m_WorkerThread.join();
-	}
-
-	bool Poll(SMusicVisualizerData &Out) override
-	{
-		std::lock_guard<std::mutex> Lock(m_Mutex);
-		Out = m_LatestFrame;
-		return Out.m_BackendStatus == EMusicVisualizerBackendStatus::LIVE || Out.m_HasRealtimeSignal || Out.m_Rms > 0.0f || Out.m_Peak > 0.0f;
-	}
-
-	void SetPlaybackHint(const SMusicPlaybackHint &Hint) override
-	{
-		std::lock_guard<std::mutex> Lock(m_Mutex);
-		if(m_PlaybackHint.m_ServiceId != Hint.m_ServiceId || m_PlaybackHint.m_Title != Hint.m_Title ||
-			m_PlaybackHint.m_Artist != Hint.m_Artist || m_PlaybackHint.m_PlaybackState != Hint.m_PlaybackState)
-		{
-			m_PlaybackHint = Hint;
-			++m_HintRevision;
-		}
-	}
-};
-#endif
-
-#if defined(CONF_FAMILY_WINDOWS) && BC_MUSICPLAYER_HAS_WINRT
-class CWindowsLoopbackVisualizer final : public IMusicVisualizerSource
-{
-	std::thread m_WorkerThread;
-	std::mutex m_Mutex;
-	bool m_Shutdown = false;
-	SMusicVisualizerData m_LatestFrame;
-
-	struct SWaveFormatInfo
-	{
-		WAVEFORMATEX *m_pFormat = nullptr;
-		int m_Channels = 0;
-		int m_BitsPerSample = 0;
-		bool m_Float = false;
-	};
-
-	static bool ExtractWaveFormatInfo(const WAVEFORMATEX *pFormat, SWaveFormatInfo &Out)
-	{
-		if(pFormat == nullptr || pFormat->nChannels == 0 || pFormat->wBitsPerSample == 0)
-			return false;
-
-		Out.m_pFormat = const_cast<WAVEFORMATEX *>(pFormat);
-		Out.m_Channels = maximum<int>(1, pFormat->nChannels);
-		Out.m_BitsPerSample = pFormat->wBitsPerSample;
-		Out.m_Float = pFormat->wFormatTag == WAVE_FORMAT_IEEE_FLOAT;
-		if(pFormat->wFormatTag == WAVE_FORMAT_EXTENSIBLE)
-		{
-			const auto *pExt = reinterpret_cast<const WAVEFORMATEXTENSIBLE *>(pFormat);
-			Out.m_Float = pExt->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
-			Out.m_BitsPerSample = pExt->Samples.wValidBitsPerSample > 0 ? pExt->Samples.wValidBitsPerSample : pFormat->wBitsPerSample;
-		}
-		return true;
-	}
-
-	static void StoreMonoSamples(const BYTE *pData, UINT32 FrameCount, const SWaveFormatInfo &Format, std::vector<float> &vOut)
-	{
-		if(pData == nullptr || FrameCount == 0 || Format.m_Channels <= 0)
-			return;
-
-		const int Channels = Format.m_Channels;
-		if(Format.m_Float && Format.m_BitsPerSample == 32)
-		{
-			const float *pSamples = reinterpret_cast<const float *>(pData);
-			for(UINT32 Frame = 0; Frame < FrameCount; ++Frame)
-			{
-				float Sum = 0.0f;
-				for(int Ch = 0; Ch < Channels; ++Ch)
-					Sum += pSamples[Frame * Channels + Ch];
-				vOut.push_back(std::clamp(Sum / Channels, -1.0f, 1.0f));
-			}
-			return;
-		}
-
-		if(!Format.m_Float && Format.m_BitsPerSample == 16)
-		{
-			const int16_t *pSamples = reinterpret_cast<const int16_t *>(pData);
-			for(UINT32 Frame = 0; Frame < FrameCount; ++Frame)
-			{
-				float Sum = 0.0f;
-				for(int Ch = 0; Ch < Channels; ++Ch)
-					Sum += pSamples[Frame * Channels + Ch] / 32768.0f;
-				vOut.push_back(std::clamp(Sum / Channels, -1.0f, 1.0f));
-			}
-			return;
-		}
-
-		if(!Format.m_Float && Format.m_BitsPerSample == 32)
-		{
-			const int32_t *pSamples = reinterpret_cast<const int32_t *>(pData);
-			for(UINT32 Frame = 0; Frame < FrameCount; ++Frame)
-			{
-				float Sum = 0.0f;
-				for(int Ch = 0; Ch < Channels; ++Ch)
-					Sum += (float)(pSamples[Frame * Channels + Ch] / 2147483648.0);
-				vOut.push_back(std::clamp(Sum / Channels, -1.0f, 1.0f));
-			}
-		}
-	}
-
-	void StoreFrame(const SMusicVisualizerData &Frame)
-	{
-		std::lock_guard<std::mutex> Lock(m_Mutex);
-		m_LatestFrame = Frame;
-	}
-
-	void WorkerMain()
-	{
-		const HRESULT CoInitResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-		if(FAILED(CoInitResult))
-			return;
-
-		winrt::com_ptr<IMMDeviceEnumerator> pEnumerator;
-		winrt::com_ptr<IMMDevice> pDevice;
-		winrt::com_ptr<IAudioClient> pAudioClient;
-		winrt::com_ptr<IAudioCaptureClient> pCaptureClient;
-		WAVEFORMATEX *pFormat = nullptr;
-		SWaveFormatInfo FormatInfo;
-		UINT32 BufferFrameCount = 0;
-		int SampleRate = 0;
-		std::vector<float> vSamples;
-		vSamples.reserve(4096);
-
-		auto Cleanup = [&]() {
-			if(pAudioClient)
-				pAudioClient->Stop();
-			pCaptureClient = nullptr;
-			pAudioClient = nullptr;
-			pDevice = nullptr;
-			pEnumerator = nullptr;
-			if(pFormat != nullptr)
-			{
-				CoTaskMemFree(pFormat);
-				pFormat = nullptr;
-			}
-			FormatInfo = SWaveFormatInfo();
-			BufferFrameCount = 0;
-			SampleRate = 0;
-			vSamples.clear();
-		};
-
-		auto EnsureCapture = [&]() -> bool {
-			if(pCaptureClient && pAudioClient)
-				return true;
-			Cleanup();
-
-			if(FAILED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, IID_PPV_ARGS(pEnumerator.put()))))
-				return false;
-			if(FAILED(pEnumerator->GetDefaultAudioEndpoint(eRender, eConsole, pDevice.put())))
-				return false;
-			if(FAILED(pDevice->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, reinterpret_cast<void **>(pAudioClient.put()))))
-				return false;
-			if(FAILED(pAudioClient->GetMixFormat(&pFormat)))
-				return false;
-			if(!ExtractWaveFormatInfo(pFormat, FormatInfo))
-				return false;
-			SampleRate = maximum<int>(1, pFormat->nSamplesPerSec);
-			if(FAILED(pAudioClient->Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK, 0, 0, pFormat, nullptr)))
-				return false;
-			if(FAILED(pAudioClient->GetBufferSize(&BufferFrameCount)))
-				return false;
-			if(FAILED(pAudioClient->GetService(IID_PPV_ARGS(pCaptureClient.put()))))
-				return false;
-			if(FAILED(pAudioClient->Start()))
-				return false;
-			return true;
-		};
-
-		while(true)
-		{
-			{
-				std::lock_guard<std::mutex> Lock(m_Mutex);
-				if(m_Shutdown)
-					break;
-			}
-
-			if(!EnsureCapture())
-			{
-				std::this_thread::sleep_for(std::chrono::milliseconds(250));
-				continue;
-			}
-
-			bool HadPacket = false;
-			UINT32 PacketLength = 0;
-			if(FAILED(pCaptureClient->GetNextPacketSize(&PacketLength)))
-			{
-				Cleanup();
-				std::this_thread::sleep_for(std::chrono::milliseconds(80));
-				continue;
-			}
-
-			while(PacketLength > 0)
-			{
-				BYTE *pData = nullptr;
-				UINT32 NumFrames = 0;
-				DWORD Flags = 0;
-				if(FAILED(pCaptureClient->GetBuffer(&pData, &NumFrames, &Flags, nullptr, nullptr)))
-				{
-					Cleanup();
-					break;
-				}
-
-				HadPacket = true;
-				if((Flags & AUDCLNT_BUFFERFLAGS_SILENT) != 0)
-				{
-					vSamples.insert(vSamples.end(), NumFrames, 0.0f);
-				}
-				else
-				{
-					StoreMonoSamples(pData, NumFrames, FormatInfo, vSamples);
-				}
-				pCaptureClient->ReleaseBuffer(NumFrames);
-
-				if(vSamples.size() > 4096)
-					vSamples.erase(vSamples.begin(), vSamples.end() - 4096);
-
-				if(FAILED(pCaptureClient->GetNextPacketSize(&PacketLength)))
-				{
-					Cleanup();
-					break;
-				}
-			}
-
-			SMusicVisualizerData Frame = AnalyzeVisualizerSamples(vSamples, SampleRate);
-			if(!HadPacket)
-			{
-				Frame.m_Peak *= 0.90f;
-				Frame.m_Rms *= 0.88f;
-				for(float &Bin : Frame.m_aBins)
-					Bin *= 0.86f;
-			}
-			StoreFrame(Frame);
-			std::this_thread::sleep_for(std::chrono::milliseconds(HadPacket ? 12 : 30));
-		}
-
-		Cleanup();
-		CoUninitialize();
-	}
-
-public:
-	CWindowsLoopbackVisualizer()
-	{
-		m_WorkerThread = std::thread([this]() { WorkerMain(); });
-	}
-
-	~CWindowsLoopbackVisualizer() override
-	{
-		{
-			std::lock_guard<std::mutex> Lock(m_Mutex);
-			m_Shutdown = true;
-		}
-		if(m_WorkerThread.joinable())
-			m_WorkerThread.join();
-	}
-
-	bool Poll(SMusicVisualizerData &Out) override
-	{
-		std::lock_guard<std::mutex> Lock(m_Mutex);
-		Out = m_LatestFrame;
-		return Out.m_HasRealtimeSignal || Out.m_Rms > 0.0f || Out.m_Peak > 0.0f;
-	}
-};
-#endif
-
-class CPassiveMusicVisualizerSource final : public IMusicVisualizerSource
-{
-public:
-	bool Poll(SMusicVisualizerData &Out) override
-	{
-		Out = SMusicVisualizerData();
-		Out.m_IsPassiveFallback = true;
-		Out.m_BackendStatus = EMusicVisualizerBackendStatus::FALLBACK;
-		return false;
-	}
-};
 
 class CNullNowPlayingProvider final : public IMusicPlaybackProvider
 {
@@ -2869,14 +1844,15 @@ public:
 class CMusicPlayer::CImpl
 {
 public:
-	static constexpr int VISUALIZER_BARS = MUSIC_PLAYER_VISUALIZER_BINS;
+	static constexpr int VISUALIZER_BARS = 5;
 
 	std::unique_ptr<IMusicPlaybackProvider> m_pProvider;
-	std::unique_ptr<IMusicVisualizerSource> m_pVisualizer;
+	std::unique_ptr<BestClientVisualizer::CRealtimeMusicVisualizer> m_pVisualizer;
 	SNowPlayingSnapshot m_Snapshot;
-	SMusicVisualizerData m_VisualizerData;
+	BestClientVisualizer::SVisualizerFrame m_VisualizerData;
 	int64_t m_LastSnapshotTick = 0;
 	int64_t m_LastPollTick = 0;
+	int64_t m_LastVisualizerPollTick = 0;
 	float m_ExpandAnim = 0.0f;
 	float m_HoverAnim = 0.0f;
 	float m_VisualPositionMs = 0.0f;
@@ -2902,7 +1878,7 @@ public:
 	bool m_DebugLastProviderValid = false;
 	std::string m_DebugLastProviderTrackKey;
 	EMusicPlaybackState m_DebugLastProviderPlaybackState = EMusicPlaybackState::STOPPED;
-	EMusicVisualizerBackendStatus m_DebugLastVisualizerBackendStatus = EMusicVisualizerBackendStatus::FALLBACK;
+	BestClientVisualizer::EVisualizerBackendStatus m_DebugLastVisualizerBackendStatus = BestClientVisualizer::EVisualizerBackendStatus::FALLBACK;
 	bool m_DebugLastVisualizerSignal = false;
 	int64_t m_DebugNextVisualizerVerboseTick = 0;
 	std::string m_DebugLastRenderPath;
@@ -2912,24 +1888,20 @@ public:
 	{
 		m_aVisualizerLevels.fill(0.18f);
 		m_VisualizerData.m_IsPassiveFallback = true;
-		m_VisualizerData.m_BackendStatus = EMusicVisualizerBackendStatus::FALLBACK;
+		m_VisualizerData.m_BackendStatus = BestClientVisualizer::EVisualizerBackendStatus::FALLBACK;
 #if defined(CONF_PLATFORM_LINUX)
 #if BC_MUSICPLAYER_HAS_DBUS
 		m_pProvider = std::make_unique<CLinuxNowPlayingProvider>();
 #else
 		m_pProvider = std::make_unique<CNullNowPlayingProvider>();
 #endif
-#if BC_MUSICPLAYER_HAS_PULSE
-		m_pVisualizer = std::make_unique<CLinuxPulseVisualizer>();
-#else
-		m_pVisualizer = std::make_unique<CPassiveMusicVisualizerSource>();
-#endif
+		m_pVisualizer = std::make_unique<BestClientVisualizer::CRealtimeMusicVisualizer>();
 #elif defined(CONF_FAMILY_WINDOWS) && BC_MUSICPLAYER_HAS_WINRT
 		m_pProvider = std::make_unique<CWindowsNowPlayingProvider>();
-		m_pVisualizer = std::make_unique<CWindowsLoopbackVisualizer>();
+		m_pVisualizer = std::make_unique<BestClientVisualizer::CRealtimeMusicVisualizer>();
 #else
 		m_pProvider = std::make_unique<CNullNowPlayingProvider>();
-		m_pVisualizer = std::make_unique<CPassiveMusicVisualizerSource>();
+		m_pVisualizer = std::make_unique<BestClientVisualizer::CRealtimeMusicVisualizer>();
 #endif
 	}
 
@@ -3015,7 +1987,7 @@ public:
 		{
 			MusicPlayerDebugLog(1, "visualizer", "%s: backend=%s signal=%d passive=%d peak=%.4f rms=%.4f bins=%s",
 				pSource,
-				MusicVisualizerBackendStatusName(m_VisualizerData.m_BackendStatus),
+				BestClientVisualizer::VisualizerBackendStatusName(m_VisualizerData.m_BackendStatus),
 				m_VisualizerData.m_HasRealtimeSignal ? 1 : 0,
 				m_VisualizerData.m_IsPassiveFallback ? 1 : 0,
 				m_VisualizerData.m_Peak,
@@ -3027,7 +1999,7 @@ public:
 			m_DebugNextVisualizerVerboseTick = time_get() + time_freq();
 			MusicPlayerDebugLog(2, "visualizer", "%s periodic: backend=%s signal=%d peak=%.4f rms=%.4f bins=%s",
 				pSource,
-				MusicVisualizerBackendStatusName(m_VisualizerData.m_BackendStatus),
+				BestClientVisualizer::VisualizerBackendStatusName(m_VisualizerData.m_BackendStatus),
 				m_VisualizerData.m_HasRealtimeSignal ? 1 : 0,
 				m_VisualizerData.m_Peak,
 				m_VisualizerData.m_Rms,
@@ -3050,7 +2022,7 @@ public:
 				pPath,
 				MusicPlaybackStateName(Snapshot.m_PlaybackState),
 				Snapshot.m_PlaybackState == EMusicPlaybackState::PLAYING ? 1 : 0,
-				MusicVisualizerBackendStatusName(Snapshot.m_Visualizer.m_BackendStatus),
+				BestClientVisualizer::VisualizerBackendStatusName(Snapshot.m_Visualizer.m_BackendStatus),
 				Snapshot.m_Visualizer.m_HasRealtimeSignal ? 1 : 0);
 			m_DebugLastRenderPath = pPath;
 		}
@@ -3103,9 +2075,10 @@ public:
 	void Reset(IGraphics *pGraphics)
 	{
 		m_Snapshot = SNowPlayingSnapshot();
-		m_VisualizerData = SMusicVisualizerData();
+		m_VisualizerData = BestClientVisualizer::SVisualizerFrame();
 		m_LastSnapshotTick = 0;
 		m_LastPollTick = 0;
+		m_LastVisualizerPollTick = 0;
 		ResetHudState();
 		ResetPlaybackAnchor();
 		ResetArtwork(pGraphics);
@@ -3319,37 +2292,37 @@ public:
 	void AttachVisualizerData(SNowPlayingSnapshot &Snapshot)
 	{
 		Snapshot.m_HasVisualizer = false;
-		Snapshot.m_Visualizer = SMusicVisualizerData();
+		Snapshot.m_Visualizer = BestClientVisualizer::SVisualizerFrame();
 		if(g_Config.m_BcMusicPlayerVisualizer == 0 || !m_pVisualizer)
 			return;
 
 		Snapshot.m_HasVisualizer = true;
 		Snapshot.m_Visualizer = m_VisualizerData;
-		if(Snapshot.m_Visualizer.m_BackendStatus == EMusicVisualizerBackendStatus::LIVE)
+		if(Snapshot.m_Visualizer.m_BackendStatus == BestClientVisualizer::EVisualizerBackendStatus::LIVE)
 			Snapshot.m_Visualizer.m_IsPassiveFallback = false;
 	}
 
 	void RefreshVisualizerData()
 	{
-		m_VisualizerData = SMusicVisualizerData();
+		m_VisualizerData = BestClientVisualizer::SVisualizerFrame();
 		if(g_Config.m_BcMusicPlayerVisualizer == 0 || !m_pVisualizer)
 		{
 			m_VisualizerData.m_IsPassiveFallback = true;
-			m_VisualizerData.m_BackendStatus = EMusicVisualizerBackendStatus::FALLBACK;
+			m_VisualizerData.m_BackendStatus = BestClientVisualizer::EVisualizerBackendStatus::FALLBACK;
 			DebugLogVisualizerState("refresh_disabled");
 			return;
 		}
 
-		SMusicPlaybackHint Hint;
+		BestClientVisualizer::SVisualizerPlaybackHint Hint;
 		Hint.m_ServiceId = m_Snapshot.m_ServiceId;
 		Hint.m_Title = m_Snapshot.m_Title;
 		Hint.m_Artist = m_Snapshot.m_Artist;
-		Hint.m_PlaybackState = m_Snapshot.m_PlaybackState;
+		Hint.m_Playing = m_Snapshot.m_PlaybackState == EMusicPlaybackState::PLAYING;
 		m_pVisualizer->SetPlaybackHint(Hint);
-		m_pVisualizer->Poll(m_VisualizerData);
-		if(m_VisualizerData.m_BackendStatus == EMusicVisualizerBackendStatus::LIVE)
+		m_pVisualizer->PollFrame(m_VisualizerData);
+		if(m_VisualizerData.m_BackendStatus == BestClientVisualizer::EVisualizerBackendStatus::LIVE)
 			m_VisualizerData.m_IsPassiveFallback = false;
-		else if(m_VisualizerData.m_BackendStatus == EMusicVisualizerBackendStatus::FALLBACK || m_VisualizerData.m_BackendStatus == EMusicVisualizerBackendStatus::UNAVAILABLE)
+		else if(m_VisualizerData.m_BackendStatus == BestClientVisualizer::EVisualizerBackendStatus::FALLBACK || m_VisualizerData.m_BackendStatus == BestClientVisualizer::EVisualizerBackendStatus::UNAVAILABLE)
 			m_VisualizerData.m_IsPassiveFallback = true;
 		DebugLogVisualizerState("refresh");
 	}
@@ -3444,54 +2417,42 @@ public:
 		}
 
 		const float Smoothing = std::clamp(g_Config.m_BcMusicPlayerVisualizerSmoothing / 100.0f, 0.0f, 1.0f);
-		const float Sensitivity = MusicPlayerVisualizerSensitivity();
-		const float AttackSpeed = mix(20.0f, 7.8f, Smoothing);
-		const float ReleaseSpeed = mix(12.5f, 3.8f, Smoothing);
-		const bool UseRealtimeVisualizer = Snapshot.m_HasVisualizer && Snapshot.m_Visualizer.m_BackendStatus == EMusicVisualizerBackendStatus::LIVE;
+		const float AttackSpeed = mix(34.0f, 16.0f, Smoothing);
+		const float ReleaseSpeed = mix(18.0f, 7.5f, Smoothing);
+		const bool UseRealtimeVisualizer =
+			Snapshot.m_PlaybackState == EMusicPlaybackState::PLAYING &&
+			Snapshot.m_HasVisualizer &&
+			Snapshot.m_Visualizer.m_BackendStatus == BestClientVisualizer::EVisualizerBackendStatus::LIVE;
 		if(UseRealtimeVisualizer)
 		{
 			DebugLogRenderDecision("live", Snapshot);
 			std::array<float, VISUALIZER_BARS> aTarget{};
-			const float Energy = std::clamp((Snapshot.m_Visualizer.m_Rms * 40.0f + Snapshot.m_Visualizer.m_Peak * 18.0f) * Sensitivity, 0.0f, 2.5f);
-			for(int i = 0; i < VISUALIZER_BARS; ++i)
-			{
-				const float Bin = Snapshot.m_Visualizer.m_aBins[i];
-				const float PrevBin = i > 0 ? Snapshot.m_Visualizer.m_aBins[i - 1] : Bin;
-				const float NextBin = i + 1 < VISUALIZER_BARS ? Snapshot.m_Visualizer.m_aBins[i + 1] : Bin;
-				const float Neighborhood = PrevBin * 0.22f + Bin * 0.56f + NextBin * 0.22f;
-				const float PeakBias = (i < VISUALIZER_BARS / 3 ? Snapshot.m_Visualizer.m_Peak * 1.40f : Snapshot.m_Visualizer.m_Rms * 1.05f) * Sensitivity;
-				float Target = Neighborhood * (2.2f + Sensitivity * 1.85f) + Energy * (0.34f + 0.16f * (1.0f - i / maximum(1.0f, (float)(VISUALIZER_BARS - 1)))) + PeakBias;
-				Target = std::clamp(Target, 0.0f, 1.35f);
-				if(Target > 0.0f)
-					Target = powf(Target, 0.52f);
-				if(Target < 0.004f / Sensitivity)
-					Target = 0.0f;
-				aTarget[i] = std::clamp(Target, 0.0f, 1.0f);
-			}
-			std::array<float, VISUALIZER_BARS> aSmoothed = aTarget;
+			BestClientVisualizer::BuildRenderBars(Snapshot.m_Visualizer, aTarget.data(), VISUALIZER_BARS);
+			std::array<float, VISUALIZER_BARS> aShaped{};
 			for(int i = 0; i < VISUALIZER_BARS; ++i)
 			{
 				const float Prev = i > 0 ? aTarget[i - 1] : aTarget[i];
 				const float Next = i + 1 < VISUALIZER_BARS ? aTarget[i + 1] : aTarget[i];
-				aSmoothed[i] = Prev * 0.20f + aTarget[i] * 0.60f + Next * 0.20f;
+				float Target = Prev * 0.04f + aTarget[i] * 0.92f + Next * 0.04f;
+				if(Target < 0.0025f)
+					Target = 0.0f;
+				aShaped[i] = std::clamp(Target, 0.0f, 1.0f);
 			}
 			for(int i = 0; i < VISUALIZER_BARS; ++i)
 			{
-				const float BoostedAttack = AttackSpeed + std::clamp(Sensitivity * 1.8f, 0.0f, 20.0f);
-				const float BoostedRelease = ReleaseSpeed + std::clamp(Sensitivity * 0.65f, 0.0f, 8.0f);
-				const float Speed = aSmoothed[i] > m_aVisualizerLevels[i] ? BoostedAttack : BoostedRelease;
-				m_aVisualizerLevels[i] = ApproachAnim(m_aVisualizerLevels[i], aSmoothed[i], Delta, Speed);
+				const float Speed = aShaped[i] > m_aVisualizerLevels[i] ? AttackSpeed : ReleaseSpeed;
+				m_aVisualizerLevels[i] = ApproachAnim(m_aVisualizerLevels[i], aShaped[i], Delta, Speed);
 			}
 			return;
 		}
 
-		const bool BackendConnecting = Snapshot.m_HasVisualizer && Snapshot.m_Visualizer.m_BackendStatus == EMusicVisualizerBackendStatus::CONNECTING;
-		const bool BackendSilent = Snapshot.m_HasVisualizer && Snapshot.m_Visualizer.m_BackendStatus == EMusicVisualizerBackendStatus::SILENT;
+		const bool BackendConnecting = Snapshot.m_HasVisualizer && Snapshot.m_Visualizer.m_BackendStatus == BestClientVisualizer::EVisualizerBackendStatus::CONNECTING;
+		const bool BackendSilent = Snapshot.m_HasVisualizer && Snapshot.m_Visualizer.m_BackendStatus == BestClientVisualizer::EVisualizerBackendStatus::SILENT;
 		if(BackendConnecting || BackendSilent)
 		{
 			DebugLogRenderDecision(BackendSilent ? "silent" : "connecting", Snapshot);
 			for(float &Level : m_aVisualizerLevels)
-				Level = ApproachAnim(Level, 0.0f, Delta, ReleaseSpeed);
+				Level = ApproachAnim(Level, 0.0f, Delta, BackendSilent ? ReleaseSpeed * 0.42f : ReleaseSpeed * 0.70f);
 			return;
 		}
 
@@ -3739,9 +2700,15 @@ void CMusicPlayer::OnUpdate()
 
 	EnsureImpl();
 	const int64_t Now = time_get();
-	if(m_pImpl->m_LastPollTick == 0 || Now - m_pImpl->m_LastPollTick >= time_freq() / 8)
+	if(g_Config.m_BcMusicPlayerVisualizer != 0 && m_pImpl->m_pVisualizer &&
+		(m_pImpl->m_LastVisualizerPollTick == 0 || Now - m_pImpl->m_LastVisualizerPollTick >= time_freq() / 60))
 	{
 		m_pImpl->RefreshVisualizerData();
+		m_pImpl->RefreshCurrentSnapshotVisualizer();
+		m_pImpl->m_LastVisualizerPollTick = Now;
+	}
+	if(m_pImpl->m_LastPollTick == 0 || Now - m_pImpl->m_LastPollTick >= time_freq() / 8)
+	{
 		SNowPlayingSnapshot Snapshot;
 		if(m_pImpl->m_pProvider && m_pImpl->m_pProvider->Poll(Snapshot))
 		{
@@ -3940,8 +2907,8 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	const float VisualInnerPadY = 0.20f * Scale;
 	const float VisualInnerW = maximum(0.0f, VisualRect.w - VisualInnerPadX * 2.0f);
 	const float VisualInnerH = maximum(0.0f, VisualRect.h - VisualInnerPadY * 2.0f);
-	const float Gap = 0.58f * Scale * WidthScale;
-	const float BarW = maximum(0.95f * Scale * WidthScale, (VisualInnerW - Gap * (NumBars - 1)) / maximum(1.0f, (float)NumBars));
+		const float Gap = 0.74f * Scale * WidthScale;
+		const float BarW = maximum(0.72f * Scale * WidthScale, (VisualInnerW - Gap * (NumBars - 1)) / maximum(1.0f, (float)NumBars));
 	const float BarsTotalW = NumBars * BarW + (NumBars - 1) * Gap;
 	const float BarsStartX = VisualRect.x + VisualInnerPadX + maximum(0.0f, (VisualInnerW - BarsTotalW) * 0.5f);
 	const float LaneH = maximum(5.2f * Scale, VisualInnerH * 0.94f);
@@ -3953,11 +2920,11 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 		const float BarT = i / maximum(1.0f, (float)(NumBars - 1));
 		const float Centered = absolute(BarT * 2.0f - 1.0f);
 		const float X = BarsStartX + i * (BarW + Gap);
-		const float LaneW = BarW * 0.88f;
+		const float LaneW = BarW * 0.72f;
 		const float LaneX = X + (BarW - LaneW) * 0.5f;
 		if(!HasMusic)
 		{
-			const float PassiveLevel = m_pImpl->m_aVisualizerLevels[minimum<int>(CImpl::VISUALIZER_BARS - 1, round_to_int((i / maximum(1.0f, (float)(NumBars - 1))) * (CImpl::VISUALIZER_BARS - 1)))];
+			const float PassiveLevel = m_pImpl->m_aVisualizerLevels[i];
 			const float DotSize = maximum(1.00f * Scale, LaneW * (0.28f + PassiveLevel * 0.22f));
 			const float DotX = LaneX + (LaneW - DotSize) * 0.5f;
 			const float DotY = VisualRect.y + VisualRect.h * 0.5f - DotSize * 0.5f;
@@ -3968,21 +2935,19 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 			continue;
 		}
 
-		const int SourceIndex = minimum<int>(CImpl::VISUALIZER_BARS - 1, round_to_int((i / maximum(1.0f, (float)(NumBars - 1))) * (CImpl::VISUALIZER_BARS - 1)));
-		const float HeightFactor = powf(std::clamp(m_pImpl->m_aVisualizerLevels[SourceIndex], 0.0f, 1.0f), 0.58f);
-		const float H = CenterMode ?
-			minimum(LaneH, maximum(3.0f * Scale, VisualInnerH * (0.22f + HeightFactor * 1.02f))) :
-			minimum(LaneH, maximum(4.0f * Scale, VisualInnerH * (0.30f + HeightFactor * 1.12f)));
+		const int SourceIndex = i;
+		const float HeightFactor = powf(std::clamp(m_pImpl->m_aVisualizerLevels[SourceIndex], 0.0f, 1.0f), 0.94f);
+		const float H = minimum(LaneH, maximum(0.0f, LaneH * HeightFactor));
 		const float Y = CenterMode ? (BaseMidY - H * 0.5f) : (LaneY + LaneH - H);
 		const float LightT = 0.18f + (1.0f - Centered) * 0.52f;
 		ColorRGBA BarColor = MixColor(Palette.m_Glow, Palette.m_Light, LightT);
 		BarColor = MixColor(BarColor, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), 0.05f + BarT * 0.10f);
 		if(Snapshot.m_HasVisualizer && Snapshot.m_Visualizer.m_IsPassiveFallback)
 			BarColor = MixColor(BarColor, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), 0.03f);
-		BarColor.a = 0.72f + 0.16f * HoverT;
-		ColorRGBA LaneColor = WithAlpha(MixColor(Palette.m_Dark, Palette.m_Glow, 0.24f + 0.10f * (1.0f - Centered)), 0.12f + 0.06f * HoverT);
-		Graphics()->DrawRect(LaneX, LaneY, LaneW, LaneH, LaneColor, IGraphics::CORNER_ALL, minimum(LaneW, LaneH) * 0.5f);
-		Graphics()->DrawRect(LaneX, Y, LaneW, H, BarColor, IGraphics::CORNER_ALL, minimum(LaneW, H) * 0.5f);
+		BarColor.a = 0.86f + 0.08f * HoverT;
+		ColorRGBA LaneColor = WithAlpha(MixColor(Palette.m_Dark, Palette.m_Glow, 0.10f + 0.04f * (1.0f - Centered)), 0.02f + 0.015f * HoverT);
+		Graphics()->DrawRect(LaneX, LaneY, LaneW, LaneH, LaneColor, IGraphics::CORNER_ALL, minimum(LaneW, LaneH) * 0.08f);
+		Graphics()->DrawRect(LaneX, Y, LaneW, H, BarColor, IGraphics::CORNER_ALL, minimum(LaneW, H) * 0.10f);
 	}
 
 	const float ControlsYOffset = (1.0f - ControlsT) * 0.75f * Scale;

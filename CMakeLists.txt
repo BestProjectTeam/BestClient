@@ -2717,6 +2717,17 @@ if(CLIENT)
     components/bestclient/hud_editor.h
     components/bestclient/music_player.cpp
     components/bestclient/music_player.h
+    components/bestclient/visualizer/analyzer.cpp
+    components/bestclient/visualizer/analyzer.h
+    components/bestclient/visualizer/service.cpp
+    components/bestclient/visualizer/service.h
+    components/bestclient/visualizer/smoother.cpp
+    components/bestclient/visualizer/smoother.h
+    components/bestclient/visualizer/source.h
+    components/bestclient/visualizer/source_passive.cpp
+    components/bestclient/visualizer/source_pulse.cpp
+    components/bestclient/visualizer/source_wasapi.cpp
+    components/bestclient/visualizer/types.h
     components/bestclient/orbit_aura.cpp
     components/bestclient/orbit_aura.h
     components/bestclient/r_jelly.cpp
@@ -3541,6 +3552,7 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     mapitems_test.cpp
     math_test.cpp
     mem_test.cpp
+    music_visualizer_test.cpp
     name_ban_test.cpp
     net_test.cpp
     netaddr_test.cpp
@@ -3577,6 +3589,11 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     src/engine/client/serverbrowser_ping_cache.cpp
     src/engine/client/serverbrowser_ping_cache.h
     src/engine/client/sqlite.cpp
+    src/game/client/components/bestclient/visualizer/analyzer.cpp
+    src/game/client/components/bestclient/visualizer/analyzer.h
+    src/game/client/components/bestclient/visualizer/smoother.cpp
+    src/game/client/components/bestclient/visualizer/smoother.h
+    src/game/client/components/bestclient/visualizer/types.h
   )
 
   set(TARGET_TESTRUNNER testrunner)
