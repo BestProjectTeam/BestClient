@@ -1026,12 +1026,13 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				static CUi::SDropDownState s_MusicPlayerColorModeState;
 				static CScrollRegion s_MusicPlayerColorModeScrollRegion;
 				s_MusicPlayerColorModeState.m_SelectionPopupContext.m_pScrollRegion = &s_MusicPlayerColorModeScrollRegion;
-				const char *apMusicPlayerColorModes[3] = {
+				const char *apMusicPlayerColorModes[4] = {
 					BCLocalize("Static color"),
 					BCLocalize("Cover accent color"),
 					BCLocalize("Dominant cover color"),
+					BCLocalize("Translucent"),
 				};
-				g_Config.m_BcMusicPlayerColorMode = std::clamp(g_Config.m_BcMusicPlayerColorMode, 0, 2);
+				g_Config.m_BcMusicPlayerColorMode = std::clamp(g_Config.m_BcMusicPlayerColorMode, 0, 3);
 				g_Config.m_BcMusicPlayerColorMode = Ui()->DoDropDown(&ModeDropDown, g_Config.m_BcMusicPlayerColorMode, apMusicPlayerColorModes, (int)std::size(apMusicPlayerColorModes), s_MusicPlayerColorModeState);
 
 				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcMusicPlayerVisualizer, BCLocalize("Enable visualizer"), &g_Config.m_BcMusicPlayerVisualizer, &Expand, LineSize);

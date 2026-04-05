@@ -2828,12 +2828,13 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	ColorRGBA LayoutColor = color_cast<ColorRGBA>(ColorHSLA(BackgroundColor, true));
 	if(!BackgroundEnabled)
 		LayoutColor = ColorRGBA(0.12f, 0.13f, 0.16f, 0.72f);
-	const bool CoverColorMode = g_Config.m_BcMusicPlayerColorMode != 0;
+	const bool TranslucentColorMode = g_Config.m_BcMusicPlayerColorMode == 3;
+	const bool CoverColorMode = g_Config.m_BcMusicPlayerColorMode == 1 || g_Config.m_BcMusicPlayerColorMode == 2;
 	const bool DominantColorMode = g_Config.m_BcMusicPlayerColorMode == 2;
-	const float PanelTintT = ((DominantColorMode ? 0.72f : (CoverColorMode ? 0.62f : 0.50f)) - HoverT * (DominantColorMode ? 0.03f : 0.04f));
+	const float PanelTintT = (DominantColorMode ? 0.72f : (CoverColorMode ? 0.62f : 0.50f)) - HoverT * (DominantColorMode ? 0.03f : 0.04f);
 	const ColorRGBA PanelTintColor = DominantColorMode ? MixColor(Palette.m_Mid, Palette.m_Dark, 0.58f) : (CoverColorMode ? MixColor(Palette.m_Mid, Palette.m_Dark, 0.40f) : Palette.m_Dark);
-	const ColorRGBA PanelColor = WithAlpha(MixColor(LayoutColor, PanelTintColor, PanelTintT), maximum(LayoutColor.a, 0.90f));
-	const ColorRGBA GlowColor = WithAlpha(MixColor(Palette.m_Glow, Palette.m_Light, DominantColorMode ? 0.40f : (CoverColorMode ? 0.28f : 0.18f)), (DominantColorMode ? 0.04f : 0.02f) + (DominantColorMode ? 0.07f : 0.05f) * HoverT);
+	const ColorRGBA PanelColor = TranslucentColorMode ? ColorRGBA(0.0f, 0.0f, 0.0f, 0.4f) : WithAlpha(MixColor(LayoutColor, PanelTintColor, PanelTintT), maximum(LayoutColor.a, 0.90f));
+	const ColorRGBA GlowColor = TranslucentColorMode ? ColorRGBA(0.0f, 0.0f, 0.0f, 0.0f) : WithAlpha(MixColor(Palette.m_Glow, Palette.m_Light, DominantColorMode ? 0.40f : (CoverColorMode ? 0.28f : 0.18f)), (DominantColorMode ? 0.04f : 0.02f) + (DominantColorMode ? 0.07f : 0.05f) * HoverT);
 	const float OuterPad = 0.42f * Scale + HoverT * 0.48f * Scale;
 
 	if(GlowColor.a > 0.001f)
