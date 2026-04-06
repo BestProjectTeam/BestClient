@@ -325,11 +325,15 @@ CHudEditor::SModuleVisual CHudEditor::GetModuleVisual(HudLayout::EModule Module)
 	switch(Module)
 	{
 	case HudLayout::MODULE_MUSIC_PLAYER:
+	{
 		Visual.m_Rect = GameClient()->m_MusicPlayer.GetHudEditorRect(false);
 		if(Visual.m_Rect.w <= 0.0f || Visual.m_Rect.h <= 0.0f)
 			Visual.m_Rect = GameClient()->m_MusicPlayer.GetHudEditorRect(true);
-		Visual.m_Rounding = 8.0f;
+		const auto Layout = HudLayout::Get(HudLayout::MODULE_MUSIC_PLAYER, Width, Height);
+		const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+		Visual.m_Rounding = minimum(5.0f * Scale, Visual.m_Rect.h * 0.24f);
 		break;
+	}
 	case HudLayout::MODULE_VOICE_TALKERS:
 		Visual.m_Rect = GameClient()->m_VoiceChat.GetHudTalkingIndicatorRect(Width, Height, true);
 		Visual.m_Rounding = 4.0f;
