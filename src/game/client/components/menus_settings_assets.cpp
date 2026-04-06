@@ -704,6 +704,7 @@ static int InitSearchList(std::vector<const TName *> &vpSearchList, std::vector<
 void CMenus::RenderSettingsCustom(CUIRect MainView)
 {
 	CUIRect TabBar, CustomList, QuickSearch, DirectoryButton, ReloadButton;
+	static bool s_EntityGamePreview = true;
 	auto SortSearchList = [this](auto &vpSearchList) {
 		std::sort(vpSearchList.begin(), vpSearchList.end(), [this](const auto *pLeft, const auto *pRight) {
 			const bool LeftFavorite = IsFavoriteAsset(s_CurCustomTab, pLeft->m_aName);
@@ -1017,7 +1018,64 @@ void CMenus::RenderSettingsCustom(CUIRect MainView)
 			ItemRect.HSplitTop(15, &ItemRect, &TextureRect);
 			TextureRect.HSplitTop(10, nullptr, &TextureRect);
 			Ui()->DoLabel(&ItemRect, pItem->m_aName, ItemRect.h - 2, TEXTALIGN_MC);
-			if(pItem->m_RenderTexture.IsValid())
+			if(s_CurCustomTab == ASSETS_TAB_ENTITIES && s_EntityGamePreview)
+			{
+				const auto *pEntitiesItem = static_cast<const SCustomEntities *>(pItem);
+				IGraphics::CTextureHandle Tex;
+				for(int m = 0; m < MAP_IMAGE_MOD_TYPE_COUNT && !Tex.IsValid(); m++)
+					Tex = pEntitiesItem->m_aImages[m].m_Texture;
+				if(!Tex.IsValid())
+					Tex = pItem->m_RenderTexture;
+
+				if(Tex.IsValid())
+				{
+					// Game-like preview: hookable/unhookable walls + freeze/death/unfreeze tiles
+					static const int COLS = 7, ROWS = 7;
+					static const unsigned char aLayout[ROWS][COLS] = {
+						{TILE_SOLID,  TILE_SOLID,  TILE_SOLID,  TILE_SOLID,  TILE_SOLID,  TILE_SOLID,  TILE_SOLID},
+						{TILE_SOLID,  0,           0,           0,           0,           0,           TILE_NOHOOK},
+						{TILE_SOLID,  TILE_FREEZE, 0,           0,           0,           0,           TILE_NOHOOK},
+						{TILE_SOLID,  0,           TILE_DEATH,  0,           TILE_UNFREEZE, 0,         TILE_NOHOOK},
+						{TILE_SOLID,  0,           0,           0,           0,           TILE_DFREEZE, TILE_NOHOOK},
+						{TILE_SOLID,  0,           0,           0,           0,           0,           TILE_NOHOOK},
+						{TILE_NOHOOK, TILE_NOHOOK, TILE_NOHOOK, TILE_NOHOOK, TILE_NOHOOK, TILE_NOHOOK, TILE_NOHOOK},
+					};
+
+					float TileSize = TextureWidth / (float)COLS;
+					float OffX = TextureRect.x + (TextureRect.w - TextureWidth) / 2.0f;
+					float OffY = TextureRect.y + (TextureRect.h - ROWS * TileSize) / 2.0f;
+
+					// inset UVs by ~1.5px to avoid bilinear bleeding at tile boundaries
+					const float kInset = 1.5f / 1024.0f;
+					const float kTile = 1.0f / 16.0f;
+
+					Graphics()->WrapClamp();
+					Graphics()->TextureSet(Tex);
+					Graphics()->QuadsBegin();
+					Graphics()->SetColor(1, 1, 1, 1);
+					for(int r = 0; r < ROWS; r++)
+					{
+						for(int c = 0; c < COLS; c++)
+						{
+							unsigned char Tile = aLayout[r][c];
+							if(Tile == 0)
+								continue;
+							int Tx = Tile % 16;
+							int Ty = Tile / 16;
+							float U0 = Tx * kTile + kInset;
+							float V0 = Ty * kTile + kInset;
+							float U1 = U0 + kTile - kInset * 2;
+							float V1 = V0 + kTile - kInset * 2;
+							Graphics()->QuadsSetSubset(U0, V0, U1, V1);
+							IGraphics::CQuadItem Q(OffX + c * TileSize, OffY + r * TileSize, TileSize, TileSize);
+							Graphics()->QuadsDrawTL(&Q, 1);
+						}
+					}
+					Graphics()->QuadsEnd();
+					Graphics()->WrapNormal();
+				}
+			}
+			else if(pItem->m_RenderTexture.IsValid())
 			{
 				Graphics()->WrapClamp();
 				Graphics()->TextureSet(pItem->m_RenderTexture);
@@ -1106,6 +1164,19 @@ void CMenus::RenderSettingsCustom(CUIRect MainView)
 	if(Ui()->DoEditBox_Search(&s_aFilterInputs[s_CurCustomTab], &QuickSearch, 14.0f, !Ui()->IsPopupOpen() && !GameClient()->m_GameConsole.IsActive()))
 	{
 		gs_aInitCustomList[s_CurCustomTab] = true;
+	}
+
+	if(s_CurCustomTab == ASSETS_TAB_ENTITIES)
+	{
+		CUIRect ToggleRect;
+		DirectoryButton.VSplitLeft(5.0f, nullptr, &DirectoryButton);
+		DirectoryButton.VSplitLeft(140.0f, &ToggleRect, &DirectoryButton);
+		DirectoryButton.VSplitLeft(5.0f, nullptr, &DirectoryButton);
+		ToggleRect.HSplitTop(5.0f, nullptr, &ToggleRect);
+		static CButtonContainer s_EntityPreviewToggleId;
+		if(DoButton_Menu(&s_EntityPreviewToggleId, Localize("Better Preview"), s_EntityGamePreview, &ToggleRect))
+			s_EntityGamePreview = !s_EntityGamePreview;
+		GameClient()->m_Tooltips.DoToolTip(&s_EntityPreviewToggleId, &ToggleRect, Localize("Toggle between game scene preview and raw texture"));
 	}
 
 	DirectoryButton.HSplitTop(5.0f, nullptr, &DirectoryButton);
