@@ -976,6 +976,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			static float s_MusicPlayerPhase = 0.0f;
 			static float s_MusicPlayerStaticColorPhase = 0.0f;
 			static float s_MusicPlayerVisualizerPhase = 0.0f;
+			static CButtonContainer s_MusicPlayerResetButton;
 			const bool MusicPlayerEnabled = g_Config.m_BcMusicPlayer != 0;
 			const bool StaticColorOn = MusicPlayerEnabled && g_Config.m_BcMusicPlayerColorMode == 0;
 			const bool VisualizerOn = MusicPlayerEnabled && g_Config.m_BcMusicPlayerVisualizer != 0;
@@ -1000,13 +1001,27 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			BeginBlock(Column, ContentHeight, Content);
 
 			Content.HSplitTop(LineSize, &Label, &Content);
-			Ui()->DoLabel(&Label, BCLocalize("Music Player"), HeadlineFontSize, TEXTALIGN_ML);
+			CUIRect TitleLabel, ResetButton, ResetHitbox;
+			Label.VSplitRight(LineSize + 8.0f, &TitleLabel, &ResetButton);
+			ResetHitbox = ResetButton;
+			const bool MusicPlayerResetClicked = Ui()->DoButton_FontIcon(&s_MusicPlayerResetButton, FontIcon::ARROW_ROTATE_LEFT, 0, &ResetHitbox, BUTTONFLAG_LEFT);
+			GameClient()->m_Tooltips.DoToolTip(&s_MusicPlayerResetButton, &ResetHitbox, BCLocalize("Reset to defaults"));
+			if(MusicPlayerResetClicked)
+			{
+				g_Config.m_BcMusicPlayerColorMode = DefaultConfig::BcMusicPlayerColorMode;
+				g_Config.m_BcMusicPlayerStaticColor = DefaultConfig::BcMusicPlayerStaticColor;
+				g_Config.m_BcMusicPlayerVisualizer = DefaultConfig::BcMusicPlayerVisualizer;
+				g_Config.m_BcMusicPlayerVisualizerMode = DefaultConfig::BcMusicPlayerVisualizerMode;
+				g_Config.m_BcMusicPlayerVisualizerSensitivity = DefaultConfig::BcMusicPlayerVisualizerSensitivity;
+				g_Config.m_BcMusicPlayerVisualizerSmoothing = DefaultConfig::BcMusicPlayerVisualizerSmoothing;
+			}
+			Ui()->DoLabel(&TitleLabel, BCLocalize("Music Player"), HeadlineFontSize, TEXTALIGN_ML);
 			Content.HSplitTop(MarginSmall, nullptr, &Content);
 
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcMusicPlayer, BCLocalize("Enable music player"), &g_Config.m_BcMusicPlayer, &Content, LineSize);
 
 			const float ExpandedHeight = ExtraTargetHeight * s_MusicPlayerPhase;
-			if(ExpandedHeight > 0.0f)
+			if(!MusicPlayerResetClicked && ExpandedHeight > 0.0f)
 			{
 				Content.HSplitTop(ExpandedHeight, &Visible, &Content);
 				Ui()->ClipEnable(&Visible);
