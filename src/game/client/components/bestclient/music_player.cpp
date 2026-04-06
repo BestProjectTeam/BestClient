@@ -1291,10 +1291,19 @@ static float ComputeCompactTextSlotWidth(ITextRender *pTextRender, const SGameTi
 	if(pTextRender == nullptr)
 		return 28.8f * Scale * WidthScale;
 
-	const bool WideTimer = GameTimer.m_Valid && GameTimer.m_Text.size() > 5;
-	// The timer uses proportional digits, so reserve width for the widest common shape.
-	const char *pReference = WideTimer ? "88:88:88" : "88:88";
-	const float TextWidth = pTextRender->TextWidth(TitleFont, pReference, -1, -1.0f);
+	std::string Reference = "88:88";
+	if(GameTimer.m_Valid && !GameTimer.m_Text.empty())
+	{
+		Reference = GameTimer.m_Text;
+		for(char &Char : Reference)
+		{
+			if(Char >= '0' && Char <= '9')
+				Char = '8';
+		}
+	}
+
+	const bool WideTimer = Reference.size() > 5;
+	const float TextWidth = pTextRender->TextWidth(TitleFont, Reference.c_str(), -1, -1.0f);
 	const float Padding = (WideTimer ? 4.2f : 5.4f) * Scale * WidthScale;
 	return TextWidth + Padding;
 }
@@ -3001,7 +3010,35 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	const float TitleWidth = TextRender()->TextWidth(UiTitleFont, Title.c_str(), -1, -1.0f);
 	if(ShowGameTimer)
 	{
-		TextRender()->Text(UiTitleRect.x + (UiTitleRect.w - TitleWidth) * 0.5f, UiTitleRect.y + (UiTitleRect.h - UiTitleFont) * 0.5f, UiTitleFont, Title.c_str(), -1.0f);
+		if(TitleWidth > UiTitleRect.w)
+		{
+			CUIRect ClipRect = UiTitleRect;
+			Ui()->ClipEnable(&ClipRect);
+			const float Overflow = TitleWidth - ClipRect.w;
+			const float PauseTime = 0.65f;
+			const float TravelTime = maximum(1.4f, Overflow / maximum(18.0f * UiFontScale, 1.0f));
+			const float Segment = TravelTime + PauseTime;
+			const float Cycle = Segment * 2.0f;
+			const float T = fmodf((float)(time_get() / (double)time_freq()), Cycle);
+			float Offset = 0.0f;
+			if(T < Segment)
+			{
+				const float MoveT = std::clamp((T - PauseTime) / maximum(TravelTime, 0.001f), 0.0f, 1.0f);
+				Offset = -Overflow * EaseInOutCubic(MoveT);
+			}
+			else
+			{
+				const float BackT = T - Segment;
+				const float MoveT = std::clamp((BackT - PauseTime) / maximum(TravelTime, 0.001f), 0.0f, 1.0f);
+				Offset = -Overflow * (1.0f - EaseInOutCubic(MoveT));
+			}
+			TextRender()->Text(ClipRect.x + Offset, ClipRect.y + (ClipRect.h - UiTitleFont) * 0.5f, UiTitleFont, Title.c_str(), -1.0f);
+			Ui()->ClipDisable();
+		}
+		else
+		{
+			TextRender()->Text(UiTitleRect.x + (UiTitleRect.w - TitleWidth) * 0.5f, UiTitleRect.y + (UiTitleRect.h - UiTitleFont) * 0.5f, UiTitleFont, Title.c_str(), -1.0f);
+		}
 	}
 	else
 	{
