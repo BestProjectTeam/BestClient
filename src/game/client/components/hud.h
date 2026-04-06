@@ -81,7 +81,7 @@ class CHud : public CComponent
 	int m_LastSpectatorCountTick;
 	void RenderSpectatorCount();
 	void RenderDummyActions();
-	void RenderMovementInformation();
+	void RenderMovementInformation(bool ForcePreview = false);
 
 	void UpdateMovementInformationTextContainer(STextContainerIndex &TextContainer, float FontSize, float Value, float &PrevValue);
 	void RenderMovementInformationTextContainer(STextContainerIndex &TextContainer, const ColorRGBA &Color, float X, float Y);
@@ -93,8 +93,28 @@ class CHud : public CComponent
 		vec2 m_Speed;
 		float m_Angle = 0.0f;
 	};
+	class SMovementInformationState
+	{
+	public:
+		int m_ClientId = -1;
+		bool m_HasValidClientId = false;
+		bool m_PosOnly = false;
+		bool m_ShowDummyCoordIndicator = false;
+		bool m_HasDummyInfo = false;
+		bool m_ShowPosition = false;
+		bool m_ShowSpeed = false;
+		bool m_ShowAngle = false;
+		bool m_ShowDummyPos = false;
+		bool m_ShowDummySpeed = false;
+		bool m_ShowDummyAngle = false;
+		CMovementInformation m_Info;
+		CMovementInformation m_DummyInfo;
+	};
 	class CMovementInformation GetMovementInformation(int ClientId, int Conn) const;
 	bool HasPlayerBelowOnSameX(int ClientId, const CMovementInformation &Info) const;
+	bool GetMovementInformationState(SMovementInformationState &State, bool ForcePreview) const;
+	float GetMovementInformationBoxHeight(const SMovementInformationState &State, float Scale) const;
+	CUIRect GetMovementInformationRect(bool ForcePreview) const;
 
 	void RenderGameTimer();
 	void RenderPauseNotification();
@@ -122,6 +142,8 @@ public:
 	void OnRender() override;
 	void OnInit() override;
 	void OnNewSnapshot() override;
+	CUIRect GetMovementInformationHudEditorRect() const;
+	void RenderMovementInformationPreview();
 	CUIRect GetLocalTimeHudEditorRect() const;
 	void RenderLocalTimePreview();
 	CUIRect GetFrozenHudEditorRect() const;
@@ -145,7 +167,6 @@ private:
 	int m_SpeedrunTimerExpiredTick;
 	bool m_ShowFinishTime;
 
-	inline float GetMovementInformationBoxHeight();
 	inline int GetDigitsIndex(int Value, int Max);
 
 	// Quad Offsets

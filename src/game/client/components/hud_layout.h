@@ -58,6 +58,7 @@ constexpr float CANVAS_HEIGHT = 300.0f;
 bool IsEditableModule(EModule Module);
 const char *Name(EModule Module);
 SModuleLayout Get(EModule Module, float HudWidth, float HudHeight);
+bool HasRuntimeOverride(EModule Module);
 void SetPosition(EModule Module, float X, float Y);
 void SetScale(EModule Module, int Scale);
 void SetEnabled(EModule Module, bool Enabled);

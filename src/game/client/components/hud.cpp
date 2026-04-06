@@ -1601,14 +1601,25 @@ void CHud::RenderSpectatorCount()
 
 	const float BoxHeight = PaddingY * 2.0f + LineHeight * (1 + NumNameLines);
 	const float BoxWidth = PaddingX * 2.0f + MaxLineWidth;
+	float MovementInfoHeight = 0.0f;
+	if(HudLayout::IsEnabled(HudLayout::MODULE_MOVEMENT_INFO))
+	{
+		SMovementInformationState MovementInfoState;
+		if(GetMovementInformationState(MovementInfoState, false))
+		{
+			const auto MovementLayout = HudLayout::Get(HudLayout::MODULE_MOVEMENT_INFO, m_Width, m_Height);
+			const float MovementScale = std::clamp(MovementLayout.m_Scale / 100.0f, 0.25f, 3.0f);
+			MovementInfoHeight = GetMovementInformationBoxHeight(MovementInfoState, MovementScale);
+		}
+	}
 
 	float StartX = m_Width - BoxWidth;
 	float StartY = 285.0f - BoxHeight - 4; // 4 units distance to the next display;
-	if(g_Config.m_ClShowhudPlayerPosition || g_Config.m_ClShowhudPlayerSpeed || g_Config.m_ClShowhudPlayerAngle)
+	if(MovementInfoHeight > 0.0f)
 	{
 		StartY -= 4;
 	}
-	StartY -= GetMovementInformationBoxHeight();
+	StartY -= MovementInfoHeight;
 
 	if(g_Config.m_ClShowhudScore)
 	{
@@ -1647,14 +1658,25 @@ void CHud::RenderDummyActions()
 	// render small dummy actions hud
 	const float BoxHeight = 29.0f;
 	const float BoxWidth = 16.0f;
+	float MovementInfoHeight = 0.0f;
+	if(HudLayout::IsEnabled(HudLayout::MODULE_MOVEMENT_INFO))
+	{
+		SMovementInformationState MovementInfoState;
+		if(GetMovementInformationState(MovementInfoState, false))
+		{
+			const auto MovementLayout = HudLayout::Get(HudLayout::MODULE_MOVEMENT_INFO, m_Width, m_Height);
+			const float MovementScale = std::clamp(MovementLayout.m_Scale / 100.0f, 0.25f, 3.0f);
+			MovementInfoHeight = GetMovementInformationBoxHeight(MovementInfoState, MovementScale);
+		}
+	}
 
 	float StartX = m_Width - BoxWidth;
 	float StartY = 285.0f - BoxHeight - 4; // 4 units distance to the next display;
-	if(g_Config.m_ClShowhudPlayerPosition || g_Config.m_ClShowhudPlayerSpeed || g_Config.m_ClShowhudPlayerAngle)
+	if(MovementInfoHeight > 0.0f)
 	{
 		StartY -= 4;
 	}
-	StartY -= GetMovementInformationBoxHeight();
+	StartY -= MovementInfoHeight;
 
 	if(g_Config.m_ClShowhudScore)
 	{
@@ -1700,27 +1722,133 @@ inline int CHud::GetDigitsIndex(int Value, int Max)
 	return DigitsIndex;
 }
 
-inline float CHud::GetMovementInformationBoxHeight()
+bool CHud::GetMovementInformationState(SMovementInformationState &State, bool ForcePreview) const
 {
-	const int ClientId = GameClient()->m_Snap.m_SpecInfo.m_Active ? GameClient()->m_Snap.m_SpecInfo.m_SpectatorId : GameClient()->m_Snap.m_LocalClientId;
-	const bool HasValidClientId = ClientId >= 0 && ClientId < MAX_CLIENTS;
-	const bool ShowDummyCoordIndicator = g_Config.m_BcShowhudDummyCoordIndicator && HasValidClientId;
+	State = SMovementInformationState{};
+	State.m_ClientId = GameClient()->m_Snap.m_SpecInfo.m_Active ? GameClient()->m_Snap.m_SpecInfo.m_SpectatorId : GameClient()->m_Snap.m_LocalClientId;
+	State.m_HasValidClientId = State.m_ClientId >= 0 && State.m_ClientId < MAX_CLIENTS;
+	State.m_PosOnly = State.m_ClientId == SPEC_FREEVIEW || (State.m_HasValidClientId && GameClient()->m_aClients[State.m_ClientId].m_SpecCharPresent);
+	State.m_ShowDummyCoordIndicator = g_Config.m_BcShowhudDummyCoordIndicator && (State.m_HasValidClientId || ForcePreview);
+	State.m_ShowPosition = g_Config.m_ClShowhudPlayerPosition != 0;
+	State.m_ShowSpeed = !State.m_PosOnly && g_Config.m_ClShowhudPlayerSpeed != 0;
+	State.m_ShowAngle = !State.m_PosOnly && g_Config.m_ClShowhudPlayerAngle != 0;
 
-	if(GameClient()->m_Snap.m_SpecInfo.m_Active && (ClientId == SPEC_FREEVIEW || (HasValidClientId && GameClient()->m_aClients[ClientId].m_SpecCharPresent)))
+	if(!State.m_HasValidClientId && State.m_ClientId != SPEC_FREEVIEW && !ForcePreview)
+		return false;
+
+	if(State.m_HasValidClientId)
+		State.m_Info = GetMovementInformation(State.m_ClientId, g_Config.m_ClDummy);
+	else if(ForcePreview)
 	{
-		float BoxHeight = g_Config.m_ClShowhudPlayerPosition ? 3.0f * MOVEMENT_INFORMATION_LINE_HEIGHT + 2.0f : 0.0f;
-		if(ShowDummyCoordIndicator)
-			BoxHeight += MOVEMENT_INFORMATION_LINE_HEIGHT;
-		return BoxHeight;
+		State.m_Info.m_Pos = vec2(163.03f, 51.53f);
+		State.m_Info.m_Speed = vec2(0.0f, 0.0f);
+		State.m_Info.m_Angle = 17.69f;
 	}
-	float BoxHeight = 3.0f * MOVEMENT_INFORMATION_LINE_HEIGHT * (g_Config.m_ClShowhudPlayerPosition + g_Config.m_ClShowhudPlayerSpeed) + 2.0f * MOVEMENT_INFORMATION_LINE_HEIGHT * g_Config.m_ClShowhudPlayerAngle;
-	if(ShowDummyCoordIndicator)
-		BoxHeight += MOVEMENT_INFORMATION_LINE_HEIGHT;
-	if(g_Config.m_ClShowhudPlayerPosition || g_Config.m_ClShowhudPlayerSpeed || g_Config.m_ClShowhudPlayerAngle)
+	else
 	{
-		BoxHeight += 2.0f;
+		State.m_Info.m_Pos = vec2(0.0f, 0.0f);
+		State.m_Info.m_Speed = vec2(0.0f, 0.0f);
+		State.m_Info.m_Angle = 0.0f;
 	}
+
+	if(Client()->DummyConnected())
+	{
+		int DummyClientId = -1;
+
+		if(GameClient()->m_Snap.m_SpecInfo.m_Active)
+		{
+			const int SpectId = GameClient()->m_Snap.m_SpecInfo.m_SpectatorId;
+
+			if(SpectId == GameClient()->m_aLocalIds[0])
+				DummyClientId = GameClient()->m_aLocalIds[1];
+			else if(SpectId == GameClient()->m_aLocalIds[1])
+				DummyClientId = GameClient()->m_aLocalIds[0];
+			else
+				DummyClientId = GameClient()->m_aLocalIds[1 - (g_Config.m_ClDummy ? 1 : 0)];
+		}
+		else
+		{
+			DummyClientId = GameClient()->m_aLocalIds[1 - (g_Config.m_ClDummy ? 1 : 0)];
+		}
+
+		if(DummyClientId >= 0 && DummyClientId < MAX_CLIENTS &&
+			GameClient()->m_aClients[DummyClientId].m_Active)
+		{
+			State.m_DummyInfo = GetMovementInformation(
+				DummyClientId,
+				DummyClientId == GameClient()->m_aLocalIds[1]);
+			State.m_HasDummyInfo = true;
+		}
+	}
+
+	State.m_ShowDummyPos = State.m_HasDummyInfo && State.m_ShowPosition && g_Config.m_TcShowhudDummyPosition;
+	State.m_ShowDummySpeed = State.m_HasDummyInfo && State.m_ShowSpeed && g_Config.m_TcShowhudDummySpeed;
+	State.m_ShowDummyAngle = State.m_HasDummyInfo && State.m_ShowAngle && g_Config.m_TcShowhudDummyAngle;
+
+	return State.m_ShowPosition || State.m_ShowSpeed || State.m_ShowAngle || State.m_ShowDummyCoordIndicator || ForcePreview;
+}
+
+float CHud::GetMovementInformationBoxHeight(const SMovementInformationState &State, float Scale) const
+{
+	const float LineHeight = MOVEMENT_INFORMATION_LINE_HEIGHT * Scale;
+	float BoxHeight = 0.0f;
+
+	if(State.m_ShowPosition)
+	{
+		BoxHeight += 3.0f * LineHeight;
+		if(State.m_ShowDummyPos)
+			BoxHeight += 2.0f * LineHeight;
+	}
+
+	if(State.m_ShowSpeed)
+	{
+		BoxHeight += 3.0f * LineHeight;
+		if(State.m_ShowDummySpeed)
+			BoxHeight += 2.0f * LineHeight;
+	}
+
+	if(State.m_ShowAngle)
+	{
+		BoxHeight += 2.0f * LineHeight;
+		if(State.m_ShowDummyAngle)
+			BoxHeight += 1.0f * LineHeight;
+	}
+
+	if(State.m_ShowDummyCoordIndicator)
+		BoxHeight += LineHeight;
+
+	if(State.m_ShowPosition || State.m_ShowSpeed || State.m_ShowAngle)
+		BoxHeight += 2.0f * Scale;
+
 	return BoxHeight;
+}
+
+CUIRect CHud::GetMovementInformationRect(bool ForcePreview) const
+{
+	if(!HudLayout::IsEnabled(HudLayout::MODULE_MOVEMENT_INFO))
+		return {0.0f, 0.0f, 0.0f, 0.0f};
+
+	SMovementInformationState State;
+	if(!GetMovementInformationState(State, ForcePreview))
+		return {0.0f, 0.0f, 0.0f, 0.0f};
+
+	const auto Layout = HudLayout::Get(HudLayout::MODULE_MOVEMENT_INFO, m_Width, m_Height);
+	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	const float BoxWidth = 62.0f * Scale;
+	const float BoxHeight = GetMovementInformationBoxHeight(State, Scale);
+	HudLayout::SModuleRect RawRect;
+	if(!HudLayout::HasRuntimeOverride(HudLayout::MODULE_MOVEMENT_INFO))
+	{
+		RawRect = {m_Width - BoxWidth, 285.0f - BoxHeight - 4.0f, BoxWidth, BoxHeight, 5.0f * Scale};
+		if(g_Config.m_ClShowhudScore)
+			RawRect.m_Y -= 56.0f;
+	}
+	else
+	{
+		RawRect = {Layout.m_X, Layout.m_Y, BoxWidth, BoxHeight, 5.0f * Scale};
+	}
+	const auto Rect = HudLayout::ClampRectToScreen(RawRect, m_Width, m_Height);
+	return {Rect.m_X, Rect.m_Y, Rect.m_W, Rect.m_H};
 }
 
 void CHud::UpdateMovementInformationTextContainer(STextContainerIndex &TextContainer, float FontSize, float Value, float &PrevValue)
@@ -1819,93 +1947,41 @@ bool CHud::HasPlayerBelowOnSameX(int ClientId, const CMovementInformation &Info)
 	return false;
 }
 
-void CHud::RenderMovementInformation()
+void CHud::RenderMovementInformation(bool ForcePreview)
 {
-	const int ClientId = GameClient()->m_Snap.m_SpecInfo.m_Active ? GameClient()->m_Snap.m_SpecInfo.m_SpectatorId : GameClient()->m_Snap.m_LocalClientId;
-	const bool HasValidClientId = ClientId >= 0 && ClientId < MAX_CLIENTS;
-	const bool ShowDummyCoordIndicator = g_Config.m_BcShowhudDummyCoordIndicator && HasValidClientId;
-	const bool PosOnly = ClientId == SPEC_FREEVIEW || (HasValidClientId && GameClient()->m_aClients[ClientId].m_SpecCharPresent);
-	if(!HasValidClientId && ClientId != SPEC_FREEVIEW)
+	if(!HudLayout::IsEnabled(HudLayout::MODULE_MOVEMENT_INFO))
 		return;
-	// Draw the information depending on settings: Position, speed and target angle
-	// This display is only to present the available information from the last snapshot, not to interpolate or predict
-	if(!g_Config.m_ClShowhudPlayerPosition && (PosOnly || (!g_Config.m_ClShowhudPlayerSpeed && !g_Config.m_ClShowhudPlayerAngle)) && !ShowDummyCoordIndicator)
-	{
+
+	SMovementInformationState State;
+	if(!GetMovementInformationState(State, ForcePreview))
 		return;
-	}
-	const float LineSpacer = 1.0f; // above and below each entry
-	const float Fontsize = 6.0f;
 
-	float BoxHeight = GetMovementInformationBoxHeight();
-	bool HasDummyInfo = false;
-	CMovementInformation DummyInfo{};
+	const CUIRect Rect = GetMovementInformationRect(ForcePreview);
+	if(Rect.w <= 0.0f || Rect.h <= 0.0f)
+		return;
 
-	if(Client()->DummyConnected())
-	{
-		int DummyClientId = -1;
+	const auto Layout = HudLayout::Get(HudLayout::MODULE_MOVEMENT_INFO, m_Width, m_Height);
+	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	const float LineSpacer = 1.0f * Scale;
+	const float Fontsize = 6.0f * Scale;
+	const float LineHeight = MOVEMENT_INFORMATION_LINE_HEIGHT * Scale;
+	const bool BackgroundEnabled = Layout.m_BackgroundEnabled;
+	const ColorRGBA BackgroundColor = color_cast<ColorRGBA>(ColorHSLA(Layout.m_BackgroundColor, true));
+	const int Corners = HudLayout::BackgroundCorners(IGraphics::CORNER_ALL, Rect.x, Rect.y, Rect.w, Rect.h, m_Width, m_Height);
 
-		if(GameClient()->m_Snap.m_SpecInfo.m_Active)
-		{
-			const int SpectId = GameClient()->m_Snap.m_SpecInfo.m_SpectatorId;
+	if(BackgroundEnabled)
+		Graphics()->DrawRect(Rect.x, Rect.y, Rect.w, Rect.h, BackgroundColor, Corners, 5.0f * Scale);
 
-			if(SpectId == GameClient()->m_aLocalIds[0])
-			{
-				DummyClientId = GameClient()->m_aLocalIds[1];
-			}
-			else if(SpectId == GameClient()->m_aLocalIds[1])
-			{
-				DummyClientId = GameClient()->m_aLocalIds[0];
-			}
-			else
-			{
-				DummyClientId = GameClient()->m_aLocalIds[1 - (g_Config.m_ClDummy ? 1 : 0)];
-			}
-		}
-		else
-		{
-			DummyClientId = GameClient()->m_aLocalIds[1 - (g_Config.m_ClDummy ? 1 : 0)];
-		}
+	const bool HasPlayerBelow = State.m_ShowDummyCoordIndicator &&
+		State.m_ClientId != SPEC_FREEVIEW &&
+		State.m_HasValidClientId &&
+		HasPlayerBelowOnSameX(State.m_ClientId, State.m_Info);
 
-		if(DummyClientId >= 0 && DummyClientId < MAX_CLIENTS &&
-			GameClient()->m_aClients[DummyClientId].m_Active)
-		{
-			DummyInfo = GetMovementInformation(
-				DummyClientId,
-				DummyClientId == GameClient()->m_aLocalIds[1]);
-			HasDummyInfo = true;
-		}
-	}
-
-	const bool ShowDummyPos = HasDummyInfo && g_Config.m_ClShowhudPlayerPosition && g_Config.m_TcShowhudDummyPosition;
-	const bool ShowDummySpeed = HasDummyInfo && !PosOnly && g_Config.m_ClShowhudPlayerSpeed && g_Config.m_TcShowhudDummySpeed;
-	const bool ShowDummyAngle = HasDummyInfo && !PosOnly && g_Config.m_ClShowhudPlayerAngle && g_Config.m_TcShowhudDummyAngle;
-
-	if(ShowDummyPos)
-		BoxHeight += 2.0f * MOVEMENT_INFORMATION_LINE_HEIGHT;
-	if(ShowDummySpeed)
-		BoxHeight += 2.0f * MOVEMENT_INFORMATION_LINE_HEIGHT;
-	if(ShowDummyAngle)
-		BoxHeight += 1.0f * MOVEMENT_INFORMATION_LINE_HEIGHT;
-
-	const float BoxWidth = 62.0f;
-
-	float StartX = m_Width - BoxWidth;
-	float StartY = 285.0f - BoxHeight - 4.0f; // 4 units distance to the next display;
-	if(g_Config.m_ClShowhudScore)
-	{
-		StartY -= 56.0f;
-	}
-
-	Graphics()->DrawRect(StartX, StartY, BoxWidth, BoxHeight, ColorRGBA(0.0f, 0.0f, 0.0f, 0.4f), IGraphics::CORNER_L, 5.0f);
-
-	const CMovementInformation Info = GetMovementInformation(ClientId, g_Config.m_ClDummy);
-	const bool HasPlayerBelow = ShowDummyCoordIndicator && ClientId != SPEC_FREEVIEW && HasPlayerBelowOnSameX(ClientId, Info);
-
-	float y = StartY + LineSpacer * 2.0f;
-	const float LeftX = StartX + 2.0f;
-	const float RightX = m_Width - 2.0f;
+	float y = Rect.y + LineSpacer * 2.0f;
+	const float LeftX = Rect.x + 2.0f * Scale;
+	const float RightX = Rect.x + Rect.w - 2.0f * Scale;
 	auto RenderPlayerBelowIndicator = [&]() {
-		if(!ShowDummyCoordIndicator)
+		if(!State.m_ShowDummyCoordIndicator)
 			return;
 
 		const ColorRGBA IndicatorNormalColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_BcShowhudDummyCoordIndicatorColor));
@@ -1914,73 +1990,73 @@ void CHud::RenderMovementInformation()
 
 		TextRender()->Text(LeftX, y, Fontsize, Localize("Player below"), -1.0f);
 
-		const float CircleX = RightX - 3.0f;
-		const float CircleY = y + 3.0f;
+		const float CircleX = RightX - 3.0f * Scale;
+		const float CircleY = y + 3.0f * Scale;
 		const float GlowAlpha = IndicatorColor.a * 0.35f;
 
 		Graphics()->TextureClear();
 		Graphics()->QuadsBegin();
 		Graphics()->SetColor(IndicatorColor.r, IndicatorColor.g, IndicatorColor.b, GlowAlpha);
-		Graphics()->DrawCircle(CircleX, CircleY, 3.0f, 16);
+		Graphics()->DrawCircle(CircleX, CircleY, 3.0f * Scale, 16);
 		Graphics()->SetColor(IndicatorColor.r, IndicatorColor.g, IndicatorColor.b, IndicatorColor.a);
-		Graphics()->DrawCircle(CircleX, CircleY, 1.8f, 16);
+		Graphics()->DrawCircle(CircleX, CircleY, 1.8f * Scale, 16);
 		Graphics()->QuadsEnd();
 		Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
 	};
 
-	if(g_Config.m_ClShowhudPlayerPosition)
+	if(State.m_ShowPosition)
 	{
 		TextRender()->Text(LeftX, y, Fontsize, Localize("Position:"), -1.0f);
-		y += MOVEMENT_INFORMATION_LINE_HEIGHT;
+		y += LineHeight;
 
 		TextRender()->Text(LeftX, y, Fontsize, "X:", -1.0f);
-		UpdateMovementInformationTextContainer(m_aPlayerPositionContainers[0], Fontsize, Info.m_Pos.x, m_aPlayerPrevPosition[0]);
+		UpdateMovementInformationTextContainer(m_aPlayerPositionContainers[0], Fontsize, State.m_Info.m_Pos.x, m_aPlayerPrevPosition[0]);
 
 		ColorRGBA TextColor = TextRender()->DefaultTextColor();
-		if(ShowDummyPos && fabsf(Info.m_Pos.x - DummyInfo.m_Pos.x) < 0.01f)
+		if(State.m_ShowDummyPos && fabsf(State.m_Info.m_Pos.x - State.m_DummyInfo.m_Pos.x) < 0.01f)
 			TextColor = ColorRGBA(0.2f, 1.0f, 0.2f, 1.0f);
 
 		RenderMovementInformationTextContainer(m_aPlayerPositionContainers[0], TextColor, RightX, y);
-		y += MOVEMENT_INFORMATION_LINE_HEIGHT;
+		y += LineHeight;
 
 		TextRender()->Text(LeftX, y, Fontsize, "Y:", -1.0f);
-		UpdateMovementInformationTextContainer(m_aPlayerPositionContainers[1], Fontsize, Info.m_Pos.y, m_aPlayerPrevPosition[1]);
+		UpdateMovementInformationTextContainer(m_aPlayerPositionContainers[1], Fontsize, State.m_Info.m_Pos.y, m_aPlayerPrevPosition[1]);
 		RenderMovementInformationTextContainer(m_aPlayerPositionContainers[1], TextRender()->DefaultTextColor(), RightX, y);
-		y += MOVEMENT_INFORMATION_LINE_HEIGHT;
+		y += LineHeight;
 
-		if(ShowDummyPos)
+		if(State.m_ShowDummyPos)
 		{
 			char aBuf[32];
 
 			TextRender()->Text(LeftX, y, Fontsize, "DX:", -1.0f);
-			str_format(aBuf, sizeof(aBuf), "%.2f", DummyInfo.m_Pos.x);
+			str_format(aBuf, sizeof(aBuf), "%.2f", State.m_DummyInfo.m_Pos.x);
 
 			ColorRGBA DummyTextColor = TextRender()->DefaultTextColor();
-			if(fabsf(Info.m_Pos.x - DummyInfo.m_Pos.x) < 0.01f)
+			if(fabsf(State.m_Info.m_Pos.x - State.m_DummyInfo.m_Pos.x) < 0.01f)
 				DummyTextColor = ColorRGBA(0.2f, 1.0f, 0.2f, 1.0f);
 
 			TextRender()->TextColor(DummyTextColor);
 			TextRender()->Text(RightX - TextRender()->TextWidth(Fontsize, aBuf), y, Fontsize, aBuf, -1.0f);
 			TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
-			y += MOVEMENT_INFORMATION_LINE_HEIGHT;
+			y += LineHeight;
 
 			TextRender()->Text(LeftX, y, Fontsize, "DY:", -1.0f);
-			str_format(aBuf, sizeof(aBuf), "%.2f", DummyInfo.m_Pos.y);
+			str_format(aBuf, sizeof(aBuf), "%.2f", State.m_DummyInfo.m_Pos.y);
 			TextRender()->Text(RightX - TextRender()->TextWidth(Fontsize, aBuf), y, Fontsize, aBuf, -1.0f);
-			y += MOVEMENT_INFORMATION_LINE_HEIGHT;
+			y += LineHeight;
 		}
 	}
 
-	if(PosOnly)
+	if(State.m_PosOnly)
 	{
 		RenderPlayerBelowIndicator();
 		return;
 	}
 
-	if(g_Config.m_ClShowhudPlayerSpeed)
+	if(State.m_ShowSpeed)
 	{
 		TextRender()->Text(LeftX, y, Fontsize, Localize("Speed:"), -1.0f);
-		y += MOVEMENT_INFORMATION_LINE_HEIGHT;
+		y += LineHeight;
 
 		const char aaCoordinates[][4] = {"X:", "Y:"};
 		for(int i = 0; i < 2; i++)
@@ -1991,44 +2067,44 @@ void CHud::RenderMovementInformation()
 			if(m_aLastPlayerSpeedChange[i] == ESpeedChange::DECREASE)
 				Color = ColorRGBA(1.0f, 0.5f, 0.5f, 1.0f);
 			TextRender()->Text(LeftX, y, Fontsize, aaCoordinates[i], -1.0f);
-			UpdateMovementInformationTextContainer(m_aPlayerSpeedTextContainers[i], Fontsize, i == 0 ? Info.m_Speed.x : Info.m_Speed.y, m_aPlayerPrevSpeed[i]);
+			UpdateMovementInformationTextContainer(m_aPlayerSpeedTextContainers[i], Fontsize, i == 0 ? State.m_Info.m_Speed.x : State.m_Info.m_Speed.y, m_aPlayerPrevSpeed[i]);
 			RenderMovementInformationTextContainer(m_aPlayerSpeedTextContainers[i], Color, RightX, y);
-			y += MOVEMENT_INFORMATION_LINE_HEIGHT;
+			y += LineHeight;
 		}
 
-		if(ShowDummySpeed)
+		if(State.m_ShowDummySpeed)
 		{
 			char aBuf[32];
 
 			TextRender()->Text(LeftX, y, Fontsize, "DX:", -1.0f);
-			str_format(aBuf, sizeof(aBuf), "%.2f", DummyInfo.m_Speed.x);
+			str_format(aBuf, sizeof(aBuf), "%.2f", State.m_DummyInfo.m_Speed.x);
 			TextRender()->Text(RightX - TextRender()->TextWidth(Fontsize, aBuf), y, Fontsize, aBuf, -1.0f);
-			y += MOVEMENT_INFORMATION_LINE_HEIGHT;
+			y += LineHeight;
 
 			TextRender()->Text(LeftX, y, Fontsize, "DY:", -1.0f);
-			str_format(aBuf, sizeof(aBuf), "%.2f", DummyInfo.m_Speed.y);
+			str_format(aBuf, sizeof(aBuf), "%.2f", State.m_DummyInfo.m_Speed.y);
 			TextRender()->Text(RightX - TextRender()->TextWidth(Fontsize, aBuf), y, Fontsize, aBuf, -1.0f);
-			y += MOVEMENT_INFORMATION_LINE_HEIGHT;
+			y += LineHeight;
 		}
 
 		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
 	}
 
-	if(g_Config.m_ClShowhudPlayerAngle)
+	if(State.m_ShowAngle)
 	{
 		TextRender()->Text(LeftX, y, Fontsize, Localize("Angle:"), -1.0f);
-		y += MOVEMENT_INFORMATION_LINE_HEIGHT;
+		y += LineHeight;
 
-		UpdateMovementInformationTextContainer(m_PlayerAngleTextContainerIndex, Fontsize, Info.m_Angle, m_PlayerPrevAngle);
+		UpdateMovementInformationTextContainer(m_PlayerAngleTextContainerIndex, Fontsize, State.m_Info.m_Angle, m_PlayerPrevAngle);
 		RenderMovementInformationTextContainer(m_PlayerAngleTextContainerIndex, TextRender()->DefaultTextColor(), RightX, y);
-		y += MOVEMENT_INFORMATION_LINE_HEIGHT;
+		y += LineHeight;
 
-		if(ShowDummyAngle)
+		if(State.m_ShowDummyAngle)
 		{
 			char aBuf[32];
 
 			TextRender()->Text(LeftX, y, Fontsize, "DA:", -1.0f);
-			str_format(aBuf, sizeof(aBuf), "%.2f", DummyInfo.m_Angle);
+			str_format(aBuf, sizeof(aBuf), "%.2f", State.m_DummyInfo.m_Angle);
 			TextRender()->Text(RightX - TextRender()->TextWidth(Fontsize, aBuf), y, Fontsize, aBuf, -1.0f);
 		}
 	}
@@ -2288,6 +2364,16 @@ void CHud::RenderLocalTime(bool ForcePreview)
 CUIRect CHud::GetLocalTimeHudEditorRect() const
 {
 	return GetLocalTimeRect(true);
+}
+
+CUIRect CHud::GetMovementInformationHudEditorRect() const
+{
+	return GetMovementInformationRect(true);
+}
+
+void CHud::RenderMovementInformationPreview()
+{
+	RenderMovementInformation(true);
 }
 
 void CHud::RenderLocalTimePreview()

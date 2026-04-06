@@ -50,7 +50,7 @@ void EnsureRuntimeLayouts()
 	gs_RuntimeLayoutsInitialized = true;
 }
 
-bool HasRuntimeOverride(EModule Module)
+bool HasRuntimeOverrideInternal(EModule Module)
 {
 	EnsureRuntimeLayouts();
 	const SModuleLayout &Runtime = gs_aRuntimeModuleLayouts[Module];
@@ -151,7 +151,7 @@ bool IsLegacyModule(EModule Module)
 SModuleLayout ResolveBaseLayout(EModule Module, float HudWidth, float HudHeight)
 {
 	SModuleLayout Layout = gs_aModuleLayouts[Module];
-	if(IsLegacyModule(Module) && !HasRuntimeOverride(Module))
+	if(IsLegacyModule(Module) && !HasRuntimeOverrideInternal(Module))
 	{
 		switch(Module)
 		{
@@ -261,6 +261,11 @@ SModuleLayout Get(EModule Module, float HudWidth, float HudHeight)
 		Layout.m_Scale = round_to_int(Layout.m_Scale * UserScale);
 	}
 	return Layout;
+}
+
+bool HasRuntimeOverride(EModule Module)
+{
+	return Module >= 0 && Module < MODULE_COUNT && HasRuntimeOverrideInternal(Module);
 }
 
 bool IsEditableModule(EModule Module)
