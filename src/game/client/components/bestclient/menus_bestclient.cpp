@@ -1914,12 +1914,17 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
 
 			const bool HookPredictorEnabled = g_Config.m_BcHookTrajectoryPredictor != 0;
-			float HookPredictorContentHeight = LineSize + MarginSmall + LineSize;
+			float HookPredictorContentHeight = LineSize + MarginSmall + LineSize + MarginSmall + LineSize;
 			if(HookPredictorEnabled)
 				HookPredictorContentHeight += MarginSmall + LineSize + MarginSmall + LineSize;
 			BeginBlock(Column, HookPredictorContentHeight, Content);
 			Content.HSplitTop(LineSize, &Label, &Content);
 			Ui()->DoLabel(&Label, BCLocalize("Hook Predictor"), HeadlineFontSize, TEXTALIGN_ML);
+			Content.HSplitTop(MarginSmall, nullptr, &Content);
+			Content.HSplitTop(LineSize, &Label, &Content);
+			TextRender()->TextColor(1.0f, 0.4f, 0.4f, 1.0f);
+			Ui()->DoLabel(&Label, BCLocalize("Experimental, only for KoG"), FontSize, TEXTALIGN_ML);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
 			Content.HSplitTop(MarginSmall, nullptr, &Content);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcHookTrajectoryPredictor, BCLocalize("Enable"), &g_Config.m_BcHookTrajectoryPredictor, &Content, LineSize);
 			if(g_Config.m_BcHookTrajectoryPredictor)
