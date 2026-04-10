@@ -2732,6 +2732,8 @@ if(CLIENT)
     components/bestclient/orbit_aura.h
     components/bestclient/r_jelly.cpp
     components/bestclient/r_jelly.h
+    components/bestclient/r_trail.cpp
+    components/bestclient/r_trail.h
     components/bestclient/voice/protocol.h
     components/bestclient/voice/voice.cpp
     components/bestclient/voice/voice.h

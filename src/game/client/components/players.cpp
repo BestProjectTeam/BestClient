@@ -22,6 +22,7 @@
 #include <game/client/components/skins.h>
 #include <game/client/components/sounds.h>
 #include <game/client/components/bestclient/r_jelly.h>
+#include <game/client/components/bestclient/r_trail.h>
 #include <game/client/gameclient.h>
 #include <game/collision.h>
 #include <game/gamecore.h>
@@ -1092,6 +1093,8 @@ void CPlayers::RenderPlayer(
 	float TeeAnimScale, TeeBaseSize;
 	CRenderTools::GetRenderTeeAnimScaleAndBaseSize(&RenderInfo, TeeAnimScale, TeeBaseSize);
 	vec2 BodyPos = Position + vec2(State.GetBody()->m_X, State.GetBody()->m_Y) * TeeAnimScale;
+	if(rTrail)
+		rTrail->RenderPlayerTrail(ClientId, Position, BodyPos, Vel, Alpha, Client()->RenderFrameTime());
 	if(RenderInfo.m_TeeRenderFlags & TEE_EFFECT_FROZEN)
 	{
 		GameClient()->m_Effects.FreezingFlakes(BodyPos, vec2(32, 32), Alpha);
