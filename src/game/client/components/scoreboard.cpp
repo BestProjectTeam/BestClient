@@ -827,16 +827,6 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 			if(DDTeam != TEAM_FLOCK)
 			{
 				const ColorRGBA TeamColor = GameClient()->GetDDTeamColor(DDTeam);
-				const ColorRGBA LeftColor(
-					std::clamp(TeamColor.r * 0.32f, 0.0f, 1.0f),
-					std::clamp(TeamColor.g * 0.32f, 0.0f, 1.0f),
-					std::clamp(TeamColor.b * 0.32f, 0.0f, 1.0f),
-					0.90f);
-				const ColorRGBA RightColor(
-					std::clamp(TeamColor.r * 0.75f + 0.22f, 0.0f, 1.0f),
-					std::clamp(TeamColor.g * 0.75f + 0.22f, 0.0f, 1.0f),
-					std::clamp(TeamColor.b * 0.75f + 0.22f, 0.0f, 1.0f),
-					0.90f);
 				int TeamRectCorners = 0;
 				if(PrevDDTeam != DDTeam)
 				{
@@ -846,7 +836,25 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 				}
 				if(NextDDTeam != DDTeam)
 					TeamRectCorners |= IGraphics::CORNER_B;
-				RowAndSpacing.Draw4(LeftColor, RightColor, LeftColor, RightColor, TeamRectCorners, RoundRadius);
+
+				if(g_Config.m_BcScoreboardTeamGradients)
+				{
+					const ColorRGBA LeftColor(
+						std::clamp(TeamColor.r * 0.32f, 0.0f, 1.0f),
+						std::clamp(TeamColor.g * 0.32f, 0.0f, 1.0f),
+						std::clamp(TeamColor.b * 0.32f, 0.0f, 1.0f),
+						0.90f);
+					const ColorRGBA RightColor(
+						std::clamp(TeamColor.r * 0.75f + 0.22f, 0.0f, 1.0f),
+						std::clamp(TeamColor.g * 0.75f + 0.22f, 0.0f, 1.0f),
+						std::clamp(TeamColor.b * 0.75f + 0.22f, 0.0f, 1.0f),
+						0.90f);
+					RowAndSpacing.Draw4(LeftColor, RightColor, LeftColor, RightColor, TeamRectCorners, RoundRadius);
+				}
+				else
+				{
+					RowAndSpacing.Draw(TeamColor.WithAlpha(0.5f), TeamRectCorners, RoundRadius);
+				}
 
 				CurrentDDTeamSize++;
 
@@ -1227,12 +1235,20 @@ void CScoreboard::OnRender()
 		RedScoreboard.HSplitTop(TitleHeight, &RedTitle, &RedScoreboard);
 		BlueScoreboard.HSplitTop(TitleHeight, &BlueTitle, &BlueScoreboard);
 
-		const ColorRGBA RedTitleLeft(0.34f, 0.03f, 0.03f, 0.92f);
-		const ColorRGBA RedTitleRight(1.00f, 0.34f, 0.34f, 0.92f);
-		const ColorRGBA BlueTitleLeft(0.04f, 0.14f, 0.40f, 0.92f);
-		const ColorRGBA BlueTitleRight(0.34f, 0.66f, 1.00f, 0.92f);
-		RedTitle.Draw4(RedTitleLeft, RedTitleRight, RedTitleLeft, RedTitleRight, IGraphics::CORNER_T, 7.5f);
-		BlueTitle.Draw4(BlueTitleLeft, BlueTitleRight, BlueTitleLeft, BlueTitleRight, IGraphics::CORNER_T, 7.5f);
+		if(g_Config.m_BcScoreboardTeamGradients)
+		{
+			const ColorRGBA RedTitleLeft(0.34f, 0.03f, 0.03f, 0.92f);
+			const ColorRGBA RedTitleRight(1.00f, 0.34f, 0.34f, 0.92f);
+			const ColorRGBA BlueTitleLeft(0.04f, 0.14f, 0.40f, 0.92f);
+			const ColorRGBA BlueTitleRight(0.34f, 0.66f, 1.00f, 0.92f);
+			RedTitle.Draw4(RedTitleLeft, RedTitleRight, RedTitleLeft, RedTitleRight, IGraphics::CORNER_T, 7.5f);
+			BlueTitle.Draw4(BlueTitleLeft, BlueTitleRight, BlueTitleLeft, BlueTitleRight, IGraphics::CORNER_T, 7.5f);
+		}
+		else
+		{
+			RedTitle.Draw(ColorRGBA(0.975f, 0.17f, 0.17f, 0.5f), IGraphics::CORNER_T, 7.5f);
+			BlueTitle.Draw(ColorRGBA(0.17f, 0.46f, 0.975f, 0.5f), IGraphics::CORNER_T, 7.5f);
+		}
 		RedScoreboard.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.5f), IGraphics::CORNER_B, 7.5f);
 		BlueScoreboard.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.5f), IGraphics::CORNER_B, 7.5f);
 
