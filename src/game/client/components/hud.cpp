@@ -2698,7 +2698,7 @@ CUIRect CHud::GetFinishPredictionRect(bool ForcePreview) const
 	char aSampleTopLine[64];
 	char aProgress[32];
 	str_format(aSampleTopLine, sizeof(aSampleTopLine), "%s %s", Localize("Finish"), ShowMillis ? "00:00:00.00" : "00:00:00");
-	str_format(aProgress, sizeof(aProgress), "100.0%%");
+	str_copy(aProgress, "100.0%", sizeof(aProgress));
 
 	const float TopWidth = ShowTime ? TextRender()->TextWidth(TitleFontSize, aSampleTopLine, -1, -1.0f) : 0.0f;
 	const float ProgressWidth = ShowPercentage ? TextRender()->TextWidth(ProgressFontSize, aProgress, -1, -1.0f) : 0.0f;
