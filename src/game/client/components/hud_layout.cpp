@@ -34,7 +34,7 @@ static const SModuleLayout gs_aModuleLayouts[MODULE_COUNT] = {
 	{0.0f, 60.0f, 100, 0, true, true, 0x66000000U},
 	{250.0f, 200.0f, 65, 0, true, true, 0x66000000U},
 	{490.0f, 5.0f, 100, 0, true, false, 0x66000000U},
-	{0.0f, 221.0f, 100, 0, true, true, 0x66000000U},
+	{0.0f, 156.0f, 100, 0, true, true, 0x66000000U},
 };
 
 static SModuleLayout gs_aRuntimeModuleLayouts[MODULE_COUNT];

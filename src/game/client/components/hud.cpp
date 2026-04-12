@@ -346,6 +346,8 @@ bool CHud::GetFinishPredictionState(SFinishPredictionState &State, bool ForcePre
 
 	if(GameClient()->LastRaceTick() < 0)
 	{
+		if(g_Config.m_BcFinishPredictionShowAlways == 0)
+			return false;
 		const_cast<CHud *>(this)->m_FinishPredictionRaceStartTick = -1;
 		const_cast<CHud *>(this)->m_FinishPredictionRaceStartDistance = -1.0f;
 		State.m_Valid = true;

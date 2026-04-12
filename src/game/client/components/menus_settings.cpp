@@ -5714,7 +5714,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			static float s_FinishPredictionPhase = 0.0f;
 			const bool FinishPredictionExpanded = g_Config.m_BcFinishPrediction != 0;
 			UpdateRevealPhase(s_FinishPredictionPhase, FinishPredictionExpanded);
-			const float ExpandedTargetHeight = LineSize * 4.0f + MarginSmall * 5.0f;
+			const float ExpandedTargetHeight = LineSize * 4.0f + MarginSmall * 4.0f;
 			const float ExpandedHeight = ExpandedTargetHeight * s_FinishPredictionPhase;
 			const float ContentHeight = LineSize + MarginSmall + LineSize + ExpandedHeight;
 			CUIRect Content, Label, Button, Visible;
@@ -5752,13 +5752,9 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				}
 
 				Expand.HSplitTop(MarginSmall, nullptr, &Expand);
+				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcFinishPredictionShowAlways, Localize("Show always"), &g_Config.m_BcFinishPredictionShowAlways, &Expand, LineSize);
 				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcFinishPredictionShowPercentage, Localize("Show percentage"), &g_Config.m_BcFinishPredictionShowPercentage, &Expand, LineSize);
 				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcFinishPredictionShowMillis, Localize("Show milliseconds"), &g_Config.m_BcFinishPredictionShowMillis, &Expand, LineSize);
-				Expand.HSplitTop(MarginSmall, nullptr, &Expand);
-				Expand.HSplitTop(LineSize * 2.0f, &Label, &Expand);
-				TextRender()->TextColor(0.8f, 0.85f, 0.9f, 1.0f);
-				Ui()->DoLabel(&Label, Localize("Uses finish path, server best and current finished players on the server."), FontSize * 0.9f, TEXTALIGN_ML);
-				TextRender()->TextColor(TextRender()->DefaultTextColor());
 			}
 		}
 
