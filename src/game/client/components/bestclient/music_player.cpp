@@ -18,6 +18,8 @@
 #include <engine/storage.h>
 #include <engine/textrender.h>
 
+#include <generated/client_data.h>
+
 #include <game/client/components/chat.h>
 #include <game/client/components/hud_layout.h>
 #include <game/client/components/scoreboard.h>
@@ -1854,25 +1856,29 @@ static void DrawRoundedTexture(IGraphics *pGraphics, IGraphics::CTextureHandle T
 	pGraphics->TextureClear();
 }
 
-static void DrawRoundedFallbackArt(IGraphics *pGraphics, const CUIRect &Rect, const SMusicPlayerPalette &Palette, float HoverT, float Scale, float Rounding)
+static void DrawRoundedFallbackArt(IGraphics *pGraphics, IGraphics::CTextureHandle LogoTexture, const CUIRect &Rect, const SMusicPlayerPalette &Palette, float HoverT, float Scale, float Rounding)
 {
 	if(pGraphics == nullptr || Rect.w <= 0.0f || Rect.h <= 0.0f)
 		return;
 
-	const float Radius = minimum(minimum(Rounding, minimum(Rect.w, Rect.h) * 0.5f), 64.0f);
-	const ColorRGBA Base = WithAlpha(MixColor(Palette.m_Mid, Palette.m_Dark, 0.34f), 1.0f);
-	const ColorRGBA Inner = WithAlpha(MixColor(Palette.m_Light, Palette.m_Mid, 0.78f), 0.92f);
-	const ColorRGBA Highlight = WithAlpha(MixColor(Palette.m_Light, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), 0.45f), 0.20f + 0.10f * HoverT);
+	if(LogoTexture.IsValid() && !LogoTexture.IsNullTexture())
+	{
+		const float LogoSize = minimum(Rect.w, Rect.h) * 0.96f;
+		const CUIRect LogoRect = {
+			Rect.x + (Rect.w - LogoSize) * 0.5f,
+			Rect.y + (Rect.h - LogoSize) * 0.5f,
+			LogoSize,
+			LogoSize};
 
-	pGraphics->DrawRect(Rect.x, Rect.y, Rect.w, Rect.h, Base, IGraphics::CORNER_ALL, Radius);
-	pGraphics->DrawRect(Rect.x + 1.5f * Scale, Rect.y + 1.5f * Scale, maximum(0.0f, Rect.w - 3.0f * Scale), maximum(0.0f, Rect.h - 3.0f * Scale), Inner, IGraphics::CORNER_ALL, maximum(0.0f, Radius - 1.5f * Scale));
-
-	CUIRect HighlightRect = Rect;
-	HighlightRect.x += Rect.w * 0.18f;
-	HighlightRect.y += Rect.h * 0.16f;
-	HighlightRect.w *= 0.42f;
-	HighlightRect.h *= 0.26f;
-	pGraphics->DrawRect(HighlightRect.x, HighlightRect.y, HighlightRect.w, HighlightRect.h, Highlight, IGraphics::CORNER_ALL, minimum(HighlightRect.w, HighlightRect.h) * 0.5f);
+		pGraphics->TextureSet(LogoTexture);
+		pGraphics->QuadsBegin();
+		pGraphics->SetColor(1.0f, 1.0f, 1.0f, 0.96f + 0.04f * HoverT);
+		pGraphics->QuadsSetSubset(0.0f, 0.0f, 1.0f, 1.0f);
+		const IGraphics::CQuadItem QuadItem(LogoRect.x, LogoRect.y, LogoRect.w, LogoRect.h);
+		pGraphics->QuadsDrawTL(&QuadItem, 1);
+		pGraphics->QuadsEnd();
+		pGraphics->TextureClear();
+	}
 }
 } // namespace
 
@@ -2962,16 +2968,15 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	CUIRect CenteredTextArea = {TextCenterX - TextHalfW, TextArea.y, TextHalfW * 2.0f, TextArea.h};
 
 	const float ArtRounding = minimum(2.4f * Scale, ArtRect.w * 0.22f);
-	Graphics()->DrawRect(ArtRect.x, ArtRect.y, ArtRect.w, ArtRect.h, WithAlpha(MixColor(Palette.m_Mid, Palette.m_Dark, 0.42f), 0.38f + 0.08f * HoverT), IGraphics::CORNER_ALL, ArtRounding);
-
 	IGraphics::CTextureHandle ArtTexture;
 	if(!m_pImpl->m_vArtFrames.empty() && MediaDecoder::GetCurrentFrameTexture(m_pImpl->m_vArtFrames, m_pImpl->m_ArtAnimated, m_pImpl->m_ArtAnimationStart, ArtTexture) && ArtTexture.IsValid())
 	{
+		Graphics()->DrawRect(ArtRect.x, ArtRect.y, ArtRect.w, ArtRect.h, WithAlpha(MixColor(Palette.m_Mid, Palette.m_Dark, 0.42f), 0.38f + 0.08f * HoverT), IGraphics::CORNER_ALL, ArtRounding);
 		DrawRoundedTexture(Graphics(), ArtTexture, ArtRect, ArtRounding, m_pImpl->m_ArtWidth, m_pImpl->m_ArtHeight, MusicArtCropProfile(Snapshot.m_ServiceId));
 	}
 	else
 	{
-		DrawRoundedFallbackArt(Graphics(), ArtRect, Palette, HoverT, Scale, ArtRounding);
+		DrawRoundedFallbackArt(Graphics(), g_pData->m_aImages[IMAGE_BCICON].m_Id, ArtRect, Palette, HoverT, Scale, ArtRounding);
 	}
 
 	const CUIRect UiViewRect = HudToUiRect(View, UiScreen, Width, Height);
