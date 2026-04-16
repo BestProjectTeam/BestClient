@@ -15,7 +15,10 @@ constexpr int CHAT_BUBBLES_MAX_LINE_LENGTH = 256;
 struct CBubbles
 {
 	char m_aText[CHAT_BUBBLES_MAX_LINE_LENGTH] = "";
+	char m_aRenderText[CHAT_BUBBLES_MAX_LINE_LENGTH] = "";
 	int64_t m_Time = 0;
+	int m_SourceClientId = -1;
+	int m_Team = 0;
 
 	STextContainerIndex m_TextContainerIndex;
 	CTextCursor m_Cursor;
@@ -26,11 +29,14 @@ struct CBubbles
 	float m_TextHeight = 0.0f;
 	ColorRGBA m_TextColor = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
 
-	CBubbles(const char *pText, CTextCursor pCursor, int64_t pTime)
+	CBubbles(const char *pText, CTextCursor pCursor, int64_t pTime, int SourceClientId, int Team)
 	{
 		str_copy(m_aText, pText, sizeof(m_aText));
+		m_aRenderText[0] = '\0';
 		m_Cursor = pCursor;
 		m_Time = pTime;
+		m_SourceClientId = SourceClientId;
+		m_Team = Team;
 		m_OffsetY = 0.0f;
 		m_TargetOffsetY = 0.0f;
 	}
@@ -58,7 +64,7 @@ class CChatBubbles : public CComponent
 	float GetOffset(int ClientId);
 	float GetAlpha(int64_t Time);
 
-	void UpdateBubbleOffsets(int ClientId, float inputBubbleHeight = 0.0f);
+	void UpdateBubbleOffsets(int ClientId, float InputBubbleHeight = 0.0f);
 
 	void AddBubble(int ClientId, int Team, const char *pText);
 	void RemoveBubble(int ClientId, CBubbles Bubble);
@@ -69,10 +75,14 @@ class CChatBubbles : public CComponent
 	int m_UseChatBubbles = 0;
 	float m_InputTextWidth = 0.0f;
 	float m_InputTextHeight = 0.0f;
+	float m_InputBubbleHeight = 0.0f;
 
 	void Reset();
 	bool HasVisibleBubbles() const;
-	void RefreshBubbleTextContainer(CBubbles &Bubble, int FontSize);
+	CChat::CLine *FindChatLine(CBubbles &Bubble) const;
+	std::string GetBubbleDisplayText(const CBubbles &Bubble, const CChat::CLine *pChatLine) const;
+	void RefreshBubbleTextContainer(CBubbles &Bubble, int FontSize, const char *pText);
+	void GetBubbleMediaSize(const CChat::CLine *pChatLine, int FontSize, float &PreviewWidth, float &PreviewHeight) const;
 
 public:
 	CChatBubbles();

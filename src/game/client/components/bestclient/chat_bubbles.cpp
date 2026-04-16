@@ -12,6 +12,13 @@
 
 #include <algorithm>
 
+namespace
+{
+constexpr float CHAT_BUBBLE_MEDIA_MAX_PREVIEW_HEIGHT = 70.0f;
+constexpr float CHAT_BUBBLE_MEDIA_PREVIEW_SIZE_SCALE = 0.9f;
+constexpr float CHAT_BUBBLE_MEDIA_MIN_PREVIEW_SIDE = 28.0f;
+}
+
 #include "chat_bubbles.h"
 
 CChat *CChatBubbles::Chat() const
@@ -42,9 +49,13 @@ bool CChatBubbles::HasVisibleBubbles() const
 	return false;
 }
 
-void CChatBubbles::RefreshBubbleTextContainer(CBubbles &Bubble, int FontSize)
+void CChatBubbles::RefreshBubbleTextContainer(CBubbles &Bubble, int FontSize, const char *pText)
 {
-	if(Bubble.m_TextContainerIndex.Valid() && Bubble.m_Cursor.m_FontSize == FontSize && (Bubble.m_TextWidth > 0.0f || Bubble.m_TextHeight > 0.0f))
+	if(!pText)
+		pText = "";
+
+	if(Bubble.m_TextContainerIndex.Valid() && Bubble.m_Cursor.m_FontSize == FontSize &&
+		str_comp(Bubble.m_aRenderText, pText) == 0 && (Bubble.m_TextWidth > 0.0f || Bubble.m_TextHeight > 0.0f || pText[0] == '\0'))
 		return;
 
 	if(Bubble.m_TextContainerIndex.Valid())
@@ -59,7 +70,9 @@ void CChatBubbles::RefreshBubbleTextContainer(CBubbles &Bubble, int FontSize)
 	Cursor.m_Flags = TEXTFLAG_RENDER;
 	Cursor.m_LineWidth = 500.0f - FontSize * 2.0f;
 	Bubble.m_Cursor.m_FontSize = FontSize;
-	TextRender()->CreateOrAppendTextContainer(Bubble.m_TextContainerIndex, &Cursor, Bubble.m_aText);
+	if(pText[0] != '\0')
+		TextRender()->CreateOrAppendTextContainer(Bubble.m_TextContainerIndex, &Cursor, pText);
+	str_copy(Bubble.m_aRenderText, pText, sizeof(Bubble.m_aRenderText));
 
 	if(Bubble.m_TextContainerIndex.Valid())
 	{
@@ -71,6 +84,89 @@ void CChatBubbles::RefreshBubbleTextContainer(CBubbles &Bubble, int FontSize)
 	{
 		Bubble.m_TextWidth = 0.0f;
 		Bubble.m_TextHeight = 0.0f;
+	}
+}
+
+CChat::CLine *CChatBubbles::FindChatLine(CBubbles &Bubble) const
+{
+	for(int i = 0; i < CChat::MAX_LINES; ++i)
+	{
+		CChat::CLine &Line = Chat()->m_aLines[((Chat()->m_CurrentLine - i) + CChat::MAX_LINES) % CChat::MAX_LINES];
+		if(!Line.m_Initialized)
+			break;
+		if(Line.m_TeamNumber != Bubble.m_Team)
+			continue;
+		if(Line.m_ClientId != Bubble.m_SourceClientId)
+			continue;
+		if(str_comp(Line.m_aText, Bubble.m_aText) != 0)
+			continue;
+		return &Line;
+	}
+
+	return nullptr;
+}
+
+std::string CChatBubbles::GetBubbleDisplayText(const CBubbles &Bubble, const CChat::CLine *pChatLine) const
+{
+	if(pChatLine && Chat()->ShouldDisplayMediaSlot(*pChatLine))
+		return Chat()->BuildVisibleMessageText(*pChatLine, false);
+
+	return Bubble.m_aText;
+}
+
+void CChatBubbles::GetBubbleMediaSize(const CChat::CLine *pChatLine, int FontSize, float &PreviewWidth, float &PreviewHeight) const
+{
+	PreviewWidth = 0.0f;
+	PreviewHeight = 0.0f;
+	if(!pChatLine || !Chat()->ShouldDisplayMediaSlot(*pChatLine))
+		return;
+
+	const float MaxPreviewWidth = minimum(500.0f - FontSize * 2.0f, (float)g_Config.m_BcChatMediaPreviewMaxWidth) * CHAT_BUBBLE_MEDIA_PREVIEW_SIZE_SCALE;
+	const float MaxPreviewHeight = CHAT_BUBBLE_MEDIA_MAX_PREVIEW_HEIGHT * CHAT_BUBBLE_MEDIA_PREVIEW_SIZE_SCALE;
+	if(MaxPreviewWidth <= 0.0f || MaxPreviewHeight <= 0.0f)
+		return;
+
+	if(Chat()->ShouldHideMediaPreview(*pChatLine) ||
+		(pChatLine->m_MediaState == CChat::EMediaState::READY && pChatLine->m_MediaWidth > 0 && pChatLine->m_MediaHeight > 0 && !pChatLine->m_vMediaFrames.empty()))
+	{
+		if(pChatLine->m_MediaState == CChat::EMediaState::READY && pChatLine->m_MediaWidth > 0 && pChatLine->m_MediaHeight > 0 && !pChatLine->m_vMediaFrames.empty())
+		{
+			const float ScaleByWidth = MaxPreviewWidth / (float)pChatLine->m_MediaWidth;
+			const float ScaleByHeight = MaxPreviewHeight / (float)pChatLine->m_MediaHeight;
+			float Scale = minimum(1.0f, minimum(ScaleByWidth, ScaleByHeight));
+			float PreviewW = maximum(1.0f, (float)pChatLine->m_MediaWidth * Scale);
+			float PreviewH = maximum(1.0f, (float)pChatLine->m_MediaHeight * Scale);
+			if(PreviewW < CHAT_BUBBLE_MEDIA_MIN_PREVIEW_SIDE || PreviewH < CHAT_BUBBLE_MEDIA_MIN_PREVIEW_SIDE)
+			{
+				const float UpscaleByW = CHAT_BUBBLE_MEDIA_MIN_PREVIEW_SIDE / PreviewW;
+				const float UpscaleByH = CHAT_BUBBLE_MEDIA_MIN_PREVIEW_SIDE / PreviewH;
+				const float Upscale = maximum(UpscaleByW, UpscaleByH);
+				const float MaxUpscale = minimum(MaxPreviewWidth / PreviewW, MaxPreviewHeight / PreviewH);
+				if(MaxUpscale > 1.0f)
+				{
+					const float UseUpscale = minimum(Upscale, MaxUpscale);
+					PreviewW *= UseUpscale;
+					PreviewH *= UseUpscale;
+				}
+			}
+			PreviewWidth = maximum(1.0f, PreviewW);
+			PreviewHeight = maximum(1.0f, PreviewH);
+		}
+		else
+		{
+			PreviewWidth = MaxPreviewWidth;
+			PreviewHeight = maximum(FontSize * 1.6f, 18.0f) * CHAT_BUBBLE_MEDIA_PREVIEW_SIZE_SCALE;
+		}
+	}
+	else if(pChatLine->m_MediaState == CChat::EMediaState::QUEUED || pChatLine->m_MediaState == CChat::EMediaState::LOADING || pChatLine->m_MediaState == CChat::EMediaState::DECODING)
+	{
+		PreviewWidth = MaxPreviewWidth;
+		PreviewHeight = maximum(FontSize * 1.2f, 12.0f) * CHAT_BUBBLE_MEDIA_PREVIEW_SIZE_SCALE;
+	}
+	else if(pChatLine->m_MediaState == CChat::EMediaState::FAILED)
+	{
+		PreviewWidth = MaxPreviewWidth;
+		PreviewHeight = maximum(FontSize * 2.1f, 18.0f) * CHAT_BUBBLE_MEDIA_PREVIEW_SIZE_SCALE;
 	}
 }
 
@@ -102,18 +198,26 @@ void CChatBubbles::OnMessage(int MsgType, void *pRawMsg)
 	}
 }
 
-void CChatBubbles::UpdateBubbleOffsets(int ClientId, float inputBubbleHeight)
+void CChatBubbles::UpdateBubbleOffsets(int ClientId, float InputBubbleHeight)
 {
 	float Offset = 0.0f;
-	if(inputBubbleHeight > 0.0f)
-		Offset += inputBubbleHeight + MarginBetween;
+	if(InputBubbleHeight > 0.0f)
+		Offset += InputBubbleHeight + MarginBetween;
 
 	int FontSize = g_Config.m_BcChatBubbleSize;
 	for(CBubbles &aBubble : m_ChatBubbles[ClientId])
 	{
-		RefreshBubbleTextContainer(aBubble, FontSize);
+		CChat::CLine *pChatLine = FindChatLine(aBubble);
+		const std::string DisplayText = GetBubbleDisplayText(aBubble, pChatLine);
+		RefreshBubbleTextContainer(aBubble, FontSize, DisplayText.c_str());
+		float PreviewWidth = 0.0f;
+		float PreviewHeight = 0.0f;
+		GetBubbleMediaSize(pChatLine, FontSize, PreviewWidth, PreviewHeight);
+		(void)PreviewWidth;
+		const float MediaGap = aBubble.m_TextHeight > 0.0f && PreviewHeight > 0.0f ? FontSize * 0.4f : 0.0f;
+		const float ContentHeight = aBubble.m_TextHeight + MediaGap + PreviewHeight;
 		aBubble.m_TargetOffsetY = Offset;
-		Offset += aBubble.m_TextHeight + FontSize + MarginBetween;
+		Offset += ContentHeight + FontSize + MarginBetween;
 	}
 }
 
@@ -138,6 +242,11 @@ void CChatBubbles::AddBubble(int ClientId, int Team, const char *pText)
 			return;
 	}
 
+	char aSanitizedText[1024];
+	GameClient()->m_BestClient.SanitizeText(pText, aSanitizedText, sizeof(aSanitizedText));
+	if(aSanitizedText[0] == '\0')
+		return;
+
 	int FontSize = g_Config.m_BcChatBubbleSize;
 	CTextCursor pCursor;
 
@@ -151,7 +260,7 @@ void CChatBubbles::AddBubble(int ClientId, int Team, const char *pText)
 	pCursor.m_Flags = TEXTFLAG_RENDER;
 	pCursor.m_LineWidth = 500.0f - FontSize * 2.0f;
 
-	CBubbles bubble(pText, pCursor, time_get());
+	CBubbles Bubble(aSanitizedText, pCursor, time_get(), ClientId, Team);
 
 	ColorRGBA Color = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
 	if(Team == 1)
@@ -165,11 +274,11 @@ void CChatBubbles::AddBubble(int ClientId, int Team, const char *pText)
 	}
 	else // regular message
 		Color = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageColor));
-	bubble.m_TextColor = Color;
+	Bubble.m_TextColor = Color;
 
-	TextRender()->CreateOrAppendTextContainer(bubble.m_TextContainerIndex, &pCursor, pText);
+	RefreshBubbleTextContainer(Bubble, FontSize, Bubble.m_aText);
 
-	m_ChatBubbles[ClientId].insert(m_ChatBubbles[ClientId].begin(), bubble);
+	m_ChatBubbles[ClientId].insert(m_ChatBubbles[ClientId].begin(), Bubble);
 
 	UpdateBubbleOffsets(ClientId);
 	Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
@@ -177,12 +286,12 @@ void CChatBubbles::AddBubble(int ClientId, int Team, const char *pText)
 
 void CChatBubbles::RemoveBubble(int ClientId, CBubbles aBubble)
 {
-	for(auto it = m_ChatBubbles[ClientId].begin(); it != m_ChatBubbles[ClientId].end(); ++it)
+	for(auto It = m_ChatBubbles[ClientId].begin(); It != m_ChatBubbles[ClientId].end(); ++It)
 	{
-		if(*it == aBubble)
+		if(*It == aBubble)
 		{
-			TextRender()->DeleteTextContainer(it->m_TextContainerIndex);
-			m_ChatBubbles[ClientId].erase(it);
+			TextRender()->DeleteTextContainer(It->m_TextContainerIndex);
+			m_ChatBubbles[ClientId].erase(It);
 			UpdateBubbleOffsets(ClientId);
 			return;
 		}
@@ -202,6 +311,7 @@ void CChatBubbles::RenderCurInput(float y)
 		m_InputFontSize = 0;
 		m_InputTextWidth = 0.0f;
 		m_InputTextHeight = 0.0f;
+		m_InputBubbleHeight = 0.0f;
 		UpdateBubbleOffsets(GameClient()->m_Snap.m_LocalClientId);
 		return;
 	}
@@ -246,19 +356,20 @@ void CChatBubbles::RenderCurInput(float y)
 	if(m_InputTextContainerIndex.Valid())
 	{
 		Position.x -= m_InputTextWidth / 2.0f + g_Config.m_BcChatBubbleSize / 15.0f;
-		float inputBubbleHeight = m_InputTextHeight + FontSize;
+		float InputBubbleHeight = m_InputTextHeight + FontSize;
+		m_InputBubbleHeight = InputBubbleHeight;
 
-		float targetY = y - inputBubbleHeight;
+		float TargetY = y - InputBubbleHeight;
 
-		Graphics()->DrawRect(Position.x - FontSize / 2.0f, targetY - FontSize / 2.0f,
+		Graphics()->DrawRect(Position.x - FontSize / 2.0f, TargetY - FontSize / 2.0f,
 			m_InputTextWidth + FontSize * 1.20f, m_InputTextHeight + FontSize,
 			ColorRGBA(0.0f, 0.0f, 0.0f, 0.15f), IGraphics::CORNER_ALL, g_Config.m_BcChatBubbleSize / 4.5f);
 
-		TextRender()->RenderTextContainer(m_InputTextContainerIndex, ColorRGBA(1.0f, 1.0f, 1.0f, 0.75f), ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f), Position.x, targetY);
+		TextRender()->RenderTextContainer(m_InputTextContainerIndex, ColorRGBA(1.0f, 1.0f, 1.0f, 0.75f), ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f), Position.x, TargetY);
 
-		UpdateBubbleOffsets(LocalId, inputBubbleHeight);
+		UpdateBubbleOffsets(LocalId, InputBubbleHeight);
 
-		y -= inputBubbleHeight + MarginBetween;
+		y -= InputBubbleHeight + MarginBetween;
 	}
 	else
 		UpdateBubbleOffsets(LocalId);
@@ -283,27 +394,24 @@ void CChatBubbles::RenderChatBubbles(int ClientId)
 	if(ClientId == GameClient()->m_Snap.m_LocalClientId)
 		RenderCurInput(BaseY);
 
-	// First pass: collect expired bubbles and clean up text containers
-	bool bRemovedAny = false;
-	for(auto it = m_ChatBubbles[ClientId].begin(); it != m_ChatBubbles[ClientId].end();)
+	// First pass: collect expired bubbles and clean up text containers.
+	for(auto It = m_ChatBubbles[ClientId].begin(); It != m_ChatBubbles[ClientId].end();)
 	{
-		CBubbles &aBubble = *it;
+		CBubbles &aBubble = *It;
 
 		if(aBubble.m_Time + time_freq() * ShowTime < time_get())
 		{
 			// Clean up text container before removal
 			if(aBubble.m_TextContainerIndex.Valid())
 				TextRender()->DeleteTextContainer(aBubble.m_TextContainerIndex);
-			it = m_ChatBubbles[ClientId].erase(it);
-			bRemovedAny = true;
+			It = m_ChatBubbles[ClientId].erase(It);
 			continue;
 		}
-		++it;
+		++It;
 	}
 
-	// Update offsets only once if we removed any bubbles
-	if(bRemovedAny)
-		UpdateBubbleOffsets(ClientId);
+	// Recalculate every frame because media previews can appear after async chat-media decoding.
+	UpdateBubbleOffsets(ClientId, ClientId == GameClient()->m_Snap.m_LocalClientId ? m_InputBubbleHeight : 0.0f);
 
 	// Second pass: render remaining bubbles
 	for(CBubbles &aBubble : m_ChatBubbles[ClientId])
@@ -318,25 +426,107 @@ void CChatBubbles::RenderChatBubbles(int ClientId)
 			continue;
 
 		aBubble.m_OffsetY += (aBubble.m_TargetOffsetY - aBubble.m_OffsetY) * 0.05f / 10.0f;
-		RefreshBubbleTextContainer(aBubble, FontSize);
+		CChat::CLine *pChatLine = FindChatLine(aBubble);
+		const std::string DisplayText = GetBubbleDisplayText(aBubble, pChatLine);
+		RefreshBubbleTextContainer(aBubble, FontSize, DisplayText.c_str());
+		float PreviewWidth = 0.0f;
+		float PreviewHeight = 0.0f;
+		GetBubbleMediaSize(pChatLine, FontSize, PreviewWidth, PreviewHeight);
+		const float MediaGap = aBubble.m_TextHeight > 0.0f && PreviewHeight > 0.0f ? FontSize * 0.4f : 0.0f;
+		const float ContentWidth = maximum(aBubble.m_TextWidth, PreviewWidth);
+		const float ContentHeight = aBubble.m_TextHeight + MediaGap + PreviewHeight;
 
 		ColorRGBA BgColor(0.0f, 0.0f, 0.0f, 0.25f * Alpha);
 		ColorRGBA TextColor(aBubble.m_TextColor.r, aBubble.m_TextColor.g, aBubble.m_TextColor.b, aBubble.m_TextColor.a * Alpha);
 		ColorRGBA OutlineColor(0.0f, 0.0f, 0.0f, 0.5f * Alpha);
 
-		if(aBubble.m_TextContainerIndex.Valid())
+		if(aBubble.m_TextContainerIndex.Valid() || PreviewHeight > 0.0f)
 		{
-			float x = Position.x - (aBubble.m_TextWidth / 2.0f + g_Config.m_BcChatBubbleSize / 15.0f);
-			float y = BaseY - aBubble.m_OffsetY - aBubble.m_TextHeight - FontSize;
+			float x = Position.x - (ContentWidth / 2.0f + g_Config.m_BcChatBubbleSize / 15.0f);
+			float y = BaseY - aBubble.m_OffsetY - ContentHeight - FontSize;
 
 			//float PushBubble = ShiftBubbles(ClientId, vec2(x - FontSize / 2.0f, y - FontSize / 2.0f), BoundingBox.m_W + FontSize * 1.20f);
 			float PushBubble = 0;
 
 			Graphics()->DrawRect((x - FontSize / 2.0f) + PushBubble, y - FontSize / 2.0f,
-				aBubble.m_TextWidth + FontSize * 1.20f, aBubble.m_TextHeight + FontSize,
+				ContentWidth + FontSize * 1.20f, ContentHeight + FontSize,
 				BgColor, IGraphics::CORNER_ALL, g_Config.m_BcChatBubbleSize / 4.5f);
 
-			TextRender()->RenderTextContainer(aBubble.m_TextContainerIndex, TextColor, OutlineColor, x + PushBubble, y);
+			if(aBubble.m_TextContainerIndex.Valid())
+				TextRender()->RenderTextContainer(aBubble.m_TextContainerIndex, TextColor, OutlineColor, x + PushBubble, y);
+
+			if(PreviewHeight > 0.0f && pChatLine)
+			{
+				const float PreviewX = x + PushBubble + (ContentWidth - PreviewWidth) / 2.0f;
+				const float PreviewY = y + (aBubble.m_TextHeight > 0.0f ? aBubble.m_TextHeight + MediaGap : 0.0f);
+				if(Chat()->ShouldHideMediaPreview(*pChatLine))
+				{
+					Graphics()->TextureClear();
+					Graphics()->QuadsBegin();
+					Graphics()->SetColor(0.10f, 0.10f, 0.10f, 0.82f * Alpha);
+					const IGraphics::CQuadItem HiddenQuad(PreviewX, PreviewY, PreviewWidth, PreviewHeight);
+					Graphics()->QuadsDrawTL(&HiddenQuad, 1);
+					Graphics()->QuadsEnd();
+
+					const float HiddenFontSize = FontSize * 0.72f;
+					const float HiddenLabelWidth = TextRender()->TextWidth(HiddenFontSize, "hidden media");
+					CTextCursor HiddenCursor;
+					HiddenCursor.SetPosition(vec2(PreviewX + maximum(FontSize * 0.35f, (PreviewWidth - HiddenLabelWidth) / 2.0f), PreviewY + maximum(FontSize * 0.25f, (PreviewHeight - HiddenFontSize) / 2.0f)));
+					HiddenCursor.m_FontSize = HiddenFontSize;
+					TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.9f * Alpha);
+					TextRender()->TextEx(&HiddenCursor, "hidden media");
+					TextRender()->TextColor(TextRender()->DefaultTextColor());
+				}
+				else if(pChatLine->m_MediaState == CChat::EMediaState::READY)
+				{
+					IGraphics::CTextureHandle MediaTexture;
+					if(Chat()->GetCurrentFrameTexture(*pChatLine, MediaTexture))
+					{
+						Graphics()->WrapClamp();
+						Graphics()->TextureSet(MediaTexture);
+						Graphics()->QuadsBegin();
+						Graphics()->QuadsSetSubset(0.0f, 0.0f, 1.0f, 1.0f);
+						Graphics()->SetColor(1.0f, 1.0f, 1.0f, Alpha);
+						const IGraphics::CQuadItem QuadItem(PreviewX, PreviewY, PreviewWidth, PreviewHeight);
+						Graphics()->QuadsDrawTL(&QuadItem, 1);
+						Graphics()->QuadsEnd();
+						Graphics()->WrapNormal();
+						Graphics()->TextureClear();
+					}
+				}
+				else if(pChatLine->m_MediaState == CChat::EMediaState::QUEUED || pChatLine->m_MediaState == CChat::EMediaState::LOADING || pChatLine->m_MediaState == CChat::EMediaState::DECODING)
+				{
+					Graphics()->TextureClear();
+					Graphics()->QuadsBegin();
+					Graphics()->SetColor(0.12f, 0.12f, 0.12f, 0.75f * Alpha);
+					const IGraphics::CQuadItem LoadingQuad(PreviewX, PreviewY, PreviewWidth, PreviewHeight);
+					Graphics()->QuadsDrawTL(&LoadingQuad, 1);
+					Graphics()->QuadsEnd();
+
+					CTextCursor LoadingCursor;
+					LoadingCursor.SetPosition(vec2(PreviewX + FontSize * 0.35f, PreviewY + PreviewHeight * 0.15f));
+					LoadingCursor.m_FontSize = FontSize * 0.75f;
+					TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.8f * Alpha);
+					TextRender()->TextEx(&LoadingCursor, "Loading media...");
+					TextRender()->TextColor(TextRender()->DefaultTextColor());
+				}
+				else if(pChatLine->m_MediaState == CChat::EMediaState::FAILED)
+				{
+					Graphics()->TextureClear();
+					Graphics()->QuadsBegin();
+					Graphics()->SetColor(0.23f, 0.10f, 0.10f, 0.82f * Alpha);
+					const IGraphics::CQuadItem FailedQuad(PreviewX, PreviewY, PreviewWidth, PreviewHeight);
+					Graphics()->QuadsDrawTL(&FailedQuad, 1);
+					Graphics()->QuadsEnd();
+
+					CTextCursor FailedCursor;
+					FailedCursor.SetPosition(vec2(PreviewX + FontSize * 0.35f, PreviewY + FontSize * 0.25f));
+					FailedCursor.m_FontSize = FontSize * 0.70f;
+					TextRender()->TextColor(1.0f, 0.85f, 0.85f, 0.95f * Alpha);
+					TextRender()->TextEx(&FailedCursor, "Media preview unavailable");
+					TextRender()->TextColor(TextRender()->DefaultTextColor());
+				}
+			}
 		}
 	}
 }
@@ -463,6 +653,7 @@ void CChatBubbles::Reset()
 	m_InputFontSize = 0;
 	m_InputTextWidth = 0.0f;
 	m_InputTextHeight = 0.0f;
+	m_InputBubbleHeight = 0.0f;
 
 	for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
 	{
