@@ -532,8 +532,8 @@ void CBestClient::LoadHookComboSounds(bool LogErrors)
 		char aParentRelativeDataPathWv[144];
 		char aBinaryDataPathWv[IO_MAX_PATH_LENGTH];
 		char aParentDataPathWv[IO_MAX_PATH_LENGTH];
-		str_format(aPathWv, sizeof(aPathWv), "bestclient/combo/combo%d.wv", i + 1);
-		str_format(aDataPathWv, sizeof(aDataPathWv), "data/bestclient/combo/combo%d.wv", i + 1);
+		str_format(aPathWv, sizeof(aPathWv), "BestClient/combo/combo%d.wv", i + 1);
+		str_format(aDataPathWv, sizeof(aDataPathWv), "data/BestClient/combo/combo%d.wv", i + 1);
 		str_format(aParentRelativeDataPathWv, sizeof(aParentRelativeDataPathWv), "../%s", aDataPathWv);
 		Storage()->GetBinaryPathAbsolute(aDataPathWv, aBinaryDataPathWv, sizeof(aBinaryDataPathWv));
 		Storage()->GetBinaryPathAbsolute(aParentRelativeDataPathWv, aParentDataPathWv, sizeof(aParentDataPathWv));
@@ -544,7 +544,7 @@ void CBestClient::LoadHookComboSounds(bool LogErrors)
 		TryLoad(aParentDataPathWv, IStorage::TYPE_ABSOLUTE);
 
 		if(LogErrors && m_aHookComboSoundIds[i] == -1)
-			log_warn("hook_combo", "Failed to load combo sound #%d (expected data/bestclient/combo/combo%d.wv)", i + 1, i + 1);
+			log_warn("hook_combo", "Failed to load combo sound #%d (expected data/BestClient/combo/combo%d.wv)", i + 1, i + 1);
 	}
 }
 
@@ -610,7 +610,7 @@ void CBestClient::TriggerHookComboStep()
 		else if(!m_HookComboSoundErrorShown)
 		{
 			m_HookComboSoundErrorShown = true;
-			GameClient()->Echo("[[red]] Hook combo sounds not found. Put files as data/bestclient/combo/combo1.wv ... combo7.wv");
+			GameClient()->Echo("[[red]] Hook combo sounds not found. Put files as data/BestClient/combo/combo1.wv ... combo7.wv");
 		}
 	}
 }
