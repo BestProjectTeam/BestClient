@@ -4259,7 +4259,11 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			static CButtonContainer s_ChatBubblesResetButton;
 			const bool ChatBubblesEnabled = g_Config.m_BcChatBubbles != 0;
 			UpdateRevealPhase(s_BcChatBubblesPhase, ChatBubblesEnabled);
-			const float ExtraTargetHeight = MarginSmall + 6.0f * LineSize;
+			const float ColorPickerLineSize = 25.0f;
+			const float ColorPickerLabelSize = 13.0f;
+			const float ColorPickerSpacing = 5.0f;
+			const float CustomColorHeight = g_Config.m_BcChatBubbleCustomColors ? 3.0f * (ColorPickerLineSize + ColorPickerSpacing) : 0.0f;
+			const float ExtraTargetHeight = MarginSmall + 9.0f * LineSize + CustomColorHeight;
 			const float ContentHeight = LineSize + MarginSmall + LineSize + ExtraTargetHeight * s_BcChatBubblesPhase;
 			CUIRect Content, Label, Row, Visible;
 			BeginBlock(Column, ContentHeight, Content);
@@ -4278,6 +4282,12 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				g_Config.m_BcChatBubbleShowTime = DefaultConfig::BcChatBubbleShowTime;
 				g_Config.m_BcChatBubbleFadeIn = DefaultConfig::BcChatBubbleFadeIn;
 				g_Config.m_BcChatBubbleFadeOut = DefaultConfig::BcChatBubbleFadeOut;
+				g_Config.m_BcChatBubbleAnimation = DefaultConfig::BcChatBubbleAnimation;
+				g_Config.m_BcChatBubbleCustomColors = DefaultConfig::BcChatBubbleCustomColors;
+				g_Config.m_BcChatBubbleBgColor = DefaultConfig::BcChatBubbleBgColor;
+				g_Config.m_BcChatBubbleTextColor = DefaultConfig::BcChatBubbleTextColor;
+				g_Config.m_BcChatBubbleOutlineColor = DefaultConfig::BcChatBubbleOutlineColor;
+				g_Config.m_BcChatBubbleRounding = DefaultConfig::BcChatBubbleRounding;
 			}
 			Ui()->DoLabel(&TitleLabel, Localize("Chat Bubbles"), HeadlineFontSize, TEXTALIGN_ML);
 			Content.HSplitTop(MarginSmall, nullptr, &Content);
@@ -4300,6 +4310,22 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatBubblesDemo, Localize("Show Chatbubbles in demo"), &g_Config.m_BcChatBubblesDemo, &Expand, LineSize);
 				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatBubblesSelf, Localize("Show Chatbubbles above you"), &g_Config.m_BcChatBubblesSelf, &Expand, LineSize);
 
+				CUIRect ModeLabel, ModeDropDown;
+				Expand.HSplitTop(LineSize, &Row, &Expand);
+				Row.VSplitLeft(120.0f, &ModeLabel, &ModeDropDown);
+				Ui()->DoLabel(&ModeLabel, Localize("Appear animation"), 14.0f, TEXTALIGN_ML);
+				static CUi::SDropDownState s_ChatBubbleAnimationState;
+				static CScrollRegion s_ChatBubbleAnimationScrollRegion;
+				s_ChatBubbleAnimationState.m_SelectionPopupContext.m_pScrollRegion = &s_ChatBubbleAnimationScrollRegion;
+				const char *apChatBubbleAnimations[4] = {
+					Localize("Fade"),
+					Localize("Rise"),
+					Localize("Slide"),
+					Localize("Pop"),
+				};
+				g_Config.m_BcChatBubbleAnimation = std::clamp(g_Config.m_BcChatBubbleAnimation, 0, 3);
+				g_Config.m_BcChatBubbleAnimation = Ui()->DoDropDown(&ModeDropDown, g_Config.m_BcChatBubbleAnimation, apChatBubbleAnimations, (int)std::size(apChatBubbleAnimations), s_ChatBubbleAnimationState);
+
 				Expand.HSplitTop(LineSize, &Row, &Expand);
 				Ui()->DoScrollbarOption(&g_Config.m_BcChatBubbleSize, &g_Config.m_BcChatBubbleSize, &Row, Localize("Chat Bubble Size"), 20, 30);
 				Expand.HSplitTop(LineSize, &Row, &Expand);
@@ -4308,6 +4334,18 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				Ui()->DoScrollbarOption(&g_Config.m_BcChatBubbleFadeIn, &g_Config.m_BcChatBubbleFadeIn, &Row, Localize("fade in for"), 15, 100);
 				Expand.HSplitTop(LineSize, &Row, &Expand);
 				Ui()->DoScrollbarOption(&g_Config.m_BcChatBubbleFadeOut, &g_Config.m_BcChatBubbleFadeOut, &Row, Localize("fade out for"), 15, 100);
+				Expand.HSplitTop(LineSize, &Row, &Expand);
+				Ui()->DoScrollbarOption(&g_Config.m_BcChatBubbleRounding, &g_Config.m_BcChatBubbleRounding, &Row, Localize("Rounding"), 0, 200, &CUi::ms_LinearScrollbarScale, 0u, "%");
+				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatBubbleCustomColors, Localize("Custom colors"), &g_Config.m_BcChatBubbleCustomColors, &Expand, LineSize);
+				if(g_Config.m_BcChatBubbleCustomColors)
+				{
+					static CButtonContainer s_ChatBubbleBgColorButton;
+					static CButtonContainer s_ChatBubbleTextColorButton;
+					static CButtonContainer s_ChatBubbleOutlineColorButton;
+					DoLine_ColorPicker(&s_ChatBubbleBgColorButton, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerSpacing, &Expand, Localize("Background"), &g_Config.m_BcChatBubbleBgColor, color_cast<ColorRGBA>(ColorHSLA(DefaultConfig::BcChatBubbleBgColor, true)), false, nullptr, true);
+					DoLine_ColorPicker(&s_ChatBubbleTextColorButton, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerSpacing, &Expand, Localize("Text"), &g_Config.m_BcChatBubbleTextColor, color_cast<ColorRGBA>(ColorHSLA(DefaultConfig::BcChatBubbleTextColor, true)), false, nullptr, true);
+					DoLine_ColorPicker(&s_ChatBubbleOutlineColorButton, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerSpacing, &Expand, Localize("Text outline"), &g_Config.m_BcChatBubbleOutlineColor, color_cast<ColorRGBA>(ColorHSLA(DefaultConfig::BcChatBubbleOutlineColor, true)), false, nullptr, true);
+				}
 			}
 			Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
 		}
@@ -5984,15 +6022,13 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			static float s_StreamerPhase = 0.0f;
 			const bool StreamerExpanded = g_Config.m_ClStreamerMode != 0;
 			UpdateRevealPhase(s_StreamerPhase, StreamerExpanded);
-			const float ExpandedTargetHeight = 6.0f * LineSize;
+			const float ExpandedTargetHeight = 7.0f * LineSize;
 			const float ContentHeight = LineSize + MarginSmall + LineSize + ExpandedTargetHeight * s_StreamerPhase;
-			CUIRect Content, Label, Note, Visible;
+			CUIRect Content, Label, Visible;
 			BeginBlock(Column, ContentHeight, Content);
 
 			Content.HSplitTop(LineSize, &Label, &Content);
-			Label.VSplitRight(160.0f, &Label, &Note);
 			Ui()->DoLabel(&Label, Localize("Streamer Mode"), HeadlineFontSize, TEXTALIGN_ML);
-			Ui()->DoLabel(&Note, "(from CAT client)", 12.0f, TEXTALIGN_MR);
 			Content.HSplitTop(MarginSmall, nullptr, &Content);
 
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClStreamerMode, Localize("Enable streamer mode"), &g_Config.m_ClStreamerMode, &Content, LineSize);
@@ -6023,12 +6059,14 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				static CButtonContainer s_HideOwnNameButton;
 				static CButtonContainer s_HideOtherNamesButton;
 				static CButtonContainer s_HideTabNamesButton;
+				static CButtonContainer s_HideLoginButton;
 				DoStreamerFlagCheckBox(&s_HideServerIpButton, Localize("Hide server IP"), CBestClient::STREAMER_HIDE_SERVER_IP);
 				DoStreamerFlagCheckBox(&s_HideChatButton, Localize("Hide chat"), CBestClient::STREAMER_HIDE_CHAT);
 				DoStreamerFlagCheckBox(&s_HideFriendInfoButton, Localize("Hide friend/whisper info"), CBestClient::STREAMER_HIDE_FRIEND_WHISPER);
 				DoStreamerFlagCheckBox(&s_HideOwnNameButton, Localize("Hide own nickname"), CBestClient::STREAMER_HIDE_OWN_NAME);
 				DoStreamerFlagCheckBox(&s_HideOtherNamesButton, Localize("Hide other nicknames"), CBestClient::STREAMER_HIDE_OTHER_NAMES);
 				DoStreamerFlagCheckBox(&s_HideTabNamesButton, Localize("Hide nicknames in tab"), CBestClient::STREAMER_HIDE_TAB_NAMES);
+				DoStreamerFlagCheckBox(&s_HideLoginButton, Localize("Hide /login"), CBestClient::STREAMER_HIDE_LOGIN);
 			}
 
 			Column.HSplitTop(MarginBetweenSections, nullptr, &Column);

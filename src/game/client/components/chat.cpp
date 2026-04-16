@@ -489,30 +489,10 @@ CChat::CChat()
 	m_Input.SetCalculateOffsetCallback([this]() { return m_IsInputCensored; });
 	m_Input.SetDisplayTextCallback([this](char *pStr, size_t NumChars) {
 		m_IsInputCensored = false;
-		if(
-			g_Config.m_ClStreamerMode &&
-			(str_startswith(pStr, "/login ") ||
-				str_startswith(pStr, "/register ") ||
-				str_startswith(pStr, "/code ") ||
-				str_startswith(pStr, "/timeout ") ||
-				str_startswith(pStr, "/save ") ||
-				str_startswith(pStr, "/load ")))
+		(void)NumChars;
+		if(GameClient()->m_BestClient.SanitizeSensitiveCommand(pStr, ms_aDisplayText, sizeof(ms_aDisplayText)))
 		{
-			bool Censor = false;
-			const size_t NumLetters = minimum(NumChars, sizeof(ms_aDisplayText) - 1);
-			for(size_t i = 0; i < NumLetters; ++i)
-			{
-				if(Censor)
-					ms_aDisplayText[i] = '*';
-				else
-					ms_aDisplayText[i] = pStr[i];
-				if(pStr[i] == ' ')
-				{
-					Censor = true;
-					m_IsInputCensored = true;
-				}
-			}
-			ms_aDisplayText[NumLetters] = '\0';
+			m_IsInputCensored = true;
 			return ms_aDisplayText;
 		}
 		return pStr;

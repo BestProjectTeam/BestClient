@@ -209,6 +209,7 @@ private:
 	int m_SpeedrunTimerExpiredTick;
 	bool m_ShowFinishTime;
 	mutable std::vector<int> m_vFinishPredictionDistances;
+	mutable std::vector<unsigned char> m_vFinishPredictionPassable;
 	mutable std::vector<ivec2> m_vFinishPredictionStartTiles;
 	mutable std::vector<ivec2> m_vFinishPredictionFinishTiles;
 	mutable int m_FinishPredictionMapWidth;
@@ -216,6 +217,8 @@ private:
 	mutable int m_FinishPredictionRaceStartTick;
 	mutable float m_FinishPredictionRaceStartDistance;
 	mutable float m_FinishPredictionLastProgress;
+	mutable int64_t m_FinishPredictionSmoothedFinishTimeMs;
+	mutable int m_FinishPredictionLastPredictTick;
 
 	inline int GetDigitsIndex(int Value, int Max);
 

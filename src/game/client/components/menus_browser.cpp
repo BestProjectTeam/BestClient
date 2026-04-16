@@ -775,7 +775,9 @@ void CMenus::RenderServerbrowserStatusBox(CUIRect StatusBox, bool WasListboxItem
 		Ui()->DoLabel(&ServerAddrLabel, Localize("Server address:"), 14.0f, TEXTALIGN_ML);
 		if(GameClient()->m_BestClient.HasStreamerFlag(CBestClient::STREAMER_HIDE_SERVER_IP))
 		{
-			Ui()->DoLabel(&ServerAddrEditBox, Localize("Hidden"), 12.0f, TEXTALIGN_ML);
+			char aMaskedAddress[128];
+			GameClient()->m_BestClient.MaskServerAddress(g_Config.m_UiServerAddress, aMaskedAddress, sizeof(aMaskedAddress));
+			Ui()->DoLabel(&ServerAddrEditBox, aMaskedAddress, 12.0f, TEXTALIGN_ML);
 		}
 		else
 		{

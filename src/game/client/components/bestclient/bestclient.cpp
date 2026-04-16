@@ -71,6 +71,60 @@ static void AppendSanitizedChunk(char **ppDst, char *pDstEnd, const char *pChunk
 	}
 }
 
+static void WriteStreamerMask(const char *pInput, char *pOutput, size_t OutputSize, bool PreserveSpaces)
+{
+	if(OutputSize == 0)
+		return;
+
+	if(pInput == nullptr || pInput[0] == '\0')
+	{
+		str_copy(pOutput, "****", OutputSize);
+		return;
+	}
+
+	char *pDst = pOutput;
+	char *pDstEnd = pOutput + OutputSize - 1;
+	const char *pCursor = pInput;
+	while(*pCursor != '\0' && pDst < pDstEnd)
+	{
+		if(PreserveSpaces && *pCursor == ' ')
+		{
+			*pDst++ = *pCursor++;
+			continue;
+		}
+
+		str_utf8_decode(&pCursor);
+		*pDst++ = '*';
+	}
+	*pDst = '\0';
+}
+
+static bool FindSensitiveChatCommandPayload(const char *pInput, const char **ppPayload)
+{
+	static const char *const s_apSensitiveCommands[] = {
+		"/login ",
+		"/register ",
+		"/code ",
+		"/timeout ",
+		"/save ",
+		"/load ",
+	};
+
+	if(!pInput || !ppPayload)
+		return false;
+
+	for(const char *pCommand : s_apSensitiveCommands)
+	{
+		if(str_startswith_nocase(pInput, pCommand))
+		{
+			*ppPayload = pInput + str_length(pCommand);
+			return true;
+		}
+	}
+
+	return false;
+}
+
 static void NormalizeBestClientVersion(const char *pVersion, char *pBuf, int BufSize)
 {
 	if(BufSize <= 0)
@@ -183,7 +237,7 @@ const char *CBestClient::MaskServerAddress(const char *pAddress, char *pOutput, 
 {
 	if(HasStreamerFlag(STREAMER_HIDE_SERVER_IP))
 	{
-		str_copy(pOutput, Localize("Hidden"), OutputSize);
+		WriteStreamerMask(pAddress, pOutput, OutputSize, false);
 		return pOutput;
 	}
 
@@ -285,6 +339,33 @@ int CBestClient::StreamerBlockedWordCount()
 	return (int)m_vStreamerBlockedWords.size();
 }
 
+bool CBestClient::SanitizeSensitiveCommand(const char *pInput, char *pOutput, size_t OutputSize) const
+{
+	if(OutputSize == 0)
+		return false;
+
+	pOutput[0] = '\0';
+	const char *pPayload = nullptr;
+	if(!HasStreamerFlag(STREAMER_HIDE_LOGIN) || !FindSensitiveChatCommandPayload(pInput, &pPayload))
+		return false;
+
+	char *pDst = pOutput;
+	char *pDstEnd = pOutput + OutputSize - 1;
+	AppendSanitizedChunk(&pDst, pDstEnd, pInput, pPayload);
+	while(*pPayload != '\0' && pDst < pDstEnd)
+	{
+		if(*pPayload == ' ')
+		{
+			*pDst++ = *pPayload++;
+			continue;
+		}
+		str_utf8_decode(&pPayload);
+		*pDst++ = '*';
+	}
+	*pDst = '\0';
+	return true;
+}
+
 void CBestClient::SanitizeText(const char *pInput, char *pOutput, size_t OutputSize)
 {
 	EnsureStreamerWordsLoaded();
@@ -346,7 +427,7 @@ void CBestClient::SanitizePlayerName(const char *pInput, char *pOutput, size_t O
 
 	if(ShouldHidePlayerName(ClientId, InScoreboard))
 	{
-		str_copy(pOutput, Localize("Hidden"), OutputSize);
+		WriteStreamerMask(pInput, pOutput, OutputSize, true);
 		return;
 	}
 
