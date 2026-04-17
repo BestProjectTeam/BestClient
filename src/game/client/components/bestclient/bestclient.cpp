@@ -71,6 +71,60 @@ static void AppendSanitizedChunk(char **ppDst, char *pDstEnd, const char *pChunk
 	}
 }
 
+static void WriteStreamerMask(const char *pInput, char *pOutput, size_t OutputSize, bool PreserveSpaces)
+{
+	if(OutputSize == 0)
+		return;
+
+	if(pInput == nullptr || pInput[0] == '\0')
+	{
+		str_copy(pOutput, "****", OutputSize);
+		return;
+	}
+
+	char *pDst = pOutput;
+	char *pDstEnd = pOutput + OutputSize - 1;
+	const char *pCursor = pInput;
+	while(*pCursor != '\0' && pDst < pDstEnd)
+	{
+		if(PreserveSpaces && *pCursor == ' ')
+		{
+			*pDst++ = *pCursor++;
+			continue;
+		}
+
+		str_utf8_decode(&pCursor);
+		*pDst++ = '*';
+	}
+	*pDst = '\0';
+}
+
+static bool FindSensitiveChatCommandPayload(const char *pInput, const char **ppPayload)
+{
+	static const char *const s_apSensitiveCommands[] = {
+		"/login ",
+		"/register ",
+		"/code ",
+		"/timeout ",
+		"/save ",
+		"/load ",
+	};
+
+	if(!pInput || !ppPayload)
+		return false;
+
+	for(const char *pCommand : s_apSensitiveCommands)
+	{
+		if(str_startswith_nocase(pInput, pCommand))
+		{
+			*ppPayload = pInput + str_length(pCommand);
+			return true;
+		}
+	}
+
+	return false;
+}
+
 static void NormalizeBestClientVersion(const char *pVersion, char *pBuf, int BufSize)
 {
 	if(BufSize <= 0)
@@ -183,7 +237,7 @@ const char *CBestClient::MaskServerAddress(const char *pAddress, char *pOutput, 
 {
 	if(HasStreamerFlag(STREAMER_HIDE_SERVER_IP))
 	{
-		str_copy(pOutput, Localize("Hidden"), OutputSize);
+		WriteStreamerMask(pAddress, pOutput, OutputSize, false);
 		return pOutput;
 	}
 
@@ -285,6 +339,33 @@ int CBestClient::StreamerBlockedWordCount()
 	return (int)m_vStreamerBlockedWords.size();
 }
 
+bool CBestClient::SanitizeSensitiveCommand(const char *pInput, char *pOutput, size_t OutputSize) const
+{
+	if(OutputSize == 0)
+		return false;
+
+	pOutput[0] = '\0';
+	const char *pPayload = nullptr;
+	if(!HasStreamerFlag(STREAMER_HIDE_LOGIN) || !FindSensitiveChatCommandPayload(pInput, &pPayload))
+		return false;
+
+	char *pDst = pOutput;
+	char *pDstEnd = pOutput + OutputSize - 1;
+	AppendSanitizedChunk(&pDst, pDstEnd, pInput, pPayload);
+	while(*pPayload != '\0' && pDst < pDstEnd)
+	{
+		if(*pPayload == ' ')
+		{
+			*pDst++ = *pPayload++;
+			continue;
+		}
+		str_utf8_decode(&pPayload);
+		*pDst++ = '*';
+	}
+	*pDst = '\0';
+	return true;
+}
+
 void CBestClient::SanitizeText(const char *pInput, char *pOutput, size_t OutputSize)
 {
 	EnsureStreamerWordsLoaded();
@@ -346,7 +427,7 @@ void CBestClient::SanitizePlayerName(const char *pInput, char *pOutput, size_t O
 
 	if(ShouldHidePlayerName(ClientId, InScoreboard))
 	{
-		str_copy(pOutput, Localize("Hidden"), OutputSize);
+		WriteStreamerMask(pInput, pOutput, OutputSize, true);
 		return;
 	}
 
@@ -532,8 +613,8 @@ void CBestClient::LoadHookComboSounds(bool LogErrors)
 		char aParentRelativeDataPathWv[144];
 		char aBinaryDataPathWv[IO_MAX_PATH_LENGTH];
 		char aParentDataPathWv[IO_MAX_PATH_LENGTH];
-		str_format(aPathWv, sizeof(aPathWv), "bestclient/combo/combo%d.wv", i + 1);
-		str_format(aDataPathWv, sizeof(aDataPathWv), "data/bestclient/combo/combo%d.wv", i + 1);
+		str_format(aPathWv, sizeof(aPathWv), "BestClient/combo/combo%d.wv", i + 1);
+		str_format(aDataPathWv, sizeof(aDataPathWv), "data/BestClient/combo/combo%d.wv", i + 1);
 		str_format(aParentRelativeDataPathWv, sizeof(aParentRelativeDataPathWv), "../%s", aDataPathWv);
 		Storage()->GetBinaryPathAbsolute(aDataPathWv, aBinaryDataPathWv, sizeof(aBinaryDataPathWv));
 		Storage()->GetBinaryPathAbsolute(aParentRelativeDataPathWv, aParentDataPathWv, sizeof(aParentDataPathWv));
@@ -544,7 +625,7 @@ void CBestClient::LoadHookComboSounds(bool LogErrors)
 		TryLoad(aParentDataPathWv, IStorage::TYPE_ABSOLUTE);
 
 		if(LogErrors && m_aHookComboSoundIds[i] == -1)
-			log_warn("hook_combo", "Failed to load combo sound #%d (expected data/bestclient/combo/combo%d.wv)", i + 1, i + 1);
+			log_warn("hook_combo", "Failed to load combo sound #%d (expected data/BestClient/combo/combo%d.wv)", i + 1, i + 1);
 	}
 }
 
@@ -610,7 +691,7 @@ void CBestClient::TriggerHookComboStep()
 		else if(!m_HookComboSoundErrorShown)
 		{
 			m_HookComboSoundErrorShown = true;
-			GameClient()->Echo("[[red]] Hook combo sounds not found. Put files as data/bestclient/combo/combo1.wv ... combo7.wv");
+			GameClient()->Echo("[[red]] Hook combo sounds not found. Put files as data/BestClient/combo/combo1.wv ... combo7.wv");
 		}
 	}
 }

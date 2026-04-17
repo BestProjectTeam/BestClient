@@ -17,6 +17,13 @@ namespace
 constexpr float CHAT_BUBBLE_MEDIA_MAX_PREVIEW_HEIGHT = 70.0f;
 constexpr float CHAT_BUBBLE_MEDIA_PREVIEW_SIZE_SCALE = 0.9f;
 constexpr float CHAT_BUBBLE_MEDIA_MIN_PREVIEW_SIDE = 28.0f;
+
+float EaseOutCubic(float Value)
+{
+	Value = std::clamp(Value, 0.0f, 1.0f);
+	const float Inv = 1.0f - Value;
+	return 1.0f - Inv * Inv * Inv;
+}
 }
 
 #include "chat_bubbles.h"
@@ -301,7 +308,7 @@ void CChatBubbles::RemoveBubble(int ClientId, CBubbles aBubble)
 void CChatBubbles::RenderCurInput(float y)
 {
 	int FontSize = g_Config.m_BcChatBubbleSize;
-	const char *pText = Chat()->m_Input.GetString();
+	const char *pText = Chat()->m_Input.GetDisplayedString();
 	if(pText[0] == '\0')
 	{
 		if(m_InputTextContainerIndex.Valid())
@@ -363,9 +370,9 @@ void CChatBubbles::RenderCurInput(float y)
 
 		Graphics()->DrawRect(Position.x - FontSize / 2.0f, TargetY - FontSize / 2.0f,
 			m_InputTextWidth + FontSize * 1.20f, m_InputTextHeight + FontSize,
-			ColorRGBA(0.0f, 0.0f, 0.0f, 0.15f), IGraphics::CORNER_ALL, g_Config.m_BcChatBubbleSize / 4.5f);
+			BubbleBackgroundColor(0.6f), IGraphics::CORNER_ALL, BubbleRounding(FontSize));
 
-		TextRender()->RenderTextContainer(m_InputTextContainerIndex, ColorRGBA(1.0f, 1.0f, 1.0f, 0.75f), ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f), Position.x, TargetY);
+		TextRender()->RenderTextContainer(m_InputTextContainerIndex, BubbleTextColor(ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), 0.75f), BubbleOutlineColor(0.5f), Position.x, TargetY);
 
 		UpdateBubbleOffsets(LocalId, InputBubbleHeight);
 
@@ -436,21 +443,36 @@ void CChatBubbles::RenderChatBubbles(int ClientId)
 		const float ContentWidth = maximum(aBubble.m_TextWidth, PreviewWidth);
 		const float ContentHeight = aBubble.m_TextHeight + MediaGap + PreviewHeight;
 
-		ColorRGBA BgColor(0.0f, 0.0f, 0.0f, 0.25f * Alpha);
-		ColorRGBA TextColor(aBubble.m_TextColor.r, aBubble.m_TextColor.g, aBubble.m_TextColor.b, aBubble.m_TextColor.a * Alpha);
-		ColorRGBA OutlineColor(0.0f, 0.0f, 0.0f, 0.5f * Alpha);
+		ColorRGBA BgColor = BubbleBackgroundColor(Alpha);
+		ColorRGBA TextColor = BubbleTextColor(aBubble.m_TextColor, Alpha);
+		ColorRGBA OutlineColor = BubbleOutlineColor(Alpha);
 
 		if(aBubble.m_TextContainerIndex.Valid() || PreviewHeight > 0.0f)
 		{
 			float x = Position.x - (ContentWidth / 2.0f + g_Config.m_BcChatBubbleSize / 15.0f);
 			float y = BaseY - aBubble.m_OffsetY - ContentHeight - FontSize;
+			const float Appear = GetAppearProgress(aBubble.m_Time);
+			switch(std::clamp(g_Config.m_BcChatBubbleAnimation, 0, 3))
+			{
+			case 1:
+				y += (1.0f - Appear) * FontSize * 0.7f;
+				break;
+			case 2:
+				x += (ClientId == GameClient()->m_Snap.m_LocalClientId ? -1.0f : 1.0f) * (1.0f - Appear) * FontSize * 1.1f;
+				break;
+			case 3:
+				y += (1.0f - Appear) * (1.0f - Appear) * FontSize * 0.45f - sinf(Appear * pi) * FontSize * 0.12f;
+				break;
+			default:
+				break;
+			}
 
 			//float PushBubble = ShiftBubbles(ClientId, vec2(x - FontSize / 2.0f, y - FontSize / 2.0f), BoundingBox.m_W + FontSize * 1.20f);
 			float PushBubble = 0;
 
 			Graphics()->DrawRect((x - FontSize / 2.0f) + PushBubble, y - FontSize / 2.0f,
 				ContentWidth + FontSize * 1.20f, ContentHeight + FontSize,
-				BgColor, IGraphics::CORNER_ALL, g_Config.m_BcChatBubbleSize / 4.5f);
+				BgColor, IGraphics::CORNER_ALL, BubbleRounding(FontSize));
 
 			if(aBubble.m_TextContainerIndex.Valid())
 				TextRender()->RenderTextContainer(aBubble.m_TextContainerIndex, TextColor, OutlineColor, x + PushBubble, y);
@@ -590,6 +612,40 @@ float CChatBubbles::GetAlpha(int64_t Time)
 
 	float FadeOutProgress = (LineAge - (ShowTime - FadeOutTime)) / FadeOutTime;
 	return std::clamp(1.0f - FadeOutProgress, 0.0f, 1.0f);
+}
+
+float CChatBubbles::GetAppearProgress(int64_t Time)
+{
+	const float FadeInTime = maximum(0.01f, g_Config.m_BcChatBubbleFadeIn / 100.0f);
+	const float LineAge = (time_get() - Time) / (float)time_freq();
+	return EaseOutCubic(LineAge / FadeInTime);
+}
+
+float CChatBubbles::BubbleRounding(int FontSize) const
+{
+	const float BaseRounding = FontSize / 4.5f;
+	return BaseRounding * std::clamp(g_Config.m_BcChatBubbleRounding / 100.0f, 0.0f, 2.0f);
+}
+
+ColorRGBA CChatBubbles::BubbleBackgroundColor(float Alpha) const
+{
+	if(g_Config.m_BcChatBubbleCustomColors)
+		return color_cast<ColorRGBA>(ColorHSLA(g_Config.m_BcChatBubbleBgColor, true)).WithMultipliedAlpha(Alpha);
+	return ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f * Alpha);
+}
+
+ColorRGBA CChatBubbles::BubbleOutlineColor(float Alpha) const
+{
+	if(g_Config.m_BcChatBubbleCustomColors)
+		return color_cast<ColorRGBA>(ColorHSLA(g_Config.m_BcChatBubbleOutlineColor, true)).WithMultipliedAlpha(Alpha);
+	return ColorRGBA(0.0f, 0.0f, 0.0f, 0.5f * Alpha);
+}
+
+ColorRGBA CChatBubbles::BubbleTextColor(const ColorRGBA &BaseColor, float Alpha) const
+{
+	if(g_Config.m_BcChatBubbleCustomColors)
+		return color_cast<ColorRGBA>(ColorHSLA(g_Config.m_BcChatBubbleTextColor, true)).WithMultipliedAlpha(Alpha);
+	return ColorRGBA(BaseColor.r, BaseColor.g, BaseColor.b, BaseColor.a * Alpha);
 }
 
 void CChatBubbles::OnRender()

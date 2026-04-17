@@ -75,7 +75,7 @@ MACRO_CONFIG_COL(BcShowRealHitboxColor, bc_show_real_hitbox_color, 0xFFFFFFFFU, 
 MACRO_CONFIG_INT(BcAutoServerListRefresh, bc_auto_server_list_refresh, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically refresh the server browser list while a browser tab is open")
 MACRO_CONFIG_INT(BcAutoServerListRefreshSeconds, bc_auto_server_list_refresh_seconds, 10, 1, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Auto refresh interval for the server browser list in seconds")
 MACRO_CONFIG_INT(BcUseShortKogServerName, bc_use_short_kog_server_name, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use short name for KoG gores servers in browser list")
-MACRO_CONFIG_INT(BcStreamerFlags, bc_streamer_flags, 0, 0, 63, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Bitmask of BestClient streamer mode options")
+MACRO_CONFIG_INT(BcStreamerFlags, bc_streamer_flags, 64, 0, 127, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Bitmask of BestClient streamer mode options")
 
 // Fast input
 MACRO_CONFIG_INT(BcFastInputMode, bc_fast_input_mode, 0, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fast input mode (0 = fast input, 1 = delta input, 2 = gamma input)")
@@ -216,6 +216,12 @@ MACRO_CONFIG_INT(BcChatBubbleSize, bc_chat_bubble_size, 20, 20, 30, CFGFLAG_CLIE
 MACRO_CONFIG_INT(BcChatBubbleShowTime, bc_chat_bubble_showtime, 200, 200, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "How long to show the bubble for")
 MACRO_CONFIG_INT(BcChatBubbleFadeOut, bc_chat_bubble_fadeout, 35, 15, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "How long it fades out")
 MACRO_CONFIG_INT(BcChatBubbleFadeIn, bc_chat_bubble_fadein, 15, 15, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "How long it fades in")
+MACRO_CONFIG_INT(BcChatBubbleAnimation, bc_chat_bubble_animation, 1, 0, 3, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Chat bubble appearance animation (0=fade, 1=rise, 2=slide, 3=pop)")
+MACRO_CONFIG_INT(BcChatBubbleCustomColors, bc_chat_bubble_custom_colors, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use custom chat bubble colors")
+MACRO_CONFIG_COL(BcChatBubbleBgColor, bc_chat_bubble_bg_color, 0x40000000, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLALPHA, "Custom chat bubble background color")
+MACRO_CONFIG_COL(BcChatBubbleTextColor, bc_chat_bubble_text_color, 0xFF0000FF, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLALPHA, "Custom chat bubble text color")
+MACRO_CONFIG_COL(BcChatBubbleOutlineColor, bc_chat_bubble_outline_color, 0x99000000, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLALPHA, "Custom chat bubble text outline color")
+MACRO_CONFIG_INT(BcChatBubbleRounding, bc_chat_bubble_rounding, 100, 0, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Chat bubble rounding in percent")
 
 // Client Indicator
 MACRO_CONFIG_INT(BcClientIndicator, bc_client_indicator, 1, 1, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Client indicator is always enabled")

@@ -63,6 +63,11 @@ class CChatBubbles : public CComponent
 
 	float GetOffset(int ClientId);
 	float GetAlpha(int64_t Time);
+	float GetAppearProgress(int64_t Time);
+	float BubbleRounding(int FontSize) const;
+	ColorRGBA BubbleBackgroundColor(float Alpha) const;
+	ColorRGBA BubbleOutlineColor(float Alpha) const;
+	ColorRGBA BubbleTextColor(const ColorRGBA &BaseColor, float Alpha) const;
 
 	void UpdateBubbleOffsets(int ClientId, float InputBubbleHeight = 0.0f);
 

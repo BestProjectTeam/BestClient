@@ -30,7 +30,9 @@
 #include <algorithm>
 #include <cstdint>
 #include <cmath>
+#include <functional>
 #include <limits>
+#include <queue>
 
 namespace
 {
@@ -158,6 +160,7 @@ void CHud::OnReset()
 	m_LastSpectatorCountTick = 0;
 	m_SpeedrunTimerExpiredTick = 0;
 	m_vFinishPredictionDistances.clear();
+	m_vFinishPredictionPassable.clear();
 	m_vFinishPredictionStartTiles.clear();
 	m_vFinishPredictionFinishTiles.clear();
 	m_FinishPredictionMapWidth = 0;
@@ -165,6 +168,8 @@ void CHud::OnReset()
 	m_FinishPredictionRaceStartTick = -1;
 	m_FinishPredictionRaceStartDistance = -1.0f;
 	m_FinishPredictionLastProgress = 0.0f;
+	m_FinishPredictionSmoothedFinishTimeMs = -1;
+	m_FinishPredictionLastPredictTick = -1;
 
 	ResetHudContainers();
 }
@@ -172,12 +177,15 @@ void CHud::OnReset()
 bool CHud::RebuildFinishPredictionPathData()
 {
 	m_vFinishPredictionDistances.clear();
+	m_vFinishPredictionPassable.clear();
 	m_vFinishPredictionStartTiles.clear();
 	m_vFinishPredictionFinishTiles.clear();
 	m_FinishPredictionMapWidth = 0;
 	m_FinishPredictionMapHeight = 0;
 	m_FinishPredictionRaceStartDistance = -1.0f;
 	m_FinishPredictionLastProgress = 0.0f;
+	m_FinishPredictionSmoothedFinishTimeMs = -1;
+	m_FinishPredictionLastPredictTick = -1;
 
 	if(!Collision() || Collision()->GetWidth() <= 0 || Collision()->GetHeight() <= 0)
 		return false;
@@ -186,16 +194,29 @@ bool CHud::RebuildFinishPredictionPathData()
 	m_FinishPredictionMapHeight = Collision()->GetHeight();
 	const int MapSize = m_FinishPredictionMapWidth * m_FinishPredictionMapHeight;
 	m_vFinishPredictionDistances.assign(MapSize, -1);
+	m_vFinishPredictionPassable.assign(MapSize, 0);
 
 	auto IsPassableTile = [&](int TileX, int TileY) {
 		if(TileX < 0 || TileX >= m_FinishPredictionMapWidth || TileY < 0 || TileY >= m_FinishPredictionMapHeight)
 			return false;
+		const int Index = TileY * m_FinishPredictionMapWidth + TileX;
+		if(m_vFinishPredictionPassable[Index] != 0)
+			return true;
 		const vec2 TileCenter(TileX * 32.0f + 16.0f, TileY * 32.0f + 16.0f);
 		return !Collision()->TestBox(TileCenter, vec2(CCharacterCore::PhysicalSize(), CCharacterCore::PhysicalSize()));
 	};
 
-	std::vector<int> vQueue;
-	vQueue.reserve(MapSize);
+	for(int y = 0; y < m_FinishPredictionMapHeight; ++y)
+	{
+		for(int x = 0; x < m_FinishPredictionMapWidth; ++x)
+		{
+			const int Index = y * m_FinishPredictionMapWidth + x;
+			m_vFinishPredictionPassable[Index] = IsPassableTile(x, y) ? 1 : 0;
+		}
+	}
+
+	using TDistanceNode = std::pair<int, int>;
+	std::priority_queue<TDistanceNode, std::vector<TDistanceNode>, std::greater<TDistanceNode>> PriorityQueue;
 	for(int y = 0; y < m_FinishPredictionMapHeight; ++y)
 	{
 		for(int x = 0; x < m_FinishPredictionMapWidth; ++x)
@@ -205,36 +226,58 @@ bool CHud::RebuildFinishPredictionPathData()
 			const bool FinishTile = Collision()->GetTileIndex(Index) == TILE_FINISH || Collision()->GetFrontTileIndex(Index) == TILE_FINISH;
 			if(StartTile)
 				m_vFinishPredictionStartTiles.emplace_back(x, y);
-			if(FinishTile && IsPassableTile(x, y))
+			if(FinishTile && m_vFinishPredictionPassable[Index] != 0)
 			{
 				m_vFinishPredictionFinishTiles.emplace_back(x, y);
 				m_vFinishPredictionDistances[Index] = 0;
-				vQueue.push_back(Index);
+				PriorityQueue.emplace(0, Index);
 			}
 		}
 	}
 
-	if(vQueue.empty())
+	if(PriorityQueue.empty())
 		return false;
 
-	static const ivec2 s_aDirs[] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-	for(size_t Head = 0; Head < vQueue.size(); ++Head)
+	struct SFinishPredictionDir
 	{
-		const int Index = vQueue[Head];
-		const int CurDist = m_vFinishPredictionDistances[Index];
+		ivec2 m_Dir;
+		int m_Cost;
+	};
+	static const SFinishPredictionDir s_aDirs[] = {
+		{{1, 0}, 10}, {{-1, 0}, 10}, {{0, 1}, 10}, {{0, -1}, 10},
+		{{1, 1}, 14}, {{1, -1}, 14}, {{-1, 1}, 14}, {{-1, -1}, 14},
+	};
+	while(!PriorityQueue.empty())
+	{
+		const auto [CurDist, Index] = PriorityQueue.top();
+		PriorityQueue.pop();
+		if(Index < 0 || Index >= MapSize || m_vFinishPredictionDistances[Index] != CurDist)
+			continue;
 		const int TileX = Index % m_FinishPredictionMapWidth;
 		const int TileY = Index / m_FinishPredictionMapWidth;
-		for(const ivec2 &Dir : s_aDirs)
+		for(const SFinishPredictionDir &DirInfo : s_aDirs)
 		{
+			const ivec2 Dir = DirInfo.m_Dir;
 			const int NextX = TileX + Dir.x;
 			const int NextY = TileY + Dir.y;
-			if(!IsPassableTile(NextX, NextY))
+			if(NextX < 0 || NextX >= m_FinishPredictionMapWidth || NextY < 0 || NextY >= m_FinishPredictionMapHeight)
 				continue;
 			const int NextIndex = NextY * m_FinishPredictionMapWidth + NextX;
-			if(m_vFinishPredictionDistances[NextIndex] >= 0)
+			if(m_vFinishPredictionPassable[NextIndex] == 0)
 				continue;
-			m_vFinishPredictionDistances[NextIndex] = CurDist + 1;
-			vQueue.push_back(NextIndex);
+			if(Dir.x != 0 && Dir.y != 0)
+			{
+				const int SideIndexX = TileY * m_FinishPredictionMapWidth + NextX;
+				const int SideIndexY = NextY * m_FinishPredictionMapWidth + TileX;
+				if(m_vFinishPredictionPassable[SideIndexX] == 0 || m_vFinishPredictionPassable[SideIndexY] == 0)
+					continue;
+			}
+
+			const int NextDistance = CurDist + DirInfo.m_Cost;
+			if(m_vFinishPredictionDistances[NextIndex] >= 0 && m_vFinishPredictionDistances[NextIndex] <= NextDistance)
+				continue;
+			m_vFinishPredictionDistances[NextIndex] = NextDistance;
+			PriorityQueue.emplace(NextDistance, NextIndex);
 		}
 	}
 
@@ -272,7 +315,7 @@ float CHud::GetFinishPredictionDistanceAtPos(vec2 Pos) const
 				if(Dist < 0)
 					continue;
 				const float OffsetCost = distance(Pos, vec2(x * 32.0f + 16.0f, y * 32.0f + 16.0f)) / 32.0f;
-				const float Total = Dist + OffsetCost;
+				const float Total = Dist / 10.0f + OffsetCost;
 				if(BestDistance < 0.0f || Total < BestDistance)
 					BestDistance = Total;
 			}
@@ -297,8 +340,9 @@ float CHud::GetFinishPredictionStartDistance() const
 		const int Dist = m_vFinishPredictionDistances[Index];
 		if(Dist < 0)
 			continue;
-		if(BestDistance < 0.0f || Dist < BestDistance)
-			BestDistance = (float)Dist;
+		const float DistanceTiles = Dist / 10.0f;
+		if(BestDistance < 0.0f || DistanceTiles < BestDistance)
+			BestDistance = DistanceTiles;
 	}
 	return BestDistance;
 }
@@ -417,6 +461,8 @@ bool CHud::GetFinishPredictionState(SFinishPredictionState &State, bool ForcePre
 		const_cast<CHud *>(this)->m_FinishPredictionRaceStartTick = -1;
 		const_cast<CHud *>(this)->m_FinishPredictionRaceStartDistance = -1.0f;
 		const_cast<CHud *>(this)->m_FinishPredictionLastProgress = 0.0f;
+		const_cast<CHud *>(this)->m_FinishPredictionSmoothedFinishTimeMs = -1;
+		const_cast<CHud *>(this)->m_FinishPredictionLastPredictTick = -1;
 		return false;
 	}
 
@@ -427,6 +473,8 @@ bool CHud::GetFinishPredictionState(SFinishPredictionState &State, bool ForcePre
 		const_cast<CHud *>(this)->m_FinishPredictionRaceStartTick = -1;
 		const_cast<CHud *>(this)->m_FinishPredictionRaceStartDistance = -1.0f;
 		const_cast<CHud *>(this)->m_FinishPredictionLastProgress = 0.0f;
+		const_cast<CHud *>(this)->m_FinishPredictionSmoothedFinishTimeMs = -1;
+		const_cast<CHud *>(this)->m_FinishPredictionLastPredictTick = -1;
 		State.m_Valid = true;
 		State.m_Progress = 0.0f;
 		State.m_CurrentTimeMs = 0;
@@ -463,9 +511,13 @@ bool CHud::GetFinishPredictionState(SFinishPredictionState &State, bool ForcePre
 		const_cast<CHud *>(this)->m_FinishPredictionRaceStartTick = RaceStartTick;
 		const_cast<CHud *>(this)->m_FinishPredictionRaceStartDistance = maximum(CurrentDistance, GetFinishPredictionStartDistance());
 		const_cast<CHud *>(this)->m_FinishPredictionLastProgress = 0.0f;
+		const_cast<CHud *>(this)->m_FinishPredictionSmoothedFinishTimeMs = -1;
+		const_cast<CHud *>(this)->m_FinishPredictionLastPredictTick = -1;
 	}
 
-	const float StartDistance = maximum(GetFinishPredictionStartDistance(), CurrentDistance);
+	const float StartDistance = m_FinishPredictionRaceStartDistance > 0.0f ?
+					    maximum(m_FinishPredictionRaceStartDistance, 1.0f) :
+					    maximum(GetFinishPredictionStartDistance(), CurrentDistance);
 	if(StartDistance <= 0.0f)
 	{
 		State.m_Valid = true;
@@ -478,7 +530,9 @@ bool CHud::GetFinishPredictionState(SFinishPredictionState &State, bool ForcePre
 		State.m_Progress = 1.0f;
 	const_cast<CHud *>(this)->m_FinishPredictionLastProgress = State.m_Progress;
 
-	const int64_t CurrentPacePrediction = State.m_Progress > 0.001f ? (int64_t)(State.m_CurrentTimeMs / maximum(State.m_Progress, 0.001f)) : -1;
+	const int64_t CurrentPacePrediction = State.m_Progress > 0.015f && State.m_CurrentTimeMs > 1500 ?
+						      (int64_t)(State.m_CurrentTimeMs / maximum(State.m_Progress, 0.015f)) :
+						      -1;
 	const int64_t BestTimeMs = GetFinishPredictionBestTimeMs();
 	const int64_t PersonalBestTimeMs = GetFinishPredictionPersonalBestTimeMs();
 	const int64_t AverageTimeMs = GetFinishPredictionAverageTimeMs();
@@ -503,10 +557,14 @@ bool CHud::GetFinishPredictionState(SFinishPredictionState &State, bool ForcePre
 	{
 		State.m_PredictedFinishTimeMs = State.m_CurrentTimeMs;
 		State.m_HasPredictedTime = true;
+		const_cast<CHud *>(this)->m_FinishPredictionSmoothedFinishTimeMs = State.m_PredictedFinishTimeMs;
+		const_cast<CHud *>(this)->m_FinishPredictionLastPredictTick = CurrentTick;
 	}
 	else if(CurrentPacePrediction > 0 && ReferenceTimeMs > 0)
 	{
-		const float Blend = std::clamp(State.m_Progress * 0.85f + 0.15f, 0.15f, 0.92f);
+		const float ProgressConfidence = std::clamp((State.m_Progress - 0.04f) / 0.34f, 0.0f, 1.0f);
+		const float TimeConfidence = std::clamp(State.m_CurrentTimeMs / 45000.0f, 0.0f, 1.0f);
+		const float Blend = std::clamp(ProgressConfidence * 0.78f + TimeConfidence * 0.22f, 0.0f, 0.96f);
 		State.m_PredictedFinishTimeMs = (int64_t)mix((float)ReferenceTimeMs, (float)CurrentPacePrediction, Blend);
 		State.m_HasPredictedTime = true;
 	}
@@ -526,6 +584,23 @@ bool CHud::GetFinishPredictionState(SFinishPredictionState &State, bool ForcePre
 	if(State.m_HasPredictedTime)
 	{
 		State.m_PredictedFinishTimeMs = maximum(State.m_PredictedFinishTimeMs, State.m_CurrentTimeMs);
+		if(State.m_Progress < 0.999f)
+		{
+			if(m_FinishPredictionSmoothedFinishTimeMs < 0)
+			{
+				const_cast<CHud *>(this)->m_FinishPredictionSmoothedFinishTimeMs = State.m_PredictedFinishTimeMs;
+				const_cast<CHud *>(this)->m_FinishPredictionLastPredictTick = CurrentTick;
+			}
+			else if(m_FinishPredictionLastPredictTick != CurrentTick)
+			{
+				const int TickDelta = maximum(1, CurrentTick - maximum(0, m_FinishPredictionLastPredictTick));
+				const float Follow = State.m_PredictedFinishTimeMs < m_FinishPredictionSmoothedFinishTimeMs ? 0.075f : 0.045f;
+				const float Blend = std::clamp(TickDelta * Follow, 0.035f, 0.30f);
+				const_cast<CHud *>(this)->m_FinishPredictionSmoothedFinishTimeMs = (int64_t)mix((float)m_FinishPredictionSmoothedFinishTimeMs, (float)State.m_PredictedFinishTimeMs, Blend);
+				const_cast<CHud *>(this)->m_FinishPredictionLastPredictTick = CurrentTick;
+			}
+			State.m_PredictedFinishTimeMs = maximum<int64_t>(m_FinishPredictionSmoothedFinishTimeMs, State.m_CurrentTimeMs);
+		}
 		State.m_RemainingTimeMs = maximum<int64_t>(0, State.m_PredictedFinishTimeMs - State.m_CurrentTimeMs);
 	}
 	else

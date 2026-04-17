@@ -66,6 +66,7 @@ public:
 		STREAMER_HIDE_OWN_NAME = 1 << 3,
 		STREAMER_HIDE_OTHER_NAMES = 1 << 4,
 		STREAMER_HIDE_TAB_NAMES = 1 << 5,
+		STREAMER_HIDE_LOGIN = 1 << 6,
 	};
 
 	enum EBestClientComponent
@@ -144,6 +145,7 @@ public:
 	void RemoveStreamerBlockedWord(int Index);
 	const std::vector<std::string> &StreamerBlockedWords();
 	int StreamerBlockedWordCount();
+	bool SanitizeSensitiveCommand(const char *pInput, char *pOutput, size_t OutputSize) const;
 	void SanitizeText(const char *pInput, char *pOutput, size_t OutputSize);
 	void SanitizePlayerName(const char *pInput, char *pOutput, size_t OutputSize, int ClientId, bool InScoreboard = false);
 	bool IsComponentDisabled(EBestClientComponent Component) const;
