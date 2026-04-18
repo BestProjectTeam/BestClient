@@ -1866,7 +1866,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 					// Latency compensation slider
 					Expand.HSplitTop(LineSize, &Button, &Expand);
 					{
-						const int Min = 0, Max = 200;
+						const int Min = 0, Max = 50;
 						int Value = std::clamp(g_Config.m_BcBestInputLatencyComp, Min, Max);
 
 						char aBuf[256];
