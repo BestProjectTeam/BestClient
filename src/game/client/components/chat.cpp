@@ -966,7 +966,7 @@ void ApplyTranslateLanguage(char *pConfig, size_t ConfigSize, int Index, const S
 
 void CChat::OpenTranslateSettingsPopup(const CUIRect &ButtonRect)
 {
-	Ui()->DoPopupMenu(&m_TranslateSettingsPopupId, ButtonRect.x, ButtonRect.y, 300.0f, 205.0f, this, PopupTranslateSettings);
+	Ui()->DoPopupMenu(&m_TranslateSettingsPopupId, ButtonRect.x, ButtonRect.y, 300.0f, 255.0f, this, PopupTranslateSettings);
 }
 
 CUi::EPopupMenuFunctionResult CChat::PopupTranslateSettings(void *pContext, CUIRect View, bool Active)
@@ -980,6 +980,7 @@ CUi::EPopupMenuFunctionResult CChat::PopupTranslateSettings(void *pContext, CUIR
 	static CUi::SDropDownState s_IncomingTargetDropDown;
 	static CUi::SDropDownState s_OutgoingSourceDropDown;
 	static CUi::SDropDownState s_OutgoingTargetDropDown;
+	static CLineInput s_IncomingIgnoreLanguagesInput(g_Config.m_BcTranslateIncomingIgnoreLanguages, sizeof(g_Config.m_BcTranslateIncomingIgnoreLanguages));
 	static CScrollRegion s_IncomingSourceScroll;
 	static CScrollRegion s_IncomingTargetScroll;
 	static CScrollRegion s_OutgoingSourceScroll;
@@ -1037,6 +1038,15 @@ CUi::EPopupMenuFunctionResult CChat::PopupTranslateSettings(void *pContext, CUIR
 	const int NewOutgoingTargetIndex = RenderLanguageField(Localize("Your messages to"), OutgoingTargetIndex, s_apTargetLabels, std::size(s_apTargetLabels), s_OutgoingTargetDropDown);
 	if(NewOutgoingTargetIndex != OutgoingTargetIndex)
 		ApplyTranslateLanguage(g_Config.m_BcTranslateOutgoingTarget, sizeof(g_Config.m_BcTranslateOutgoingTarget), NewOutgoingTargetIndex, gs_aTranslateTargetOptions);
+
+	View.HSplitTop(Spacing, nullptr, &View);
+	View.HSplitTop(RowHeight, &Row, &View);
+	CUIRect IgnoreLabel, IgnoreEditBox;
+	Row.VSplitLeft(145.0f, &IgnoreLabel, &IgnoreEditBox);
+	pChat->Ui()->DoLabel(&IgnoreLabel, Localize("Don't translate from"), FontSize, TEXTALIGN_ML);
+	s_IncomingIgnoreLanguagesInput.SetEmptyText("ru; en; zh");
+	pChat->Ui()->DoClearableEditBox(&s_IncomingIgnoreLanguagesInput, &IgnoreEditBox, 14.0f);
+	pChat->GameClient()->m_Tooltips.DoToolTip(&s_IncomingIgnoreLanguagesInput, &IgnoreEditBox, Localize("Semicolon-separated source languages to skip for auto-translation, for example: ru; en; zh"));
 
 	return CUi::POPUP_KEEP_OPEN;
 }
@@ -4702,9 +4712,14 @@ void CChat::OnPrepareLines(float y, int StartLine, int HoveredTranslateLineIndex
 					pTranslatedLanguage = Line.m_pTranslateResponse->m_Language;
 			}
 		}
+		const char *pDisplayedTranslatedText = pTranslatedText;
+		const char *pDisplayedTranslatedLanguage = pTranslatedLanguage;
 		const bool ShowOriginalOnHover = pTranslatedText != nullptr && HoveredTranslateLineIndex == LineIndex;
-		const char *pDisplayedTranslatedText = ShowOriginalOnHover ? pText : pTranslatedText;
-		const char *pDisplayedTranslatedLanguage = ShowOriginalOnHover ? nullptr : pTranslatedLanguage;
+		if(ShowOriginalOnHover)
+		{
+			pDisplayedTranslatedText = pText;
+			pDisplayedTranslatedLanguage = nullptr;
+		}
 
 		Line.m_SelectionStart = -1;
 		Line.m_SelectionEnd = -1;
@@ -4929,11 +4944,21 @@ void CChat::OnPrepareLines(float y, int StartLine, int HoveredTranslateLineIndex
 		{
 			const float TranslateRectX = LineCursor.m_X;
 			const float TranslateRectY = LineCursor.m_Y;
-			const STextBoundingBox TranslatedBoundingBox = TextRender()->TextBoundingBox(FontSize, pDisplayedTranslatedText, -1, maximum(1.0f, LineCursor.m_LineWidth));
+			const float TextLineWidth = maximum(1.0f, LineCursor.m_LineWidth);
+			const STextBoundingBox DisplayedBoundingBox = TextRender()->TextBoundingBox(FontSize, pDisplayedTranslatedText, -1, TextLineWidth);
+			float HoverRectWidth = DisplayedBoundingBox.m_W;
+			float HoverRectHeight = DisplayedBoundingBox.m_H;
+			if(pTranslatedText != nullptr && pText != nullptr)
+			{
+				const STextBoundingBox TranslatedBoundingBox = TextRender()->TextBoundingBox(FontSize, pTranslatedText, -1, TextLineWidth);
+				const STextBoundingBox OriginalBoundingBox = TextRender()->TextBoundingBox(FontSize, pText, -1, TextLineWidth);
+				HoverRectWidth = maximum(TranslatedBoundingBox.m_W, OriginalBoundingBox.m_W);
+				HoverRectHeight = maximum(TranslatedBoundingBox.m_H, OriginalBoundingBox.m_H);
+			}
 			Line.m_TranslateRect.m_X = TranslateRectX;
 			Line.m_TranslateRect.m_Y = TranslateRectY;
-			Line.m_TranslateRect.m_W = maximum(1.0f, TranslatedBoundingBox.m_W);
-			Line.m_TranslateRect.m_H = maximum(FontSize, TranslatedBoundingBox.m_H);
+			Line.m_TranslateRect.m_W = maximum(1.0f, HoverRectWidth);
+			Line.m_TranslateRect.m_H = maximum(FontSize, HoverRectHeight);
 			Line.m_TranslateRectValid = true;
 			Line.m_TranslateLanguageRectValid = false;
 			TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &LineCursor, pDisplayedTranslatedText);
@@ -4953,6 +4978,10 @@ void CChat::OnPrepareLines(float y, int StartLine, int HoveredTranslateLineIndex
 				Line.m_TranslateLanguageRect.m_W = maximum(1.0f, LineCursor.m_X - RectX);
 				Line.m_TranslateLanguageRect.m_H = FontSize;
 				Line.m_TranslateLanguageRectValid = true;
+				const float TranslateRight = maximum(Line.m_TranslateRect.m_X + Line.m_TranslateRect.m_W, Line.m_TranslateLanguageRect.m_X + Line.m_TranslateLanguageRect.m_W);
+				const float TranslateBottom = maximum(Line.m_TranslateRect.m_Y + Line.m_TranslateRect.m_H, Line.m_TranslateLanguageRect.m_Y + Line.m_TranslateLanguageRect.m_H);
+				Line.m_TranslateRect.m_W = maximum(1.0f, TranslateRight - Line.m_TranslateRect.m_X);
+				Line.m_TranslateRect.m_H = maximum(FontSize, TranslateBottom - Line.m_TranslateRect.m_Y);
 				TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &LineCursor, "]");
 			}
 			TextRender()->TextColor(Color);
@@ -5069,8 +5098,6 @@ void CChat::OnRender()
 	for(auto &Line : m_aLines)
 	{
 		Line.m_NameRectValid = false;
-		Line.m_TranslateRectValid = false;
-		Line.m_TranslateLanguageRectValid = false;
 		Line.m_MediaPreviewRectValid = false;
 		Line.m_MediaRetryRectValid = false;
 	}
@@ -5613,7 +5640,7 @@ void CChat::OnRender()
 				}
 
 				if(HoveredTranslatedMessage || HoveredLanguageTag)
-					Ui()->SetHotItem(Line.m_TranslateLanguageRectValid ? (const void *)&Line.m_TranslateLanguageRect : (const void *)&Line.m_TranslateRect);
+					Ui()->SetHotItem((const void *)&Line.m_TranslateRect);
 
 				if(HoveredTranslatedMessage || HoveredLanguageTag)
 					HoveredTranslateLineIndex = LineIndex;

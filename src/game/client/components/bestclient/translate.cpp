@@ -44,6 +44,66 @@ static void UrlEncode(const char *pText, char *pOut, size_t Length)
 
 namespace
 {
+void NormalizeLanguageCode(const char *pLanguage, char *pOut, size_t Size)
+{
+	if(!pOut || Size == 0)
+		return;
+	pOut[0] = '\0';
+	if(!pLanguage || pLanguage[0] == '\0')
+		return;
+
+	char aLower[32] = "";
+	int Out = 0;
+	for(const char *p = pLanguage; *p != '\0' && Out < (int)sizeof(aLower) - 1; ++p)
+	{
+		const unsigned char c = (unsigned char)*p;
+		if(c == '-' || c == '_' || c == ';' || c == ',' || c == '|' || std::isspace(c))
+			break;
+		if(std::isalnum(c))
+			aLower[Out++] = (char)std::tolower(c);
+	}
+	aLower[Out] = '\0';
+	if(aLower[0] == '\0')
+		return;
+
+	const struct
+	{
+		const char *m_pIn;
+		const char *m_pOut;
+	} aMappings[] = {
+		{"auto", "auto"},
+		{"ru", "ru"},
+		{"russian", "ru"},
+		{"en", "en"},
+		{"english", "en"},
+		{"de", "de"},
+		{"german", "de"},
+		{"fr", "fr"},
+		{"french", "fr"},
+		{"es", "es"},
+		{"spanish", "es"},
+		{"zh", "zh"},
+		{"cn", "zh"},
+		{"chinese", "zh"},
+		{"mandarin", "zh"},
+		{"pt", "pt"},
+		{"portuguese", "pt"},
+		{"brazilian", "pt"},
+		{"brasileiro", "pt"},
+		{"tr", "tr"},
+		{"turkish", "tr"},
+	};
+
+	for(const auto &Mapping : aMappings)
+	{
+		if(str_comp(aLower, Mapping.m_pIn) == 0)
+		{
+			str_copy(pOut, Mapping.m_pOut, Size);
+			return;
+		}
+	}
+}
+
 std::string UrlDecode(std::string_view Encoded)
 {
 	std::string Decoded;
@@ -168,53 +228,49 @@ void NormalizeDetectedLanguage(char *pLanguage, size_t Size)
 	if(!pLanguage || Size == 0 || pLanguage[0] == '\0')
 		return;
 
-	char aLower[16] = "";
-	int Out = 0;
-	for(const char *p = pLanguage; *p != '\0' && Out < (int)sizeof(aLower) - 1; ++p)
-	{
-		const unsigned char c = (unsigned char)*p;
-		if(c == '-' || c == '_' || std::isspace(c))
-			break;
-		if(std::isalpha(c))
-			aLower[Out++] = (char)std::tolower(c);
-	}
-	aLower[Out] = '\0';
+	char aNormalized[16] = "";
+	NormalizeLanguageCode(pLanguage, aNormalized, sizeof(aNormalized));
+	str_copy(pLanguage, aNormalized, Size);
+}
 
-	const struct
-	{
-		const char *m_pIn;
-		const char *m_pOut;
-	} aMappings[] = {
-		{"ru", "ru"},
-		{"russian", "ru"},
-		{"en", "en"},
-		{"english", "en"},
-		{"de", "de"},
-		{"german", "de"},
-		{"fr", "fr"},
-		{"french", "fr"},
-		{"es", "es"},
-		{"spanish", "es"},
-		{"zh", "zh"},
-		{"chinese", "zh"},
-		{"pt", "pt"},
-		{"portuguese", "pt"},
-		{"brazilian", "pt"},
-		{"brasileiro", "pt"},
-		{"tr", "tr"},
-		{"turkish", "tr"},
-	};
+bool ExtractOutgoingChatPrefix(const CGameClient &GameClient, const char *pText, char *pPrefix, size_t PrefixSize, char *pBody, size_t BodySize)
+{
+	if(!pPrefix || PrefixSize == 0 || !pBody || BodySize == 0)
+		return false;
+	pPrefix[0] = '\0';
+	pBody[0] = '\0';
+	if(!pText || pText[0] == '\0')
+		return false;
 
-	for(const auto &Mapping : aMappings)
+	const char *pColon = str_find(pText, ":");
+	if(!pColon || pColon == pText)
+		return false;
+
+	const int NameLength = (int)(pColon - pText);
+	const char *pBodyStart = pColon + 1;
+	while(*pBodyStart != '\0' && std::isspace((unsigned char)*pBodyStart))
+		++pBodyStart;
+	if(*pBodyStart == '\0')
+		return false;
+
+	for(const auto &Client : GameClient.m_aClients)
 	{
-		if(str_comp(aLower, Mapping.m_pIn) == 0)
-		{
-			str_copy(pLanguage, Mapping.m_pOut, Size);
-			return;
-		}
+		if(!Client.m_Active || Client.m_aName[0] == '\0')
+			continue;
+		if(str_length(Client.m_aName) != NameLength)
+			continue;
+		char aNamePrefix[64] = "";
+		str_copy(aNamePrefix, std::string(pText, NameLength).c_str(), sizeof(aNamePrefix));
+		if(str_comp_nocase(Client.m_aName, aNamePrefix) != 0)
+			continue;
+
+		const int PrefixLength = (int)(pBodyStart - pText);
+		str_copy(pPrefix, std::string(pText, PrefixLength).c_str(), PrefixSize);
+		str_copy(pBody, pBodyStart, BodySize);
+		return true;
 	}
 
-	pLanguage[0] = '\0';
+	return false;
 }
 }
 
@@ -644,6 +700,41 @@ const char *CTranslate::OutgoingTargetLanguage() const
 	return g_Config.m_BcTranslateOutgoingTarget;
 }
 
+bool CTranslate::IsIgnoredIncomingLanguage(const char *pLanguage) const
+{
+	if(!pLanguage || pLanguage[0] == '\0' || g_Config.m_BcTranslateIncomingIgnoreLanguages[0] == '\0')
+		return false;
+
+	char aLanguage[16] = "";
+	NormalizeLanguageCode(pLanguage, aLanguage, sizeof(aLanguage));
+	if(aLanguage[0] == '\0' || str_comp(aLanguage, "auto") == 0)
+		return false;
+
+	const char *pToken = g_Config.m_BcTranslateIncomingIgnoreLanguages;
+	while(*pToken != '\0')
+	{
+		while(*pToken != '\0' && (*pToken == ';' || *pToken == ',' || *pToken == '|' || std::isspace((unsigned char)*pToken)))
+			++pToken;
+		if(*pToken == '\0')
+			break;
+
+		const char *pTokenEnd = pToken;
+		while(*pTokenEnd != '\0' && *pTokenEnd != ';' && *pTokenEnd != ',' && *pTokenEnd != '|' && !std::isspace((unsigned char)*pTokenEnd))
+			++pTokenEnd;
+
+		char aToken[32] = "";
+		str_copy(aToken, std::string(pToken, pTokenEnd - pToken).c_str(), sizeof(aToken));
+		char aNormalizedToken[16] = "";
+		NormalizeLanguageCode(aToken, aNormalizedToken, sizeof(aNormalizedToken));
+		if(aNormalizedToken[0] != '\0' && str_comp(aLanguage, aNormalizedToken) == 0)
+			return true;
+
+		pToken = pTokenEnd;
+	}
+
+	return false;
+}
+
 bool CTranslate::ShouldTranslateOutgoingChat(const char *pText) const
 {
 	if(!g_Config.m_TcTranslateAutoOutgoing || !pText || pText[0] == '\0')
@@ -724,6 +815,11 @@ void CTranslate::Translate(const char *pName, bool ShowProgress)
 
 void CTranslate::Translate(CChat::CLine &Line, bool ShowProgress)
 {
+	TranslateLine(Line, ShowProgress, false);
+}
+
+void CTranslate::TranslateLine(CChat::CLine &Line, bool ShowProgress, bool RespectIgnoredIncomingLanguages)
+{
 	if(m_vJobs.size() > 15)
 	{
 		return;
@@ -732,6 +828,7 @@ void CTranslate::Translate(CChat::CLine &Line, bool ShowProgress)
 	CTranslateJob Job;
 	Job.m_Type = CTranslateJob::EType::CHAT_LINE;
 	Job.m_pLine = &Line;
+	Job.m_RespectIgnoredIncomingLanguages = RespectIgnoredIncomingLanguages;
 	Job.m_pTranslateResponse = std::make_shared<CTranslateResponse>();
 	Job.m_pLine->m_pTranslateResponse = Job.m_pTranslateResponse;
 	Job.m_pBackend = CreateBackend(Job.m_pLine->m_aText, IncomingSourceLanguage(), IncomingTargetLanguage());
@@ -768,8 +865,10 @@ bool CTranslate::TryTranslateOutgoingChat(int Team, const char *pText)
 	Job.m_Type = CTranslateJob::EType::OUTGOING_CHAT;
 	Job.m_Team = Team;
 	str_copy(Job.m_aOriginalText, pText, sizeof(Job.m_aOriginalText));
+	if(!ExtractOutgoingChatPrefix(*GameClient(), pText, Job.m_aOutgoingPrefix, sizeof(Job.m_aOutgoingPrefix), Job.m_aTextToTranslate, sizeof(Job.m_aTextToTranslate)))
+		str_copy(Job.m_aTextToTranslate, pText, sizeof(Job.m_aTextToTranslate));
 	Job.m_pTranslateResponse = std::make_shared<CTranslateResponse>();
-	Job.m_pBackend = CreateBackend(Job.m_aOriginalText, OutgoingSourceLanguage(), OutgoingTargetLanguage());
+	Job.m_pBackend = CreateBackend(Job.m_aTextToTranslate, OutgoingSourceLanguage(), OutgoingTargetLanguage());
 	if(!Job.m_pBackend)
 		return false;
 
@@ -795,10 +894,22 @@ void CTranslate::OnRender()
 		{
 			const char *pTextToSend = Job.m_aOriginalText;
 			char aTranslated[MAX_LINE_LENGTH] = "";
-			if(*Done && Job.m_pTranslateResponse->m_Text[0] != '\0' && str_comp_nocase(Job.m_aOriginalText, Job.m_pTranslateResponse->m_Text) != 0 &&
-				SanitizeOutgoingTranslatedText(Job.m_aOriginalText, Job.m_pTranslateResponse->m_Text, aTranslated, sizeof(aTranslated)))
+			if(*Done && Job.m_pTranslateResponse->m_Text[0] != '\0' && str_comp_nocase(Job.m_aTextToTranslate, Job.m_pTranslateResponse->m_Text) != 0 &&
+				SanitizeOutgoingTranslatedText(Job.m_aTextToTranslate, Job.m_pTranslateResponse->m_Text, aTranslated, sizeof(aTranslated)))
 			{
-				pTextToSend = aTranslated;
+				if(Job.m_aOutgoingPrefix[0] != '\0')
+				{
+					char aPrefixedTranslated[MAX_LINE_LENGTH] = "";
+					if(str_length(Job.m_aOutgoingPrefix) + str_length(aTranslated) < (int)sizeof(aPrefixedTranslated))
+					{
+						str_format(aPrefixedTranslated, sizeof(aPrefixedTranslated), "%s%s", Job.m_aOutgoingPrefix, aTranslated);
+						pTextToSend = aPrefixedTranslated;
+					}
+				}
+				else
+				{
+					pTextToSend = aTranslated;
+				}
 			}
 			GameClient()->m_Chat.SendTranslatedChatQueued(Job.m_Team, pTextToSend);
 			return true;
@@ -806,6 +917,11 @@ void CTranslate::OnRender()
 
 		if(*Done)
 		{
+			if(Job.m_RespectIgnoredIncomingLanguages && IsIgnoredIncomingLanguage(Job.m_pTranslateResponse->m_Language))
+			{
+				Job.m_pTranslateResponse->m_Text[0] = '\0';
+				Job.m_pTranslateResponse->m_Language[0] = '\0';
+			}
 			if(str_comp_nocase(Job.m_pLine->m_aText, Job.m_pTranslateResponse->m_Text) == 0)
 				Job.m_pTranslateResponse->m_Text[0] = '\0';
 		}
@@ -842,5 +958,5 @@ void CTranslate::AutoTranslate(CChat::CLine &Line)
 	}
 	if(LanguagesEqual(IncomingSourceLanguage(), IncomingTargetLanguage()))
 		return;
-	Translate(Line, false);
+	TranslateLine(Line, false, true);
 }

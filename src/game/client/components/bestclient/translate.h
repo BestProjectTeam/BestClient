@@ -39,6 +39,9 @@ class CTranslate : public CComponent
 		std::shared_ptr<CTranslateResponse> m_pTranslateResponse = nullptr;
 		int m_Team = 0;
 		char m_aOriginalText[MAX_LINE_LENGTH] = "";
+		char m_aTextToTranslate[MAX_LINE_LENGTH] = "";
+		char m_aOutgoingPrefix[MAX_LINE_LENGTH] = "";
+		bool m_RespectIgnoredIncomingLanguages = false;
 	};
 	std::vector<CTranslateJob> m_vJobs;
 
@@ -49,8 +52,10 @@ class CTranslate : public CComponent
 	const char *IncomingTargetLanguage() const;
 	const char *OutgoingSourceLanguage() const;
 	const char *OutgoingTargetLanguage() const;
+	bool IsIgnoredIncomingLanguage(const char *pLanguage) const;
 	bool ShouldTranslateOutgoingChat(const char *pText) const;
 	bool HasPendingJobs() const;
+	void TranslateLine(CChat::CLine &Line, bool ShowProgress, bool RespectIgnoredIncomingLanguages);
 
 public:
 	int Sizeof() const override { return sizeof(*this); }
