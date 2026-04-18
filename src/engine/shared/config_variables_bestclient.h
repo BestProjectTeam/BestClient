@@ -86,9 +86,6 @@ MACRO_CONFIG_INT(BcDeltaInputOthers, bc_delta_input_others, 0, 0, 1, CFGFLAG_CLI
 MACRO_CONFIG_INT(BcGammaInputOthers, bc_gamma_input_others, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Apply gamma input to other tees")
 MACRO_CONFIG_INT(BcSnapTap, bc_snap_tap, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable Snap Tap for opposite left/right inputs")
 MACRO_CONFIG_INT(BcSnapTapDelay, bc_snap_tap_delay, 0, 0, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Snap Tap direction switch delay in milliseconds (0 = off)")
-MACRO_CONFIG_INT(BcHookTrajectoryPredictor, bc_hook_trajectory_predictor, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable hook predictor settings")
-MACRO_CONFIG_INT(BcHookTrajectoryPredictorReleaseOffset, bc_hook_trajectory_predictor_release_offset, 20, 0, 250, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Release timing offset after predicted tension point in milliseconds")
-MACRO_CONFIG_INT(BcHookTrajectoryPredictorReleaseWindow, bc_hook_trajectory_predictor_release_window, 45, 5, 250, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Half-width of the ideal release timing window in milliseconds")
 
 // Auto team lock
 MACRO_CONFIG_INT(BcAutoTeamLock, bc_auto_team_lock, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically lock your team after joining it")

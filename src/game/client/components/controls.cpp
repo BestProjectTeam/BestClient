@@ -27,13 +27,6 @@ CControls::CControls()
 	mem_zero(m_aSnapTapLastPressedTime, sizeof(m_aSnapTapLastPressedTime));
 	mem_zero(m_aSnapTapPrevLeft, sizeof(m_aSnapTapPrevLeft));
 	mem_zero(m_aSnapTapPrevRight, sizeof(m_aSnapTapPrevRight));
-	mem_zero(m_aHookPredictorActive, sizeof(m_aHookPredictorActive));
-	mem_zero(m_aHookPredictorPeakLocked, sizeof(m_aHookPredictorPeakLocked));
-	mem_zero(m_aHookPredictorLastTrend, sizeof(m_aHookPredictorLastTrend));
-	mem_zero(m_aHookPredictorPeakTick, sizeof(m_aHookPredictorPeakTick));
-	mem_zero(m_aHookPredictorStartDistance, sizeof(m_aHookPredictorStartDistance));
-	mem_zero(m_aHookPredictorBestDistance, sizeof(m_aHookPredictorBestDistance));
-	mem_zero(m_aHookPredictorPrevDistance, sizeof(m_aHookPredictorPrevDistance));
 	std::fill(std::begin(m_aMousePos), std::end(m_aMousePos), vec2(0.0f, 0.0f));
 	std::fill(std::begin(m_aMousePosOnAction), std::end(m_aMousePosOnAction), vec2(0.0f, 0.0f));
 	std::fill(std::begin(m_aTargetPos), std::end(m_aTargetPos), vec2(0.0f, 0.0f));
@@ -68,7 +61,6 @@ void CControls::ResetInput(int Dummy)
 	m_aSnapTapLastPressedTime[Dummy] = 0;
 	m_aSnapTapPrevLeft[Dummy] = 0;
 	m_aSnapTapPrevRight[Dummy] = 0;
-	ResetHookPredictorState(Dummy);
 }
 
 void CControls::OnPlayerDeath()
@@ -281,131 +273,6 @@ int CControls::ResolveSnapTapDirection(int Dummy, bool LeftPressed, bool RightPr
 	return m_aSnapTapAppliedDirection[Dummy];
 }
 
-void CControls::ResetHookPredictorState(int Dummy)
-{
-	m_aHookPredictorActive[Dummy] = 0;
-	m_aHookPredictorPeakLocked[Dummy] = 0;
-	m_aHookPredictorLastTrend[Dummy] = 0;
-	m_aHookPredictorPeakTick[Dummy] = 0;
-	m_aHookPredictorStartDistance[Dummy] = 0.0f;
-	m_aHookPredictorBestDistance[Dummy] = 0.0f;
-	m_aHookPredictorPrevDistance[Dummy] = 0.0f;
-}
-
-void CControls::ApplyHookTrajectoryPredictor(int Dummy)
-{
-	// The predictor is only meaningful on the currently controlled tee.
-	if(Dummy != g_Config.m_ClDummy)
-	{
-		ResetHookPredictorState(Dummy);
-		return;
-	}
-
-	if(!g_Config.m_BcHookTrajectoryPredictor || !GameClient()->m_Snap.m_pLocalCharacter || GameClient()->m_Snap.m_SpecInfo.m_Active)
-	{
-		ResetHookPredictorState(Dummy);
-		return;
-	}
-
-	if(m_aInputData[Dummy].m_Hook == 0)
-	{
-		ResetHookPredictorState(Dummy);
-		return;
-	}
-
-	const int LocalId = GameClient()->m_aLocalIds[Dummy];
-	if(LocalId < 0 || LocalId >= MAX_CLIENTS || !GameClient()->m_Snap.m_aCharacters[LocalId].m_Active)
-	{
-		ResetHookPredictorState(Dummy);
-		return;
-	}
-
-	const CCharacterCore &Core = GameClient()->m_aClients[LocalId].m_Predicted;
-	if(Core.m_HookState != HOOK_GRABBED || Core.HookedPlayer() != -1)
-	{
-		ResetHookPredictorState(Dummy);
-		return;
-	}
-
-	const int PredTick = Client()->PredGameTick(Dummy);
-	const float HookDistance = distance(Core.m_HookPos, Core.m_Pos);
-	if(HookDistance <= 0.0f)
-	{
-		ResetHookPredictorState(Dummy);
-		return;
-	}
-
-	if(!m_aHookPredictorActive[Dummy])
-	{
-		m_aHookPredictorActive[Dummy] = 1;
-		m_aHookPredictorPeakLocked[Dummy] = 0;
-		m_aHookPredictorLastTrend[Dummy] = 0;
-		m_aHookPredictorPeakTick[Dummy] = PredTick;
-		m_aHookPredictorStartDistance[Dummy] = HookDistance;
-		m_aHookPredictorBestDistance[Dummy] = HookDistance;
-		m_aHookPredictorPrevDistance[Dummy] = HookDistance;
-		return;
-	}
-
-	static constexpr float s_TrendEpsilon = 0.5f;
-	static constexpr float s_MinGainForPeak = 24.0f;
-	static constexpr float s_MinDropAfterPeak = 6.0f;
-
-	const float DeltaDistance = HookDistance - m_aHookPredictorPrevDistance[Dummy];
-	int Trend = 0;
-	if(DeltaDistance > s_TrendEpsilon)
-		Trend = 1;
-	else if(DeltaDistance < -s_TrendEpsilon)
-		Trend = -1;
-
-	if(HookDistance > m_aHookPredictorBestDistance[Dummy])
-	{
-		m_aHookPredictorBestDistance[Dummy] = HookDistance;
-		m_aHookPredictorPeakTick[Dummy] = PredTick;
-	}
-
-	if(!m_aHookPredictorPeakLocked[Dummy])
-	{
-		const float Gain = m_aHookPredictorBestDistance[Dummy] - m_aHookPredictorStartDistance[Dummy];
-		const float Drop = m_aHookPredictorBestDistance[Dummy] - HookDistance;
-		if(Gain >= s_MinGainForPeak && Drop >= s_MinDropAfterPeak && m_aHookPredictorLastTrend[Dummy] >= 0 && Trend < 0)
-		{
-			m_aHookPredictorPeakLocked[Dummy] = 1;
-		}
-	}
-
-	if(Trend != 0)
-		m_aHookPredictorLastTrend[Dummy] = Trend;
-
-	if(m_aHookPredictorPeakLocked[Dummy])
-	{
-		const int TickSpeed = maximum(1, Client()->GameTickSpeed());
-		const int OffsetTicks = maximum(0, round_to_int((float)g_Config.m_BcHookTrajectoryPredictorReleaseOffset * TickSpeed / 1000.0f));
-		const int WindowTicks = maximum(0, round_to_int((float)g_Config.m_BcHookTrajectoryPredictorReleaseWindow * TickSpeed / 1000.0f));
-		const int TargetTick = m_aHookPredictorPeakTick[Dummy] + OffsetTicks;
-		const int TickDelta = PredTick - TargetTick;
-
-		if(absolute(TickDelta) <= WindowTicks)
-		{
-			m_aInputData[Dummy].m_Hook = 0;
-			ResetHookPredictorState(Dummy);
-			return;
-		}
-
-		// Missed window: keep searching for the next swing peak while hook is still held.
-		if(TickDelta > WindowTicks)
-		{
-			m_aHookPredictorPeakLocked[Dummy] = 0;
-			m_aHookPredictorLastTrend[Dummy] = 0;
-			m_aHookPredictorPeakTick[Dummy] = PredTick;
-			m_aHookPredictorStartDistance[Dummy] = HookDistance;
-			m_aHookPredictorBestDistance[Dummy] = HookDistance;
-		}
-	}
-
-	m_aHookPredictorPrevDistance[Dummy] = HookDistance;
-}
-
 void CControls::GoresMode()
 {
 	// if turning off kog mode and it was on before, rebind to previous bind
@@ -481,8 +348,6 @@ int CControls::SnapInput(int *pData)
 	// we freeze the input if chat or menu is activated
 	if(!(m_aInputData[g_Config.m_ClDummy].m_PlayerFlags & PLAYERFLAG_PLAYING))
 	{
-		ResetHookPredictorState(g_Config.m_ClDummy);
-
 		if(!GameClient()->m_GameInfo.m_BugDDRaceInput)
 			ResetInput(g_Config.m_ClDummy);
 
@@ -537,7 +402,6 @@ int CControls::SnapInput(int *pData)
 		const bool LeftPressed = m_aInputDirectionLeft[g_Config.m_ClDummy] != 0;
 		const bool RightPressed = m_aInputDirectionRight[g_Config.m_ClDummy] != 0;
 		m_aInputData[g_Config.m_ClDummy].m_Direction = ResolveMovementDirection(g_Config.m_ClDummy, LeftPressed, RightPressed);
-		ApplyHookTrajectoryPredictor(g_Config.m_ClDummy);
 
 		// dummy copy moves
 		if(g_Config.m_ClDummyCopyMoves)
