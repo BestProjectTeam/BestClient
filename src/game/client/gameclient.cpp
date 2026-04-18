@@ -117,7 +117,7 @@ float EffectiveFastInputOffsetTicksFastMode()
 	return g_Config.m_TcFastInputAmount / 20.0f;
 }
 
-float EffectiveFastInputOffsetTicksBestMode()
+float EffectiveFastInputOffsetTicksBestMode(const CGameClient *pGameClient)
 {
 	// Mode 1: best input (tick based, stored in 0.01 ticks, with smoothing and latency compensation)
 	if(!g_Config.m_TcFastInput ||
@@ -125,24 +125,25 @@ float EffectiveFastInputOffsetTicksBestMode()
 		IsGameplayInputComponentDisabled())
 		return 0.0f;
 
-	if(g_Config.m_BcBestInputOffset <= 0)
+	const CGameClient::SBestInputSettings Settings = pGameClient->BestInputSettings();
+	if(Settings.m_Offset <= 0)
 		return 0.0f;
 
 	// Base offset in ticks
-	float Offset = g_Config.m_BcBestInputOffset / 100.0f;
+	float Offset = Settings.m_Offset / 100.0f;
 
 	// Apply smoothing (reduces jitter)
-	if(g_Config.m_BcBestInputSmoothing > 0)
+	if(Settings.m_Smoothing > 0)
 	{
 		// Smoothing reduces the effective offset slightly
-		float SmoothFactor = 1.0f - (g_Config.m_BcBestInputSmoothing / 200.0f);
+		float SmoothFactor = 1.0f - (Settings.m_Smoothing / 200.0f);
 		Offset *= SmoothFactor;
 	}
 
 	// Apply latency compensation (increases offset based on ping)
-	if(g_Config.m_BcBestInputLatencyComp > 0)
+	if(Settings.m_LatencyComp > 0)
 	{
-		float CompFactor = 1.0f + (g_Config.m_BcBestInputLatencyComp / 100.0f);
+		float CompFactor = 1.0f + (Settings.m_LatencyComp / 100.0f);
 		Offset *= CompFactor;
 	}
 
@@ -153,7 +154,7 @@ float EffectiveFastInputOffsetTicks(const CGameClient *pGameClient)
 {
 	if(g_Config.m_BcFastInputMode == 0)
 		return EffectiveFastInputOffsetTicksFastMode();
-	return EffectiveFastInputOffsetTicksBestMode();
+	return EffectiveFastInputOffsetTicksBestMode(pGameClient);
 }
 
 int FastInputPredictionTicks(float OffsetTicks)
@@ -1401,6 +1402,36 @@ int CGameClient::CurrentRaceTime() const
 		return 0;
 	}
 	return (Client()->GameTick(g_Config.m_ClDummy) - m_LastRaceTick) / Client()->GameTickSpeed();
+}
+
+int CGameClient::CurrentPing() const
+{
+	if(!m_Snap.m_pLocalInfo)
+		return 0;
+	return std::clamp(m_Snap.m_pLocalInfo->m_Latency, 0, 999);
+}
+
+CGameClient::SBestInputSettings CGameClient::BestInputSettings() const
+{
+	if(g_Config.m_BcBestInputPreset == 1)
+		return {250, 20, 0};
+	if(g_Config.m_BcBestInputPreset == 2)
+		return {300, 40, 50};
+	if(g_Config.m_BcBestInputPreset == 3)
+	{
+		const int Ping = std::clamp(CurrentPing(), 0, 100);
+		return {
+			std::clamp(245 + Ping / 2, 245, 295),
+			std::clamp(28 + Ping / 8, 28, 40),
+			std::clamp((Ping - 20) / 3, 0, 20),
+		};
+	}
+
+	return {
+		std::clamp(g_Config.m_BcBestInputOffset, 0, 1000),
+		std::clamp(g_Config.m_BcBestInputSmoothing, 0, 100),
+		std::clamp(g_Config.m_BcBestInputLatencyComp, 0, 50),
+	};
 }
 
 bool CGameClient::Predict() const

@@ -1796,30 +1796,40 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				else
 				{
 					// Best Input mode - preset buttons
+					const CGameClient::SBestInputSettings BestInputSettings = GameClient()->BestInputSettings();
 					CUIRect PresetLabel, PresetButtons;
 					Button.VSplitLeft(Button.w * 0.3f, &PresetLabel, &PresetButtons);
 					Ui()->DoLabel(&PresetLabel, BCLocalize("Presets:"), FontSize, TEXTALIGN_ML);
 
-					CUIRect DeltaBtn, GammaBtn;
-					PresetButtons.VSplitMid(&DeltaBtn, &GammaBtn, 4.0f);
+					CUIRect DeltaBtn, GammaBtn, AutoBtn;
+					PresetButtons.VSplitLeft((PresetButtons.w - 8.0f) / 3.0f, &DeltaBtn, &PresetButtons);
+					PresetButtons.VSplitLeft(4.0f, nullptr, &PresetButtons);
+					PresetButtons.VSplitLeft((PresetButtons.w - 4.0f) / 2.0f, &GammaBtn, &AutoBtn);
 					DeltaBtn.HMargin(2.0f, &DeltaBtn);
 					GammaBtn.HMargin(2.0f, &GammaBtn);
+					AutoBtn.HMargin(2.0f, &AutoBtn);
 
-					static CButtonContainer s_PresetDelta, s_PresetGamma;
-					if(DoButton_Menu(&s_PresetDelta, "Delta", 0, &DeltaBtn))
+					static CButtonContainer s_PresetDelta, s_PresetGamma, s_PresetAuto;
+					if(DoButton_Menu(&s_PresetDelta, "Delta", g_Config.m_BcBestInputPreset == 1, &DeltaBtn))
 					{
+						g_Config.m_BcBestInputPreset = 1;
 						// Apply Delta preset values
 						g_Config.m_BcBestInputOffset = 250; // 2.50 ticks
 						g_Config.m_BcBestInputSmoothing = 20;
 						g_Config.m_BcBestInputLatencyComp = 0;
 					}
-					if(DoButton_Menu(&s_PresetGamma, "Gamma", 0, &GammaBtn))
+					if(DoButton_Menu(&s_PresetGamma, "Gamma", g_Config.m_BcBestInputPreset == 2, &GammaBtn))
 					{
+						g_Config.m_BcBestInputPreset = 2;
 						// Apply Gamma preset values
 						g_Config.m_BcBestInputOffset = 300; // 3.00 ticks
 						g_Config.m_BcBestInputSmoothing = 40;
 						g_Config.m_BcBestInputLatencyComp = 50;
 					}
+					char aAutoPreset[64];
+					str_format(aAutoPreset, sizeof(aAutoPreset), "Auto (%d)", GameClient()->CurrentPing());
+					if(DoButton_Menu(&s_PresetAuto, aAutoPreset, g_Config.m_BcBestInputPreset == 3, &AutoBtn))
+						g_Config.m_BcBestInputPreset = 3;
 
 					Expand.HSplitTop(MarginSmall, nullptr, &Expand);
 
@@ -1827,7 +1837,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 					Expand.HSplitTop(LineSize, &Button, &Expand);
 					{
 						const int Min = 0, Max = 1000;
-						int Value = std::clamp(g_Config.m_BcBestInputOffset, Min, Max);
+						int Value = std::clamp(BestInputSettings.m_Offset, Min, Max);
 
 						char aBuf[256];
 						str_format(aBuf, sizeof(aBuf), "%s: %.2f ticks", BCLocalize("Prediction offset"), Value / 100.0f);
@@ -1838,7 +1848,12 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 
 						float Rel = (Value - Min) / (float)(Max - Min);
 						float NewRel = Ui()->DoScrollbarH(&g_Config.m_BcBestInputOffset, &ScrollBar, Rel);
-						g_Config.m_BcBestInputOffset = std::clamp((int)(Min + NewRel * (Max - Min) + 0.5f), Min, Max);
+						int NewValue = std::clamp((int)(Min + NewRel * (Max - Min) + 0.5f), Min, Max);
+						if(NewValue != Value)
+						{
+							g_Config.m_BcBestInputPreset = 0;
+							g_Config.m_BcBestInputOffset = NewValue;
+						}
 					}
 
 					Expand.HSplitTop(MarginSmall, nullptr, &Expand);
@@ -1847,7 +1862,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 					Expand.HSplitTop(LineSize, &Button, &Expand);
 					{
 						const int Min = 0, Max = 100;
-						int Value = std::clamp(g_Config.m_BcBestInputSmoothing, Min, Max);
+						int Value = std::clamp(BestInputSettings.m_Smoothing, Min, Max);
 
 						char aBuf[256];
 						str_format(aBuf, sizeof(aBuf), "%s: %d%%", BCLocalize("Input smoothing"), Value);
@@ -1858,7 +1873,12 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 
 						float Rel = (Value - Min) / (float)(Max - Min);
 						float NewRel = Ui()->DoScrollbarH(&g_Config.m_BcBestInputSmoothing, &ScrollBar, Rel);
-						g_Config.m_BcBestInputSmoothing = std::clamp((int)(Min + NewRel * (Max - Min) + 0.5f), Min, Max);
+						int NewValue = std::clamp((int)(Min + NewRel * (Max - Min) + 0.5f), Min, Max);
+						if(NewValue != Value)
+						{
+							g_Config.m_BcBestInputPreset = 0;
+							g_Config.m_BcBestInputSmoothing = NewValue;
+						}
 					}
 
 					Expand.HSplitTop(MarginSmall, nullptr, &Expand);
@@ -1867,7 +1887,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 					Expand.HSplitTop(LineSize, &Button, &Expand);
 					{
 						const int Min = 0, Max = 50;
-						int Value = std::clamp(g_Config.m_BcBestInputLatencyComp, Min, Max);
+						int Value = std::clamp(BestInputSettings.m_LatencyComp, Min, Max);
 
 						char aBuf[256];
 						str_format(aBuf, sizeof(aBuf), "%s: %d%%", BCLocalize("Latency compensation"), Value);
@@ -1878,7 +1898,12 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 
 						float Rel = (Value - Min) / (float)(Max - Min);
 						float NewRel = Ui()->DoScrollbarH(&g_Config.m_BcBestInputLatencyComp, &ScrollBar, Rel);
-						g_Config.m_BcBestInputLatencyComp = std::clamp((int)(Min + NewRel * (Max - Min) + 0.5f), Min, Max);
+						int NewValue = std::clamp((int)(Min + NewRel * (Max - Min) + 0.5f), Min, Max);
+						if(NewValue != Value)
+						{
+							g_Config.m_BcBestInputPreset = 0;
+							g_Config.m_BcBestInputLatencyComp = NewValue;
+						}
 					}
 				}
 

@@ -55,8 +55,6 @@ int ReleasedFireState(int FireState)
 
 float EffectiveFastInputOffsetTicks(const CGameClient *pGameClient)
 {
-	(void)pGameClient;
-
 	if(!g_Config.m_TcFastInput)
 		return 0.0f;
 
@@ -68,20 +66,21 @@ float EffectiveFastInputOffsetTicks(const CGameClient *pGameClient)
 	}
 
 	// Best mode
-	if(g_Config.m_BcBestInputOffset <= 0)
+	const CGameClient::SBestInputSettings Settings = pGameClient->BestInputSettings();
+	if(Settings.m_Offset <= 0)
 		return 0.0f;
 
-	float Offset = g_Config.m_BcBestInputOffset / 100.0f;
+	float Offset = Settings.m_Offset / 100.0f;
 
-	if(g_Config.m_BcBestInputSmoothing > 0)
+	if(Settings.m_Smoothing > 0)
 	{
-		float SmoothFactor = 1.0f - (g_Config.m_BcBestInputSmoothing / 200.0f);
+		float SmoothFactor = 1.0f - (Settings.m_Smoothing / 200.0f);
 		Offset *= SmoothFactor;
 	}
 
-	if(g_Config.m_BcBestInputLatencyComp > 0)
+	if(Settings.m_LatencyComp > 0)
 	{
-		float CompFactor = 1.0f + (g_Config.m_BcBestInputLatencyComp / 100.0f);
+		float CompFactor = 1.0f + (Settings.m_LatencyComp / 100.0f);
 		Offset *= CompFactor;
 	}
 

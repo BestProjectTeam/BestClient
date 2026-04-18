@@ -777,6 +777,14 @@ public:
 
 	int LastRaceTick() const;
 	int CurrentRaceTime() const;
+	struct SBestInputSettings
+	{
+		int m_Offset;
+		int m_Smoothing;
+		int m_LatencyComp;
+	};
+	int CurrentPing() const;
+	SBestInputSettings BestInputSettings() const;
 
 	bool IsTeamPlay() const { return m_Snap.m_pGameInfoObj && m_Snap.m_pGameInfoObj->m_GameFlags & GAMEFLAG_TEAMS; }
 
