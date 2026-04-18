@@ -272,6 +272,85 @@ bool ExtractOutgoingChatPrefix(const CGameClient &GameClient, const char *pText,
 
 	return false;
 }
+
+bool IsWhisperCommandToken(const char *pToken)
+{
+	return pToken != nullptr && (str_comp_nocase(pToken, "w") == 0 || str_comp_nocase(pToken, "whisper") == 0);
+}
+
+bool ExtractOutgoingWhisperPrefix(const CGameClient &GameClient, const char *pText, char *pPrefix, size_t PrefixSize, char *pBody, size_t BodySize)
+{
+	if(!pPrefix || PrefixSize == 0 || !pBody || BodySize == 0)
+		return false;
+	pPrefix[0] = '\0';
+	pBody[0] = '\0';
+	if(!pText || pText[0] != '/')
+		return false;
+
+	const char *pCommand = pText + 1;
+	while(*pCommand != '\0' && std::isspace((unsigned char)*pCommand))
+		++pCommand;
+	if(*pCommand == '\0')
+		return false;
+
+	const char *pCommandEnd = pCommand;
+	while(*pCommandEnd != '\0' && !std::isspace((unsigned char)*pCommandEnd))
+		++pCommandEnd;
+	char aCommand[32] = "";
+	str_copy(aCommand, std::string(pCommand, pCommandEnd - pCommand).c_str(), sizeof(aCommand));
+	if(!IsWhisperCommandToken(aCommand))
+		return false;
+
+	const char *pNameStart = pCommandEnd;
+	while(*pNameStart != '\0' && std::isspace((unsigned char)*pNameStart))
+		++pNameStart;
+	if(*pNameStart == '\0')
+		return false;
+
+	const char *pBestBodyStart = nullptr;
+	int BestNameLength = -1;
+	for(const auto &Client : GameClient.m_aClients)
+	{
+		if(!Client.m_Active || Client.m_aName[0] == '\0')
+			continue;
+
+		const int NameLength = str_length(Client.m_aName);
+		if(NameLength <= 0 || NameLength <= BestNameLength)
+			continue;
+		char aNamePrefix[MAX_NAME_LENGTH] = "";
+		str_copy(aNamePrefix, std::string(pNameStart, NameLength).c_str(), sizeof(aNamePrefix));
+		if(str_comp_nocase(aNamePrefix, Client.m_aName) != 0)
+			continue;
+
+		const char *pAfterName = pNameStart + NameLength;
+		if(*pAfterName != '\0' && !std::isspace((unsigned char)*pAfterName))
+			continue;
+
+		const char *pMessageStart = pAfterName;
+		while(*pMessageStart != '\0' && std::isspace((unsigned char)*pMessageStart))
+			++pMessageStart;
+		if(*pMessageStart == '\0')
+			continue;
+
+		BestNameLength = NameLength;
+		pBestBodyStart = pMessageStart;
+	}
+
+	if(!pBestBodyStart)
+		return false;
+
+	const int PrefixLength = (int)(pBestBodyStart - pText);
+	str_copy(pPrefix, std::string(pText, PrefixLength).c_str(), PrefixSize);
+	str_copy(pBody, pBestBodyStart, BodySize);
+	return true;
+}
+
+bool ExtractOutgoingTranslatableText(const CGameClient &GameClient, const char *pText, char *pPrefix, size_t PrefixSize, char *pBody, size_t BodySize)
+{
+	if(ExtractOutgoingWhisperPrefix(GameClient, pText, pPrefix, PrefixSize, pBody, BodySize))
+		return true;
+	return ExtractOutgoingChatPrefix(GameClient, pText, pPrefix, PrefixSize, pBody, BodySize);
+}
 }
 
 const char *ITranslateBackend::EncodeSource(const char *pSource) const
@@ -740,7 +819,12 @@ bool CTranslate::ShouldTranslateOutgoingChat(const char *pText) const
 	if(!g_Config.m_TcTranslateAutoOutgoing || !pText || pText[0] == '\0')
 		return false;
 	if(pText[0] == '/')
-		return false;
+	{
+		char aPrefix[MAX_LINE_LENGTH] = "";
+		char aBody[MAX_LINE_LENGTH] = "";
+		if(!ExtractOutgoingWhisperPrefix(*GameClient(), pText, aPrefix, sizeof(aPrefix), aBody, sizeof(aBody)))
+			return false;
+	}
 	if(IsAutoLanguage(OutgoingTargetLanguage()))
 		return false;
 	if(LanguagesEqual(OutgoingSourceLanguage(), OutgoingTargetLanguage()))
@@ -865,7 +949,7 @@ bool CTranslate::TryTranslateOutgoingChat(int Team, const char *pText)
 	Job.m_Type = CTranslateJob::EType::OUTGOING_CHAT;
 	Job.m_Team = Team;
 	str_copy(Job.m_aOriginalText, pText, sizeof(Job.m_aOriginalText));
-	if(!ExtractOutgoingChatPrefix(*GameClient(), pText, Job.m_aOutgoingPrefix, sizeof(Job.m_aOutgoingPrefix), Job.m_aTextToTranslate, sizeof(Job.m_aTextToTranslate)))
+	if(!ExtractOutgoingTranslatableText(*GameClient(), pText, Job.m_aOutgoingPrefix, sizeof(Job.m_aOutgoingPrefix), Job.m_aTextToTranslate, sizeof(Job.m_aTextToTranslate)))
 		str_copy(Job.m_aTextToTranslate, pText, sizeof(Job.m_aTextToTranslate));
 	Job.m_pTranslateResponse = std::make_shared<CTranslateResponse>();
 	Job.m_pBackend = CreateBackend(Job.m_aTextToTranslate, OutgoingSourceLanguage(), OutgoingTargetLanguage());

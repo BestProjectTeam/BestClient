@@ -239,7 +239,7 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	char aTClientBuf[64];
 	char aBestClientBuf[64];
 	str_format(aDDNetBuf, sizeof(aDDNetBuf), "DDNet %s", GAME_RELEASE_VERSION);
-	str_format(aTClientBuf, sizeof(aTClientBuf), "%s %s", CLIENT_NAME, CLIENT_RELEASE_VERSION);
+	str_format(aTClientBuf, sizeof(aTClientBuf), "TClient %s", CLIENT_RELEASE_VERSION);
 	str_format(aBestClientBuf, sizeof(aBestClientBuf), "BestClient %s", BESTCLIENT_VERSION);
 	Ui()->DoLabel(&VersionLine1, aDDNetBuf, 14.0f, TEXTALIGN_MR);
 	Ui()->DoLabel(&VersionLine2, aTClientBuf, 14.0f, TEXTALIGN_MR);
