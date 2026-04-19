@@ -83,7 +83,7 @@ MACRO_CONFIG_INT(BcBestInputPreset, bc_best_input_preset, 0, 0, 3, CFGFLAG_CLIEN
 MACRO_CONFIG_INT(BcBestInputOffset, bc_best_input_offset, 0, 0, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Best input prediction offset in 0.01 ticks (0-10.00 ticks)")
 MACRO_CONFIG_INT(BcBestInputSmoothing, bc_best_input_smoothing, 0, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Best input smoothing amount (0-100%)")
 MACRO_CONFIG_INT(BcBestInputLatencyComp, bc_best_input_latency_comp, 0, 0, 50, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Best input latency compensation (0-50%)")
-MACRO_CONFIG_INT(BcBestInputInterpolation, bc_best_input_interpolation, 1, 0, 3, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Best input interpolation mode (0 = none, 1 = linear, 2 = cubic, 3 = smooth)")
+MACRO_CONFIG_INT(BcBestInputInterpolation, bc_best_input_interpolation, 1, 1, 3, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Best input interpolation mode (1 = linear, 2 = cubic, 3 = smooth)")
 MACRO_CONFIG_INT(BcBestInputOthers, bc_best_input_others, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Apply best input to other tees")
 MACRO_CONFIG_INT(BcFastInputAutoMargin, bc_fast_input_auto_margin, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically adjusts prediction margin in real time for fast input, latency and connection stability")
 MACRO_CONFIG_INT(BcSnapTap, bc_snap_tap, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable Snap Tap for opposite left/right inputs")

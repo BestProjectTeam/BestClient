@@ -1917,39 +1917,39 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 					Expand.HSplitTop(MarginSmall, nullptr, &Expand);
 					Expand.HSplitTop(LineSize, &Button, &Expand);
 					{
-						static CButtonContainer s_aInterpolationButtons[4];
-						static const char *s_apInterpolationNames[] = {
-							"None",
-							"Linear",
-							"Cubic",
-							"Smooth",
-						};
+					static CButtonContainer s_aInterpolationButtons[3];
+					static const char *s_apInterpolationNames[] = {
+						"Linear",
+						"Cubic",
+						"Smooth",
+					};
+					static const int s_aInterpolationValues[] = {1, 2, 3};
 
-						CUIRect ButtonsRect = Button;
-						const float Spacing = 2.0f;
-						const float InterpolationButtonWidth = (ButtonsRect.w - Spacing * 3.0f) / 4.0f;
-						for(int i = 0; i < 4; ++i)
+					CUIRect ButtonsRect = Button;
+					const float Spacing = 2.0f;
+					const float InterpolationButtonWidth = (ButtonsRect.w - Spacing * 2.0f) / 3.0f;
+					for(int i = 0; i < 3; ++i)
+					{
+						CUIRect InterpolationButton;
+						if(i < 2)
 						{
-							CUIRect InterpolationButton;
-							if(i < 3)
-							{
-								ButtonsRect.VSplitLeft(InterpolationButtonWidth, &InterpolationButton, &ButtonsRect);
-								ButtonsRect.VSplitLeft(Spacing, nullptr, &ButtonsRect);
+							ButtonsRect.VSplitLeft(InterpolationButtonWidth, &InterpolationButton, &ButtonsRect);
+							ButtonsRect.VSplitLeft(Spacing, nullptr, &ButtonsRect);
 							}
 							else
 								InterpolationButton = ButtonsRect;
-							InterpolationButton.HMargin(2.0f, &InterpolationButton);
+						InterpolationButton.HMargin(2.0f, &InterpolationButton);
 
-							int Corners = IGraphics::CORNER_NONE;
-							if(i == 0)
-								Corners = IGraphics::CORNER_L;
-							else if(i == 3)
-								Corners = IGraphics::CORNER_R;
+						int Corners = IGraphics::CORNER_NONE;
+						if(i == 0)
+							Corners = IGraphics::CORNER_L;
+						else if(i == 2)
+							Corners = IGraphics::CORNER_R;
 
-							if(DoButton_Menu(&s_aInterpolationButtons[i], BCLocalize(s_apInterpolationNames[i]), g_Config.m_BcBestInputInterpolation == i, &InterpolationButton, BUTTONFLAG_LEFT, nullptr, Corners))
-								g_Config.m_BcBestInputInterpolation = i;
-						}
+						if(DoButton_Menu(&s_aInterpolationButtons[i], BCLocalize(s_apInterpolationNames[i]), g_Config.m_BcBestInputInterpolation == s_aInterpolationValues[i], &InterpolationButton, BUTTONFLAG_LEFT, nullptr, Corners))
+							g_Config.m_BcBestInputInterpolation = s_aInterpolationValues[i];
 					}
+				}
 				}
 
 				Expand.HSplitTop(MarginSmall, nullptr, &Expand);

@@ -187,10 +187,8 @@ float BestInputInterpolationAmount(float Fraction, float DeltaLength, bool Enabl
 	const float T = std::clamp(Fraction, 0.0f, 1.0f);
 	const float T2 = T * T;
 	const float CubicT = 3.0f * T2 - 2.0f * T2 * T;
-	switch(std::clamp(g_Config.m_BcBestInputInterpolation, 0, 3))
+	switch(std::clamp(g_Config.m_BcBestInputInterpolation, 1, 3))
 	{
-	case 0:
-		return 1.0f;
 	case 2:
 		return CubicT;
 	case 3:
