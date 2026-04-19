@@ -1816,7 +1816,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 						g_Config.m_BcBestInputPreset = 1;
 						// Apply Delta+ preset values
 						g_Config.m_BcBestInputOffset = 260; // 2.60 ticks
-						g_Config.m_BcBestInputSmoothing = 30;
+						g_Config.m_BcBestInputSmoothing = 40;
 						g_Config.m_BcBestInputLatencyComp = 25;
 					}
 					if(DoButton_Menu(&s_PresetGamma, "Gamma+", g_Config.m_BcBestInputPreset == 2, &GammaBtn, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_NONE))
