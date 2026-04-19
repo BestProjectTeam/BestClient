@@ -1797,38 +1797,39 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				{
 					// Best Input mode - preset buttons
 					const CGameClient::SBestInputSettings BestInputSettings = GameClient()->BestInputSettings();
-					CUIRect PresetLabel, PresetButtons;
-					Button.VSplitLeft(Button.w * 0.3f, &PresetLabel, &PresetButtons);
-					Ui()->DoLabel(&PresetLabel, BCLocalize("Presets:"), FontSize, TEXTALIGN_ML);
-
+					CUIRect PresetButtons = Button;
 					CUIRect DeltaBtn, GammaBtn, AutoBtn;
-					PresetButtons.VSplitLeft((PresetButtons.w - 8.0f) / 3.0f, &DeltaBtn, &PresetButtons);
-					PresetButtons.VSplitLeft(4.0f, nullptr, &PresetButtons);
-					PresetButtons.VSplitLeft((PresetButtons.w - 4.0f) / 2.0f, &GammaBtn, &AutoBtn);
+					const float PresetSpacing = 2.0f;
+					const float PresetWidth = (PresetButtons.w - PresetSpacing * 2.0f) / 3.0f;
+					PresetButtons.VSplitLeft(PresetWidth, &DeltaBtn, &PresetButtons);
+					PresetButtons.VSplitLeft(PresetSpacing, nullptr, &PresetButtons);
+					PresetButtons.VSplitLeft(PresetWidth, &GammaBtn, &PresetButtons);
+					PresetButtons.VSplitLeft(PresetSpacing, nullptr, &PresetButtons);
+					AutoBtn = PresetButtons;
 					DeltaBtn.HMargin(2.0f, &DeltaBtn);
 					GammaBtn.HMargin(2.0f, &GammaBtn);
 					AutoBtn.HMargin(2.0f, &AutoBtn);
 
 					static CButtonContainer s_PresetDelta, s_PresetGamma, s_PresetAuto;
-					if(DoButton_Menu(&s_PresetDelta, "Delta", g_Config.m_BcBestInputPreset == 1, &DeltaBtn))
+					if(DoButton_Menu(&s_PresetDelta, "Delta+", g_Config.m_BcBestInputPreset == 1, &DeltaBtn, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_L))
 					{
 						g_Config.m_BcBestInputPreset = 1;
-						// Apply Delta preset values
-						g_Config.m_BcBestInputOffset = 250; // 2.50 ticks
-						g_Config.m_BcBestInputSmoothing = 20;
-						g_Config.m_BcBestInputLatencyComp = 0;
+						// Apply Delta+ preset values
+						g_Config.m_BcBestInputOffset = 260; // 2.60 ticks
+						g_Config.m_BcBestInputSmoothing = 30;
+						g_Config.m_BcBestInputLatencyComp = 25;
 					}
-					if(DoButton_Menu(&s_PresetGamma, "Gamma", g_Config.m_BcBestInputPreset == 2, &GammaBtn))
+					if(DoButton_Menu(&s_PresetGamma, "Gamma+", g_Config.m_BcBestInputPreset == 2, &GammaBtn, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_NONE))
 					{
 						g_Config.m_BcBestInputPreset = 2;
-						// Apply Gamma preset values
+						// Apply Gamma+ preset values
 						g_Config.m_BcBestInputOffset = 300; // 3.00 ticks
-						g_Config.m_BcBestInputSmoothing = 40;
-						g_Config.m_BcBestInputLatencyComp = 50;
+						g_Config.m_BcBestInputSmoothing = 35;
+						g_Config.m_BcBestInputLatencyComp = 15;
 					}
 					char aAutoPreset[64];
 					str_format(aAutoPreset, sizeof(aAutoPreset), "Auto (%d)", GameClient()->CurrentPing());
-					if(DoButton_Menu(&s_PresetAuto, aAutoPreset, g_Config.m_BcBestInputPreset == 3, &AutoBtn))
+					if(DoButton_Menu(&s_PresetAuto, aAutoPreset, g_Config.m_BcBestInputPreset == 3, &AutoBtn, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
 						g_Config.m_BcBestInputPreset = 3;
 
 					Expand.HSplitTop(MarginSmall, nullptr, &Expand);

@@ -1414,11 +1414,14 @@ int CGameClient::CurrentPing() const
 CGameClient::SBestInputSettings CGameClient::BestInputSettings() const
 {
 	if(g_Config.m_BcBestInputPreset == 1)
-		return {250, 20, 0};
+		return {260, 30, 25};
 	if(g_Config.m_BcBestInputPreset == 2)
-		return {300, 40, 50};
+		return {300, 35, 15};
 	if(g_Config.m_BcBestInputPreset == 3)
 	{
+		if(!m_Snap.m_pLocalInfo)
+			return {0, 0, 0};
+
 		const int Ping = std::clamp(CurrentPing(), 0, 100);
 		return {
 			std::clamp(245 + Ping / 2, 245, 295),
