@@ -1742,7 +1742,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			UpdateRevealPhase(s_FastInputPhase, FastInputExpanded);
 
 			const bool BestInputMode = g_Config.m_BcFastInputMode == 1;
-			const float FastInputExtraTargetHeight = BestInputMode ? (MarginSmall * 6.0f + LineSize * 6.0f) : (MarginSmall * 3.0f + LineSize * 3.0f);
+			const float FastInputExtraTargetHeight = BestInputMode ? (MarginSmall * 8.0f + LineSize * 8.0f) : (MarginSmall * 3.0f + LineSize * 3.0f);
 			const float ContentHeight = LineSize + MarginSmall + LineSize * 3.0f +
 				FastInputExtraTargetHeight * s_FastInputPhase;
 
@@ -1904,6 +1904,50 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 						{
 							g_Config.m_BcBestInputPreset = 0;
 							g_Config.m_BcBestInputLatencyComp = NewValue;
+						}
+					}
+
+					Expand.HSplitTop(MarginSmall, nullptr, &Expand);
+
+					// Interpolation mode buttons
+					CUIRect InterpolationLabel;
+					Expand.HSplitTop(LineSize, &InterpolationLabel, &Expand);
+					Ui()->DoLabel(&InterpolationLabel, BCLocalize("Interpolation"), InterpolationLabel.h * CUi::ms_FontmodHeight * 0.8f, TEXTALIGN_ML);
+
+					Expand.HSplitTop(MarginSmall, nullptr, &Expand);
+					Expand.HSplitTop(LineSize, &Button, &Expand);
+					{
+						static CButtonContainer s_aInterpolationButtons[4];
+						static const char *s_apInterpolationNames[] = {
+							"None",
+							"Linear",
+							"Cubic",
+							"Smooth",
+						};
+
+						CUIRect ButtonsRect = Button;
+						const float Spacing = 2.0f;
+						const float InterpolationButtonWidth = (ButtonsRect.w - Spacing * 3.0f) / 4.0f;
+						for(int i = 0; i < 4; ++i)
+						{
+							CUIRect InterpolationButton;
+							if(i < 3)
+							{
+								ButtonsRect.VSplitLeft(InterpolationButtonWidth, &InterpolationButton, &ButtonsRect);
+								ButtonsRect.VSplitLeft(Spacing, nullptr, &ButtonsRect);
+							}
+							else
+								InterpolationButton = ButtonsRect;
+							InterpolationButton.HMargin(2.0f, &InterpolationButton);
+
+							int Corners = IGraphics::CORNER_NONE;
+							if(i == 0)
+								Corners = IGraphics::CORNER_L;
+							else if(i == 3)
+								Corners = IGraphics::CORNER_R;
+
+							if(DoButton_Menu(&s_aInterpolationButtons[i], BCLocalize(s_apInterpolationNames[i]), g_Config.m_BcBestInputInterpolation == i, &InterpolationButton, BUTTONFLAG_LEFT, nullptr, Corners))
+								g_Config.m_BcBestInputInterpolation = i;
 						}
 					}
 				}

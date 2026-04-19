@@ -1108,6 +1108,21 @@ Input smoothing
 Latency compensation
 == Компенсация задержки
 
+Interpolation
+== Интерполяция
+
+None
+== Без
+
+Linear
+== Лин.
+
+Cubic
+== Куб.
+
+Smooth
+== Сглаж.
+
 Best input others
 == Лучший инпут для других
 
