@@ -58,6 +58,8 @@
 #include <engine/storage.h>
 #include <engine/textrender.h>
 
+#include <game/client/components/bestclient/browser/cef_runtime.h>
+
 #include <generated/protocol.h>
 #include <generated/protocol7.h>
 #include <generated/protocolglue.h>
@@ -5033,6 +5035,9 @@ int main(int argc, const char **argv)
 	CWindowsComLifecycle WindowsComLifecycle(true);
 #endif
 	CCmdlineFix CmdlineFix(&argc, &argv);
+	const int CefExitCode = BestClientCefExecuteSubprocess();
+	if(CefExitCode >= 0)
+		return CefExitCode;
 
 	std::vector<std::shared_ptr<ILogger>> vpLoggers;
 	std::shared_ptr<ILogger> pStdoutLogger = nullptr;

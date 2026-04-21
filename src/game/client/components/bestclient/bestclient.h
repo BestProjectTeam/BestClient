@@ -13,6 +13,9 @@
 #include <string>
 #include <vector>
 
+class CBestClientBrowser;
+class CUIRect;
+
 class CBestClient : public CComponent
 {
 	class SHookComboPopup
@@ -51,6 +54,8 @@ class CBestClient : public CComponent
 	char m_Oldmouse1Bind[128] = {};
 	bool m_StreamerWordsLoaded = false;
 	std::vector<std::string> m_vStreamerBlockedWords;
+	std::unique_ptr<CBestClientBrowser> m_pBrowser;
+	int64_t m_BrowserLastShowTime = 0;
 
 	void FinishBestClientInfo();
 	void ResetBestClientInfoTask();
@@ -129,12 +134,14 @@ public:
 	};
 
 	CBestClient();
+	~CBestClient() override;
 	int Sizeof() const override { return sizeof(*this); }
 	void OnInit() override;
 	void OnShutdown() override;
 	void OnReset() override;
 	void OnStateChange(int NewState, int OldState) override;
 	void OnRender() override;
+	void OnWindowResize() override;
 	void OnConsoleInit() override;
 	bool IsStreamerModeEnabled() const;
 	bool HasStreamerFlag(int Flag) const;
@@ -151,6 +158,10 @@ public:
 	bool IsComponentDisabled(EBestClientComponent Component) const;
 	static bool IsComponentDisabledByMask(int Component, int MaskLo, int MaskHi);
 	void RenderHookCombo(bool ForcePreview = false);
+	void ShowBrowser(const CUIRect &Rect, const char *pUrl);
+	void HideBrowser();
+	bool BrowserAvailable() const;
+	const char *BrowserStatus() const;
 
 	std::shared_ptr<CHttpRequest> m_pBestClientInfoTask = nullptr;
 	void FetchBestClientInfo();

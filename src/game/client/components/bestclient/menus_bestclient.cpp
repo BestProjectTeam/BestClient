@@ -55,6 +55,32 @@ static bool IsBestClientTabFlagSet(int32_t Flags, int Tab)
 	return (Flags & (1 << Tab)) != 0;
 }
 
+static bool BestClientBrowserHasScheme(const char *pUrl)
+{
+	return str_startswith_nocase(pUrl, "http://") || str_startswith_nocase(pUrl, "https://");
+}
+
+static void BestClientBrowserBuildUrl(const char *pInputUrl, char *pOutput, size_t OutputSize)
+{
+	if(OutputSize == 0)
+		return;
+
+	const char *pUrl = pInputUrl != nullptr ? pInputUrl : "";
+	while(*pUrl == ' ' || *pUrl == '\t')
+		++pUrl;
+
+	if(pUrl[0] == '\0')
+	{
+		str_copy(pOutput, "https://www.google.com/", OutputSize);
+		return;
+	}
+
+	if(BestClientBrowserHasScheme(pUrl))
+		str_copy(pOutput, pUrl, OutputSize);
+	else
+		str_format(pOutput, OutputSize, "https://%s", pUrl);
+}
+
 enum
 {
 	COMPONENTS_GROUP_VISUALS = 0,
@@ -155,6 +181,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		BESTCLIENT_TAB_VISUALS = 0,
 		BESTCLIENT_TAB_GAMEPLAY,
 		BESTCLIENT_TAB_OTHERS,
+		BESTCLIENT_TAB_BROWSER,
 		BESTCLIENT_TAB_FUN,
 		BESTCLIENT_TAB_SHOP,
 		BESTCLIENT_TAB_EDITORS,
@@ -186,6 +213,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		BCLocalize("Visuals"),
 		BCLocalize("Gameplay"),
 		BCLocalize("Others"),
+		BCLocalize("Browser"),
 		BCLocalize("Fun"),
 		BCLocalize("Shop"),
 		BCLocalize("Editors"),
@@ -195,6 +223,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		BESTCLIENT_TAB_VISUALS,
 		BESTCLIENT_TAB_GAMEPLAY,
 		BESTCLIENT_TAB_OTHERS,
+		BESTCLIENT_TAB_BROWSER,
 		BESTCLIENT_TAB_EDITORS,
 		BESTCLIENT_TAB_FUN,
 		BESTCLIENT_TAB_SHOP,
@@ -247,6 +276,8 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 
 	MainView.HSplitTop(10.0f, nullptr, &MainView);
 	SetBestClientShopVisible(s_CurTab == BESTCLIENT_TAB_SHOP);
+	if(s_CurTab != BESTCLIENT_TAB_BROWSER)
+		GameClient()->m_BestClient.HideBrowser();
 
 	if(s_CurTab == BESTCLIENT_TAB_VISUALS)
 	{
@@ -2902,6 +2933,10 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 	{
 		RenderSettingsBestClientShop(MainView);
 	}
+	else if(s_CurTab == BESTCLIENT_TAB_BROWSER)
+	{
+		RenderSettingsBestClientBrowser(MainView);
+	}
 	else if(s_CurTab == BESTCLIENT_TAB_INFO)
 	{
 		RenderSettingsBestClientInfo(MainView);
@@ -2955,6 +2990,74 @@ void CMenus::ComponentsEditorApply()
 	m_ComponentsEditorState.m_HasUnsavedChanges = false;
 	m_ComponentsEditorState.m_ShowExitConfirm = false;
 	m_ComponentsEditorState.m_ShowRestartConfirm = true;
+}
+
+void CMenus::RenderSettingsBestClientBrowser(CUIRect MainView)
+{
+	const float LineSize = 20.0f;
+	const float MarginSmall = 5.0f;
+	const float MarginBetweenViews = 30.0f;
+	const float HeadlineFontSize = 20.0f;
+
+	CUIRect LeftView, RightView, Label, Row, ButtonRow;
+	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+	MainView.VSplitMid(&LeftView, &RightView, MarginBetweenViews);
+	LeftView.VSplitLeft(MarginSmall, nullptr, &LeftView);
+	RightView.VSplitRight(MarginSmall, &RightView, nullptr);
+
+	static CLineInput s_BrowserHomeUrl(g_Config.m_BcBrowserHomeUrl, sizeof(g_Config.m_BcBrowserHomeUrl));
+	static CButtonContainer s_OpenExternalButton;
+	static CButtonContainer s_OpenGoogleButton;
+	static CButtonContainer s_ResetBrowserUrlButton;
+
+	char aResolvedUrl[sizeof(g_Config.m_BcBrowserHomeUrl) + 16];
+	BestClientBrowserBuildUrl(g_Config.m_BcBrowserHomeUrl, aResolvedUrl, sizeof(aResolvedUrl));
+
+	LeftView.HSplitTop(HeadlineFontSize, &Label, &LeftView);
+	Ui()->DoLabel(&Label, BCLocalize("Browser"), HeadlineFontSize, TEXTALIGN_ML);
+	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+
+	LeftView.HSplitTop(LineSize, &Label, &LeftView);
+	Ui()->DoLabel(&Label, BCLocalize("Home URL"), 14.0f, TEXTALIGN_ML);
+	LeftView.HSplitTop(LineSize, &Row, &LeftView);
+	s_BrowserHomeUrl.SetEmptyText("https://www.google.com/");
+	Ui()->DoClearableEditBox(&s_BrowserHomeUrl, &Row, 14.0f);
+
+	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+	LeftView.HSplitTop(LineSize * 2.0f, &ButtonRow, &LeftView);
+	CUIRect LeftButton, RightButton;
+	ButtonRow.VSplitMid(&LeftButton, &RightButton, MarginSmall);
+	if(DoButtonLineSize_Menu(&s_OpenExternalButton, BCLocalize("Open external"), 0, &LeftButton, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+		Client()->ViewLink(aResolvedUrl);
+	if(DoButtonLineSize_Menu(&s_OpenGoogleButton, BCLocalize("Load Google"), 0, &RightButton, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+		str_copy(g_Config.m_BcBrowserHomeUrl, "https://www.google.com/", sizeof(g_Config.m_BcBrowserHomeUrl));
+
+	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+	LeftView.HSplitTop(LineSize * 2.0f, &ButtonRow, &LeftView);
+	if(DoButtonLineSize_Menu(&s_ResetBrowserUrlButton, BCLocalize("Reset to Google"), 0, &ButtonRow, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+		str_copy(g_Config.m_BcBrowserHomeUrl, "https://www.google.com/", sizeof(g_Config.m_BcBrowserHomeUrl));
+
+	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+	LeftView.HSplitTop(LineSize * 2.0f, &Label, &LeftView);
+	char aStatus[512];
+	str_format(aStatus, sizeof(aStatus), "%s: %s", BCLocalize("Status"), GameClient()->m_BestClient.BrowserStatus());
+	Ui()->DoLabel(&Label, aStatus, 12.0f, TEXTALIGN_TL);
+
+	RightView.HSplitTop(HeadlineFontSize, &Label, &RightView);
+	Ui()->DoLabel(&Label, BCLocalize("Embedded Browser"), HeadlineFontSize, TEXTALIGN_ML);
+	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+	CUIRect BrowserView = RightView;
+	BrowserView.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.30f), IGraphics::CORNER_ALL, 8.0f);
+	BrowserView.Margin(6.0f, &BrowserView);
+	GameClient()->m_BestClient.ShowBrowser(BrowserView, aResolvedUrl);
+
+	if(!GameClient()->m_BestClient.BrowserAvailable())
+	{
+		CUIRect Overlay = BrowserView;
+		Overlay.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.55f), IGraphics::CORNER_ALL, 6.0f);
+		Overlay.Margin(12.0f, &Overlay);
+		Ui()->DoLabel(&Overlay, GameClient()->m_BestClient.BrowserStatus(), 14.0f, TEXTALIGN_TL);
+	}
 }
 
 void CMenus::ComponentsEditorRenderExitConfirm(const CUIRect &Rect)
@@ -3192,6 +3295,7 @@ void CMenus::RenderSettingsBestClientInfo(CUIRect MainView)
 		BESTCLIENT_TAB_VISUALS = 0,
 		BESTCLIENT_TAB_GAMEPLAY,
 		BESTCLIENT_TAB_OTHERS,
+		BESTCLIENT_TAB_BROWSER,
 		BESTCLIENT_TAB_FUN,
 		BESTCLIENT_TAB_SHOP,
 		BESTCLIENT_TAB_EDITORS,
@@ -3367,6 +3471,7 @@ void CMenus::RenderSettingsBestClientInfo(CUIRect MainView)
 		BCLocalize("Visuals"),
 		BCLocalize("Gameplay"),
 		BCLocalize("Others"),
+		BCLocalize("Browser"),
 		BCLocalize("Fun"),
 		BCLocalize("Shop"),
 		BCLocalize("Editors"),
@@ -3376,6 +3481,7 @@ void CMenus::RenderSettingsBestClientInfo(CUIRect MainView)
 		BESTCLIENT_TAB_VISUALS,
 		BESTCLIENT_TAB_GAMEPLAY,
 		BESTCLIENT_TAB_OTHERS,
+		BESTCLIENT_TAB_BROWSER,
 		BESTCLIENT_TAB_EDITORS,
 		BESTCLIENT_TAB_FUN,
 		BESTCLIENT_TAB_SHOP,

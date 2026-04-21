@@ -75,6 +75,7 @@ MACRO_CONFIG_COL(BcShowRealHitboxColor, bc_show_real_hitbox_color, 0xFFFFFFFFU, 
 MACRO_CONFIG_INT(BcAutoServerListRefresh, bc_auto_server_list_refresh, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically refresh the server browser list while a browser tab is open")
 MACRO_CONFIG_INT(BcAutoServerListRefreshSeconds, bc_auto_server_list_refresh_seconds, 10, 1, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Auto refresh interval for the server browser list in seconds")
 MACRO_CONFIG_INT(BcUseShortKogServerName, bc_use_short_kog_server_name, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use short name for KoG gores servers in browser list")
+MACRO_CONFIG_STR(BcBrowserHomeUrl, bc_browser_home_url, 256, "https://www.google.com/", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Home URL for the BestClient browser tab")
 MACRO_CONFIG_INT(BcStreamerFlags, bc_streamer_flags, 64, 0, 127, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Bitmask of BestClient streamer mode options")
 
 // Fast input

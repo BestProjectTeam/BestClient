@@ -726,6 +726,7 @@ public:
 	virtual const char *GetVendorString() = 0;
 	virtual const char *GetVersionString() = 0;
 	virtual const char *GetRendererString() = 0;
+	virtual void *GetNativeWindowHandle() = 0;
 
 	// be aware that this function should only be called from the graphics thread, and even then you should really know what you are doing
 	virtual TGLBackendReadPresentedImageData &GetReadPresentedImageDataFuncUnsafe() = 0;
@@ -1225,6 +1226,7 @@ public:
 
 	int WindowActive() override;
 	int WindowOpen() override;
+	void *NativeWindowHandle() override;
 
 	void SetWindowGrab(bool Grab) override;
 	void NotifyWindow() override;

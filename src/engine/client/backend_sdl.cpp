@@ -15,6 +15,7 @@
 
 #include <SDL.h>
 #include <SDL_messagebox.h>
+#include <SDL_syswm.h>
 #include <SDL_vulkan.h>
 
 #if defined(CONF_VIDEORECORDER)
@@ -1712,6 +1713,23 @@ int CGraphicsBackend_SDL_GL::WindowActive()
 int CGraphicsBackend_SDL_GL::WindowOpen()
 {
 	return m_pWindow && SDL_GetWindowFlags(m_pWindow) & SDL_WINDOW_SHOWN;
+}
+
+void *CGraphicsBackend_SDL_GL::GetNativeWindowHandle()
+{
+#if defined(CONF_FAMILY_WINDOWS)
+	if(m_pWindow == nullptr)
+		return nullptr;
+
+	SDL_SysWMinfo WmInfo;
+	SDL_VERSION(&WmInfo.version);
+	if(SDL_GetWindowWMInfo(m_pWindow, &WmInfo) != SDL_TRUE)
+		return nullptr;
+
+	return WmInfo.info.win.window;
+#else
+	return nullptr;
+#endif
 }
 
 void CGraphicsBackend_SDL_GL::SetWindowGrab(bool Grab)

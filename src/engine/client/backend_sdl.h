@@ -295,6 +295,8 @@ public:
 		return m_aRendererString;
 	}
 
+	void *GetNativeWindowHandle() override;
+
 	TGLBackendReadPresentedImageData &GetReadPresentedImageDataFuncUnsafe() override;
 
 	std::optional<int> ShowMessageBox(const IGraphics::CMessageBox &MessageBox) override;

@@ -165,6 +165,7 @@ option(DISCORD_DYNAMIC "Enable discovering Discord rich presence libraries at ru
 option(PREFER_BUNDLED_LIBS "Prefer bundled libraries over system libraries" ${AUTO_DEPENDENCIES_DEFAULT})
 option(DEV "Don't generate stuff necessary for packaging" OFF)
 option(VULKAN "Enable the vulkan backend" ${AUTO_VULKAN_BACKEND})
+option(BESTCLIENT_CEF "Enable embedded CEF browser support in BestClient" ON)
 
 option(EXCEPTION_HANDLING "Enable crashdumps (only works with Windows)" OFF)
 option(IPO "Enable interprocedural optimizations" OFF)
@@ -187,6 +188,55 @@ endif()
 
 if(TEST_MYSQL)
   set(MYSQL ON)
+endif()
+
+set(BESTCLIENT_CEF_ENABLED OFF)
+if(BESTCLIENT_CEF AND CLIENT AND TARGET_OS STREQUAL "windows" AND NOT HEADLESS_CLIENT)
+  set(BESTCLIENT_CEF_ENABLED ON)
+  if(NOT TARGET_CPU_ARCHITECTURE STREQUAL "x86_64")
+    message(FATAL_ERROR "BESTCLIENT_CEF currently supports only Windows x86_64 builds")
+  endif()
+  set(BESTCLIENT_CEF_VERSION "138.0.62+g6981a09+chromium-138.0.7204.310")
+  set(BESTCLIENT_CEF_PLATFORM "windows64")
+  set(BESTCLIENT_CEF_ARCHIVE "cef_binary_${BESTCLIENT_CEF_VERSION}_${BESTCLIENT_CEF_PLATFORM}_minimal.tar.bz2")
+  set(BESTCLIENT_CEF_URL "https://cef-builds.spotifycdn.com/${BESTCLIENT_CEF_ARCHIVE}")
+  set(BESTCLIENT_CEF_DOWNLOAD_DIR "${CMAKE_BINARY_DIR}/_deps")
+  set(BESTCLIENT_CEF_ARCHIVE_PATH "${BESTCLIENT_CEF_DOWNLOAD_DIR}/${BESTCLIENT_CEF_ARCHIVE}")
+  set(BESTCLIENT_CEF_ROOT "${BESTCLIENT_CEF_DOWNLOAD_DIR}/cef_binary_${BESTCLIENT_CEF_VERSION}_${BESTCLIENT_CEF_PLATFORM}_minimal")
+
+  file(MAKE_DIRECTORY "${BESTCLIENT_CEF_DOWNLOAD_DIR}")
+  if(NOT EXISTS "${BESTCLIENT_CEF_ARCHIVE_PATH}")
+    message(STATUS "Downloading CEF binary ${BESTCLIENT_CEF_VERSION}")
+    file(DOWNLOAD "${BESTCLIENT_CEF_URL}" "${BESTCLIENT_CEF_ARCHIVE_PATH}" SHOW_PROGRESS STATUS BESTCLIENT_CEF_DOWNLOAD_STATUS TLS_VERIFY ON)
+    list(GET BESTCLIENT_CEF_DOWNLOAD_STATUS 0 BESTCLIENT_CEF_DOWNLOAD_CODE)
+    list(GET BESTCLIENT_CEF_DOWNLOAD_STATUS 1 BESTCLIENT_CEF_DOWNLOAD_MESSAGE)
+    if(NOT BESTCLIENT_CEF_DOWNLOAD_CODE EQUAL 0)
+      message(FATAL_ERROR "Failed to download CEF: ${BESTCLIENT_CEF_DOWNLOAD_MESSAGE}")
+    endif()
+  endif()
+
+  if(NOT EXISTS "${BESTCLIENT_CEF_ROOT}/include/cef_app.h")
+    message(STATUS "Extracting CEF binary ${BESTCLIENT_CEF_VERSION}")
+    execute_process(
+      COMMAND ${CMAKE_COMMAND} -E tar xjf "${BESTCLIENT_CEF_ARCHIVE_PATH}"
+      WORKING_DIRECTORY "${BESTCLIENT_CEF_DOWNLOAD_DIR}"
+      RESULT_VARIABLE BESTCLIENT_CEF_EXTRACT_RESULT
+    )
+    if(NOT BESTCLIENT_CEF_EXTRACT_RESULT EQUAL 0)
+      message(FATAL_ERROR "Failed to extract CEF archive: ${BESTCLIENT_CEF_ARCHIVE_PATH}")
+    endif()
+  endif()
+
+  add_library(bestclient-cef-binary SHARED IMPORTED GLOBAL)
+  set_target_properties(bestclient-cef-binary PROPERTIES
+    IMPORTED_IMPLIB "${BESTCLIENT_CEF_ROOT}/Release/libcef.lib"
+    IMPORTED_LOCATION "${BESTCLIENT_CEF_ROOT}/Release/libcef.dll"
+  )
+
+  set(CEF_ROOT "${BESTCLIENT_CEF_ROOT}")
+  set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${BESTCLIENT_CEF_ROOT}/cmake")
+  find_package(CEF REQUIRED)
+  add_subdirectory("${CEF_LIBCEF_DLL_WRAPPER_PATH}" "${CMAKE_BINARY_DIR}/bestclient_cef_wrapper" EXCLUDE_FROM_ALL)
 endif()
 
 # Set version if not explicitly set
@@ -2758,6 +2808,8 @@ if(CLIENT)
     components/bestclient/afterimage.h
     components/bestclient/bestclient.cpp
     components/bestclient/bestclient.h
+    components/bestclient/browser/cef_runtime.cpp
+    components/bestclient/browser/cef_runtime.h
     components/bestclient/clientindicator/browser_cache.cpp
     components/bestclient/clientindicator/browser_cache.h
     components/bestclient/clientindicator/client_indicator.cpp
@@ -3143,6 +3195,9 @@ if(CLIENT)
       list(APPEND LIBS_CLIENT ${CMAKE_DL_LIBS})
     endif()
   endif()
+  if(BESTCLIENT_CEF_ENABLED)
+    list(APPEND LIBS_CLIENT bestclient-cef-binary libcef_dll_wrapper)
+  endif()
 
   if(TARGET_OS STREQUAL "windows")
     set(VERSION_EXECUTABLE "${CLIENT_EXECUTABLE}")
@@ -3223,6 +3278,9 @@ if(CLIENT)
 
     ${PLATFORM_CLIENT_INCLUDE_DIRS}
   )
+  if(BESTCLIENT_CEF_ENABLED)
+    target_include_directories(game-client SYSTEM PRIVATE "${BESTCLIENT_CEF_ROOT}")
+  endif()
 
   if(DBUS_FOUND)
     target_include_directories(game-client SYSTEM PRIVATE ${DBUS_INCLUDE_DIRS})
@@ -3263,11 +3321,26 @@ if(CLIENT)
   if(VULKAN)
     target_compile_definitions(game-client PRIVATE CONF_BACKEND_VULKAN)
   endif()
+  if(BESTCLIENT_CEF_ENABLED)
+    target_compile_definitions(game-client PRIVATE CONF_BESTCLIENT_CEF)
+  endif()
 
   if(DBUS_FOUND)
     target_compile_definitions(game-client PRIVATE BC_MUSICPLAYER_HAS_DBUS=1)
   else()
     target_compile_definitions(game-client PRIVATE BC_MUSICPLAYER_HAS_DBUS=0)
+  endif()
+
+  if(BESTCLIENT_CEF_ENABLED)
+    add_custom_command(
+      TARGET game-client POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${BESTCLIENT_CEF_ROOT}/Release"
+        "$<TARGET_FILE_DIR:game-client>"
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${BESTCLIENT_CEF_ROOT}/Resources"
+        "$<TARGET_FILE_DIR:game-client>"
+    )
   endif()
   if(PULSE_SIMPLE_FOUND)
     target_compile_definitions(game-client PRIVATE BC_MUSICPLAYER_HAS_PULSE=1)

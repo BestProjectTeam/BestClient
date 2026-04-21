@@ -1,9 +1,11 @@
 /* Copyright © 2026 BestProject Team */
 #include "bestclient.h"
+#include "browser/cef_runtime.h"
 #include "version.h"
 
 #include <base/color.h>
 #include <base/log.h>
+#include <base/math.h>
 #include <base/system.h>
 
 #include <engine/client.h>
@@ -15,6 +17,7 @@
 #include <game/client/components/hud_layout.h>
 #include <game/client/components/sounds.h>
 #include <game/client/gameclient.h>
+#include <game/client/ui.h>
 #include <game/localization.h>
 #include <game/version.h>
 
@@ -548,15 +551,23 @@ CBestClient::CBestClient()
 	OnReset();
 }
 
+CBestClient::~CBestClient() = default;
+
 void CBestClient::OnInit()
 {
 	LoadHookComboSounds();
 	ResetHookComboState();
 	FetchBestClientInfo();
+	m_pBrowser = std::make_unique<CBestClientBrowser>(Client(), Graphics(), Storage());
 }
 
 void CBestClient::OnShutdown()
 {
+	if(m_pBrowser)
+	{
+		m_pBrowser->Shutdown();
+		m_pBrowser.reset();
+	}
 	ResetBestClientInfoTask();
 	ResetHookComboState();
 	UnloadHookComboSounds();
@@ -572,10 +583,19 @@ void CBestClient::OnStateChange(int NewState, int OldState)
 	(void)NewState;
 	(void)OldState;
 	ResetHookComboState();
+	HideBrowser();
 }
 
 void CBestClient::OnRender()
 {
+	if(m_pBrowser)
+	{
+		m_pBrowser->OnRender();
+		const int64_t BrowserHideDelay = time_freq() / 4;
+		if(!GameClient()->m_Menus.IsActive() || (m_BrowserLastShowTime != 0 && time_get() - m_BrowserLastShowTime > BrowserHideDelay))
+			m_pBrowser->Hide();
+	}
+
 	if(m_pBestClientInfoTask)
 	{
 		if(m_pBestClientInfoTask->State() == EHttpState::DONE)
@@ -591,6 +611,46 @@ void CBestClient::OnRender()
 
 	if(HasHookComboWork())
 		UpdateHookCombo();
+}
+
+void CBestClient::OnWindowResize()
+{
+	if(m_pBrowser)
+		m_pBrowser->OnWindowResize();
+}
+
+void CBestClient::ShowBrowser(const CUIRect &Rect, const char *pUrl)
+{
+	if(!m_pBrowser)
+		return;
+
+	const float PixelSize = Ui()->PixelSize();
+	if(PixelSize <= 0.0f)
+		return;
+
+	const int X = maximum(round_to_int(Rect.x / PixelSize), 0);
+	const int Y = maximum(round_to_int(Rect.y / PixelSize), 0);
+	const int Width = maximum(round_to_int(Rect.w / PixelSize), 1);
+	const int Height = maximum(round_to_int(Rect.h / PixelSize), 1);
+	m_BrowserLastShowTime = time_get();
+	m_pBrowser->Show(X, Y, Width, Height, pUrl);
+}
+
+void CBestClient::HideBrowser()
+{
+	m_BrowserLastShowTime = 0;
+	if(m_pBrowser)
+		m_pBrowser->Hide();
+}
+
+bool CBestClient::BrowserAvailable() const
+{
+	return m_pBrowser && m_pBrowser->IsAvailable();
+}
+
+const char *CBestClient::BrowserStatus() const
+{
+	return m_pBrowser ? m_pBrowser->Status() : "CEF browser is unavailable";
 }
 
 void CBestClient::LoadHookComboSounds(bool LogErrors)

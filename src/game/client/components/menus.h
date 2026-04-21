@@ -1145,6 +1145,7 @@ private:
 	// found in menus_settings.cpp
 	void RenderSettingsDDNet(CUIRect MainView);
 	void RenderSettingsBestClient(CUIRect MainView);
+	void RenderSettingsBestClientBrowser(CUIRect MainView);
 	void RenderSettingsBestClientInfo(CUIRect MainView);
 	void RenderSettingsBestClientFun(CUIRect MainView);
 	void RenderSettingsBestClientShop(CUIRect MainView);
