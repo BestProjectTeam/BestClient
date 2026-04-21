@@ -38,7 +38,7 @@ import (
 
 const (
 	defaultListen = ":6667"
-	protocolName  = "bestclient-irc"
+	protocolName  = "bestgram"
 	maxLineBytes  = 32 * 1024
 	maxMsgLen     = 1200
 	maxHistory    = 100
@@ -104,6 +104,8 @@ type incoming struct {
 	BannerColor string `json:"banner_color,omitempty"`
 	Skin        string `json:"skin,omitempty"`
 	UserID      int64  `json:"user_id,omitempty"`
+	BeforeID    int64  `json:"before_id,omitempty"`
+	Limit       int    `json:"limit,omitempty"`
 }
 
 type security struct {
@@ -134,7 +136,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("BestClient IRC TLS fingerprint sha256=%s", fingerprint)
+	log.Printf("BestGram TLS fingerprint sha256=%s", fingerprint)
 
 	srv, err := newServer(cfg)
 	if err != nil {
@@ -147,7 +149,7 @@ func main() {
 		log.Fatal(err)
 	}
 	defer ln.Close()
-	log.Printf("BestClient IRC listening on %s, data=%s", cfg.listen, cfg.dir)
+	log.Printf("BestGram listening on %s, data=%s", cfg.listen, cfg.dir)
 
 	for {
 		conn, err := ln.Accept()
@@ -272,7 +274,7 @@ func generateSelfSignedCert(certPath, keyPath string) error {
 		NotAfter:     time.Now().AddDate(5, 0, 0),
 		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		DNSNames:     []string{"bestclient-irc"},
+		DNSNames:     []string{"bestgram"},
 		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
 	}
 	der, err := x509.CreateCertificate(rand.Reader, &tpl, &tpl, &key.PublicKey, key)
@@ -683,7 +685,17 @@ func (s *server) handleHistory(c *client, msg incoming, roomType, roomKey string
 			return
 		}
 	}
-	rows, err := s.db.Query(`SELECT id, sender_id, body_enc, created_at FROM messages WHERE room_type=? AND room_key=? ORDER BY id DESC LIMIT ?`, roomType, roomKey, maxHistory)
+	limit := msg.Limit
+	if limit <= 0 || limit > maxHistory {
+		limit = maxHistory
+	}
+	var rows *sql.Rows
+	var err error
+	if msg.BeforeID > 0 {
+		rows, err = s.db.Query(`SELECT id, sender_id, body_enc, created_at FROM messages WHERE room_type=? AND room_key=? AND id < ? ORDER BY id DESC LIMIT ?`, roomType, roomKey, msg.BeforeID, limit)
+	} else {
+		rows, err = s.db.Query(`SELECT id, sender_id, body_enc, created_at FROM messages WHERE room_type=? AND room_key=? ORDER BY id DESC LIMIT ?`, roomType, roomKey, limit)
+	}
 	if err != nil {
 		c.sendError(msg.RequestID, "db_error", "History unavailable.")
 		return

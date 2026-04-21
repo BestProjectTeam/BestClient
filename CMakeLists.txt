@@ -3288,12 +3288,14 @@ if(CLIENT)
 
   find_program(GO_EXECUTABLE go)
   if(GO_EXECUTABLE)
-    add_custom_target(bestclient-irc-server
-      COMMAND ${GO_EXECUTABLE} build -o "${PROJECT_BINARY_DIR}/bestclient-irc-server" .
+    add_custom_target(bestgram-server
+      COMMAND ${GO_EXECUTABLE} build -o "${PROJECT_BINARY_DIR}/bestgram-server" .
+      COMMAND ${CMAKE_COMMAND} -E copy "${PROJECT_BINARY_DIR}/bestgram-server" "${PROJECT_BINARY_DIR}/bestclient-irc-server"
       WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/src/irc"
-      COMMENT "Building BestClient IRC server"
+      COMMENT "Building BestGram server"
       VERBATIM
     )
+    add_custom_target(bestclient-irc-server DEPENDS bestgram-server)
   endif()
 
   list(APPEND TARGETS_OWN game-client)

@@ -247,14 +247,14 @@ MACRO_CONFIG_STR(BcClientIndicatorTokenUrl, bc_client_indicator_token_url, 256, 
 MACRO_CONFIG_STR(BcClientIndicatorSharedToken, bc_client_indicator_shared_token, 256, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Client indicator shared token for signed UDP packets")
 MACRO_CONFIG_INT(BrFilterBestclient, br_filter_bestclient, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Filter out servers with no BestClient users")
 
-// BestClient IRC
-MACRO_CONFIG_STR(BcIrcHost, bc_irc_host, 256, "150.241.70.188", CFGFLAG_CLIENT | CFGFLAG_SAVE, "BestClient IRC server host")
-MACRO_CONFIG_INT(BcIrcPort, bc_irc_port, 6667, 1, 65535, CFGFLAG_CLIENT | CFGFLAG_SAVE, "BestClient IRC server port")
-MACRO_CONFIG_INT(BcIrcAutoconnect, bc_irc_autoconnect, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically connect to BestClient IRC")
-MACRO_CONFIG_INT(BcIrcAutologin, bc_irc_autologin, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically login to BestClient IRC with saved session token")
-MACRO_CONFIG_STR(BcIrcSessionToken, bc_irc_session_token, 256, "", CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_NONTEEHISTORIC, "BestClient IRC session token")
-MACRO_CONFIG_STR(BcIrcTlsFingerprint, bc_irc_tls_fingerprint, 128, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Pinned BestClient IRC TLS SHA256 fingerprint")
-MACRO_CONFIG_INT(BcIrcMediaPreview, bc_irc_media_preview, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show media previews in BestClient IRC")
+// BestGram
+MACRO_CONFIG_STR(BcIrcHost, bc_irc_host, 256, "150.241.70.188", CFGFLAG_CLIENT | CFGFLAG_SAVE, "BestGram server host")
+MACRO_CONFIG_INT(BcIrcPort, bc_irc_port, 6667, 1, 65535, CFGFLAG_CLIENT | CFGFLAG_SAVE, "BestGram server port")
+MACRO_CONFIG_INT(BcIrcAutoconnect, bc_irc_autoconnect, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically connect to BestGram")
+MACRO_CONFIG_INT(BcIrcAutologin, bc_irc_autologin, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically login to BestGram with saved session token")
+MACRO_CONFIG_STR(BcIrcSessionToken, bc_irc_session_token, 256, "", CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_NONTEEHISTORIC, "BestGram session token")
+MACRO_CONFIG_STR(BcIrcTlsFingerprint, bc_irc_tls_fingerprint, 128, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Pinned BestGram TLS SHA256 fingerprint")
+MACRO_CONFIG_INT(BcIrcMediaPreview, bc_irc_media_preview, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show media previews in BestGram")
 
 // Magic particles
 MACRO_CONFIG_INT(BcMagicParticles, bc_magic_particles, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Toggle magic particles")

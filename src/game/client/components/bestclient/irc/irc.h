@@ -3,17 +3,21 @@
 #define GAME_CLIENT_COMPONENTS_BESTCLIENT_IRC_IRC_H
 
 #include <game/client/component.h>
+#include <game/client/components/media_decoder.h>
 #include <game/client/lineinput.h>
 #include <game/client/ui.h>
 
 #include <atomic>
 #include <condition_variable>
 #include <cstdint>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
 #include <unordered_map>
 #include <vector>
+
+class CHttpRequest;
 
 class CIrcChat : public CComponent
 {
@@ -68,6 +72,27 @@ private:
 		int64_t m_CreatedAt = 0;
 	};
 
+	enum class EMediaPreviewState
+	{
+		NONE,
+		LOADING,
+		READY,
+		FAILED,
+	};
+
+	struct SMediaPreview
+	{
+		std::string m_Url;
+		std::string m_ResolvedUrl;
+		EMediaPreviewState m_State = EMediaPreviewState::NONE;
+		std::shared_ptr<CHttpRequest> m_pRequest;
+		std::vector<SMediaFrame> m_vFrames;
+		bool m_Animated = false;
+		int m_Width = 0;
+		int m_Height = 0;
+		int64_t m_AnimationStart = 0;
+	};
+
 	struct SNetEvent
 	{
 		std::string m_Line;
@@ -85,6 +110,10 @@ private:
 	int64_t m_SelectedDmUserId = 0;
 	std::string m_StatusText = "Disconnected";
 	std::string m_ErrorText;
+	CUIRect m_LastChatListRect;
+	int m_ChatScrollOffset = 0;
+	bool m_LoadingOlderHistory = false;
+	bool m_HistoryExhausted = false;
 
 	std::unordered_map<int64_t, SUser> m_Users;
 	std::vector<int64_t> m_PresenceOrder;
@@ -93,6 +122,7 @@ private:
 	std::vector<int64_t> m_PendingOut;
 	std::vector<int64_t> m_SearchResults;
 	std::vector<SMessage> m_Messages;
+	std::unordered_map<int64_t, SMediaPreview> m_MediaPreviews;
 
 	CLineInputBuffered<64> m_LoginInput;
 	CLineInputBuffered<128> m_PasswordInput;
@@ -120,6 +150,11 @@ private:
 	CButtonContainer m_ChannelButtons[5];
 	CButtonContainer m_FriendsButton;
 	CButtonContainer m_LinkButtons[24];
+	CButtonContainer m_SettingsStatusButtons[4];
+	CButtonContainer m_SettingsPanelSupportButton;
+	CButtonContainer m_SettingsPanelResetTlsButton;
+	CButtonContainer m_SettingsPanelLogoutButton;
+	CButtonContainer m_LoadHistoryButton;
 
 	std::atomic<bool> m_StopThread{false};
 	std::thread m_NetworkThread;
@@ -151,6 +186,7 @@ private:
 	void SendLoginChange();
 	void SendPasswordChange();
 	void SendFriendList();
+	void SendHistoryRequest(bool OlderPage);
 
 	void RenderAuth(CUIRect View);
 	void RenderShell(CUIRect View);
@@ -158,13 +194,26 @@ private:
 	void RenderChat(CUIRect View);
 	void RenderRightPanel(CUIRect View);
 	void RenderSettings(CUIRect View);
+	void RenderSettingsPanel(CUIRect View);
 	void RenderUserRow(CUIRect Row, const SUser &User, bool FriendActions);
 	void RenderAvatar(const CUIRect &Rect, const SUser *pUser);
+	int DoIrcButton(CButtonContainer *pButton, const char *pLabel, CUIRect Rect, bool Active, const char *pIcon = nullptr, float FontSize = 12.0f);
+	void RenderStatusIcon(CUIRect Rect, const char *pStatus, float Size = 10.0f);
+	void RenderWrappedText(CUIRect Rect, const char *pText, float FontSize, ColorRGBA Color);
+	float WrappedTextHeight(const char *pText, float FontSize, float Width) const;
+	SMediaPreview *EnsureMediaPreview(int64_t MessageId, const std::string &Url);
+	void StartMediaPreview(SMediaPreview &Preview, const std::string &Url);
+	void UpdateMediaPreviews();
+	void ResetMediaPreviews();
+	bool DecodeMediaPreview(SMediaPreview &Preview, const unsigned char *pData, size_t DataSize);
+	float MediaPreviewHeight(const SMediaPreview *pPreview, float MaxWidth) const;
+	void RenderMediaPreview(CUIRect Rect, SMediaPreview *pPreview, const std::string &Url, int ButtonIndex);
 
 	const char *ConnectionStatusText() const;
 	const SUser *FindUser(int64_t UserId) const;
 	SUser &EnsureUser(int64_t UserId);
 	std::vector<SMessage> CurrentRoomMessages() const;
+	int64_t CurrentRoomOldestMessageId() const;
 	std::string CurrentRoomType() const;
 	std::string CurrentRoomKey() const;
 	std::string BuildLocalSkinJson() const;
@@ -172,6 +221,7 @@ private:
 	static std::string Lower(std::string Value);
 	static std::string DisplayChannelName(const std::string &Channel);
 	static std::string ExtractFirstUrl(const std::string &Text);
+	static std::string ExtractMediaUrlFromHtml(const unsigned char *pData, size_t DataSize);
 };
 
 #endif
