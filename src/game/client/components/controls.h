@@ -67,14 +67,12 @@ public:
 	bool CheckNewInput();
 	void GoresMode();
 
-private:
-	bool UseGammaInputMovement() const;
-	bool UseBestInputInstantSwitch() const;
-	void UpdateSnapTapState(int Dummy, bool LeftPressed, bool RightPressed);
-	int ResolveMovementDirection(int Dummy, bool LeftPressed, bool RightPressed);
-	int ResolveSnapTapDirection(int Dummy, bool LeftPressed, bool RightPressed);
-	int ResolveBestInputInstantSwitchDirection(int Dummy, bool LeftPressed, bool RightPressed);
-	bool IsSnapTapActive() const;
+	private:
+		bool UseGammaInputMovement() const;
+		void UpdateSnapTapState(int Dummy, bool LeftPressed, bool RightPressed);
+		int ResolveMovementDirection(int Dummy, bool LeftPressed, bool RightPressed);
+		int ResolveSnapTapDirection(int Dummy, bool LeftPressed, bool RightPressed);
+		bool IsSnapTapActive() const;
 	static void ConKeyInputState(IConsole::IResult *pResult, void *pUserData);
 	static void ConKeyInputCounter(IConsole::IResult *pResult, void *pUserData);
 	static void ConKeyInputSet(IConsole::IResult *pResult, void *pUserData);

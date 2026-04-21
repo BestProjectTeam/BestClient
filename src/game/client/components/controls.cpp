@@ -205,13 +205,6 @@ bool CControls::UseGammaInputMovement() const
 		BcFastInputGammaUiToEffectiveAmount(g_Config.m_BcFastInputGammaInput) > 0;
 }
 
-bool CControls::UseBestInputInstantSwitch() const
-{
-	return g_Config.m_TcFastInput != 0 &&
-		g_Config.m_BcFastInputMode == 3 &&
-		g_Config.m_BcBestInputInstantSwitch != 0;
-}
-
 void CControls::UpdateSnapTapState(int Dummy, bool LeftPressed, bool RightPressed)
 {
 	const int64_t Now = time_get();
@@ -234,9 +227,6 @@ int CControls::ResolveMovementDirection(int Dummy, bool LeftPressed, bool RightP
 {
 	UpdateSnapTapState(Dummy, LeftPressed, RightPressed);
 
-	if(UseBestInputInstantSwitch())
-		return ResolveBestInputInstantSwitchDirection(Dummy, LeftPressed, RightPressed);
-
 	if(IsSnapTapActive() || !UseGammaInputMovement())
 		return ResolveSnapTapDirection(Dummy, LeftPressed, RightPressed);
 
@@ -247,29 +237,6 @@ int CControls::ResolveMovementDirection(int Dummy, bool LeftPressed, bool RightP
 		Direction = 1;
 	return Direction;
 }
-
-int CControls::ResolveBestInputInstantSwitchDirection(int Dummy, bool LeftPressed, bool RightPressed)
-{
-	if(LeftPressed == RightPressed)
-	{
-		if(!LeftPressed)
-		{
-			m_aSnapTapAppliedDirection[Dummy] = 0;
-			return 0;
-		}
-
-		int CandidateDirection = m_aSnapTapLastPressedDirection[Dummy];
-		if(CandidateDirection != -1 && CandidateDirection != 1)
-			CandidateDirection = m_aSnapTapAppliedDirection[Dummy] != 0 ? m_aSnapTapAppliedDirection[Dummy] : -1;
-
-		m_aSnapTapAppliedDirection[Dummy] = CandidateDirection;
-		return CandidateDirection;
-	}
-
-	m_aSnapTapAppliedDirection[Dummy] = LeftPressed ? -1 : 1;
-	return m_aSnapTapAppliedDirection[Dummy];
-}
-
 int CControls::ResolveSnapTapDirection(int Dummy, bool LeftPressed, bool RightPressed)
 {
 	if(LeftPressed == RightPressed)

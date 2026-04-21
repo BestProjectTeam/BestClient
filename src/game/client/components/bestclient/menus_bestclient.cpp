@@ -1742,7 +1742,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			UpdateRevealPhase(s_FastInputPhase, FastInputExpanded);
 
 			const bool BestInputMode = g_Config.m_BcFastInputMode == 3;
-			const float FastInputExtraTargetHeight = BestInputMode ? (MarginSmall * 9.0f + LineSize * 9.0f) : (MarginSmall * 3.0f + LineSize * 3.0f);
+			const float FastInputExtraTargetHeight = BestInputMode ? (MarginSmall * 8.0f + LineSize * 8.0f) : (MarginSmall * 3.0f + LineSize * 3.0f);
 			const float ContentHeight = LineSize + MarginSmall + LineSize * 3.0f +
 				FastInputExtraTargetHeight * s_FastInputPhase;
 
@@ -2059,11 +2059,6 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				}
 
 				Expand.HSplitTop(MarginSmall, nullptr, &Expand);
-				if(g_Config.m_BcFastInputMode == 3)
-				{
-					DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcBestInputInstantSwitch, BCLocalize("Instant A/D switch"), &g_Config.m_BcBestInputInstantSwitch, &Expand, LineSize);
-					Expand.HSplitTop(MarginSmall, nullptr, &Expand);
-				}
 				if(g_Config.m_BcFastInputMode == 0)
 					DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcFastInputOthers, BCLocalize("Fast Input others"), &g_Config.m_TcFastInputOthers, &Expand, LineSize);
 				else if(g_Config.m_BcFastInputMode == 1)
