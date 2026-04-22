@@ -191,18 +191,13 @@ if(TEST_MYSQL)
 endif()
 
 set(BESTCLIENT_CEF_ENABLED OFF)
-if(BESTCLIENT_CEF AND CLIENT AND (TARGET_OS STREQUAL "windows" OR TARGET_OS STREQUAL "linux") AND NOT HEADLESS_CLIENT)
+if(BESTCLIENT_CEF AND CLIENT AND TARGET_OS STREQUAL "windows" AND NOT HEADLESS_CLIENT)
   set(BESTCLIENT_CEF_ENABLED ON)
   if(NOT TARGET_CPU_ARCHITECTURE STREQUAL "x86_64")
-    message(FATAL_ERROR "BESTCLIENT_CEF currently supports only Windows/Linux x86_64 builds")
+    message(FATAL_ERROR "BESTCLIENT_CEF currently supports only Windows x86_64 builds")
   endif()
   set(BESTCLIENT_CEF_VERSION "138.0.62+g6981a09+chromium-138.0.7204.310")
-  if(TARGET_OS STREQUAL "windows")
-    set(BESTCLIENT_CEF_PLATFORM "windows64")
-  else()
-    set(BESTCLIENT_CEF_PLATFORM "linux64")
-    find_package(X11 REQUIRED)
-  endif()
+  set(BESTCLIENT_CEF_PLATFORM "windows64")
   set(BESTCLIENT_CEF_ARCHIVE "cef_binary_${BESTCLIENT_CEF_VERSION}_${BESTCLIENT_CEF_PLATFORM}_minimal.tar.bz2")
   set(BESTCLIENT_CEF_URL "https://cef-builds.spotifycdn.com/${BESTCLIENT_CEF_ARCHIVE}")
   set(BESTCLIENT_CEF_DOWNLOAD_DIR "${CMAKE_BINARY_DIR}/_deps")
@@ -233,16 +228,10 @@ if(BESTCLIENT_CEF AND CLIENT AND (TARGET_OS STREQUAL "windows" OR TARGET_OS STRE
   endif()
 
   add_library(bestclient-cef-binary SHARED IMPORTED GLOBAL)
-  if(TARGET_OS STREQUAL "windows")
-    set_target_properties(bestclient-cef-binary PROPERTIES
-      IMPORTED_IMPLIB "${BESTCLIENT_CEF_ROOT}/Release/libcef.lib"
-      IMPORTED_LOCATION "${BESTCLIENT_CEF_ROOT}/Release/libcef.dll"
-    )
-  else()
-    set_target_properties(bestclient-cef-binary PROPERTIES
-      IMPORTED_LOCATION "${BESTCLIENT_CEF_ROOT}/Release/libcef.so"
-    )
-  endif()
+  set_target_properties(bestclient-cef-binary PROPERTIES
+    IMPORTED_IMPLIB "${BESTCLIENT_CEF_ROOT}/Release/libcef.lib"
+    IMPORTED_LOCATION "${BESTCLIENT_CEF_ROOT}/Release/libcef.dll"
+  )
 
   set(CEF_ROOT "${BESTCLIENT_CEF_ROOT}")
   set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${BESTCLIENT_CEF_ROOT}/cmake")
@@ -3207,10 +3196,7 @@ if(CLIENT)
     endif()
   endif()
   if(BESTCLIENT_CEF_ENABLED)
-    list(APPEND LIBS_CLIENT bestclient-cef-binary libcef_dll_wrapper ${CEF_STANDARD_LIBS})
-    if(TARGET_OS STREQUAL "linux")
-      list(APPEND LIBS_CLIENT ${X11_LIBRARIES})
-    endif()
+    list(APPEND LIBS_CLIENT bestclient-cef-binary libcef_dll_wrapper)
   endif()
 
   if(TARGET_OS STREQUAL "windows")
@@ -3294,9 +3280,6 @@ if(CLIENT)
   )
   if(BESTCLIENT_CEF_ENABLED)
     target_include_directories(game-client SYSTEM PRIVATE "${BESTCLIENT_CEF_ROOT}")
-    if(TARGET_OS STREQUAL "linux")
-      target_include_directories(game-client SYSTEM PRIVATE ${X11_INCLUDE_DIR})
-    endif()
   endif()
 
   if(DBUS_FOUND)
@@ -3306,7 +3289,7 @@ if(CLIENT)
     target_include_directories(game-client SYSTEM PRIVATE ${PULSE_SIMPLE_INCLUDE_DIRS})
   endif()
 
-  if(STEAMAPI_KIND STREQUAL SHARED OR DISCORD_DYNAMIC OR (BESTCLIENT_CEF_ENABLED AND TARGET_OS STREQUAL "linux"))
+  if(STEAMAPI_KIND STREQUAL SHARED OR DISCORD_DYNAMIC)
     set_own_rpath(game-client)
   endif()
 

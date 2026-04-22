@@ -5035,7 +5035,7 @@ int main(int argc, const char **argv)
 	CWindowsComLifecycle WindowsComLifecycle(true);
 #endif
 	CCmdlineFix CmdlineFix(&argc, &argv);
-	const int CefExitCode = BestClientCefExecuteSubprocess(argc, argv);
+	const int CefExitCode = BestClientCefExecuteSubprocess();
 	if(CefExitCode >= 0)
 		return CefExitCode;
 

@@ -27,6 +27,6 @@ private:
 	CBestClientBrowserImpl *m_pImpl;
 };
 
-int BestClientCefExecuteSubprocess(int argc, const char **argv);
+int BestClientCefExecuteSubprocess();
 
 #endif

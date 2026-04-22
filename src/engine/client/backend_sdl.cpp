@@ -1717,6 +1717,7 @@ int CGraphicsBackend_SDL_GL::WindowOpen()
 
 void *CGraphicsBackend_SDL_GL::GetNativeWindowHandle()
 {
+#if defined(CONF_FAMILY_WINDOWS)
 	if(m_pWindow == nullptr)
 		return nullptr;
 
@@ -1725,13 +1726,7 @@ void *CGraphicsBackend_SDL_GL::GetNativeWindowHandle()
 	if(SDL_GetWindowWMInfo(m_pWindow, &WmInfo) != SDL_TRUE)
 		return nullptr;
 
-#if defined(CONF_FAMILY_WINDOWS)
 	return WmInfo.info.win.window;
-#elif defined(CONF_PLATFORM_LINUX) && defined(SDL_VIDEO_DRIVER_X11) && !defined(SDL2COMPAT_DISABLE_X11)
-	if(WmInfo.subsystem != SDL_SYSWM_X11)
-		return nullptr;
-
-	return reinterpret_cast<void *>(WmInfo.info.x11.window);
 #else
 	return nullptr;
 #endif
