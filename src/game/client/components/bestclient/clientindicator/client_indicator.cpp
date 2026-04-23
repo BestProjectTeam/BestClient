@@ -528,6 +528,7 @@ const char *CClientIndicator::CurrentGameServerAddress()
 {
 	if(Client()->State() != IClient::STATE_ONLINE)
 	{
+		m_aLastBlockedGameServerAddr[0] = '\0';
 		DebugLog("current game server address unavailable: client offline");
 		return "";
 	}
@@ -535,9 +536,14 @@ const char *CClientIndicator::CurrentGameServerAddress()
 	{
 		char aAddr[NETADDR_MAXSTRSIZE];
 		net_addr_str(&Client()->ServerAddress(), aAddr, sizeof(aAddr), true);
-		DebugLogF("current game server address blocked: %s is local", aAddr);
+		if(str_comp(m_aLastBlockedGameServerAddr, aAddr) != 0)
+		{
+			DebugLogF("current game server address blocked: %s is local", aAddr);
+			str_copy(m_aLastBlockedGameServerAddr, aAddr, sizeof(m_aLastBlockedGameServerAddr));
+		}
 		return "";
 	}
+	m_aLastBlockedGameServerAddr[0] = '\0';
 	char aAddr[NETADDR_MAXSTRSIZE];
 	net_addr_str(&Client()->ServerAddress(), aAddr, sizeof(aAddr), true);
 	str_copy(m_aLastGameServerAddr, aAddr, sizeof(m_aLastGameServerAddr));
@@ -971,6 +977,7 @@ void CClientIndicator::ResetPresenceState()
 	m_DeveloperClientIds.clear();
 	m_PresenceCache.Clear();
 	m_aLastGameServerAddr[0] = '\0';
+	m_aLastBlockedGameServerAddr[0] = '\0';
 	m_LastPresenceBlockReason.clear();
 }
 

@@ -43,6 +43,7 @@ private:
 	bool m_HasServerAddr = false;
 	char m_aLastPresenceServerAddr[256] = "";
 	char m_aLastGameServerAddr[NETADDR_MAXSTRSIZE] = "";
+	char m_aLastBlockedGameServerAddr[NETADDR_MAXSTRSIZE] = "";
 	bool m_WasPresenceEnabled = false;
 	ESubsystemRuntimeState m_RuntimeState = ESubsystemRuntimeState::DISABLED;
 	int64_t m_LastHeartbeatTick = 0;
