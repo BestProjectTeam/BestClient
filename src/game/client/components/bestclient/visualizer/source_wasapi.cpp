@@ -4,6 +4,7 @@
 #include "smoother.h"
 
 #include <base/math.h>
+#include <base/system.h>
 
 #include <cstdint>
 #include <chrono>
@@ -11,7 +12,7 @@
 #include <thread>
 #include <vector>
 
-#if defined(CONF_FAMILY_WINDOWS) && defined(BC_MUSICPLAYER_HAS_WINRT) && BC_MUSICPLAYER_HAS_WINRT
+#if defined(CONF_FAMILY_WINDOWS)
 #include <winrt/base.h>
 #if !defined(NOBITMAP)
 #define BC_VISUALIZER_DEFINED_NOBITMAP
@@ -33,8 +34,9 @@ namespace BestClientVisualizer
 
 namespace
 {
+	constexpr int WASAPI_ANALYZE_FRAMES = 1024;
 
-#if defined(CONF_FAMILY_WINDOWS) && defined(BC_MUSICPLAYER_HAS_WINRT) && BC_MUSICPLAYER_HAS_WINRT
+#if defined(CONF_FAMILY_WINDOWS)
 class CWasapiVisualizerSource final : public IVisualizerSource
 {
 	struct SWaveFormatInfo
@@ -78,6 +80,10 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 		if(!pData || FrameCount == 0 || Format.m_Channels <= 0)
 			return 0;
 		const int Channels = Format.m_Channels;
+		// WASAPI loopback often exposes the full speaker layout (5.1/7.1).
+		// Averaging every channel makes regular stereo music look much quieter on Windows,
+		// because the rear/center/LFE channels are frequently silent or near-silent.
+		const int MixedChannels = Channels > 2 ? 2 : Channels;
 		vOut.resize(FrameCount);
 
 		if(Format.m_Float && Format.m_BitsPerSample == 32)
@@ -86,9 +92,9 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 			for(UINT32 Frame = 0; Frame < FrameCount; ++Frame)
 			{
 				float Sum = 0.0f;
-				for(int Ch = 0; Ch < Channels; ++Ch)
+				for(int Ch = 0; Ch < MixedChannels; ++Ch)
 					Sum += pSamples[Frame * Channels + Ch];
-				vOut[Frame] = std::clamp(Sum / Channels, -1.0f, 1.0f);
+				vOut[Frame] = std::clamp(Sum / MixedChannels, -1.0f, 1.0f);
 			}
 			return (int)FrameCount;
 		}
@@ -98,9 +104,9 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 			for(UINT32 Frame = 0; Frame < FrameCount; ++Frame)
 			{
 				float Sum = 0.0f;
-				for(int Ch = 0; Ch < Channels; ++Ch)
+				for(int Ch = 0; Ch < MixedChannels; ++Ch)
 					Sum += pSamples[Frame * Channels + Ch] / 32768.0f;
-				vOut[Frame] = std::clamp(Sum / Channels, -1.0f, 1.0f);
+				vOut[Frame] = std::clamp(Sum / MixedChannels, -1.0f, 1.0f);
 			}
 			return (int)FrameCount;
 		}
@@ -112,7 +118,7 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 			{
 				float Sum = 0.0f;
 				const uint8_t *pFrame = pSamples + Frame * Format.m_BlockAlign;
-				for(int Ch = 0; Ch < Channels; ++Ch)
+				for(int Ch = 0; Ch < MixedChannels; ++Ch)
 				{
 					const uint8_t *pSample = pFrame + Ch * BytesPerSample;
 					int32_t Sample = 0;
@@ -129,7 +135,7 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 					}
 					Sum += Sample / 8388608.0f;
 				}
-				vOut[Frame] = std::clamp(Sum / Channels, -1.0f, 1.0f);
+				vOut[Frame] = std::clamp(Sum / MixedChannels, -1.0f, 1.0f);
 			}
 			return (int)FrameCount;
 		}
@@ -139,9 +145,9 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 			for(UINT32 Frame = 0; Frame < FrameCount; ++Frame)
 			{
 				float Sum = 0.0f;
-				for(int Ch = 0; Ch < Channels; ++Ch)
+				for(int Ch = 0; Ch < MixedChannels; ++Ch)
 					Sum += (float)(pSamples[Frame * Channels + Ch] / 2147483648.0);
-				vOut[Frame] = std::clamp(Sum / Channels, -1.0f, 1.0f);
+				vOut[Frame] = std::clamp(Sum / MixedChannels, -1.0f, 1.0f);
 			}
 			return (int)FrameCount;
 		}
@@ -154,11 +160,22 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 		m_LatestFrame = Frame;
 	}
 
+	void StoreBackendState(EVisualizerBackendStatus Status)
+	{
+		SVisualizerFrame Frame;
+		Frame.m_BackendStatus = Status;
+		Frame.m_IsPassiveFallback = Status == EVisualizerBackendStatus::FALLBACK || Status == EVisualizerBackendStatus::UNAVAILABLE;
+		StoreFrame(Frame);
+	}
+
 	void WorkerMain()
 	{
 		const HRESULT CoInitResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
 		if(FAILED(CoInitResult))
+		{
+			StoreBackendState(EVisualizerBackendStatus::UNAVAILABLE);
 			return;
+		}
 
 		winrt::com_ptr<IMMDeviceEnumerator> pEnumerator;
 		winrt::com_ptr<IMMDevice> pDevice;
@@ -175,6 +192,8 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 		int ValidatedReads = 0;
 		int ActiveSignalReads = 0;
 		int SilentReads = 0;
+		int PendingAnalyzeFrames = 0;
+		int ConsecutiveFailures = 0;
 		bool LatchedSignal = false;
 		bool ValidatedLive = false;
 		auto LastPacketAt = std::chrono::steady_clock::now();
@@ -196,6 +215,7 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 			ValidatedReads = 0;
 			ActiveSignalReads = 0;
 			SilentReads = 0;
+			PendingAnalyzeFrames = 0;
 			LatchedSignal = false;
 			ValidatedLive = false;
 			LastPacketAt = std::chrono::steady_clock::now();
@@ -223,24 +243,17 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 				ActiveSignalReads = 0;
 				SilentReads++;
 			}
-			if(!ValidatedLive && ValidatedReads >= 2)
+			if(!ValidatedLive && ValidatedReads >= 3)
 				ValidatedLive = true;
-			if(!LatchedSignal && ActiveSignalReads >= 1)
+			if(!LatchedSignal && ActiveSignalReads >= 2)
 				LatchedSignal = true;
-			else if(LatchedSignal && SilentReads >= 6)
+			else if(LatchedSignal && SilentReads >= 10)
 				LatchedSignal = false;
 			RawFrame.m_HasRealtimeSignal = LatchedSignal;
 			RawFrame.m_BackendStatus = ValidatedLive ? (LatchedSignal ? EVisualizerBackendStatus::LIVE : EVisualizerBackendStatus::SILENT) : EVisualizerBackendStatus::SILENT;
 			RawFrame.m_IsPassiveFallback = false;
 			SVisualizerFrame SmoothedFrame;
 			Smoother.Process(RawFrame, SmoothedFrame);
-			for(size_t Band = 0; Band < SmoothedFrame.m_aBands.size(); ++Band)
-			{
-				if(RawFrame.m_aBands[Band] > SmoothedFrame.m_aBands[Band])
-					SmoothedFrame.m_aBands[Band] = mix(SmoothedFrame.m_aBands[Band], RawFrame.m_aBands[Band], 0.75f);
-			}
-			SmoothedFrame.m_Peak = maximum(SmoothedFrame.m_Peak, RawFrame.m_Peak * 0.9f);
-			SmoothedFrame.m_Rms = maximum(SmoothedFrame.m_Rms, RawFrame.m_Rms * 0.9f);
 			SmoothedFrame.m_BackendStatus = RawFrame.m_BackendStatus;
 			SmoothedFrame.m_IsPassiveFallback = false;
 			StoreFrame(SmoothedFrame);
@@ -251,32 +264,68 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 				return true;
 			Cleanup();
 			if(FAILED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, IID_PPV_ARGS(pEnumerator.put()))))
+			{
+				++ConsecutiveFailures;
+				StoreBackendState(ConsecutiveFailures >= 6 ? EVisualizerBackendStatus::UNAVAILABLE : EVisualizerBackendStatus::CONNECTING);
 				return false;
+			}
 			if(FAILED(pEnumerator->GetDefaultAudioEndpoint(eRender, eConsole, pDevice.put())))
+			{
+				++ConsecutiveFailures;
+				StoreBackendState(ConsecutiveFailures >= 6 ? EVisualizerBackendStatus::UNAVAILABLE : EVisualizerBackendStatus::CONNECTING);
 				return false;
+			}
 			if(FAILED(pDevice->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, reinterpret_cast<void **>(pAudioClient.put()))))
+			{
+				++ConsecutiveFailures;
+				StoreBackendState(ConsecutiveFailures >= 6 ? EVisualizerBackendStatus::UNAVAILABLE : EVisualizerBackendStatus::CONNECTING);
 				return false;
+			}
 			if(FAILED(pAudioClient->GetMixFormat(&pFormat)))
+			{
+				++ConsecutiveFailures;
+				StoreBackendState(ConsecutiveFailures >= 6 ? EVisualizerBackendStatus::UNAVAILABLE : EVisualizerBackendStatus::CONNECTING);
 				return false;
+			}
 			if(!ExtractWaveFormatInfo(pFormat, FormatInfo))
+			{
+				++ConsecutiveFailures;
+				StoreBackendState(ConsecutiveFailures >= 6 ? EVisualizerBackendStatus::UNAVAILABLE : EVisualizerBackendStatus::CONNECTING);
 				return false;
+			}
 			SampleRate = maximum<int>(1, pFormat->nSamplesPerSec);
 			if(FAILED(pAudioClient->Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK, 0, 0, pFormat, nullptr)))
+			{
+				++ConsecutiveFailures;
+				StoreBackendState(ConsecutiveFailures >= 6 ? EVisualizerBackendStatus::UNAVAILABLE : EVisualizerBackendStatus::CONNECTING);
 				return false;
+			}
 			if(FAILED(pAudioClient->GetService(IID_PPV_ARGS(pCaptureClient.put()))))
+			{
+				++ConsecutiveFailures;
+				StoreBackendState(ConsecutiveFailures >= 6 ? EVisualizerBackendStatus::UNAVAILABLE : EVisualizerBackendStatus::CONNECTING);
 				return false;
+			}
 			if(FAILED(pAudioClient->Start()))
+			{
+				++ConsecutiveFailures;
+				StoreBackendState(ConsecutiveFailures >= 6 ? EVisualizerBackendStatus::UNAVAILABLE : EVisualizerBackendStatus::CONNECTING);
 				return false;
+			}
 			SVisualizerConfig ConfigSnapshot;
 			{
 				std::lock_guard<std::mutex> Lock(m_Mutex);
 				ConfigSnapshot = m_Config;
 			}
+			ConsecutiveFailures = 0;
 			ApplyConfig(ConfigSnapshot);
 			LastPacketAt = std::chrono::steady_clock::now();
 			LastSyntheticSilenceAt = LastPacketAt;
+			StoreBackendState(EVisualizerBackendStatus::CONNECTING);
 			return true;
 		};
+
+		StoreBackendState(EVisualizerBackendStatus::CONNECTING);
 
 		while(true)
 		{
@@ -301,6 +350,7 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 			if(FAILED(pCaptureClient->GetNextPacketSize(&PacketLength)))
 			{
 				Cleanup();
+				StoreBackendState(EVisualizerBackendStatus::CONNECTING);
 				std::this_thread::sleep_for(std::chrono::milliseconds(80));
 				continue;
 			}
@@ -314,6 +364,7 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 				if(FAILED(pCaptureClient->GetBuffer(&pData, &NumFrames, &Flags, nullptr, nullptr)))
 				{
 					Cleanup();
+					StoreBackendState(EVisualizerBackendStatus::CONNECTING);
 					break;
 				}
 
@@ -323,18 +374,23 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 				{
 					vMonoBuffer.assign(NumFrames, 0.0f);
 					Analyzer.PushMonoSamples(vMonoBuffer.data(), (int)NumFrames);
+					PendingAnalyzeFrames += (int)NumFrames;
 				}
 				else
 				{
 					const int Stored = StoreMonoSamples(pData, NumFrames, FormatInfo, vMonoBuffer);
 					if(Stored > 0)
+					{
 						Analyzer.PushMonoSamples(vMonoBuffer.data(), Stored);
+						PendingAnalyzeFrames += Stored;
+					}
 				}
 				pCaptureClient->ReleaseBuffer(NumFrames);
 
 				if(FAILED(pCaptureClient->GetNextPacketSize(&PacketLength)))
 				{
 					Cleanup();
+					StoreBackendState(EVisualizerBackendStatus::CONNECTING);
 					break;
 				}
 			}
@@ -349,15 +405,24 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 					const int SilenceFrames = std::clamp(SampleRate / 100, 128, 1024);
 					vIdleSilenceBuffer.assign(SilenceFrames, 0.0f);
 					Analyzer.PushMonoSamples(vIdleSilenceBuffer.data(), SilenceFrames);
+					PendingAnalyzeFrames += SilenceFrames;
 					LastSyntheticSilenceAt = Now;
-					StoreAnalyzerFrame();
+					while(PendingAnalyzeFrames >= WASAPI_ANALYZE_FRAMES)
+					{
+						StoreAnalyzerFrame();
+						PendingAnalyzeFrames -= WASAPI_ANALYZE_FRAMES;
+					}
 				}
 				std::this_thread::sleep_for(std::chrono::milliseconds(1));
 				continue;
 			}
 
 			LastSyntheticSilenceAt = LastPacketAt;
-			StoreAnalyzerFrame();
+			while(PendingAnalyzeFrames >= WASAPI_ANALYZE_FRAMES)
+			{
+				StoreAnalyzerFrame();
+				PendingAnalyzeFrames -= WASAPI_ANALYZE_FRAMES;
+			}
 			std::this_thread::sleep_for(std::chrono::milliseconds(1));
 		}
 
@@ -407,7 +472,7 @@ public:
 
 std::unique_ptr<IVisualizerSource> CreateWasapiVisualizerSource()
 {
-#if defined(CONF_FAMILY_WINDOWS) && defined(BC_MUSICPLAYER_HAS_WINRT) && BC_MUSICPLAYER_HAS_WINRT
+#if defined(CONF_FAMILY_WINDOWS)
 	return std::make_unique<CWasapiVisualizerSource>();
 #else
 	return CreatePassiveVisualizerSource();

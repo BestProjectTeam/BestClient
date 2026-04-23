@@ -3,6 +3,7 @@
 #include "source.h"
 
 #include <base/math.h>
+#include <base/system.h>
 
 #include <engine/shared/config.h>
 
@@ -16,7 +17,7 @@ CRealtimeMusicVisualizer::CRealtimeMusicVisualizer()
 {
 #if defined(CONF_PLATFORM_LINUX) && defined(BC_MUSICPLAYER_HAS_PULSE) && BC_MUSICPLAYER_HAS_PULSE
 	m_pSource = CreatePulseVisualizerSource();
-#elif defined(CONF_FAMILY_WINDOWS) && defined(BC_MUSICPLAYER_HAS_WINRT) && BC_MUSICPLAYER_HAS_WINRT
+#elif defined(CONF_FAMILY_WINDOWS)
 	m_pSource = CreateWasapiVisualizerSource();
 #else
 	m_pSource = CreatePassiveVisualizerSource();
