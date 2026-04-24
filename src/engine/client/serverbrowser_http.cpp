@@ -13,6 +13,7 @@
 #include <engine/engine.h>
 #include <engine/external/json-parser/json.h>
 #include <engine/serverbrowser.h>
+#include <engine/shared/config.h>
 #include <engine/shared/http.h>
 #include <engine/shared/jobs.h>
 #include <engine/shared/linereader.h>
@@ -46,6 +47,15 @@ static int ClassifyAge(int AgeSeconds)
 	       + (AgeSeconds >= 300) // 5 minutes
 	       + (AgeSeconds / 3600); // 1 hour
 }
+
+static const char *DEFAULT_SERVERLIST_URLS[] = {
+	"https://master1.ddnet.org/ddnet/15/servers.json",
+	"https://master2.ddnet.org/ddnet/15/servers.json",
+	"https://master3.ddnet.org/ddnet/15/servers.json",
+	"https://master4.ddnet.org/ddnet/15/servers.json",
+};
+
+static const char *BESTCLIENT_SERVERLIST_URL = "https://master.bestclient.fun/servers.json";
 
 class CChooseMaster
 {
@@ -308,7 +318,7 @@ void CChooseMaster::CJob::Run()
 class CServerBrowserHttp : public IServerBrowserHttp
 {
 public:
-	CServerBrowserHttp(IEngine *pEngine, IHttp *pHttp, const char **ppUrls, int NumUrls, int PreviousBestIndex);
+	CServerBrowserHttp(IEngine *pEngine, IStorage *pStorage, IHttp *pHttp, const char **ppUrls, int NumUrls, int PreviousBestIndex);
 	~CServerBrowserHttp() override;
 	void Update() override;
 	bool IsRefreshing() const override { return m_State != STATE_DONE && m_State != STATE_NO_MASTER; }
@@ -338,19 +348,78 @@ private:
 	static bool Parse(json_value *pJson, std::vector<CServerInfo> *pvServers);
 
 	IHttp *m_pHttp;
+	IEngine *m_pEngine;
+	IStorage *m_pStorage;
 
 	int m_State = STATE_WANTREFRESH;
 	std::shared_ptr<CHttpRequest> m_pGetServers;
 	std::unique_ptr<CChooseMaster> m_pChooseMaster;
+	bool m_UseBestClientMaster = false;
 
 	std::vector<CServerInfo> m_vServers;
+
+	void ResetMasterChooser(const char *pPreviousBestUrl);
 };
 
-CServerBrowserHttp::CServerBrowserHttp(IEngine *pEngine, IHttp *pHttp, const char **ppUrls, int NumUrls, int PreviousBestIndex) :
+CServerBrowserHttp::CServerBrowserHttp(IEngine *pEngine, IStorage *pStorage, IHttp *pHttp, const char **ppUrls, int NumUrls, int PreviousBestIndex) :
 	m_pHttp(pHttp),
-	m_pChooseMaster(new CChooseMaster(pEngine, pHttp, Validate, ppUrls, NumUrls, PreviousBestIndex))
+	m_pEngine(pEngine),
+	m_pStorage(pStorage),
+	m_pChooseMaster(new CChooseMaster(pEngine, pHttp, Validate, ppUrls, NumUrls, PreviousBestIndex)),
+	m_UseBestClientMaster(g_Config.m_BcMastersrv != 0)
 {
 	Refresh();
+}
+
+void CServerBrowserHttp::ResetMasterChooser(const char *pPreviousBestUrl)
+{
+	const bool UseBestClientMaster = g_Config.m_BcMastersrv != 0;
+	char aaUrls[CChooseMaster::MAX_URLS][256];
+	const char *apUrls[CChooseMaster::MAX_URLS] = {nullptr};
+	int NumUrls = 0;
+	if(UseBestClientMaster)
+	{
+		apUrls[0] = BESTCLIENT_SERVERLIST_URL;
+		NumUrls = 1;
+	}
+	else
+	{
+		CLineReader LineReader;
+		if(LineReader.OpenFile(m_pStorage->OpenFile("ddnet-serverlist-urls.cfg", IOFLAG_READ, IStorage::TYPE_ALL)))
+		{
+			while(const char *pLine = LineReader.Get())
+			{
+				if(NumUrls == CChooseMaster::MAX_URLS)
+				{
+					break;
+				}
+				str_copy(aaUrls[NumUrls], pLine);
+				apUrls[NumUrls] = aaUrls[NumUrls];
+				NumUrls += 1;
+			}
+		}
+		if(NumUrls == 0)
+		{
+			for(size_t i = 0; i < std::size(DEFAULT_SERVERLIST_URLS); i++)
+			{
+				apUrls[i] = DEFAULT_SERVERLIST_URLS[i];
+			}
+			NumUrls = std::size(DEFAULT_SERVERLIST_URLS);
+		}
+	}
+
+	int PreviousBestIndex = -1;
+	for(int i = 0; i < NumUrls; i++)
+	{
+		if(pPreviousBestUrl != nullptr && str_comp(apUrls[i], pPreviousBestUrl) == 0)
+		{
+			PreviousBestIndex = i;
+			break;
+		}
+	}
+
+	m_UseBestClientMaster = UseBestClientMaster;
+	m_pChooseMaster = std::make_unique<CChooseMaster>(m_pEngine, m_pHttp, Validate, apUrls, NumUrls, PreviousBestIndex);
 }
 
 CServerBrowserHttp::~CServerBrowserHttp()
@@ -363,6 +432,14 @@ CServerBrowserHttp::~CServerBrowserHttp()
 
 void CServerBrowserHttp::Update()
 {
+	if(m_UseBestClientMaster != (g_Config.m_BcMastersrv != 0))
+	{
+		const char *pPreviousBestUrl = nullptr;
+		m_pChooseMaster->GetBestUrl(&pPreviousBestUrl);
+		ResetMasterChooser(pPreviousBestUrl);
+		m_State = STATE_WANTREFRESH;
+	}
+
 	if(m_State == STATE_WANTREFRESH)
 	{
 		const char *pBestUrl;
@@ -525,46 +602,49 @@ bool CServerBrowserHttp::Parse(json_value *pJson, std::vector<CServerInfo> *pvSe
 	return false;
 }
 
-static const char *DEFAULT_SERVERLIST_URLS[] = {
-	"https://master1.ddnet.org/ddnet/15/servers.json",
-	"https://master2.ddnet.org/ddnet/15/servers.json",
-	"https://master3.ddnet.org/ddnet/15/servers.json",
-	"https://master4.ddnet.org/ddnet/15/servers.json",
-};
-
 IServerBrowserHttp *CreateServerBrowserHttp(IEngine *pEngine, IStorage *pStorage, IHttp *pHttp, const char *pPreviousBestUrl)
 {
 	char aaUrls[CChooseMaster::MAX_URLS][256];
 	const char *apUrls[CChooseMaster::MAX_URLS] = {nullptr};
-	const char **ppUrls = apUrls;
 	int NumUrls = 0;
-	CLineReader LineReader;
-	if(LineReader.OpenFile(pStorage->OpenFile("ddnet-serverlist-urls.cfg", IOFLAG_READ, IStorage::TYPE_ALL)))
+	if(g_Config.m_BcMastersrv != 0)
 	{
-		while(const char *pLine = LineReader.Get())
-		{
-			if(NumUrls == CChooseMaster::MAX_URLS)
-			{
-				break;
-			}
-			str_copy(aaUrls[NumUrls], pLine);
-			apUrls[NumUrls] = aaUrls[NumUrls];
-			NumUrls += 1;
-		}
+		apUrls[0] = BESTCLIENT_SERVERLIST_URL;
+		NumUrls = 1;
 	}
-	if(NumUrls == 0)
+	else
 	{
-		ppUrls = DEFAULT_SERVERLIST_URLS;
-		NumUrls = std::size(DEFAULT_SERVERLIST_URLS);
+		CLineReader LineReader;
+		if(LineReader.OpenFile(pStorage->OpenFile("ddnet-serverlist-urls.cfg", IOFLAG_READ, IStorage::TYPE_ALL)))
+		{
+			while(const char *pLine = LineReader.Get())
+			{
+				if(NumUrls == CChooseMaster::MAX_URLS)
+				{
+					break;
+				}
+				str_copy(aaUrls[NumUrls], pLine);
+				apUrls[NumUrls] = aaUrls[NumUrls];
+				NumUrls += 1;
+			}
+		}
+		if(NumUrls == 0)
+		{
+			for(size_t i = 0; i < std::size(DEFAULT_SERVERLIST_URLS); i++)
+			{
+				apUrls[i] = DEFAULT_SERVERLIST_URLS[i];
+			}
+			NumUrls = std::size(DEFAULT_SERVERLIST_URLS);
+		}
 	}
 	int PreviousBestIndex = -1;
 	for(int i = 0; i < NumUrls; i++)
 	{
-		if(str_comp(ppUrls[i], pPreviousBestUrl) == 0)
+		if(str_comp(apUrls[i], pPreviousBestUrl) == 0)
 		{
 			PreviousBestIndex = i;
 			break;
 		}
 	}
-	return new CServerBrowserHttp(pEngine, pHttp, ppUrls, NumUrls, PreviousBestIndex);
+	return new CServerBrowserHttp(pEngine, pStorage, pHttp, apUrls, NumUrls, PreviousBestIndex);
 }
