@@ -15,6 +15,7 @@ This repository contains code and content under multiple licenses.
 
 3) BestProject-authored functions (permission-required scope)
 - Prior written permission from BestProject Team is required only for reuse or redistribution of BestProject-authored function implementations listed in `docs/BESTCLIENT_AUTHORED_FUNCTIONS.md`.
+- Chat Bubbles implementation/config handling is excluded from that permission-required scope.
 - This permission requirement applies only to those listed function implementations and does not apply to upstream/DDNet code or third-party code.
 - If those listed functions are removed or replaced, the remaining code may be used and redistributed under the applicable upstream/per-file licenses.
 

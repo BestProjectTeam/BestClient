@@ -12,7 +12,7 @@
 ## About
 
 BestClient is a customized DDNet client focused on comfort, utility and full control over gameplay and visuals.
-It extends the base client with native BestClient systems like Camera Drift, Dynamic FOV, Jelly Tee, 3D/Magic particles, Afterimage, Hook Combo, Fast Input/Delta Input, Snap Tap, Focus Mode, Voice Chat, Chat Media, Client Indicator, plus built-in Editors, Shop and Fun tabs.
+It extends the base client with native BestClient systems like Camera Drift, Dynamic FOV, Jelly Tee, Afterimage, Player Trail, 3D/Magic particles, Hook Combo, Fast/Best/Gamma Input, Snap Tap, Finish Prediction, Focus Mode, Voice Chat, Chat Media, BestGram, Client Indicator, plus built-in Editors, Shop and Fun tabs.
 
 ## Links
 
@@ -22,9 +22,9 @@ It extends the base client with native BestClient systems like Camera Drift, Dyn
 
 ## Highlights
 
-- BestClient focuses on its own visual stack: Camera Drift, Dynamic FOV, Jelly Tee, Magic/Orbit/3D particles, Afterimage, Crystal Laser, Aspect Ratio and Media Background.
-- BestClient gameplay tools include Fast Input/Delta Input, Snap Tap, Hook Combo, Gores Mode, Auto Team Lock, Speedrun Timer and Focus Mode.
-- BestClient utility features cover Chat Media, integrated Voice Chat and Client Indicator.
+- BestClient focuses on its own visual stack: Camera Drift, Dynamic FOV, Jelly Tee, Player Trail, Magic/Orbit/3D particles, Afterimage, Crystal Laser, Aspect Ratio and Media Background.
+- BestClient gameplay tools include Fast/Best/Gamma Input, Snap Tap, Hook Combo, Gores Mode, Auto Team Lock, Speedrun Timer, Finish Prediction and Focus Mode.
+- BestClient utility features cover Chat Media, integrated Voice Chat, BestGram, Client Indicator, Admin Panel and browser helpers.
 - BestClient comes with native tooling and content flow: Assets Editor, Components Editor, HUD Editor, in-client Shop and Fun tab.
 
 ## Installation
@@ -47,18 +47,27 @@ It extends the base client with native BestClient systems like Camera Drift, Dyn
 - Orbit Aura
 - 3D Particles
 - Afterimage
+- Player Trail
 - Music Player
 - Media Background
 - Animations
 - Aspect Ratio
+- Emoticon Shadow
+- Scoreboard Team Gradients
+- Real Hitbox Dot
+- Dummy Coord Indicator
 
 ### Gameplay
 - Input
+- Best Input
+- Gamma Input
 - Snap Tap
+- Keystrokes HUD
 - Optimizer
 - Gores mode
 - Fast Actions
 - Speedrun timer
+- Finish Prediction
 - Auto team lock
 - Focus Mode
 
@@ -66,9 +75,12 @@ It extends the base client with native BestClient systems like Camera Drift, Dyn
 - Misc
 - Browser Utils
 - Chat Media
+- BestGram
 - Voice Chat
 - Voice Binds
 - Client Indicator
+- Admin Panel
+- Streamer Flags
 
 ### Editors
 - Assets editor
@@ -153,18 +165,31 @@ bc_auto_server_list_refresh
 bc_auto_server_list_refresh_seconds
 bc_auto_team_lock
 bc_auto_team_lock_delay
+bc_best_input_interpolation
+bc_best_input_latency_comp
+bc_best_input_offset
+bc_best_input_others
+bc_best_input_preset
+bc_best_input_smoothing
 bc_bestclient_settings_tabs
 bc_camera_drift
 bc_camera_drift_amount
 bc_camera_drift_reverse
 bc_camera_drift_smoothness
+bc_chat_alt_command_layout
 bc_chat_animation
 bc_chat_animation_ms
 bc_chat_animation_type
+bc_chat_bubble_animation
+bc_chat_bubble_bg_color
+bc_chat_bubble_custom_colors
 bc_chat_bubble_fadein
 bc_chat_bubble_fadeout
+bc_chat_bubble_outline_color
+bc_chat_bubble_rounding
 bc_chat_bubble_showtime
 bc_chat_bubble_size
+bc_chat_bubble_text_color
 bc_chat_bubbles
 bc_chat_bubbles_demo
 bc_chat_bubbles_self
@@ -198,6 +223,7 @@ bc_crystal_laser
 bc_custom_aspect_ratio
 bc_custom_aspect_ratio_apply_mode
 bc_custom_aspect_ratio_mode
+bc_delta_input_others
 bc_disabled_components_mask_hi
 bc_disabled_components_mask_lo
 bc_dynamic_fov
@@ -205,10 +231,19 @@ bc_dynamic_fov_amount
 bc_dynamic_fov_smoothness
 bc_emoticon_shadow
 bc_esc_player_list
+bc_fast_input_auto_margin
 bc_fast_input_delta_input
+bc_fast_input_gamma_input
 bc_fast_input_mode
+bc_finish_prediction
+bc_finish_prediction_show_always
+bc_finish_prediction_show_millis
+bc_finish_prediction_show_percentage
+bc_finish_prediction_show_time
+bc_finish_prediction_time_mode
 bc_game_media_background
 bc_game_media_background_offset
+bc_gamma_input_others
 bc_gores_mode
 bc_gores_mode_disable_weapons
 bc_hide_hud_in_settings
@@ -234,6 +269,13 @@ bc_hud_votes_x
 bc_hud_votes_y
 bc_ingame_menu_animation
 bc_ingame_menu_animation_ms
+bc_irc_autoconnect
+bc_irc_autologin
+bc_irc_host
+bc_irc_media_preview
+bc_irc_port
+bc_irc_session_token
+bc_irc_tls_fingerprint
 bc_jelly_tee
 bc_jelly_tee_duration
 bc_jelly_tee_others
@@ -244,7 +286,6 @@ bc_keystrokes_keyboard
 bc_keystrokes_keyboard_preset
 bc_keystrokes_mouse
 bc_keystrokes_mouse_preset
-bc_delta_input_others
 bc_magic_particles
 bc_magic_particles_alpha_delay
 bc_magic_particles_count
@@ -289,6 +330,7 @@ bc_orbit_aura_speed
 bc_prev_inp_mousesens_45_degrees
 bc_prev_inp_mousesens_small_sens
 bc_prev_mouse_max_distance_45_degrees
+bc_scoreboard_team_gradients
 bc_settings_layout
 bc_shop_auto_set
 bc_show_real_hitbox
@@ -305,15 +347,17 @@ bc_speedrun_timer_milliseconds
 bc_speedrun_timer_minutes
 bc_speedrun_timer_seconds
 bc_speedrun_timer_time
+bc_streamer_flags
 bc_toggle_45_degrees
 bc_toggle_small_sens
-bc_translate_incoming_source
-bc_translate_outgoing_source
-bc_translate_outgoing_target
+bc_trail
+bc_trail_mode
+bc_trail_others
 bc_use_short_kog_server_name
 bc_voice_chat_activation_mode
 bc_voice_chat_bitrate
 bc_voice_chat_enable
+bc_voice_chat_enable_your_group
 bc_voice_chat_headphones_muted
 bc_voice_chat_ingame_only
 bc_voice_chat_input_device
@@ -327,6 +371,9 @@ bc_voice_chat_output_device
 bc_voice_chat_radius_enabled
 bc_voice_chat_radius_tiles
 bc_voice_chat_server_address
+bc_voice_chat_use_team0
+bc_voice_chat_vad_release_delay_ms
+bc_voice_chat_vad_threshold
 bc_voice_chat_volume
 ```
 
