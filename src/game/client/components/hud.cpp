@@ -227,9 +227,14 @@ namespace
 
 	const SKeystrokesElement gs_aMouseNoMovementElements[] = {
 		StaticElement(328, 1, 283, 242, 2, 179),
-		MouseButtonElement(1, 1, 1, 139, 174, 2, 0),
-		MouseButtonElement(2, 143, 1, 139, 174, 146, 0),
-		WheelElement(0, 285, 246, 48, 95, 117, 79),
+		StaticElement(1, 1, 139, 174, 2, 0),
+		StaticElement(143, 1, 139, 174, 146, 0),
+		MouseButtonElement(1, 1, 178, 139, 174, 2, 0, true, 2),
+		MouseButtonElement(2, 143, 178, 139, 174, 146, 0, true, 2),
+		StaticElement(285, 246, 48, 95, 117, 79),
+		MouseButtonElement(3, 336, 246, 48, 95, 117, 79, true, 2),
+		WheelElement(1, 387, 246, 48, 95, 117, 79, true, 2),
+		WheelElement(2, 438, 246, 48, 95, 117, 79, true, 2),
 		MouseButtonElement(5, 285, 1, 40, 62, 0, 210),
 		MouseButtonElement(4, 284, 1, 41, 62, 11, 273),
 	};
@@ -260,7 +265,32 @@ namespace
 
 	bool IsKeystrokesMouseButtonPressed(IInput *pInput, int MouseButton)
 	{
-		return MouseButton > 0 && pInput->NativeMousePressed(MouseButton);
+		if(MouseButton <= 0)
+			return false;
+
+		switch(MouseButton)
+		{
+		case 1:
+			return pInput->KeyIsPressed(KEY_MOUSE_1);
+		case 2:
+			return pInput->KeyIsPressed(KEY_MOUSE_2);
+		case 3:
+			return pInput->KeyIsPressed(KEY_MOUSE_3);
+		case 4:
+			return pInput->KeyIsPressed(KEY_MOUSE_4);
+		case 5:
+			return pInput->KeyIsPressed(KEY_MOUSE_5);
+		case 6:
+			return pInput->KeyIsPressed(KEY_MOUSE_6);
+		case 7:
+			return pInput->KeyIsPressed(KEY_MOUSE_7);
+		case 8:
+			return pInput->KeyIsPressed(KEY_MOUSE_8);
+		case 9:
+			return pInput->KeyIsPressed(KEY_MOUSE_9);
+		default:
+			return false;
+		}
 	}
 
 	bool IsKeystrokesWheelActive(int WheelDir, int64_t Now, int64_t WheelUpEndTime, int64_t WheelDownEndTime)
