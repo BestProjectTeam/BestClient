@@ -166,7 +166,7 @@ namespace
 		StaticElement(285, 246, 48, 95, 117, 79),
 		StaticElement(285, 1, 40, 62, 0, 210),
 		StaticElement(284, 1, 41, 62, 11, 273),
-		MouseMoveElement(1, 614, 1, 100, 100, 110, 235, 0),
+		MouseMoveElement(1, 614, 1, 100, 100, 110, 235, 50),
 		MouseButtonElement(1, 1, 178, 139, 174, 2, 0, true, 2),
 		MouseButtonElement(2, 143, 178, 139, 174, 146, 0, true, 2),
 		MouseButtonElement(3, 336, 246, 48, 95, 117, 79, true, 2),
@@ -3395,10 +3395,9 @@ void CHud::RenderKeystrokesMouseInternal(bool ForcePreview, bool IgnoreModuleEna
 		float Rotation = 0.0f;
 		if(Element.m_InputKind == EKeystrokesInputKind::MOUSE_MOVE)
 		{
+			Offset = AimOffset * (Element.m_MouseRadius * Scale);
 			if(Element.m_MouseType == 1)
 				Rotation = AimRotation;
-			else
-				Offset = AimOffset * (Element.m_MouseRadius * Scale);
 		}
 
 		DrawKeystrokesSprite(
