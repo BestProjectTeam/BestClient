@@ -20,6 +20,7 @@
 #include <deque>
 #include <numeric>
 #include <vector>
+#include <unordered_map>
 
 namespace FontIcons
 {
@@ -1361,6 +1362,9 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			bool m_WhiteTurn = true;
 			bool m_GameOver = false;
 			bool m_WhiteWon = false;
+			bool m_Stalemate = false;
+			bool m_FiftyMove = false;
+			bool m_Threefold = false;
 			int m_SelectedX = -1;
 			int m_SelectedY = -1;
 			bool m_Dragging = false;
@@ -1375,6 +1379,19 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			int m_AnimToY = -1;
 			float m_AnimStart = 0.0f;
 			float m_AnimDuration = 0.18f;
+
+			// castling variables
+			bool m_WhiteKingSideCastle = true;
+			bool m_WhiteQueenSideCastle = true;
+			bool m_BlackKingSideCastle = true;
+			bool m_BlackQueenSideCastle = true;
+
+			// en passant variable
+			int m_EnPassantColumn = -1;
+
+			int m_HalfMoveClock = 0; // fifty-move rule
+
+			std::unordered_map<std::string, int> m_RepetitionTable;
 		};
 
 		static SChessState s_Chess;
@@ -1384,6 +1401,32 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 
 		auto IsWhitePiece = [](char Piece) { return Piece >= 'A' && Piece <= 'Z'; };
 		auto IsBlackPiece = [](char Piece) { return Piece >= 'a' && Piece <= 'z'; };
+
+		auto MakeStateKey = [&](const auto &Board) {
+			std::string key = "";
+
+			// 1. board position
+			for(int y = 0; y < 8; ++y)
+				for(int x = 0; x < 8; ++x)
+					key += Board[y][x];
+
+			// 2. turn
+			key += s_Chess.m_WhiteTurn ? 'w' : 'b';
+
+			// 3. castling
+			key += s_Chess.m_WhiteKingSideCastle ? 'K' : '-';
+			key += s_Chess.m_WhiteQueenSideCastle ? 'Q' : '-';
+			key += s_Chess.m_BlackKingSideCastle ? 'k' : '-';
+			key += s_Chess.m_BlackQueenSideCastle ? 'q' : '-';
+
+			// 4. en passant
+			if(s_Chess.m_EnPassantColumn != -1)
+				key += ('a' + s_Chess.m_EnPassantColumn);
+			else
+				key += '-';
+
+			return key;
+		};
 
 		auto ResetChess = [&]() {
 			static const char *s_apSetup[8] = {
@@ -1399,6 +1442,9 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			s_Chess.m_WhiteTurn = true;
 			s_Chess.m_GameOver = false;
 			s_Chess.m_WhiteWon = false;
+			s_Chess.m_Stalemate = false;
+			s_Chess.m_FiftyMove = false;
+			s_Chess.m_Threefold = false;
 			s_Chess.m_SelectedX = -1;
 			s_Chess.m_SelectedY = -1;
 			s_Chess.m_Dragging = false;
@@ -1409,6 +1455,18 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			for(int y = 0; y < 8; ++y)
 				for(int x = 0; x < 8; ++x)
 					s_Chess.m_aBoard[y][x] = s_apSetup[y][x];
+
+			s_Chess.m_WhiteKingSideCastle = true;
+			s_Chess.m_WhiteQueenSideCastle = true;
+			s_Chess.m_BlackKingSideCastle = true;
+			s_Chess.m_BlackQueenSideCastle = true;
+
+			s_Chess.m_EnPassantColumn = -1;
+
+			s_Chess.m_HalfMoveClock = 0;
+
+			s_Chess.m_RepetitionTable.clear();
+			s_Chess.m_RepetitionTable[MakeStateKey(s_Chess.m_aBoard)] = 1;
 		};
 
 		using TChessBoard = std::array<std::array<char, 8>, 8>;
@@ -1420,7 +1478,7 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 					Board[y][x] = s_Chess.m_aBoard[y][x];
 			return Board;
 		};
-
+		
 		auto IsPathClearOnBoard = [&](const auto &Board, int FromX, int FromY, int ToX, int ToY) {
 			const int StepX = (ToX > FromX) - (ToX < FromX);
 			const int StepY = (ToY > FromY) - (ToY < FromY);
@@ -1434,6 +1492,97 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 				Y += StepY;
 			}
 			return true;
+		};
+
+		auto IsUnderAttack = [&](const auto &Board, int ToX, int ToY, bool WhiteTurn){
+			for(int fromY = 0; fromY < 8; ++fromY)
+			{
+				for(int fromX = 0; fromX < 8; ++fromX)
+				{
+					if(fromX == ToX && fromY == ToY)
+						continue;
+
+					const char Piece = Board[fromY][fromX];
+					if(Piece == '.' || IsWhitePiece(Piece) == WhiteTurn)
+						continue;
+					
+					const int Dx = ToX - fromX;
+					const int Dy = ToY - fromY;
+					const int AbsDx = abs(Dx);
+					const int AbsDy = abs(Dy);
+					const char UpperPiece = (char)toupper((unsigned char)Piece);
+
+					if(UpperPiece == 'P')
+					{
+						const int Backward = WhiteTurn ? 1 : -1;
+						if(Dy == Backward && AbsDx == 1)
+							return true;
+					}
+					else if(UpperPiece == 'N') {
+						if((AbsDx == 1 && AbsDy == 2) || (AbsDx == 2 && AbsDy == 1))
+							return true;
+					}
+					else if(UpperPiece == 'B' || UpperPiece == 'R' || UpperPiece == 'Q') {
+						bool IsValidLine = false;
+						if(UpperPiece == 'B')
+							IsValidLine = (AbsDx == AbsDy);
+						else if(UpperPiece == 'R')
+							IsValidLine = (Dx == 0 || Dy == 0);
+						else
+							IsValidLine = ((AbsDx == AbsDy) || (Dx == 0 || Dy == 0));
+						if(IsValidLine)
+						{
+							if(IsPathClearOnBoard(Board, fromX, fromY, ToX, ToY))
+								return true;
+
+							const int StepX = (ToX > fromX) - (ToX < fromX);
+							const int StepY = (ToY > fromY) - (ToY < fromY);
+							int CheckX = fromX + StepX;
+							int CheckY = fromY + StepY;
+							bool foundBlockPiece = false;
+							while(CheckX != ToX || CheckY != ToY)
+							{
+								const char BlockPiece = Board[CheckY][CheckX];
+								CheckX += StepX;
+								CheckY += StepY;
+
+								if(BlockPiece != '.')
+								{
+									if((char)toupper((unsigned char)BlockPiece) == 'K' && IsWhitePiece(BlockPiece) == WhiteTurn) {
+										continue;
+									}
+
+									foundBlockPiece = true;
+									break;
+								}
+							}
+
+							if(!foundBlockPiece)
+								return true;
+						}
+					}
+					else if(UpperPiece == 'K') {
+						if(AbsDx <= 1 && AbsDy <= 1)
+							return true;
+					}
+				}
+			}
+			return false;
+		};
+
+		auto IsCheckOnBoard = [&](const auto &Board, bool WhiteTurn) {
+			for(int y = 0; y < 8; ++y)
+			{
+				for(int x = 0; x < 8; ++x)
+				{
+					const char Piece = Board[y][x];
+					if(Piece == '.' || IsWhitePiece(Piece) != WhiteTurn)
+						continue;
+					if((char)toupper((unsigned char)Piece) == 'K')
+						return IsUnderAttack(Board, x, y, WhiteTurn);
+				}
+			}
+			return false;
 		};
 
 		auto IsValidMoveOnBoard = [&](const auto &Board, int FromX, int FromY, int ToX, int ToY) {
@@ -1455,6 +1604,7 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			const int AbsDy = abs(Dy);
 			const char UpperPiece = (char)toupper((unsigned char)Piece);
 
+			bool IsBasicMoveValid = false;
 			if(UpperPiece == 'P')
 			{
 				const int Forward = IsWhitePiece(Piece) ? -1 : 1;
@@ -1462,25 +1612,123 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 				if(Dx == 0 && Target == '.')
 				{
 					if(Dy == Forward)
-						return true;
-					if(FromY == StartRow && Dy == Forward * 2 && Board[FromY + Forward][FromX] == '.')
-						return true;
+						IsBasicMoveValid = true;
+					else if(FromY == StartRow && Dy == Forward * 2 && Board[FromY + Forward][FromX] == '.')
+						IsBasicMoveValid = true;
 				}
-				if(AbsDx == 1 && Dy == Forward && Target != '.' && IsWhitePiece(Target) != IsWhitePiece(Piece))
-					return true;
-				return false;
+				else if (AbsDx == 1 && Dy == Forward)
+				{
+					if(Target != '.' && IsWhitePiece(Target) != IsWhitePiece(Piece))
+						IsBasicMoveValid = true;
+					else if(Target == '.' && ToX == s_Chess.m_EnPassantColumn)
+					{
+						const int EnPassantRow = IsWhitePiece(Piece) ? 3 : 4;
+						if(FromY == EnPassantRow)
+							IsBasicMoveValid = true;
+					}
+				}
 			}
-			if(UpperPiece == 'N')
-				return (AbsDx == 1 && AbsDy == 2) || (AbsDx == 2 && AbsDy == 1);
-			if(UpperPiece == 'B')
-				return AbsDx == AbsDy && IsPathClearOnBoard(Board, FromX, FromY, ToX, ToY);
-			if(UpperPiece == 'R')
-				return (Dx == 0 || Dy == 0) && IsPathClearOnBoard(Board, FromX, FromY, ToX, ToY);
-			if(UpperPiece == 'Q')
-				return ((AbsDx == AbsDy) || (Dx == 0 || Dy == 0)) && IsPathClearOnBoard(Board, FromX, FromY, ToX, ToY);
-			if(UpperPiece == 'K')
-				return AbsDx <= 1 && AbsDy <= 1;
-			return false;
+			else if(UpperPiece == 'N')
+				IsBasicMoveValid = (AbsDx == 1 && AbsDy == 2) || (AbsDx == 2 && AbsDy == 1);
+			else if(UpperPiece == 'B')
+				IsBasicMoveValid = AbsDx == AbsDy && IsPathClearOnBoard(Board, FromX, FromY, ToX, ToY);
+			else if(UpperPiece == 'R')
+				IsBasicMoveValid = (Dx == 0 || Dy == 0) && IsPathClearOnBoard(Board, FromX, FromY, ToX, ToY);
+			else if(UpperPiece == 'Q')
+				IsBasicMoveValid = ((AbsDx == AbsDy) || (Dx == 0 || Dy == 0)) && IsPathClearOnBoard(Board, FromX, FromY, ToX, ToY);
+			else if(UpperPiece == 'K') {
+				if(IsUnderAttack(Board, ToX, ToY, IsWhitePiece(Piece)))
+					return false;
+
+				if(AbsDx == 2 && AbsDy == 0)
+				{
+					const int RookPos = Dx == 2 ? 7 : 0;
+					if(!IsPathClearOnBoard(Board, FromX, FromY, RookPos, ToY))
+						return false;
+					if(IsUnderAttack(Board, FromX, FromY, IsWhitePiece(Piece)))
+						return false;
+					if(IsUnderAttack(Board, FromX + Dx / 2, FromY, IsWhitePiece(Piece)))
+						return false;
+					if(IsUnderAttack(Board, FromX + Dx, FromY, IsWhitePiece(Piece)))
+						return false;
+
+					if(Dx == 2)
+					{
+						IsBasicMoveValid = IsWhitePiece(Piece) ? s_Chess.m_WhiteKingSideCastle : s_Chess.m_BlackKingSideCastle;
+					}
+					else
+					{
+						IsBasicMoveValid = IsWhitePiece(Piece) ? s_Chess.m_WhiteQueenSideCastle : s_Chess.m_BlackQueenSideCastle;
+					}
+				}
+				else
+				{
+					IsBasicMoveValid = AbsDx <= 1 && AbsDy <= 1;
+				}
+			}
+
+			if(!IsBasicMoveValid)
+				return false;
+			
+			// check check
+			TChessBoard TempBoard = CopyChessBoard();
+			TempBoard[ToY][ToX] = Piece;
+			TempBoard[FromY][FromX] = '.';
+			if(IsCheckOnBoard(TempBoard, IsWhitePiece(Piece)))
+				return false;
+			
+				return true;
+			};
+
+		auto IsCheckmateOnBoard = [&](const auto &Board, bool WhiteTurn) {
+			if(!IsCheckOnBoard(Board, WhiteTurn))
+				return false;
+			for(int y = 0; y < 8; ++y)
+			{
+				for(int x = 0; x < 8; ++x)
+				{
+					const char Piece = Board[y][x];
+					if(Piece == '.' || IsWhitePiece(Piece) != WhiteTurn)
+						continue;
+					for(int ty = 0; ty < 8; ++ty)
+					{
+						for(int tx = 0; tx < 8; ++tx)
+						{
+							if(IsValidMoveOnBoard(Board, x, y, tx, ty))
+								return false;
+						}
+					}
+				}
+			}
+			return true;
+		};
+
+		auto IsStalemateOnBoard = [&](const auto &Board, bool WhiteTurn) {
+			if(IsCheckOnBoard(Board, WhiteTurn))
+				return false;
+			for(int y = 0; y < 8; ++y)
+			{
+				for(int x = 0; x < 8; ++x)
+				{
+					const char Piece = Board[y][x];
+					if(Piece == '.' || IsWhitePiece(Piece) != WhiteTurn)
+						continue;
+					for(int ty = 0; ty < 8; ++ty)
+					{
+						for(int tx = 0; tx < 8; ++tx)
+						{
+							if(IsValidMoveOnBoard(Board, x, y, tx, ty))
+								return false;
+						}
+					}
+				}
+			}
+			return true;
+		};
+
+		auto IsThreefold = [&](const auto &Board) {
+			std::string key = MakeStateKey(Board);
+			return s_Chess.m_RepetitionTable[key] >= 3;
 		};
 
 		auto CollectLegalMovesOnBoard = [&](const auto &Board, bool WhiteTurn) {
@@ -1506,7 +1754,7 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			}
 			return vMoves;
 		};
-
+		
 		auto PieceValue = [&](char Piece) {
 			switch((char)toupper((unsigned char)Piece))
 			{
@@ -1523,11 +1771,35 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 		auto ApplyMoveOnBoard = [&](auto &Board, const SChessMove &Move) {
 			const char MovingPiece = Board[Move.m_FromY][Move.m_FromX];
 			const char CapturedPiece = Board[Move.m_ToY][Move.m_ToX];
+			const char Upper = (char)toupper((unsigned char)MovingPiece);
+
 			Board[Move.m_ToY][Move.m_ToX] = MovingPiece;
 			Board[Move.m_FromY][Move.m_FromX] = '.';
-			const char Upper = (char)toupper((unsigned char)MovingPiece);
+
+			// Pawn promotion
 			if(Upper == 'P' && (Move.m_ToY == 0 || Move.m_ToY == 7))
 				Board[Move.m_ToY][Move.m_ToX] = IsWhitePiece(MovingPiece) ? 'Q' : 'q';
+
+			// Castling: move rook
+			if(Upper == 'K' && abs(Move.m_ToX - Move.m_FromX) == 2)
+			{
+				const bool KingSide = Move.m_ToX > Move.m_FromX;
+				const int RookFromX = KingSide ? 7 : 0;
+				const int RookToX = KingSide ? 5 : 3;
+				Board[Move.m_FromY][RookToX] = Board[Move.m_FromY][RookFromX];
+				Board[Move.m_FromY][RookFromX] = '.';
+			}
+
+			// En passant: capture the pawn
+			if(Upper == 'P' && Move.m_FromX != Move.m_ToX && CapturedPiece == '.')
+			{
+				const char EnPassantVictim = Board[Move.m_FromY][Move.m_ToX];
+				if((char)toupper((unsigned char)EnPassantVictim) == 'P')
+				{
+					Board[Move.m_FromY][Move.m_ToX] = '.';
+				}
+			}
+
 			return CapturedPiece;
 		};
 
@@ -1637,12 +1909,109 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			s_Chess.m_AnimToX = Move.m_ToX;
 			s_Chess.m_AnimToY = Move.m_ToY;
 			s_Chess.m_AnimStart = AnimTime;
-			if(CapturedPiece == 'k' || CapturedPiece == 'K')
+			s_Chess.m_WhiteTurn = !s_Chess.m_WhiteTurn;
+
+			if(MovingPiece == 'K')
+			{
+				s_Chess.m_WhiteKingSideCastle = false;
+				s_Chess.m_WhiteQueenSideCastle = false;
+			}
+			else if(MovingPiece == 'k')
+			{
+				s_Chess.m_BlackKingSideCastle = false;
+				s_Chess.m_BlackQueenSideCastle = false;
+			}
+			else if(MovingPiece == 'R')
+			{
+				if(Move.m_FromX == 0 && Move.m_FromY == 7)
+					s_Chess.m_WhiteQueenSideCastle = false;
+				else if(Move.m_FromX == 7 && Move.m_FromY == 7)
+					s_Chess.m_WhiteKingSideCastle = false;
+			}
+			else if(MovingPiece == 'r')
+			{
+				if(Move.m_FromX == 0 && Move.m_FromY == 0)
+					s_Chess.m_BlackQueenSideCastle = false;
+				else if(Move.m_FromX == 7 && Move.m_FromY == 0)
+					s_Chess.m_BlackKingSideCastle = false;
+			}
+
+			// disable castling if rook is captured
+			if(CapturedPiece == 'R' && Move.m_ToX == 0 && Move.m_ToY == 7)
+				s_Chess.m_WhiteQueenSideCastle = false;
+			else if(CapturedPiece == 'R' && Move.m_ToX == 7 && Move.m_ToY == 7)
+				s_Chess.m_WhiteKingSideCastle = false;
+			else if(CapturedPiece == 'r' && Move.m_ToX == 0 && Move.m_ToY == 0)
+				s_Chess.m_BlackQueenSideCastle = false;
+			else if(CapturedPiece == 'r' && Move.m_ToX == 7 && Move.m_ToY == 0)
+				s_Chess.m_BlackKingSideCastle = false;
+
+			if((char)toupper((unsigned char)MovingPiece) == 'P' && abs(Move.m_FromY - Move.m_ToY) == 2)
+			{
+				const bool WhitePawn = IsWhitePiece(MovingPiece);
+				bool CanEnPassant = false;
+
+				// check left
+				if(Move.m_ToX > 0)
+				{
+					const char LeftPiece = s_Chess.m_aBoard[Move.m_ToY][Move.m_ToX - 1];
+					if((char)toupper((unsigned char)LeftPiece) == 'P' && IsWhitePiece(LeftPiece) != WhitePawn)
+						CanEnPassant = true;
+				}
+
+				// check right
+				if(Move.m_ToX < 7)
+				{
+					const char RightPiece = s_Chess.m_aBoard[Move.m_ToY][Move.m_ToX + 1];
+					if((char)toupper((unsigned char)RightPiece) == 'P' && IsWhitePiece(RightPiece) != WhitePawn)
+						CanEnPassant = true;
+				}
+
+				s_Chess.m_EnPassantColumn = CanEnPassant ? Move.m_ToX : -1;
+			}
+			else
+			{
+				s_Chess.m_EnPassantColumn = -1;
+			}
+
+			if (CapturedPiece != '.' || (char)toupper((unsigned char)MovingPiece) == 'P')
+			{
+				s_Chess.m_HalfMoveClock = 0;
+				s_Chess.m_RepetitionTable.clear();
+			}
+			else
+			{
+				s_Chess.m_HalfMoveClock++;
+			}
+			
+			std::string key = MakeStateKey(s_Chess.m_aBoard);
+			s_Chess.m_RepetitionTable[key]++;
+
+			// end conditions
+			if(IsCheckmateOnBoard(s_Chess.m_aBoard, s_Chess.m_WhiteTurn))
 			{
 				s_Chess.m_GameOver = true;
-				s_Chess.m_WhiteWon = IsWhitePiece(MovingPiece);
+				s_Chess.m_WhiteWon = !s_Chess.m_WhiteTurn;
+				s_Chess.m_Stalemate = false;
 			}
-			s_Chess.m_WhiteTurn = !s_Chess.m_WhiteTurn;
+			else if(IsStalemateOnBoard(s_Chess.m_aBoard, s_Chess.m_WhiteTurn))
+			{
+				s_Chess.m_GameOver = true;
+				s_Chess.m_WhiteWon = false;
+				s_Chess.m_Stalemate = true;
+			}
+			else if(s_Chess.m_HalfMoveClock > 100)
+			{
+				s_Chess.m_GameOver = true;
+				s_Chess.m_WhiteWon = false;
+				s_Chess.m_FiftyMove = true;
+			}
+			else if(IsThreefold(s_Chess.m_aBoard))
+			{
+				s_Chess.m_GameOver = true;
+				s_Chess.m_WhiteWon = false;
+				s_Chess.m_Threefold = true;
+			}
 		};
 
 		if(!s_Chess.m_InGame)
@@ -1682,7 +2051,22 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			BtnArea.VSplitRight(110.0f, &BtnArea, &RestartButton);
 			SetupButton.VSplitLeft(10.0f, nullptr, &SetupButton);
 
-			const char *pStatus = s_Chess.m_GameOver ? (s_Chess.m_WhiteWon ? TCLocalize("Winner: White") : TCLocalize("Winner: Black")) : (s_Chess.m_WhiteTurn ? TCLocalize("Turn: White") : TCLocalize("Turn: Black"));
+			const char *pStatus;
+			if(s_Chess.m_GameOver)
+			{
+				if(s_Chess.m_Stalemate)
+					pStatus = TCLocalize("Draw - Stalemate");
+				else if (s_Chess.m_FiftyMove)
+					pStatus = TCLocalize("Draw - Fifty move rule");
+				else if(s_Chess.m_Threefold)
+					pStatus = TCLocalize("Draw - Threefold repetition");
+				else
+					pStatus = s_Chess.m_WhiteWon ? TCLocalize("Winner: White") : TCLocalize("Winner: Black");
+			}
+			else
+			{
+				pStatus = s_Chess.m_WhiteTurn ? TCLocalize("Turn: White") : TCLocalize("Turn: Black");
+			}
 			Ui()->DoLabel(&TurnLabel, pStatus, FONT_SIZE, TEXTALIGN_ML);
 			if(DoButton_Menu(&s_ChessRestartButton, TCLocalize("Restart"), 0, &RestartButton))
 				ResetChess();
@@ -1719,7 +2103,16 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 					if(!PickBotMove(BotMove))
 					{
 						s_Chess.m_GameOver = true;
-						s_Chess.m_WhiteWon = true;
+						if(IsCheckOnBoard(s_Chess.m_aBoard, s_Chess.m_WhiteTurn))
+						{
+							s_Chess.m_WhiteWon = true;
+							s_Chess.m_Stalemate = false;
+						}
+						else
+						{
+							s_Chess.m_WhiteWon = false;
+							s_Chess.m_Stalemate = true;
+						}
 					}
 					else
 					{
@@ -1857,7 +2250,18 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			{
 				CUIRect Overlay = Board;
 				Overlay.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.32f), IGraphics::CORNER_ALL, 4.0f);
-				Ui()->DoLabel(&Overlay, s_Chess.m_WhiteWon ? TCLocalize("White Wins") : TCLocalize("Black Wins"), HEADLINE_FONT_SIZE, TEXTALIGN_MC);
+
+				const char *pResult;
+				if(s_Chess.m_Stalemate)
+					pResult = TCLocalize("Draw - Stalemate");
+				else if(s_Chess.m_FiftyMove)
+					pResult = TCLocalize("Draw - Fifty move rule");
+				else if(s_Chess.m_Threefold)
+					pResult = TCLocalize("Draw - Threefold repetition");
+				else
+					pResult = s_Chess.m_WhiteWon ? TCLocalize("White Wins") : TCLocalize("Black Wins");
+
+				Ui()->DoLabel(&Overlay, pResult, HEADLINE_FONT_SIZE, TEXTALIGN_MC);
 			}
 		}
 	}
