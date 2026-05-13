@@ -1165,6 +1165,68 @@ endif()
 ########################################################################
 
 set(EXPECTED_DATA
+  BestClient/bc_dev_icon.png
+  BestClient/bc_icon.png
+  BestClient/builtinscripts/sayemoticon.chai
+  BestClient/combo/combo1.wv
+  BestClient/combo/combo2.wv
+  BestClient/combo/combo3.wv
+  BestClient/combo/combo4.wv
+  BestClient/combo/combo5.wv
+  BestClient/combo/combo6.wv
+  BestClient/combo/combo7.wv
+  BestClient/fonts/Cabin-Regular.ttf
+  BestClient/fonts/FreeSansBold.ttf
+  BestClient/fonts/GoogleSans-Regular.ttf
+  BestClient/fonts/Inter_24pt-Regular.ttf
+  BestClient/fonts/Inter_24pt-SemiBold.ttf
+  BestClient/fonts/Montserrat-Regular.ttf
+  BestClient/fonts/Nunito-Black.ttf
+  BestClient/fonts/Rubik-Regular.ttf
+  BestClient/fonts/minecraft_font.ttf
+  BestClient/gui_logo.png
+  BestClient/keystrokes/mouse.png
+  BestClient/keystrokes/wasd.png
+  BestClient/languages/arabic.txt
+  BestClient/languages/azerbaijani.txt
+  BestClient/languages/belarusian.txt
+  BestClient/languages/bosnian.txt
+  BestClient/languages/brazilian_portuguese.txt
+  BestClient/languages/bulgarian.txt
+  BestClient/languages/catalan.txt
+  BestClient/languages/chuvash.txt
+  BestClient/languages/czech.txt
+  BestClient/languages/danish.txt
+  BestClient/languages/dutch.txt
+  BestClient/languages/esperanto.txt
+  BestClient/languages/estonian.txt
+  BestClient/languages/finnish.txt
+  BestClient/languages/french.txt
+  BestClient/languages/galician.txt
+  BestClient/languages/german.txt
+  BestClient/languages/greek.txt
+  BestClient/languages/hungarian.txt
+  BestClient/languages/index.txt
+  BestClient/languages/italian.txt
+  BestClient/languages/japanese.txt
+  BestClient/languages/korean.txt
+  BestClient/languages/kyrgyz.txt
+  BestClient/languages/license.txt
+  BestClient/languages/norwegian.txt
+  BestClient/languages/persian.txt
+  BestClient/languages/polish.txt
+  BestClient/languages/portuguese.txt
+  BestClient/languages/romanian.txt
+  BestClient/languages/russian.txt
+  BestClient/languages/serbian.txt
+  BestClient/languages/serbian_cyrillic.txt
+  BestClient/languages/simplified_chinese.txt
+  BestClient/languages/slovak.txt
+  BestClient/languages/spanish.txt
+  BestClient/languages/swedish.txt
+  BestClient/languages/traditional_chinese.txt
+  BestClient/languages/turkish.txt
+  BestClient/languages/ukrainian.txt
   announcement.txt
   arrow.png
   assets/entities/comfort/ddnet.png
@@ -1369,68 +1431,6 @@ set(EXPECTED_DATA
   autoexec_server.cfg
   background_noise.png
   blob.png
-  BestClient/bc_dev_icon.png
-  BestClient/bc_icon.png
-  BestClient/builtinscripts/sayemoticon.chai
-  BestClient/combo/combo1.wv
-  BestClient/combo/combo2.wv
-  BestClient/combo/combo3.wv
-  BestClient/combo/combo4.wv
-  BestClient/combo/combo5.wv
-  BestClient/combo/combo6.wv
-  BestClient/combo/combo7.wv
-  BestClient/fonts/Cabin-Regular.ttf
-  BestClient/fonts/FreeSansBold.ttf
-  BestClient/fonts/GoogleSans-Regular.ttf
-  BestClient/fonts/Inter_24pt-Regular.ttf
-  BestClient/fonts/Inter_24pt-SemiBold.ttf
-  BestClient/fonts/minecraft_font.ttf
-  BestClient/fonts/Montserrat-Regular.ttf
-  BestClient/fonts/Nunito-Black.ttf
-  BestClient/fonts/Rubik-Regular.ttf
-  BestClient/gui_logo.png
-  BestClient/keystrokes/mouse.png
-  BestClient/keystrokes/wasd.png
-  BestClient/languages/arabic.txt
-  BestClient/languages/azerbaijani.txt
-  BestClient/languages/belarusian.txt
-  BestClient/languages/bosnian.txt
-  BestClient/languages/brazilian_portuguese.txt
-  BestClient/languages/bulgarian.txt
-  BestClient/languages/catalan.txt
-  BestClient/languages/chuvash.txt
-  BestClient/languages/czech.txt
-  BestClient/languages/danish.txt
-  BestClient/languages/dutch.txt
-  BestClient/languages/esperanto.txt
-  BestClient/languages/estonian.txt
-  BestClient/languages/finnish.txt
-  BestClient/languages/french.txt
-  BestClient/languages/galician.txt
-  BestClient/languages/german.txt
-  BestClient/languages/greek.txt
-  BestClient/languages/hungarian.txt
-  BestClient/languages/index.txt
-  BestClient/languages/italian.txt
-  BestClient/languages/japanese.txt
-  BestClient/languages/korean.txt
-  BestClient/languages/kyrgyz.txt
-  BestClient/languages/license.txt
-  BestClient/languages/norwegian.txt
-  BestClient/languages/persian.txt
-  BestClient/languages/polish.txt
-  BestClient/languages/portuguese.txt
-  BestClient/languages/romanian.txt
-  BestClient/languages/russian.txt
-  BestClient/languages/serbian.txt
-  BestClient/languages/serbian_cyrillic.txt
-  BestClient/languages/simplified_chinese.txt
-  BestClient/languages/slovak.txt
-  BestClient/languages/spanish.txt
-  BestClient/languages/swedish.txt
-  BestClient/languages/traditional_chinese.txt
-  BestClient/languages/turkish.txt
-  BestClient/languages/ukrainian.txt
   censorlist.txt
   communityicons/none.png
   countryflags/AD.png
@@ -2776,6 +2776,7 @@ if(CLIENT)
   set_src(GAME_CLIENT GLOB_RECURSE src/game/client
     animstate.cpp
     animstate.h
+    bc_ui_animations.h
     component.cpp
     component.h
     components/background.cpp
@@ -2788,6 +2789,8 @@ if(CLIENT)
     components/bestclient/afterimage.h
     components/bestclient/bestclient.cpp
     components/bestclient/bestclient.h
+    components/bestclient/chat_bubbles.cpp
+    components/bestclient/chat_bubbles.h
     components/bestclient/clientindicator/browser_cache.cpp
     components/bestclient/clientindicator/browser_cache.h
     components/bestclient/clientindicator/client_indicator.cpp
@@ -2796,21 +2799,31 @@ if(CLIENT)
     components/bestclient/clientindicator/presence_cache.cpp
     components/bestclient/clientindicator/presence_cache.h
     components/bestclient/clientindicator/protocol.h
+    components/bestclient/editors/menus_assets_editor.cpp
     components/bestclient/fast_actions.cpp
     components/bestclient/fast_actions.h
     components/bestclient/fast_practice.cpp
     components/bestclient/fast_practice.h
-    components/bestclient/chat_bubbles.cpp
-    components/bestclient/chat_bubbles.h
-    components/bestclient/editors/menus_assets_editor.cpp
-    components/bestclient/magic_particles.cpp
-    components/bestclient/magic_particles.h
     components/bestclient/hud_editor.cpp
     components/bestclient/hud_editor.h
     components/bestclient/irc/irc.cpp
     components/bestclient/irc/irc.h
+    components/bestclient/magic_particles.cpp
+    components/bestclient/magic_particles.h
+    components/bestclient/menus_bestclient.cpp
+    components/bestclient/menus_bestclient_shop.cpp
     components/bestclient/music_player.cpp
     components/bestclient/music_player.h
+    components/bestclient/orbit_aura.cpp
+    components/bestclient/orbit_aura.h
+    components/bestclient/r_jelly.cpp
+    components/bestclient/r_jelly.h
+    components/bestclient/r_trail.cpp
+    components/bestclient/r_trail.h
+    components/bestclient/subsystem_runtime.h
+    components/bestclient/translate.cpp
+    components/bestclient/translate.h
+    components/bestclient/version.h
     components/bestclient/visualizer/analyzer.cpp
     components/bestclient/visualizer/analyzer.h
     components/bestclient/visualizer/service.cpp
@@ -2819,23 +2832,14 @@ if(CLIENT)
     components/bestclient/visualizer/smoother.h
     components/bestclient/visualizer/source.h
     components/bestclient/visualizer/source_passive.cpp
+    components/bestclient/visualizer/source_priority.h
     components/bestclient/visualizer/source_pulse.cpp
     components/bestclient/visualizer/source_wasapi.cpp
     components/bestclient/visualizer/types.h
-    components/bestclient/orbit_aura.cpp
-    components/bestclient/orbit_aura.h
-    components/bestclient/r_jelly.cpp
-    components/bestclient/r_jelly.h
-    components/bestclient/r_trail.cpp
-    components/bestclient/r_trail.h
     components/bestclient/voice/protocol.h
+    components/bestclient/voice/server.cpp
     components/bestclient/voice/voice.cpp
     components/bestclient/voice/voice.h
-    components/bestclient/menus_bestclient.cpp
-    components/bestclient/menus_bestclient_shop.cpp
-    components/bestclient/translate.cpp
-    components/bestclient/translate.h
-    components/bestclient/subsystem_runtime.h
     components/binds.cpp
     components/binds.h
     components/broadcast.cpp
@@ -3639,9 +3643,9 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     aio_test.cpp
     bezier_test.cpp
     blocklist_driver_test.cpp
-    clientindicator_test.cpp
     bytes_be_test.cpp
     chunk_header_test.cpp
+    clientindicator_test.cpp
     color_test.cpp
     compression_test.cpp
     csv_test.cpp
