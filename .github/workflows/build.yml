@@ -20,19 +20,19 @@ jobs:
         - name: ubuntu-latest-fancy
           os: ubuntu-latest
           cmake-args: -G Ninja
-          cmake-init-env: CXXFLAGS=-Werror
+          cmake-init-env: CXXFLAGS="-Werror -Wno-unused-function"
           package-file: "*-linux_x86_64.tar.xz"
         - name: ubuntu-22.04
           os: ubuntu-22.04
           cmake-path: /usr/bin/
           cmake-args: -G "Unix Makefiles" -DTEST_MYSQL=ON
-          cmake-init-env: CXXFLAGS=-Werror
+          cmake-init-env: CXXFLAGS="-Werror -Wno-unused-function"
           gtest-env: GTEST_FILTER=-*SQLite*
           package-file: "*-linux_x86_64.tar.xz"
         - name: macOS-latest
           os: macOS-latest
-          cmake-args: -G Ninja
-          cmake-init-env: CXXFLAGS=-Werror
+          cmake-args: -G Ninja -DSDL2_LIBRARY=${{ github.workspace }}/ddnet-libs/sdl/mac/libfat/SDL2.framework/Versions/A/SDL2 -DSDL2_INCLUDEDIR=${{ github.workspace }}/ddnet-libs/sdl/mac/libfat/SDL2.framework/Headers
+          cmake-init-env: CXXFLAGS="-Werror -Wno-unused-function"
           package-file: "*-macos.dmg"
         - name: windows-latest
           os: windows-latest
@@ -43,7 +43,7 @@ jobs:
         - name: windows-latest-mingw
           os: windows-latest
           cmake-args: -G Ninja -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DEXCEPTION_HANDLING=ON -DCMAKE_RC_COMPILER=windres -DCMAKE_AR=ar -DVULKAN=ON
-          cmake-init-env: CXXFLAGS=-Werror LDFLAGS=-Werror
+          cmake-init-env: CXXFLAGS="-Werror -Wno-unused-but-set-variable" LDFLAGS=-Werror
           package-file: "*-win64.zip"
           executable-suffix: .exe
           # Delete outdated libwinpthread-1.dll after configuring to workaround https://github.com/ddnet/ddnet/issues/10203 when using MinGW.
@@ -61,7 +61,7 @@ jobs:
         sudo apt-get update -y
         # mount: /var/lib/grub/esp: special device /dev/disk/by-id/scsi-... does not exist.
         # sudo apt-get upgrade -y
-        sudo apt-get install pkg-config ninja-build libfreetype6-dev libnotify-dev libsdl2-dev libsqlite3-dev libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev libx264-dev libpng-dev valgrind gcovr libglew-dev -y
+        sudo apt-get install pkg-config ninja-build libcurl4-openssl-dev libfreetype6-dev libnotify-dev libogg-dev libopus-dev libopusfile-dev libsdl2-dev libsqlite3-dev libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev libx264-dev libpng-dev libvulkan-dev valgrind gcovr libglew-dev -y
 
     - name: Prepare Linux (non-fancy)
       if: contains(matrix.os, 'ubuntu') && !contains(matrix.name, 'fancy')
@@ -103,7 +103,7 @@ jobs:
       if: contains(matrix.os, 'macOS')
       run: |
         brew update
-        brew install ffmpeg molten-vk ninja pkg-config sdl2
+        brew install ffmpeg molten-vk ninja pkg-config
         brew upgrade freetype
         pip3 install --break-system-packages dmgbuild
         echo /Library/Frameworks/Python.framework/Versions/3.12/bin >> $GITHUB_PATH
@@ -399,7 +399,7 @@ jobs:
       run: |
         export PATH=/home/runner/cmake/bin:$PATH
         source emsdk/emsdk_env.sh
-        emcmake cmake -H. -G "Unix Makefiles" -B build-emscripten-headless -DCMAKE_BUILD_TYPE=Debug -DVIDEORECORDER=OFF -DVULKAN=OFF -DSERVER=OFF -DTOOLS=OFF -DHEADLESS_CLIENT=ON -DPREFER_BUNDLED_LIBS=ON
+        emcmake cmake -H. -G "Unix Makefiles" -B build-emscripten-headless -DCMAKE_BUILD_TYPE=Debug -DDISCORD=OFF -DVIDEORECORDER=OFF -DVULKAN=OFF -DSERVER=OFF -DTOOLS=OFF -DHEADLESS_CLIENT=ON -DPREFER_BUNDLED_LIBS=ON
         cmake --build build-emscripten-headless --target game-client -j$(nproc)
 
     - name: Test headless Emscripten client
@@ -413,7 +413,7 @@ jobs:
         export PATH=/home/runner/cmake/bin:$PATH
         source emsdk/emsdk_env.sh
         # -G "Unix Makefiles" required due to https://gitlab.kitware.com/cmake/cmake/-/issues/16395
-        emcmake cmake -H. -G "Unix Makefiles" -B build-emscripten-release -DCMAKE_BUILD_TYPE=Release -DVIDEORECORDER=OFF -DVULKAN=OFF -DSERVER=OFF -DTOOLS=OFF -DPREFER_BUNDLED_LIBS=ON
+        emcmake cmake -H. -G "Unix Makefiles" -B build-emscripten-release -DCMAKE_BUILD_TYPE=Release -DDISCORD=OFF -DVIDEORECORDER=OFF -DVULKAN=OFF -DSERVER=OFF -DTOOLS=OFF -DPREFER_BUNDLED_LIBS=ON
         cmake --build build-emscripten-release --target game-client -j$(nproc)
         cmake --build build-emscripten-release --target package_default
         mkdir artifacts

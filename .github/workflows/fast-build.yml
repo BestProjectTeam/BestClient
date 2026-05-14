@@ -42,13 +42,13 @@ jobs:
         sudo apt-get update -y
         # mount: /var/lib/grub/esp: special device /dev/disk/by-id/scsi-... does not exist.
         # sudo apt-get upgrade -y
-        sudo apt-get install pkg-config cmake ninja-build libfreetype6-dev libnotify-dev libsdl2-dev libsqlite3-dev libvulkan-dev glslang-tools spirv-tools libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev libx264-dev libpng-dev valgrind gcovr libglew-dev -y
+        sudo apt-get install pkg-config cmake ninja-build libcurl4-openssl-dev libfreetype6-dev libnotify-dev libogg-dev libopus-dev libopusfile-dev libsdl2-dev libsqlite3-dev libvulkan-dev glslang-tools spirv-tools libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev libx264-dev libpng-dev valgrind gcovr libglew-dev -y
 
     - name: Prepare macOS
       if: contains(matrix.os, 'macOS')
       run: |
         brew update || true
-        brew install ffmpeg molten-vk ninja pkg-config sdl2 || true
+        brew install ffmpeg molten-vk ninja pkg-config || true
         brew upgrade freetype
         pip3 install --break-system-packages dmgbuild
         echo /Library/Frameworks/Python.framework/Versions/3.12/bin >> $GITHUB_PATH
@@ -100,6 +100,8 @@ jobs:
         if [[ "${{ matrix.os }}" == "macOS-latest" ]]; then
             POST_FLAGS+=" -DPNG_LIBRARY=${GITHUB_WORKSPACE}/ddnet-libs/png/mac/libfat/libpng16.16.dylib"
             POST_FLAGS+=" -DPNG_INCLUDEDIR=${GITHUB_WORKSPACE}/ddnet-libs/png/include"
+            POST_FLAGS+=" -DSDL2_LIBRARY=${GITHUB_WORKSPACE}/ddnet-libs/sdl/mac/libfat/SDL2.framework/Versions/A/SDL2"
+            POST_FLAGS+=" -DSDL2_INCLUDEDIR=${GITHUB_WORKSPACE}/ddnet-libs/sdl/mac/libfat/SDL2.framework/Headers"
         fi
         mkdir release
         cd release

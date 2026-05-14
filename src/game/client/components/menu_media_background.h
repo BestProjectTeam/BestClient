@@ -1,8 +1,8 @@
 #ifndef GAME_CLIENT_COMPONENTS_MENU_MEDIA_BACKGROUND_H
 #define GAME_CLIENT_COMPONENTS_MENU_MEDIA_BACKGROUND_H
 
-#include "media_decoder.h"
 #include "bestclient/subsystem_runtime.h"
+#include "media_decoder.h"
 
 #include <base/system.h>
 
@@ -13,11 +13,11 @@
 #include <cstdint>
 #include <vector>
 
-extern "C" {
-#include <libavcodec/avcodec.h>
-#include <libavformat/avformat.h>
-#include <libswscale/swscale.h>
-}
+struct AVCodecContext;
+struct AVFormatContext;
+struct AVFrame;
+struct AVPacket;
+struct SwsContext;
 
 class CMenuMediaBackground
 {
@@ -46,7 +46,7 @@ class CMenuMediaBackground
 	AVPacket *m_pPacket = nullptr;
 	SwsContext *m_pSwsCtx = nullptr;
 	int m_VideoStream = -1;
-	int64_t m_LastVideoPts = AV_NOPTS_VALUE;
+	int64_t m_LastVideoPts = 0;
 	IGraphics::CTextureHandle m_VideoTexture;
 	std::chrono::nanoseconds m_NextFrameTime{0};
 	std::vector<uint8_t> m_vVideoUploadBuffer;
@@ -70,7 +70,6 @@ public:
 	};
 
 private:
-
 	void SetStatus(const char *pText);
 	void SetError(const char *pText);
 	void ClearVideoState();

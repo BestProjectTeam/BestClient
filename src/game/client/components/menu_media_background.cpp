@@ -9,112 +9,137 @@
 #include <algorithm>
 #include <limits>
 
+#if defined(CONF_VIDEORECORDER)
+extern "C" {
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+#include <libswscale/swscale.h>
+}
+#endif
+
 namespace
 {
-constexpr int MENU_MEDIA_MAX_VIDEO_FRAME_MS = 250;
-constexpr int MENU_MEDIA_DEFAULT_VIDEO_FRAME_MS = 33;
+	constexpr int MENU_MEDIA_MAX_VIDEO_FRAME_MS = 250;
+	constexpr int MENU_MEDIA_DEFAULT_VIDEO_FRAME_MS = 33;
 
-bool DecodeFirstFrameFromFile(const char *pAbsolutePath, CImageInfo &ImageOut)
-{
-	ImageOut.Free();
-
-	if(pAbsolutePath == nullptr || pAbsolutePath[0] == '\0')
-		return false;
-
-	AVFormatContext *pFormatCtx = nullptr;
-	AVCodecContext *pCodecCtx = nullptr;
-	SwsContext *pSwsCtx = nullptr;
-	AVPacket *pPacket = nullptr;
-	AVFrame *pFrame = nullptr;
-	AVFrame *pFrameRgba = nullptr;
-	int VideoStream = -1;
-	bool Success = false;
-	int SrcW = 0;
-	int SrcH = 0;
-	size_t FrameBytes = 0;
-
-	auto CopyFrame = [&]() -> bool {
-		if(!pFrame || !pFrameRgba || !pSwsCtx || SrcW <= 0 || SrcH <= 0 || FrameBytes == 0)
-			return false;
-		if(av_frame_make_writable(pFrameRgba) < 0)
-			return false;
-		const int ScaledLines = sws_scale(pSwsCtx, pFrame->data, pFrame->linesize, 0, SrcH, pFrameRgba->data, pFrameRgba->linesize);
-		if(ScaledLines <= 0 || pFrameRgba->linesize[0] <= 0 || (size_t)pFrameRgba->linesize[0] < (size_t)SrcW * 4ull)
-			return false;
-
-		ImageOut.Free();
-		ImageOut.m_Width = SrcW;
-		ImageOut.m_Height = SrcH;
-		ImageOut.m_Format = CImageInfo::FORMAT_RGBA;
-		ImageOut.m_pData = (uint8_t *)malloc(FrameBytes);
-		if(!ImageOut.m_pData)
-			return false;
-
-		for(int y = 0; y < SrcH; ++y)
-		{
-			mem_copy(
-				ImageOut.m_pData + (size_t)y * (size_t)SrcW * 4ull,
-				pFrameRgba->data[0] + (size_t)y * (size_t)pFrameRgba->linesize[0],
-				(size_t)SrcW * 4ull);
-		}
-		return true;
-	};
-
-	do
+#if defined(CONF_VIDEORECORDER)
+	bool DecodeFirstFrameFromFile(const char *pAbsolutePath, CImageInfo &ImageOut)
 	{
-		if(avformat_open_input(&pFormatCtx, pAbsolutePath, nullptr, nullptr) != 0)
-			break;
-		if(avformat_find_stream_info(pFormatCtx, nullptr) < 0)
-			break;
+		ImageOut.Free();
 
-		VideoStream = av_find_best_stream(pFormatCtx, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
-		if(VideoStream < 0)
-			break;
+		if(pAbsolutePath == nullptr || pAbsolutePath[0] == '\0')
+			return false;
 
-		const AVStream *pStream = pFormatCtx->streams[VideoStream];
-		const AVCodec *pCodec = avcodec_find_decoder(pStream->codecpar->codec_id);
-		if(!pCodec)
-			break;
+		AVFormatContext *pFormatCtx = nullptr;
+		AVCodecContext *pCodecCtx = nullptr;
+		SwsContext *pSwsCtx = nullptr;
+		AVPacket *pPacket = nullptr;
+		AVFrame *pFrame = nullptr;
+		AVFrame *pFrameRgba = nullptr;
+		int VideoStream = -1;
+		bool Success = false;
+		int SrcW = 0;
+		int SrcH = 0;
+		size_t FrameBytes = 0;
 
-		pCodecCtx = avcodec_alloc_context3(pCodec);
-		if(!pCodecCtx || avcodec_parameters_to_context(pCodecCtx, pStream->codecpar) < 0 || avcodec_open2(pCodecCtx, pCodec, nullptr) < 0)
-			break;
+		auto CopyFrame = [&]() -> bool {
+			if(!pFrame || !pFrameRgba || !pSwsCtx || SrcW <= 0 || SrcH <= 0 || FrameBytes == 0)
+				return false;
+			if(av_frame_make_writable(pFrameRgba) < 0)
+				return false;
+			const int ScaledLines = sws_scale(pSwsCtx, pFrame->data, pFrame->linesize, 0, SrcH, pFrameRgba->data, pFrameRgba->linesize);
+			if(ScaledLines <= 0 || pFrameRgba->linesize[0] <= 0 || (size_t)pFrameRgba->linesize[0] < (size_t)SrcW * 4ull)
+				return false;
 
-		SrcW = pCodecCtx->width;
-		SrcH = pCodecCtx->height;
-		if(SrcW <= 0 || SrcH <= 0)
-			break;
-		if((size_t)SrcW > std::numeric_limits<size_t>::max() / ((size_t)SrcH * 4ull))
-			break;
-		FrameBytes = (size_t)SrcW * (size_t)SrcH * 4ull;
-		if(FrameBytes == 0)
-			break;
+			ImageOut.Free();
+			ImageOut.m_Width = SrcW;
+			ImageOut.m_Height = SrcH;
+			ImageOut.m_Format = CImageInfo::FORMAT_RGBA;
+			ImageOut.m_pData = (uint8_t *)malloc(FrameBytes);
+			if(!ImageOut.m_pData)
+				return false;
 
-		pSwsCtx = sws_getContext(SrcW, SrcH, pCodecCtx->pix_fmt, SrcW, SrcH, AV_PIX_FMT_RGBA, SWS_BILINEAR, nullptr, nullptr, nullptr);
-		if(!pSwsCtx)
-			break;
-
-		pPacket = av_packet_alloc();
-		pFrame = av_frame_alloc();
-		pFrameRgba = av_frame_alloc();
-		if(!pPacket || !pFrame || !pFrameRgba)
-			break;
-
-		pFrameRgba->format = AV_PIX_FMT_RGBA;
-		pFrameRgba->width = SrcW;
-		pFrameRgba->height = SrcH;
-		if(av_frame_get_buffer(pFrameRgba, 1) < 0)
-			break;
-
-		while(av_read_frame(pFormatCtx, pPacket) >= 0)
-		{
-			if(pPacket->stream_index == VideoStream)
+			for(int y = 0; y < SrcH; ++y)
 			{
-				if(avcodec_send_packet(pCodecCtx, pPacket) < 0)
+				mem_copy(
+					ImageOut.m_pData + (size_t)y * (size_t)SrcW * 4ull,
+					pFrameRgba->data[0] + (size_t)y * (size_t)pFrameRgba->linesize[0],
+					(size_t)SrcW * 4ull);
+			}
+			return true;
+		};
+
+		do
+		{
+			if(avformat_open_input(&pFormatCtx, pAbsolutePath, nullptr, nullptr) != 0)
+				break;
+			if(avformat_find_stream_info(pFormatCtx, nullptr) < 0)
+				break;
+
+			VideoStream = av_find_best_stream(pFormatCtx, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
+			if(VideoStream < 0)
+				break;
+
+			const AVStream *pStream = pFormatCtx->streams[VideoStream];
+			const AVCodec *pCodec = avcodec_find_decoder(pStream->codecpar->codec_id);
+			if(!pCodec)
+				break;
+
+			pCodecCtx = avcodec_alloc_context3(pCodec);
+			if(!pCodecCtx || avcodec_parameters_to_context(pCodecCtx, pStream->codecpar) < 0 || avcodec_open2(pCodecCtx, pCodec, nullptr) < 0)
+				break;
+
+			SrcW = pCodecCtx->width;
+			SrcH = pCodecCtx->height;
+			if(SrcW <= 0 || SrcH <= 0)
+				break;
+			if((size_t)SrcW > std::numeric_limits<size_t>::max() / ((size_t)SrcH * 4ull))
+				break;
+			FrameBytes = (size_t)SrcW * (size_t)SrcH * 4ull;
+			if(FrameBytes == 0)
+				break;
+
+			pSwsCtx = sws_getContext(SrcW, SrcH, pCodecCtx->pix_fmt, SrcW, SrcH, AV_PIX_FMT_RGBA, SWS_BILINEAR, nullptr, nullptr, nullptr);
+			if(!pSwsCtx)
+				break;
+
+			pPacket = av_packet_alloc();
+			pFrame = av_frame_alloc();
+			pFrameRgba = av_frame_alloc();
+			if(!pPacket || !pFrame || !pFrameRgba)
+				break;
+
+			pFrameRgba->format = AV_PIX_FMT_RGBA;
+			pFrameRgba->width = SrcW;
+			pFrameRgba->height = SrcH;
+			if(av_frame_get_buffer(pFrameRgba, 1) < 0)
+				break;
+
+			while(av_read_frame(pFormatCtx, pPacket) >= 0)
+			{
+				if(pPacket->stream_index == VideoStream)
 				{
-					av_packet_unref(pPacket);
-					break;
+					if(avcodec_send_packet(pCodecCtx, pPacket) < 0)
+					{
+						av_packet_unref(pPacket);
+						break;
+					}
+					while(avcodec_receive_frame(pCodecCtx, pFrame) == 0)
+					{
+						if(CopyFrame())
+						{
+							Success = true;
+							break;
+						}
+					}
 				}
+				av_packet_unref(pPacket);
+				if(Success)
+					break;
+			}
+
+			if(!Success && avcodec_send_packet(pCodecCtx, nullptr) >= 0)
+			{
 				while(avcodec_receive_frame(pCodecCtx, pFrame) == 0)
 				{
 					if(CopyFrame())
@@ -124,42 +149,34 @@ bool DecodeFirstFrameFromFile(const char *pAbsolutePath, CImageInfo &ImageOut)
 					}
 				}
 			}
-			av_packet_unref(pPacket);
-			if(Success)
-				break;
-		}
+		} while(false);
 
-		if(!Success && avcodec_send_packet(pCodecCtx, nullptr) >= 0)
-		{
-			while(avcodec_receive_frame(pCodecCtx, pFrame) == 0)
-			{
-				if(CopyFrame())
-				{
-					Success = true;
-					break;
-				}
-			}
-		}
-	} while(false);
+		if(!Success)
+			ImageOut.Free();
 
-	if(!Success)
+		if(pFrameRgba)
+			av_frame_free(&pFrameRgba);
+		if(pFrame)
+			av_frame_free(&pFrame);
+		if(pPacket)
+			av_packet_free(&pPacket);
+		if(pSwsCtx)
+			sws_freeContext(pSwsCtx);
+		if(pCodecCtx)
+			avcodec_free_context(&pCodecCtx);
+		if(pFormatCtx)
+			avformat_close_input(&pFormatCtx);
+
+		return Success;
+	}
+#else
+	bool DecodeFirstFrameFromFile(const char *pAbsolutePath, CImageInfo &ImageOut)
+	{
+		(void)pAbsolutePath;
 		ImageOut.Free();
-
-	if(pFrameRgba)
-		av_frame_free(&pFrameRgba);
-	if(pFrame)
-		av_frame_free(&pFrame);
-	if(pPacket)
-		av_packet_free(&pPacket);
-	if(pSwsCtx)
-		sws_freeContext(pSwsCtx);
-	if(pCodecCtx)
-		avcodec_free_context(&pCodecCtx);
-	if(pFormatCtx)
-		avformat_close_input(&pFormatCtx);
-
-	return Success;
-}
+		return false;
+	}
+#endif
 }
 
 CMenuMediaBackground::~CMenuMediaBackground()
@@ -188,6 +205,7 @@ void CMenuMediaBackground::SetError(const char *pText)
 
 void CMenuMediaBackground::ClearVideoState()
 {
+#if defined(CONF_VIDEORECORDER)
 	if(m_pGraphics != nullptr)
 		m_pGraphics->UnloadTexture(&m_VideoTexture);
 	if(m_pPacket)
@@ -213,6 +231,20 @@ void CMenuMediaBackground::ClearVideoState()
 	m_LastVideoPts = AV_NOPTS_VALUE;
 	m_NextFrameTime = std::chrono::nanoseconds::zero();
 	m_vVideoUploadBuffer.clear();
+#else
+	if(m_pGraphics != nullptr)
+		m_pGraphics->UnloadTexture(&m_VideoTexture);
+	m_pFormatCtx = nullptr;
+	m_pCodecCtx = nullptr;
+	m_pFrame = nullptr;
+	m_pFrameRgba = nullptr;
+	m_pPacket = nullptr;
+	m_pSwsCtx = nullptr;
+	m_VideoStream = -1;
+	m_LastVideoPts = 0;
+	m_NextFrameTime = std::chrono::nanoseconds::zero();
+	m_vVideoUploadBuffer.clear();
+#endif
 }
 
 void CMenuMediaBackground::Unload()
@@ -360,6 +392,11 @@ bool CMenuMediaBackground::LoadStaticMedia(const char *pPath, int StorageType)
 
 bool CMenuMediaBackground::UploadCurrentVideoFrame(const char *pContextName, int DurationMs)
 {
+#if !defined(CONF_VIDEORECORDER)
+	(void)pContextName;
+	(void)DurationMs;
+	return false;
+#else
 	if(m_pGraphics == nullptr || m_pFrame == nullptr || m_pFrameRgba == nullptr || m_pSwsCtx == nullptr || m_Width <= 0 || m_Height <= 0)
 		return false;
 
@@ -395,10 +432,15 @@ bool CMenuMediaBackground::UploadCurrentVideoFrame(const char *pContextName, int
 	m_LastVideoPts = m_pFrame->best_effort_timestamp;
 	m_NextFrameTime = time_get_nanoseconds() + std::chrono::milliseconds(std::clamp(DurationMs, 1, MENU_MEDIA_MAX_VIDEO_FRAME_MS));
 	return true;
+#endif
 }
 
 bool CMenuMediaBackground::DecodeNextVideoFrame(bool LoopOnEof)
 {
+#if !defined(CONF_VIDEORECORDER)
+	(void)LoopOnEof;
+	return false;
+#else
 	if(!m_pFormatCtx || !m_pCodecCtx || !m_pPacket || !m_pFrame)
 		return false;
 
@@ -442,10 +484,18 @@ bool CMenuMediaBackground::DecodeNextVideoFrame(bool LoopOnEof)
 		if(SendResult < 0)
 			return false;
 	}
+#endif
 }
 
 bool CMenuMediaBackground::LoadVideo(const char *pPath, int StorageType)
 {
+#if !defined(CONF_VIDEORECORDER)
+	(void)pPath;
+	(void)StorageType;
+	m_IsVideo = true;
+	SetError(Localize("Video backgrounds are unavailable in this build."));
+	return false;
+#else
 	m_IsVideo = true;
 
 	char aPath[IO_MAX_PATH_LENGTH];
@@ -533,6 +583,7 @@ bool CMenuMediaBackground::LoadVideo(const char *pPath, int StorageType)
 	m_IsLoaded = true;
 	SetStatus(Localize("Loaded video."));
 	return true;
+#endif
 }
 
 void CMenuMediaBackground::ReloadFromConfig(int Enabled, const char *pPath)
@@ -694,9 +745,9 @@ bool CMenuMediaBackground::Render(float ScreenWidth, float ScreenHeight, const S
 	m_pGraphics->BlendNormal();
 
 	const bool UseWorldOffset = pRenderContext != nullptr &&
-		pRenderContext->m_WorldOffset > 0.0f &&
-		pRenderContext->m_ViewWidth > 0.0f &&
-		pRenderContext->m_ViewHeight > 0.0f;
+				    pRenderContext->m_WorldOffset > 0.0f &&
+				    pRenderContext->m_ViewWidth > 0.0f &&
+				    pRenderContext->m_ViewHeight > 0.0f;
 	if(UseWorldOffset)
 	{
 		const float WorldOffset = std::clamp(pRenderContext->m_WorldOffset, 0.0f, 1.0f);
