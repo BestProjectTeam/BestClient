@@ -32,6 +32,7 @@ const MIN_PRESENCE_INTERVAL: Duration = Duration::from_millis(200);
 const MIN_DEV_AUTH_INTERVAL: Duration = Duration::from_secs(1);
 const MIN_VERSION_INTERVAL: Duration = Duration::from_secs(1);
 const MAX_ENTRIES: usize = 5000;
+const MAX_ENTRIES_PER_IP: usize = 4;
 const MAX_NONCES: usize = 20000;
 const MAX_BROADCAST_PEERS: usize = 128;
 const DEFAULT_TLS_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
@@ -232,20 +233,32 @@ impl ServerState {
 
         match packet.packet_type {
             PACKET_JOIN | PACKET_HEARTBEAT => self.handle_join_or_heartbeat(packet, from, now),
-            PACKET_LEAVE => self.handle_leave(key),
+            PACKET_LEAVE => self.handle_leave(key, from),
             _ => (false, Vec::new()),
         }
     }
 
     fn handle_join_or_heartbeat(&mut self, packet: PresencePacket, from: SocketAddr, now: Instant) -> (bool, Vec<OutPacket>) {
-        if self.entries.len() >= MAX_ENTRIES && !self.entries.contains_key(&IdentityKey { instance_id: packet.instance_id, client_id: packet.client_id }) {
-            return (false, Vec::new());
-        }
         let identity = IdentityKey {
             instance_id: packet.instance_id,
             client_id: packet.client_id,
         };
         let old = self.entries.get(&identity).cloned();
+
+        if let Some(ref old_entry) = old {
+            if old_entry.remote_addr != from {
+                return (false, Vec::new());
+            }
+        } else {
+            if self.entries.len() >= MAX_ENTRIES {
+                return (false, Vec::new());
+            }
+            let ip_count = self.entries.values().filter(|e| e.remote_addr.ip() == from.ip()).count();
+            if ip_count >= MAX_ENTRIES_PER_IP {
+                return (false, Vec::new());
+            }
+        }
+
         let treat_as_join = packet.packet_type == PACKET_JOIN || old.is_none();
         let old_server = old.as_ref().map(|entry| entry.server_address.clone());
         let old_name = old.as_ref().map(|entry| entry.player_name.clone());
@@ -302,7 +315,12 @@ impl ServerState {
         (treat_as_join || server_changed || name_changed, out)
     }
 
-    fn handle_leave(&mut self, key: IdentityKey) -> (bool, Vec<OutPacket>) {
+    fn handle_leave(&mut self, key: IdentityKey, from: SocketAddr) -> (bool, Vec<OutPacket>) {
+        if let Some(entry) = self.entries.get(&key) {
+            if entry.remote_addr != from {
+                return (false, Vec::new());
+            }
+        }
         let Some(entry) = self.entries.remove(&key) else {
             return (false, Vec::new());
         };
@@ -882,15 +900,8 @@ async fn web_loop(
             }
         });
 
-    let shared_token = config.shared_token.clone();
-    let token = warp::path("token.json")
-        .and(warp::path::end())
-        .and(warp::get())
-        .map(move || warp::reply::json(&serde_json::json!({ "token": shared_token })));
-
     let routes = healthz
         .or(users)
-        .or(token)
         .with(warp::reply::with::header("cache-control", "no-store"))
         .with(warp::reply::with::header("connection", "close"));
     let tls_acceptor = load_tls_acceptor(&config)?;
