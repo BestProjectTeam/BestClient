@@ -3077,8 +3077,6 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		MainView.VSplitRight(5.0f, &MainView, nullptr);
 		MainView.VSplitLeft(5.0f, nullptr, &MainView);
 
-		const bool IsOnline = Client()->State() == IClient::STATE_ONLINE;
-
 		CUIRect LeftView, RightView;
 		MainView.VSplitMid(&LeftView, &RightView, MarginBetweenViews);
 		LeftView.VSplitLeft(MarginSmall, nullptr, &LeftView);
