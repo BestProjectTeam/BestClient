@@ -3286,7 +3286,7 @@ CUIRect CHud::GetLocalTimeRect(bool ForcePreview) const
 	const bool Seconds = g_Config.m_TcShowLocalTimeSeconds; // TClient
 
 	char aTimeStr[16];
-	str_timestamp_format(aTimeStr, sizeof(aTimeStr), Seconds ? "%H:%M.%S" : "%H:%M");
+	str_timestamp_format(aTimeStr, sizeof(aTimeStr), Seconds ? "%H:%M:%S" : "%H:%M");
 	const float FontSize = 5.0f * Scale;
 	const float Padding = 5.0f * Scale;
 	const float Width = std::round(TextRender()->TextBoundingBox(FontSize, aTimeStr).m_W);
@@ -3320,7 +3320,7 @@ void CHud::RenderLocalTime(bool ForcePreview)
 	const bool Seconds = g_Config.m_TcShowLocalTimeSeconds; // TClient
 
 	char aTimeStr[16];
-	str_timestamp_format(aTimeStr, sizeof(aTimeStr), Seconds ? "%H:%M.%S" : "%H:%M");
+	str_timestamp_format(aTimeStr, sizeof(aTimeStr), Seconds ? "%H:%M:%S" : "%H:%M");
 	const float FontSize = 5.0f * Scale;
 	const float Padding = 5.0f * Scale;
 	const float RectX = Rect.x;
