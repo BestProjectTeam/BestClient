@@ -1133,19 +1133,19 @@ void CDuoSession::HandleMessage(const uint8_t *pData, int Size)
 				goto skip_add_sound;
 		}
 		{
-			void *pData = malloc(DataSize);
-			if(!pData)
+			void *pSoundData = malloc(DataSize);
+			if(!pSoundData)
 				break;
-			Reader.ReadBytes(reinterpret_cast<uint8_t *>(pData), DataSize);
-			const int SoundId = Editor()->Sound()->LoadOpusFromMem(pData, (unsigned)DataSize, true, aName);
+			Reader.ReadBytes(reinterpret_cast<uint8_t *>(pSoundData), DataSize);
+			const int SoundId = Editor()->Sound()->LoadOpusFromMem(pSoundData, (unsigned)DataSize, true, aName);
 			if(SoundId == -1)
 			{
-				free(pData);
+				free(pSoundData);
 				break;
 			}
 			auto pSound = std::make_shared<CEditorSound>(Editor()->Map());
 			pSound->m_SoundId = SoundId;
-			pSound->m_pData = pData;
+			pSound->m_pData = pSoundData;
 			pSound->m_DataSize = (unsigned)DataSize;
 			str_copy(pSound->m_aName, aName, sizeof(pSound->m_aName));
 			m_ApplyingRemote = true;
