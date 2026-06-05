@@ -288,34 +288,6 @@ void CCamera::UpdateCamera()
 	m_CanUseCameraInfo = CanUseCameraInfo;
 	m_UsingAutoSpecCamera = UsingAutoSpecCamera;
 
-	const bool IsOnline = Client()->State() == IClient::STATE_ONLINE;
-	const bool IsFngServer = IsOnline && GameClient()->m_GameInfo.m_PredictFNG;
-	const bool Is0xFServer = IsOnline && str_comp_nocase(GameClient()->m_GameInfo.m_aGameType, "0xf") == 0;
-	const bool IsBlockedCameraServer = IsFngServer || Is0xFServer;
-
-	const bool IsDemoPlayback = Client()->State() == IClient::STATE_DEMOPLAYBACK;
-	const CNetObj_Character *pDemoTrackedCharacter = nullptr;
-	const CNetObj_Character *pDemoTrackedPrevCharacter = nullptr;
-	if(IsDemoPlayback)
-	{
-		int TrackedClientId = -1;
-		if(GameClient()->m_Snap.m_SpecInfo.m_Active)
-		{
-			const int SpectatorId = GameClient()->m_Snap.m_SpecInfo.m_SpectatorId;
-			if(in_range(SpectatorId, 0, MAX_CLIENTS - 1) && GameClient()->m_Snap.m_aCharacters[SpectatorId].m_Active)
-				TrackedClientId = SpectatorId;
-		}
-		else if(in_range(GameClient()->m_Snap.m_LocalClientId, 0, MAX_CLIENTS - 1) && GameClient()->m_Snap.m_aCharacters[GameClient()->m_Snap.m_LocalClientId].m_Active)
-		{
-			TrackedClientId = GameClient()->m_Snap.m_LocalClientId;
-		}
-
-		if(TrackedClientId >= 0)
-		{
-			pDemoTrackedCharacter = &GameClient()->m_Snap.m_aCharacters[TrackedClientId].m_Cur;
-			pDemoTrackedPrevCharacter = &GameClient()->m_Snap.m_aCharacters[TrackedClientId].m_Prev;
-		}
-	}
 }
 
 void CCamera::OnRender()
