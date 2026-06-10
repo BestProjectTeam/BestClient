@@ -661,6 +661,9 @@ void CBestClient::OnShutdown()
 void CBestClient::OnReset()
 {
 	ResetHookComboState();
+	m_SpecMovedNotifyTime = -999.0f;
+	m_SpecMovedLastTick = -1;
+	m_SpecMovedActiveTick = -1;
 }
 
 void CBestClient::OnStateChange(int NewState, int OldState)
@@ -687,6 +690,8 @@ void CBestClient::OnRender()
 
 	if(HasHookComboWork())
 		UpdateHookCombo();
+
+	UpdateSpecMoved();
 }
 
 bool CBestClient::OnInput(const IInput::CEvent &Event)
@@ -954,6 +959,91 @@ void CBestClient::SaveRollback()
 	char aCommand[IO_MAX_PATH_LENGTH + 64];
 	str_format(aCommand, sizeof(aCommand), "save_replay %d \"%s\"", Length, aFilename);
 	Console()->ExecuteLine(aCommand, IConsole::CLIENT_ID_UNSPECIFIED);
+}
+
+void CBestClient::UpdateSpecMoved()
+{
+	if(Client()->State() != IClient::STATE_ONLINE)
+	{
+		m_SpecMovedActiveTick = -1;
+		return;
+	}
+
+	if(!GameClient()->m_Snap.m_SpecInfo.m_Active)
+	{
+		m_SpecMovedActiveTick = -1;
+		return;
+	}
+
+	const int LocalId = GameClient()->m_Snap.m_LocalClientId;
+	if(LocalId < 0 || LocalId >= MAX_CLIENTS)
+	{
+		m_SpecMovedActiveTick = -1;
+		return;
+	}
+
+	const auto &CharInfo = GameClient()->m_Snap.m_aCharacters[LocalId];
+	if(!CharInfo.m_Active)
+	{
+		m_SpecMovedActiveTick = -1;
+		return;
+	}
+
+	const int CurrentTick = Client()->GameTick(0);
+
+	if(m_SpecMovedActiveTick < 0)
+		m_SpecMovedActiveTick = CurrentTick;
+
+	if(CurrentTick <= m_SpecMovedActiveTick + 3)
+		return;
+
+	if(m_SpecMovedLastTick == CurrentTick)
+		return;
+	m_SpecMovedLastTick = CurrentTick;
+
+	if(CharInfo.m_Cur.m_X != CharInfo.m_Prev.m_X || CharInfo.m_Cur.m_Y != CharInfo.m_Prev.m_Y)
+	{
+		constexpr float Duration = 2.5f;
+		const float Age = Client()->LocalTime() - m_SpecMovedNotifyTime;
+		if(Age < 0.0f || Age >= Duration)
+			m_SpecMovedNotifyTime = Client()->LocalTime();
+	}
+}
+
+void CBestClient::RenderSpecMoved()
+{
+	if(!g_Config.m_BcSpecMovedNotify)
+		return;
+
+	constexpr float Duration = 2.5f;
+	constexpr float FadeIn = 0.12f;
+	constexpr float FadeOut = 0.5f;
+
+	const float Now = Client()->LocalTime();
+	const float Age = Now - m_SpecMovedNotifyTime;
+	if(Age < 0.0f || Age > Duration)
+		return;
+
+	if(GameClient()->m_Scoreboard.IsActive() || GameClient()->m_Menus.IsActive())
+		return;
+
+	const float In = std::clamp(Age / FadeIn, 0.0f, 1.0f);
+	const float Out = Age > Duration - FadeOut ? std::clamp((Duration - Age) / FadeOut, 0.0f, 1.0f) : 1.0f;
+	const float Alpha = In * Out;
+	if(Alpha <= 0.0f)
+		return;
+
+	const float Width = 300.0f * Graphics()->ScreenAspect();
+	constexpr float Height = HudLayout::CANVAS_HEIGHT;
+	constexpr float FontSize = 9.0f;
+	const char *pText = "moved in game";
+	const float TextW = TextRender()->TextWidth(FontSize, pText, -1, -1.0f);
+	const float X = Width * 0.5f - TextW * 0.5f;
+	const float Y = Height * 0.58f;
+
+	TextRender()->TextColor(1.0f, 0.15f, 0.15f, Alpha);
+	TextRender()->Text(X, Y, FontSize, pText, -1.0f);
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
 }
 
 void CBestClient::RenderHookCombo(bool ForcePreview)

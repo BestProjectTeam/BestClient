@@ -31,6 +31,12 @@ class CBestClient : public CComponent
 	int m_HookComboLastProcessedGameTick = -1;
 	bool m_HookComboSoundErrorShown = false;
 
+	float m_SpecMovedNotifyTime = -999.0f;
+	int m_SpecMovedLastTick = -1;
+	int m_SpecMovedActiveTick = -1;
+
+	void UpdateSpecMoved();
+
 	void LoadHookComboSounds(bool LogErrors = true);
 	void UnloadHookComboSounds();
 	void ResetHookComboState();
@@ -156,6 +162,7 @@ public:
 	bool IsComponentDisabled(EBestClientComponent Component) const;
 	static bool IsComponentDisabledByMask(int Component, int MaskLo, int MaskHi);
 	void RenderHookCombo(bool ForcePreview = false);
+	void RenderSpecMoved();
 
 	std::shared_ptr<CHttpRequest> m_pBestClientInfoTask = nullptr;
 	void FetchBestClientInfo();
