@@ -141,7 +141,13 @@ static ColorRGBA GetGametypeTextColor(const char *pGametype)
 template<size_t N>
 static const char *GetServerbrowserDisplayName(const CServerInfo *pInfo, char (&aBuffer)[N])
 {
-	if(!g_Config.m_BcUseShortKogServerName || !str_find_nocase(pInfo->m_aGameType, "gores") || !str_find_nocase(pInfo->m_aName, "kog"))
+	if(!g_Config.m_BcUseShortKogServerName)
+		return pInfo->m_aName;
+
+	const bool IsKog = str_find_nocase(pInfo->m_aGameType, "gores") && str_find_nocase(pInfo->m_aName, "kog");
+	const bool IsEGores = str_find_nocase(pInfo->m_aGameType, "e-gores") || str_find_nocase(pInfo->m_aGameType, "e_gores");
+
+	if(!IsKog && !IsEGores)
 		return pInfo->m_aName;
 
 	const auto IsAsciiWordChar = [](char c) {
@@ -152,23 +158,49 @@ static const char *GetServerbrowserDisplayName(const CServerInfo *pInfo, char (&
 	};
 
 	const char *pShortName = pInfo->m_aName;
-	const char *pScan = pInfo->m_aName;
-	while(const char *pMatch = str_find_nocase(pScan, "kog"))
+
+	if(IsKog)
 	{
-		const char Prev = pMatch > pInfo->m_aName ? pMatch[-1] : '\0';
-		const char Next = pMatch[3];
-		if(!IsAsciiWordChar(Prev) && !IsAsciiWordChar(Next))
+		// Strip "KoG" prefix: "KoG | DE #1 - Map" -> "DE #1 - Map"
+		const char *pScan = pInfo->m_aName;
+		while(const char *pMatch = str_find_nocase(pScan, "kog"))
 		{
-			pShortName = pMatch + 3;
-			while(*pShortName != '\0' && IsKogSeparator(*pShortName))
-				++pShortName;
-			break;
+			const char Prev = pMatch > pInfo->m_aName ? pMatch[-1] : '\0';
+			const char Next = pMatch[3];
+			if(!IsAsciiWordChar(Prev) && !IsAsciiWordChar(Next))
+			{
+				pShortName = pMatch + 3;
+				while(*pShortName != '\0' && IsKogSeparator(*pShortName))
+					++pShortName;
+				break;
+			}
+			pScan = pMatch + 1;
 		}
-		pScan = pMatch + 1;
 	}
 
 	pShortName = str_skip_whitespaces_const(pShortName);
 	str_copy(aBuffer, pShortName, sizeof(aBuffer));
+
+	if(IsEGores)
+	{
+		// Strip everything up to and including "EGO |":
+		// "[A] EGO | RUS | #8 | Insane Gore [eternal-gores.ru]" -> "RUS | #8 | Insane Gore"
+		if(const char *pEgo = str_find_nocase(aBuffer, "ego"))
+		{
+			const char *pAfterEgo = pEgo + 3;
+			while(*pAfterEgo == ' ' || *pAfterEgo == '|')
+				++pAfterEgo;
+			if(*pAfterEgo != '\0')
+				str_copy(aBuffer, pAfterEgo, sizeof(aBuffer));
+		}
+		// Strip "[eternal..." suffix
+		if(char *pSuffix = const_cast<char *>(str_find_nocase(aBuffer, "[eternal")))
+		{
+			while(pSuffix > aBuffer && pSuffix[-1] == ' ')
+				--pSuffix;
+			*pSuffix = '\0';
+		}
+	}
 
 	if(const char *pSuffix = str_endswith_nocase(aBuffer, "[kog.tw]"))
 	{
