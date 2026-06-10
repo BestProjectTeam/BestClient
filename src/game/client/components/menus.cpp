@@ -3008,7 +3008,8 @@ bool CMenus::OnInput(const IInput::CEvent &Event)
 	{
 		if((Event.m_Flags & IInput::FLAG_PRESS) && Event.m_Key == KEY_ESCAPE &&
 			IsActive() && (Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK) &&
-			BCUiAnimations::Enabled() && g_Config.m_BcIngameMenuAnimation != 0 && g_Config.m_BcIngameMenuAnimationMs > 0)
+			BCUiAnimations::Enabled() && g_Config.m_BcIngameMenuAnimation != 0 && g_Config.m_BcIngameMenuAnimationMs > 0 &&
+			!Ui()->IsPopupOpen())
 		{
 			if(!m_BcIngameMenuClosing)
 			{
