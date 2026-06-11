@@ -77,22 +77,17 @@ void CSkinProfiles::ApplyProfile(int Dummy, const CProfile &Profile)
 		str_copy(Dummy ? g_Config.m_ClDummyClan : g_Config.m_PlayerClan, Profile.m_Clan); // TODO m_ClPlayerClan
 	if(g_Config.m_TcProfileFlag && Profile.m_CountryFlag != -2)
 		(Dummy ? g_Config.m_ClDummyCountry : g_Config.m_PlayerCountry) = Profile.m_CountryFlag;
-	if(g_Config.m_TcProfileAssets)
+	if(g_Config.m_TcProfileAssetsTiles && Profile.m_AssetEntities[0] != '\0')
 	{
-		if(Profile.m_AssetEntities[0] != '\0')
-		{
-			str_copy(g_Config.m_ClAssetsEntities, Profile.m_AssetEntities);
-			GameClient()->m_MapImages.ChangeEntitiesPath(Profile.m_AssetEntities);
-		}
+		str_copy(g_Config.m_ClAssetsEntities, Profile.m_AssetEntities);
+		GameClient()->m_MapImages.ChangeEntitiesPath(Profile.m_AssetEntities);
+	}
+	if(g_Config.m_TcProfileAssetsGunpacks)
+	{
 		if(Profile.m_AssetGame[0] != '\0')
 		{
 			str_copy(g_Config.m_ClAssetGame, Profile.m_AssetGame);
 			GameClient()->LoadGameSkin(Profile.m_AssetGame);
-		}
-		if(Profile.m_AssetEmoticons[0] != '\0')
-		{
-			str_copy(g_Config.m_ClAssetEmoticons, Profile.m_AssetEmoticons);
-			GameClient()->LoadEmoticonsSkin(Profile.m_AssetEmoticons);
 		}
 		if(Profile.m_AssetParticles[0] != '\0')
 		{

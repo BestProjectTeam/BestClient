@@ -2452,7 +2452,8 @@ void CMenus::RenderSettingsTClientProfiles(CUIRect MainView)
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcProfileName, TCLocalize("Save/Load Name"), &g_Config.m_TcProfileName, &Settings, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcProfileClan, TCLocalize("Save/Load Clan"), &g_Config.m_TcProfileClan, &Settings, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcProfileFlag, TCLocalize("Save/Load Flag"), &g_Config.m_TcProfileFlag, &Settings, LineSize);
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcProfileAssets, TCLocalize("Save/Load Assets"), &g_Config.m_TcProfileAssets, &Settings, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcProfileAssetsTiles, TCLocalize("Save/Load Entities"), &g_Config.m_TcProfileAssetsTiles, &Settings, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcProfileAssetsGunpacks, TCLocalize("Save/Load Gunpacks"), &g_Config.m_TcProfileAssetsGunpacks, &Settings, LineSize);
 		}
 		{
 			Actions.HSplitTop(30.0f, &Button, &Actions);
@@ -2479,14 +2480,14 @@ void CMenus::RenderSettingsTClientProfiles(CUIRect MainView)
 					g_Config.m_TcProfileSkin ? pCurrentSkinName : "",
 					g_Config.m_TcProfileName ? pCurrentName : "",
 					g_Config.m_TcProfileClan ? pCurrentClan : "",
-					g_Config.m_TcProfileAssets ? g_Config.m_ClAssetsEntities : "",
-					g_Config.m_TcProfileAssets ? g_Config.m_ClAssetGame : "",
-					g_Config.m_TcProfileAssets ? g_Config.m_ClAssetEmoticons : "",
-					g_Config.m_TcProfileAssets ? g_Config.m_ClAssetParticles : "",
-					g_Config.m_TcProfileAssets ? g_Config.m_ClAssetHud : "",
-					g_Config.m_TcProfileAssets ? g_Config.m_ClAssetExtras : "",
-					g_Config.m_TcProfileAssets ? g_Config.m_ClAssetCursor : "",
-					g_Config.m_TcProfileAssets ? g_Config.m_ClAssetArrow : "");
+					g_Config.m_TcProfileAssetsTiles ? g_Config.m_ClAssetsEntities : "",
+					g_Config.m_TcProfileAssetsGunpacks ? g_Config.m_ClAssetGame : "",
+					"",
+					g_Config.m_TcProfileAssetsGunpacks ? g_Config.m_ClAssetParticles : "",
+					g_Config.m_TcProfileAssetsGunpacks ? g_Config.m_ClAssetHud : "",
+					g_Config.m_TcProfileAssetsGunpacks ? g_Config.m_ClAssetExtras : "",
+					g_Config.m_TcProfileAssetsGunpacks ? g_Config.m_ClAssetCursor : "",
+					g_Config.m_TcProfileAssetsGunpacks ? g_Config.m_ClAssetArrow : "");
 			}
 			Actions.HSplitTop(5.0f, nullptr, &Actions);
 
@@ -2517,14 +2518,14 @@ void CMenus::RenderSettingsTClientProfiles(CUIRect MainView)
 							g_Config.m_TcProfileSkin ? pCurrentSkinName : "",
 							g_Config.m_TcProfileName ? pCurrentName : "",
 							g_Config.m_TcProfileClan ? pCurrentClan : "",
-							g_Config.m_TcProfileAssets ? g_Config.m_ClAssetsEntities : "",
-							g_Config.m_TcProfileAssets ? g_Config.m_ClAssetGame : "",
-							g_Config.m_TcProfileAssets ? g_Config.m_ClAssetEmoticons : "",
-							g_Config.m_TcProfileAssets ? g_Config.m_ClAssetParticles : "",
-							g_Config.m_TcProfileAssets ? g_Config.m_ClAssetHud : "",
-							g_Config.m_TcProfileAssets ? g_Config.m_ClAssetExtras : "",
-							g_Config.m_TcProfileAssets ? g_Config.m_ClAssetCursor : "",
-							g_Config.m_TcProfileAssets ? g_Config.m_ClAssetArrow : "");
+							g_Config.m_TcProfileAssetsTiles ? g_Config.m_ClAssetsEntities : "",
+							g_Config.m_TcProfileAssetsGunpacks ? g_Config.m_ClAssetGame : "",
+							"",
+							g_Config.m_TcProfileAssetsGunpacks ? g_Config.m_ClAssetParticles : "",
+							g_Config.m_TcProfileAssetsGunpacks ? g_Config.m_ClAssetHud : "",
+							g_Config.m_TcProfileAssetsGunpacks ? g_Config.m_ClAssetExtras : "",
+							g_Config.m_TcProfileAssetsGunpacks ? g_Config.m_ClAssetCursor : "",
+							g_Config.m_TcProfileAssetsGunpacks ? g_Config.m_ClAssetArrow : "");
 					}
 				}
 			}

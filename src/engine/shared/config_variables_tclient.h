@@ -156,7 +156,8 @@ MACRO_CONFIG_INT(TcProfileFlag, tc_profile_flag, 0, 0, 1, CFGFLAG_CLIENT | CFGFL
 MACRO_CONFIG_INT(TcProfileColors, tc_profile_colors, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Apply colors in profiles")
 MACRO_CONFIG_INT(TcProfileEmote, tc_profile_emote, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Apply emote in profiles")
 MACRO_CONFIG_INT(TcProfileOverwriteClanWithEmpty, tc_profile_overwrite_clan_with_empty, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Overwrite clan name even if profile has an empty clan name")
-MACRO_CONFIG_INT(TcProfileAssets, tc_profile_assets, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Apply game assets in profiles")
+MACRO_CONFIG_INT(TcProfileAssetsTiles, tc_profile_assets_tiles, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Apply tile assets (entities) in profiles")
+MACRO_CONFIG_INT(TcProfileAssetsGunpacks, tc_profile_assets_gunpacks, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Apply gunpack assets in profiles")
 
 // Rainbow
 MACRO_CONFIG_INT(TcRainbowTees, tc_rainbow_tees, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Turn on rainbow client side")
