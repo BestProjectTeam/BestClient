@@ -1101,58 +1101,25 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			static float s_MotionBlurPhase = 0.0f;
 			static CButtonContainer s_MotionBlurResetButton;
 			const bool MotionBlurEnabled = g_Config.m_BcMotionBlur != 0;
-			const bool IsVulkanBackend = str_find_nocase(Graphics()->GetVersionString(), "vulkan") != nullptr;
-#if defined(CONF_PLATFORM_LINUX)
-			const bool IsLinuxFrameBlendUnsupported = true;
-#else
-			const bool IsLinuxFrameBlendUnsupported = false;
-#endif
 			UpdateRevealPhase(s_MotionBlurPhase, MotionBlurEnabled);
-			const float BackendNoteHeight = IsVulkanBackend ? 0.0f : LineSize;
-			const float LinuxNoteHeight = IsLinuxFrameBlendUnsupported ? LineSize : 0.0f;
 			const float ExtraTargetHeight = LineSize;
-			const float ContentHeight = LineSize + MarginSmall + LineSize + BackendNoteHeight + LinuxNoteHeight + ExtraTargetHeight * s_MotionBlurPhase;
+			const float ContentHeight = LineSize + MarginSmall + LineSize + ExtraTargetHeight * s_MotionBlurPhase;
 			CUIRect Content, Label, Row, Visible;
 			BeginBlock(Column, ContentHeight, Content);
 
 			Content.HSplitTop(LineSize, &Label, &Content);
 			const float ResetButtonWidth = LineSize + 8.0f;
-			const float BadgeWidth = 52.0f;
-			const float BadgeSpacing = 4.0f;
-			CUIRect TitleLabel, HeaderRight, BadgeSlot, ResetButton, ResetHitbox, Badge;
-			Label.VSplitRight(BadgeWidth + BadgeSpacing + ResetButtonWidth, &TitleLabel, &HeaderRight);
-			HeaderRight.VSplitLeft(BadgeWidth, &BadgeSlot, &HeaderRight);
-			HeaderRight.VSplitLeft(BadgeSpacing, nullptr, &HeaderRight);
-			ResetButton = HeaderRight;
+			CUIRect TitleLabel, ResetButton, ResetHitbox;
+			Label.VSplitRight(ResetButtonWidth, &TitleLabel, &ResetButton);
 			ResetHitbox = ResetButton;
 			const bool MotionBlurResetClicked = Ui()->DoButton_FontIcon(&s_MotionBlurResetButton, FontIcon::ARROW_ROTATE_LEFT, 0, &ResetHitbox, BUTTONFLAG_LEFT);
 			GameClient()->m_Tooltips.DoToolTip(&s_MotionBlurResetButton, &ResetHitbox, BCLocalize("Reset to defaults"));
 			if(MotionBlurResetClicked)
 				g_Config.m_BcMotionBlurStrength = DefaultConfig::BcMotionBlurStrength;
 			Ui()->DoLabel(&TitleLabel, BCLocalize("Motion Blur"), HeadlineFontSize, TEXTALIGN_ML);
-			BadgeSlot.HMargin(1.5f, &Badge);
-			Graphics()->DrawRect4(
-				Badge.x, Badge.y, Badge.w, Badge.h,
-				ColorRGBA(0.85f, 0.15f, 0.15f, 1.0f),
-				ColorRGBA(0.65f, 0.05f, 0.05f, 1.0f),
-				ColorRGBA(0.85f, 0.15f, 0.15f, 1.0f),
-				ColorRGBA(0.65f, 0.05f, 0.05f, 1.0f),
-				IGraphics::CORNER_ALL, 5.0f);
-			Ui()->DoLabel(&Badge, "BETA", 11.0f, TEXTALIGN_MC);
 			Content.HSplitTop(MarginSmall, nullptr, &Content);
 
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcMotionBlur, BCLocalize("Enable motion blur (frame blend)"), &g_Config.m_BcMotionBlur, &Content, LineSize);
-
-			if(!IsVulkanBackend)
-			{
-				Content.HSplitTop(LineSize, &Row, &Content);
-				Ui()->DoLabel(&Row, BCLocalize("Requires the Vulkan backend"), 12.0f, TEXTALIGN_ML);
-			}
-			if(IsLinuxFrameBlendUnsupported)
-			{
-				Content.HSplitTop(LineSize, &Row, &Content);
-				Ui()->DoLabel(&Row, BCLocalize("Temporarily disabled on Linux"), 12.0f, TEXTALIGN_ML);
-			}
 
 			const float ExtraHeight = ExtraTargetHeight * s_MotionBlurPhase;
 			if(!MotionBlurResetClicked && ExtraHeight > 0.0f)
@@ -1167,7 +1134,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 
 				CUIRect Expand = {Visible.x, Visible.y, Visible.w, ExtraTargetHeight};
 				Expand.HSplitTop(LineSize, &Row, &Expand);
-				DoSliderWithScaledValue(&g_Config.m_BcMotionBlurStrength, &g_Config.m_BcMotionBlurStrength, &Row, BCLocalize("Blend strength"), 1, 400, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "%");
+				DoSliderWithScaledValue(&g_Config.m_BcMotionBlurStrength, &g_Config.m_BcMotionBlurStrength, &Row, BCLocalize("Blend strength"), 0, 95, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "%");
 			}
 			Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
 		}

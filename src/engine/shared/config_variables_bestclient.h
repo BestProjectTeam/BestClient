@@ -221,8 +221,8 @@ MACRO_CONFIG_INT(BcAfterimage, bc_afterimage, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_
 MACRO_CONFIG_INT(BcAfterimageFrames, bc_afterimage_frames, 6, 2, 20, CFGFLAG_CLIENT | CFGFLAG_SAVE, "How many previous frames to keep for the afterimage")
 MACRO_CONFIG_INT(BcAfterimageAlpha, bc_afterimage_alpha, 40, 1, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Maximum alpha of afterimage layers (1-100)")
 MACRO_CONFIG_INT(BcAfterimageSpacing, bc_afterimage_spacing, 18, 1, 64, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Distance between afterimage samples")
-MACRO_CONFIG_INT(BcMotionBlur, bc_motion_blur, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable Vulkan motion blur via previous-frame blending")
-MACRO_CONFIG_INT(BcMotionBlurStrength, bc_motion_blur_strength, 140, 1, 400, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Strength of Vulkan motion blur frame blending in percent")
+MACRO_CONFIG_INT(BcMotionBlur, bc_motion_blur, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable motion blur via previous-frame blending")
+MACRO_CONFIG_INT(BcMotionBlurStrength, bc_motion_blur_strength, 50, 0, 95, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Strength of motion blur frame blending (0-95%)")
 
 // Jelly tee
 MACRO_CONFIG_INT(BcJellyTee, bc_jelly_tee, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable jelly tee deformation")

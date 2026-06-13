@@ -69,20 +69,7 @@ class CCommandProcessorFragment_Vulkan : public CCommandProcessorFragment_GLBase
 
 	[[nodiscard]] bool IsFrameBlendEnabled()
 	{
-		if(g_Config.m_BcMotionBlur == 0 || g_Config.m_BcMotionBlurStrength <= 0)
-			return false;
-
-#if defined(CONF_PLATFORM_LINUX)
-		static bool s_FrameBlendUnsupportedWarningShown = false;
-		if(!s_FrameBlendUnsupportedWarningShown)
-		{
-			log_warn("gfx/vulkan", "BestClient motion blur is temporarily disabled on Linux because it can crash the client.");
-			s_FrameBlendUnsupportedWarningShown = true;
-		}
-		return false;
-#else
-		return true;
-#endif
+		return g_Config.m_BcMotionBlur != 0 && g_Config.m_BcMotionBlurStrength > 0;
 	}
 
 	static const char *MemoryUsageName(EMemoryBlockUsage MemUsage)
@@ -7315,10 +7302,11 @@ public:
 		if(!FrameBlendImage.m_Valid)
 			return true;
 
-		constexpr float MaxBlendAlphaPerPass = 0.85f;
-		const float TotalBlendStrength = std::clamp(g_Config.m_BcMotionBlurStrength / 100.0f, 0.0f, 4.0f);
+		// Map 0-95 user range to 0-4.0 internal strength (matching old 400% max behavior)
+		const float TotalBlendStrength = (g_Config.m_BcMotionBlurStrength / 95.0f) * 4.0f;
 		if(TotalBlendStrength <= 0.0f)
 			return true;
+		constexpr float MaxBlendAlphaPerPass = 0.85f;
 		const int BlendPassCount = std::max(1, (int)std::ceil(TotalBlendStrength / MaxBlendAlphaPerPass));
 		const float BlendAlphaPerPass = TotalBlendStrength / (float)BlendPassCount;
 

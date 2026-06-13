@@ -586,6 +586,7 @@ void CCommandProcessorFragment_OpenGL3_3::Cmd_Shutdown(const SCommand_Shutdown *
 	glDeleteBuffers(1, &m_PrimitiveDrawBufferIdTex3D);
 	glDeleteVertexArrays(1, &m_PrimitiveDrawVertexIdTex3D);
 	DestroyBlurResources();
+	DestroyMotionBlurTexture();
 
 	for(int i = 0; i < (int)m_vTextures.size(); ++i)
 	{
@@ -1701,6 +1702,140 @@ void CCommandProcessorFragment_OpenGL3_3::Cmd_RenderQuadContainerAsSpriteMultipl
 		RenderOffset += RSPCount;
 		DrawCount -= RSPCount;
 	}
+}
+
+void CCommandProcessorFragment_OpenGL3_3::EnsureMotionBlurTexture()
+{
+	if(m_MotionBlurTexture != 0 && m_MotionBlurTexWidth == m_CanvasWidth && m_MotionBlurTexHeight == m_CanvasHeight)
+		return;
+
+	DestroyMotionBlurTexture();
+
+	m_MotionBlurTexWidth = m_CanvasWidth;
+	m_MotionBlurTexHeight = m_CanvasHeight;
+
+	glGenTextures(1, &m_MotionBlurTexture);
+	glBindTexture(GL_TEXTURE_2D, m_MotionBlurTexture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, m_MotionBlurTexWidth, m_MotionBlurTexHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+	glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void CCommandProcessorFragment_OpenGL3_3::DestroyMotionBlurTexture()
+{
+	if(m_MotionBlurTexture != 0)
+		glDeleteTextures(1, &m_MotionBlurTexture);
+	m_MotionBlurTexture = 0;
+	m_MotionBlurTexWidth = 0;
+	m_MotionBlurTexHeight = 0;
+	m_MotionBlurHistoryValid = false;
+}
+
+void CCommandProcessorFragment_OpenGL3_3::RenderMotionBlurGL()
+{
+	// Single-pass feedback blend. Unlike Vulkan, the OpenGL history lives in a single
+	// 8-bit texture that we read and write each frame, so multi-pass would push the
+	// current-scene contribution below 1/255 and freeze the image. Cap alpha at 0.90
+	// to keep the scene contribution >= 10% — trail fades smoothly without freezing.
+	const float BlendAlpha = (g_Config.m_BcMotionBlurStrength / 95.0f) * 0.90f;
+	if(BlendAlpha <= 0.0f)
+		return;
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, m_MotionBlurTexture);
+
+	if(!m_MotionBlurHistoryValid)
+	{
+		// First frame — just save, no blend
+		glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, m_MotionBlurTexWidth, m_MotionBlurTexHeight);
+		glBindTexture(GL_TEXTURE_2D, 0);
+		m_MotionBlurHistoryValid = true;
+		return;
+	}
+
+	// Bind default framebuffer and set full viewport
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(0, 0, m_CanvasWidth, m_CanvasHeight);
+
+	// Alpha blend: previous frame over current scene
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	// Disable scissor
+	if(m_LastClipEnable)
+	{
+		glDisable(GL_SCISSOR_TEST);
+		m_LastClipEnable = false;
+	}
+
+	// Textured primitive program with identity gPos (vertices in NDC)
+	UseProgram(m_pPrimitiveProgramTextured);
+	const float aIdentityPos[8] = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f};
+	glUniformMatrix4x2fv(m_pPrimitiveProgramTextured->m_LocPos, 1, true, aIdentityPos);
+	// Invalidate program cache so next SetState re-uploads the correct matrix
+	m_pPrimitiveProgramTextured->m_LastScreenTL = vec2(0.0f, 0.0f);
+	m_pPrimitiveProgramTextured->m_LastScreenBR = vec2(0.0f, 0.0f);
+
+	// Bind motion blur texture directly (no sampler object)
+	glBindSampler(0, 0);
+	glBindTexture(GL_TEXTURE_2D, m_MotionBlurTexture);
+	glUniform1i(m_pPrimitiveProgramTextured->m_LocTextureSampler, 0);
+	m_pPrimitiveProgramTextured->m_LastTextureSampler = -1;
+
+	// Fullscreen quad in NDC, alpha controls blend strength
+	const uint8_t Alpha = (uint8_t)std::round(BlendAlpha * 255.0f);
+	CCommandBuffer::SVertex aVertices[4];
+	aVertices[0].m_Pos = vec2(-1.0f, -1.0f);
+	aVertices[0].m_Tex = vec2(0.0f, 0.0f);
+	aVertices[1].m_Pos = vec2(1.0f, -1.0f);
+	aVertices[1].m_Tex = vec2(1.0f, 0.0f);
+	aVertices[2].m_Pos = vec2(1.0f, 1.0f);
+	aVertices[2].m_Tex = vec2(1.0f, 1.0f);
+	aVertices[3].m_Pos = vec2(-1.0f, 1.0f);
+	aVertices[3].m_Tex = vec2(0.0f, 1.0f);
+	for(auto &Vertex : aVertices)
+	{
+		Vertex.m_Color.r = 255;
+		Vertex.m_Color.g = 255;
+		Vertex.m_Color.b = 255;
+		Vertex.m_Color.a = Alpha;
+	}
+
+	UploadStreamBufferData(EPrimitiveType::QUADS, aVertices, sizeof(CCommandBuffer::SVertex), 1);
+	glBindVertexArray(m_aPrimitiveDrawVertexId[m_LastStreamBuffer]);
+	if(m_aLastIndexBufferBound[m_LastStreamBuffer] != m_QuadDrawIndexBufferId)
+	{
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_QuadDrawIndexBufferId);
+		m_aLastIndexBufferBound[m_LastStreamBuffer] = m_QuadDrawIndexBufferId;
+	}
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+	m_LastStreamBuffer = (m_LastStreamBuffer + 1 >= MAX_STREAM_BUFFER_COUNT ? 0 : m_LastStreamBuffer + 1);
+
+	// Capture blended result for next frame
+	glBindTexture(GL_TEXTURE_2D, m_MotionBlurTexture);
+	glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, m_MotionBlurTexWidth, m_MotionBlurTexHeight);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	// Force blend state reset so next SetState reconfigures correctly
+	m_LastBlendMode = EBlendMode::NONE;
+}
+
+void CCommandProcessorFragment_OpenGL3_3::Cmd_BeforeSwap()
+{
+	const bool Enabled = g_Config.m_BcMotionBlur != 0 && g_Config.m_BcMotionBlurStrength > 0;
+	if(Enabled != m_MotionBlurEnabledLastFrame)
+	{
+		m_MotionBlurHistoryValid = false;
+		m_MotionBlurEnabledLastFrame = Enabled;
+	}
+	if(!Enabled || m_CanvasWidth == 0 || m_CanvasHeight == 0)
+		return;
+
+	EnsureMotionBlurTexture();
+	RenderMotionBlurGL();
 }
 
 #endif
