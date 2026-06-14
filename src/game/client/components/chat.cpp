@@ -4049,7 +4049,10 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 
 bool CChat::OnCursorMove(float x, float y, IInput::ECursorType CursorType)
 {
-	if(m_Mode == MODE_NONE && !m_Show && !m_MediaViewerOpen)
+	// BestClient: holding the expand-only bind (+show_chat) must not grab the cursor.
+	// Only typing (m_Mode) or an open media viewer routes mouse movement into the UI;
+	// while only m_Show is set the crosshair keeps moving and no cursor appears.
+	if(m_Mode == MODE_NONE && !m_MediaViewerOpen)
 		return false;
 
 	Ui()->ConvertMouseMove(&x, &y, CursorType);
@@ -4578,7 +4581,10 @@ void CChat::OnPrepareLines(float y, int StartLine, int HoveredTranslateLineIndex
 
 	const bool IsScoreBoardOpen = GameClient()->m_Scoreboard.IsActive() && (Graphics()->ScreenAspect() > 1.7f); // only assume scoreboard when screen ratio is widescreen(something around 16:9)
 	const bool ShowLargeArea = m_Show || (m_Mode != MODE_NONE && g_Config.m_ClShowChat == 1) || g_Config.m_ClShowChat == 2;
-	const bool ChatInteractionActive = m_Mode != MODE_NONE || m_Show;
+	// BestClient: mouse interaction (cursor, selection, scrollbar, media clicks) belongs to
+	// typing only. The expand-only bind (m_Show) still shows the large area and wheel-scrolls,
+	// but must not engage the mouse, so it is intentionally excluded here.
+	const bool ChatInteractionActive = m_Mode != MODE_NONE;
 	const bool ModeActive = m_Mode != MODE_NONE;
 	const bool ChatSelectionActive = m_HasSelection && !m_MouseIsPress && !m_WantsSelectionCopy && !m_Input.HasSelection();
 	const bool ForceSelectionRefresh = m_MouseIsPress || m_WantsSelectionCopy || ChatSelectionActive != m_PrevChatSelectionActive;
@@ -5120,7 +5126,10 @@ void CChat::OnRender()
 		const float ChatOpenEase = BCUiAnimations::EaseInOutQuart(Progress);
 		ChatOpenOffsetX = -(x + maximum(Width - 190.0f, 190.0f) + 24.0f) * (1.0f - ChatOpenEase);
 	}
-	const bool ChatInteractionActive = m_Mode != MODE_NONE || m_Show;
+	// BestClient: mouse interaction (cursor, selection, scrollbar, media clicks) belongs to
+	// typing only. The expand-only bind (m_Show) still shows the large area and wheel-scrolls,
+	// but must not engage the mouse, so it is intentionally excluded here.
+	const bool ChatInteractionActive = m_Mode != MODE_NONE;
 	if(m_MediaViewerOpen && !ChatInteractionActive)
 		CloseMediaViewer();
 	if(!ChatInteractionActive)
