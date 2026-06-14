@@ -399,7 +399,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			Ui()->DoLabel(&TitleLabel, BCLocalize("Hook combo"), HeadlineFontSize, TEXTALIGN_ML);
 			Content.HSplitTop(MarginSmall, nullptr, &Content);
 
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcHookCombo, BCLocalize("Hook combo"), &g_Config.m_BcHookCombo, &Content, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcHookCombo, BCLocalize("Enable Hook combo"), &g_Config.m_BcHookCombo, &Content, LineSize);
 			if(!HookComboResetClicked && ExpandedHeight > 0.0f)
 			{
 				Content.HSplitTop(ExpandedHeight, &Visible, &Content);
@@ -551,7 +551,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			Ui()->DoLabel(&TitleLabel, BCLocalize("3D Particles"), HeadlineFontSize, TEXTALIGN_ML);
 			Content.HSplitTop(MarginSmall, nullptr, &Content);
 
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_Bc3dParticles, BCLocalize("3D Particles"), &g_Config.m_Bc3dParticles, &Content, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_Bc3dParticles, BCLocalize("Enable 3D Particles"), &g_Config.m_Bc3dParticles, &Content, LineSize);
 
 			const float ExpandedHeight = ExtraTargetHeight * s_Bc3dParticlesPhase;
 			if(!Particles3DResetClicked && ExpandedHeight > 0.0f)
@@ -789,7 +789,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			Ui()->DoLabel(&TitleLabel, BCLocalize("Eye Comfort"), HeadlineFontSize, TEXTALIGN_ML);
 			Content.HSplitTop(MarginSmall, nullptr, &Content);
 
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcEyeComfort, BCLocalize("Enable warm screen filter"), &g_Config.m_BcEyeComfort, &Content, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcEyeComfort, BCLocalize("Enable Eye Comfort"), &g_Config.m_BcEyeComfort, &Content, LineSize);
 
 			const float ExpandedHeight = ExtraTargetHeight * s_EyeComfortPhase;
 			if(!EyeComfortResetClicked && ExpandedHeight > 0.0f)
@@ -819,7 +819,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			Ui()->DoLabel(&Label, BCLocalize("Sweat Weapon"), HeadlineFontSize, TEXTALIGN_ML);
 			Content.HSplitTop(MarginSmall, nullptr, &Content);
 
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcCrystalLaser, BCLocalize("Enable"), &g_Config.m_BcCrystalLaser, &Content, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcCrystalLaser, BCLocalize("Enable Sweat Weapon"), &g_Config.m_BcCrystalLaser, &Content, LineSize);
 
 			Content.HSplitTop(MarginSmall, nullptr, &Content);
 			Content.HSplitTop(LineSize, &PreviewLabel, &Content);
@@ -937,7 +937,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			Ui()->DoLabel(&TitleLabel, BCLocalize("Chat Bubbles"), HeadlineFontSize, TEXTALIGN_ML);
 			Content.HSplitTop(MarginSmall, nullptr, &Content);
 
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatBubbles, BCLocalize("Chat Bubbles"), &g_Config.m_BcChatBubbles, &Content, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatBubbles, BCLocalize("Enable Chat Bubbles"), &g_Config.m_BcChatBubbles, &Content, LineSize);
 			const float ExtraHeight = ExtraTargetHeight * s_BcChatBubblesPhase;
 			if(!ChatBubblesResetClicked && ExtraHeight > 0.0f)
 			{
@@ -1465,7 +1465,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			Ui()->DoLabel(&TitleLabel, BCLocalize("Keystrokes"), HeadlineFontSize, TEXTALIGN_ML);
 			Content.HSplitTop(MarginSmall, nullptr, &Content);
 
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcKeystrokesKeyboard, BCLocalize("Show keyboard HUD"), &g_Config.m_BcKeystrokesKeyboard, &Content, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcKeystrokesKeyboard, BCLocalize("Enable keyboard"), &g_Config.m_BcKeystrokesKeyboard, &Content, LineSize);
 			if(g_Config.m_BcKeystrokesKeyboard && !HudLayout::IsEnabled(HudLayout::MODULE_KEYSTROKES_KEYBOARD))
 				HudLayout::SetEnabled(HudLayout::MODULE_KEYSTROKES_KEYBOARD, true);
 			if(KeyboardExpandedHeight > 0.0f)
@@ -1500,7 +1500,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			}
 
 			Content.HSplitTop(MarginSmall, nullptr, &Content);
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcKeystrokesMouse, BCLocalize("Show mouse HUD"), &g_Config.m_BcKeystrokesMouse, &Content, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcKeystrokesMouse, BCLocalize("Enable mouse"), &g_Config.m_BcKeystrokesMouse, &Content, LineSize);
 			if(g_Config.m_BcKeystrokesMouse && !HudLayout::IsEnabled(HudLayout::MODULE_KEYSTROKES_MOUSE))
 				HudLayout::SetEnabled(HudLayout::MODULE_KEYSTROKES_MOUSE, true);
 			if(MouseExpandedHeight > 0.0f)
@@ -1849,10 +1849,10 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			BeginBlock(Column, ContentHeight, Content);
 
 			Content.HSplitTop(LineSize, &Label, &Content);
-			Ui()->DoLabel(&Label, BCLocalize("Input"), HeadlineFontSize, TEXTALIGN_ML);
+			Ui()->DoLabel(&Label, BCLocalize("Inputs"), HeadlineFontSize, TEXTALIGN_ML);
 			Content.HSplitTop(MarginSmall, nullptr, &Content);
 
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcFastInput, BCLocalize("Fast Input"), &g_Config.m_TcFastInput, &Content, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcFastInput, BCLocalize("Enable Inputs"), &g_Config.m_TcFastInput, &Content, LineSize);
 
 			const float FastInputExtraHeight = FastInputExtraTargetHeight * s_FastInputPhase;
 			if(FastInputExtraHeight > 0.0f)
