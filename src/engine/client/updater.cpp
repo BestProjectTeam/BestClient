@@ -21,7 +21,6 @@
 static constexpr const char *GITHUB_RELEASES_URL = "https://api.github.com/repos/BestProjectTeam/BestClient/releases?per_page=10";
 static constexpr const char *GITHUB_LATEST_RELEASE_URL = "https://github.com/BestProjectTeam/BestClient/releases/latest";
 static constexpr const char *UPDATE_ARCHIVE_PATH = "update/bestclient-release.zip";
-static constexpr const char *UPDATE_SCRIPT_PATH = "update/apply_bestclient_update.ps1";
 
 static void BuildGitHubReleasesUrl(char *pBuf, int BufSize)
 {
@@ -413,96 +412,11 @@ void CUpdater::StartArchiveDownload()
 	m_pHttp->Run(m_pCurrentTask);
 }
 
-bool CUpdater::WriteApplyScript(char *pScriptPath, int ScriptPathSize, char *pInstallDir, int InstallDirSize, char *pExePath, int ExePathSize)
-{
-	m_pStorage->GetBinaryPath(UPDATE_SCRIPT_PATH, pScriptPath, ScriptPathSize);
-	m_pStorage->GetBinaryPathAbsolute(PLAT_CLIENT_EXEC, pExePath, ExePathSize);
-	str_copy(pInstallDir, pExePath, InstallDirSize);
-	StripFilename(pInstallDir);
-
-	if(fs_makedir_rec_for(pScriptPath) < 0)
-		return false;
-
-	static constexpr const char *pScript =
-		"param(\n"
-		"    [int]$PidToWait,\n"
-		"    [string]$ArchivePath,\n"
-		"    [string]$InstallDir,\n"
-		"    [string]$ExePath\n"
-		")\n"
-		"$ErrorActionPreference = 'Stop'\n"
-		"try {\n"
-		"    $updateDir = Join-Path $InstallDir 'update'\n"
-		"    New-Item -ItemType Directory -Path $updateDir -Force | Out-Null\n"
-		"    $logPath = Join-Path $updateDir 'apply_update.log'\n"
-		"    Add-Content -LiteralPath $logPath -Value ('[' + (Get-Date).ToString('s') + '] updater started')\n"
-		"    while(Get-Process -Id $PidToWait -ErrorAction SilentlyContinue) {\n"
-		"        Start-Sleep -Milliseconds 200\n"
-		"    }\n"
-		"    Add-Content -LiteralPath $logPath -Value ('[' + (Get-Date).ToString('s') + '] client process stopped')\n"
-		"    $extractDir = Join-Path $InstallDir 'update\\extract'\n"
-		"    if(Test-Path -LiteralPath $extractDir) {\n"
-		"        Remove-Item -LiteralPath $extractDir -Recurse -Force\n"
-		"    }\n"
-		"    New-Item -ItemType Directory -Path $extractDir -Force | Out-Null\n"
-		"    Expand-Archive -LiteralPath $ArchivePath -DestinationPath $extractDir -Force\n"
-		"    Add-Content -LiteralPath $logPath -Value ('[' + (Get-Date).ToString('s') + '] archive extracted')\n"
-		"    $copyRoot = $extractDir\n"
-		"    $items = @(Get-ChildItem -LiteralPath $extractDir -Force)\n"
-		"    if($items.Count -eq 1 -and $items[0].PSIsContainer) {\n"
-		"        $copyRoot = $items[0].FullName\n"
-		"    }\n"
-		"    $userAssetDirs = @('data\\assets\\arrow', 'data\\assets\\arrows', 'data\\assets\\audio', 'data\\audio')\n"
-		"    $backupDir = Join-Path $env:TEMP ('BestClient_user_assets_' + $PidToWait)\n"
-		"    if(Test-Path -LiteralPath $backupDir) {\n"
-		"        Remove-Item -LiteralPath $backupDir -Recurse -Force\n"
-		"    }\n"
-		"    foreach($rel in $userAssetDirs) {\n"
-		"        $src = Join-Path $InstallDir $rel\n"
-		"        if(Test-Path -LiteralPath $src) {\n"
-		"            $dst = Join-Path $backupDir $rel\n"
-		"            New-Item -ItemType Directory -Path $dst -Force | Out-Null\n"
-		"            Copy-Item -Path (Join-Path $src '*') -Destination $dst -Recurse -Force\n"
-		"            Add-Content -LiteralPath $logPath -Value ('[' + (Get-Date).ToString('s') + '] backed up ' + $rel)\n"
-		"        }\n"
-		"    }\n"
-		"    foreach($item in Get-ChildItem -LiteralPath $copyRoot -Force) {\n"
-		"        Copy-Item -Path $item.FullName -Destination $InstallDir -Recurse -Force\n"
-		"    }\n"
-		"    Add-Content -LiteralPath $logPath -Value ('[' + (Get-Date).ToString('s') + '] files copied')\n"
-		"    foreach($rel in $userAssetDirs) {\n"
-		"        $src = Join-Path $backupDir $rel\n"
-		"        if(Test-Path -LiteralPath $src) {\n"
-		"            $dst = Join-Path $InstallDir $rel\n"
-		"            New-Item -ItemType Directory -Path $dst -Force | Out-Null\n"
-		"            Copy-Item -Path (Join-Path $src '*') -Destination $dst -Recurse -Force\n"
-		"            Add-Content -LiteralPath $logPath -Value ('[' + (Get-Date).ToString('s') + '] restored ' + $rel)\n"
-		"        }\n"
-		"    }\n"
-		"    Remove-Item -LiteralPath $backupDir -Recurse -Force -ErrorAction SilentlyContinue\n"
-		"    Remove-Item -LiteralPath $ArchivePath -Force -ErrorAction SilentlyContinue\n"
-		"    Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue\n"
-		"    Start-Process -FilePath $ExePath -WorkingDirectory $InstallDir\n"
-		"    Add-Content -LiteralPath $logPath -Value ('[' + (Get-Date).ToString('s') + '] client relaunched')\n"
-		"} catch {\n"
-		"    $logPath = Join-Path $InstallDir 'update\\apply_update_error.txt'\n"
-		"    $_ | Out-String | Set-Content -LiteralPath $logPath -Encoding UTF8\n"
-		"}\n";
-
-	IOHANDLE File = io_open(pScriptPath, IOFLAG_WRITE);
-	if(!File)
-		return false;
-
-	io_write(File, pScript, str_length(pScript));
-	io_close(File);
-	return true;
-}
-
 bool CUpdater::LaunchApplyScriptAndQuit()
 {
 #if defined(CONF_FAMILY_WINDOWS)
 	char aArchivePath[IO_MAX_PATH_LENGTH];
-	char aScriptPath[IO_MAX_PATH_LENGTH];
+	char aUpdaterPath[IO_MAX_PATH_LENGTH];
 	char aInstallDir[IO_MAX_PATH_LENGTH];
 	char aExePath[IO_MAX_PATH_LENGTH];
 	char aPid[32];
@@ -514,31 +428,15 @@ bool CUpdater::LaunchApplyScriptAndQuit()
 		return false;
 	}
 
-	if(!WriteApplyScript(aScriptPath, sizeof(aScriptPath), aInstallDir, sizeof(aInstallDir), aExePath, sizeof(aExePath)))
-	{
-		SetStatus("Failed to prepare updater script");
-		return false;
-	}
+	m_pStorage->GetBinaryPathAbsolute("bestclient-updater.exe", aUpdaterPath, sizeof(aUpdaterPath));
+	m_pStorage->GetBinaryPathAbsolute(PLAT_CLIENT_EXEC, aExePath, sizeof(aExePath));
+	str_copy(aInstallDir, aExePath, sizeof(aInstallDir));
+	StripFilename(aInstallDir);
 
 	str_format(aPid, sizeof(aPid), "%d", process_id());
-	const char *apArguments[] = {
-		"-NoProfile",
-		"-NonInteractive",
-		"-ExecutionPolicy",
-		"Bypass",
-		"-File",
-		aScriptPath,
-		"-PidToWait",
-		aPid,
-		"-ArchivePath",
-		aArchivePath,
-		"-InstallDir",
-		aInstallDir,
-		"-ExePath",
-		aExePath,
-	};
+	const char *apArguments[] = {aPid, aArchivePath, aInstallDir, aExePath};
 
-	if(process_execute("powershell.exe", EShellExecuteWindowState::BACKGROUND, apArguments, std::size(apArguments)) == INVALID_PROCESS)
+	if(process_execute(aUpdaterPath, EShellExecuteWindowState::FOREGROUND, apArguments, std::size(apArguments)) == INVALID_PROCESS)
 	{
 		SetStatus("Failed to launch updater");
 		return false;
