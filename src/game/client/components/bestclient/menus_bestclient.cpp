@@ -2530,7 +2530,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			DoOpenHudEditorButton(&s_FinishPredictionResizeButton, &ResizeHitbox);
 			Ui()->DoLabel(&TitleLabel, BCLocalize("Finish Prediction"), HeadlineFontSize, TEXTALIGN_ML);
 			Content.HSplitTop(MarginSmall, nullptr, &Content);
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcFinishPrediction, BCLocalize("Show finish prediction HUD"), &g_Config.m_BcFinishPrediction, &Content, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcFinishPrediction, BCLocalize("Enable finish prediction"), &g_Config.m_BcFinishPrediction, &Content, LineSize);
 
 			if(ExpandedHeight > 0.0f)
 			{
