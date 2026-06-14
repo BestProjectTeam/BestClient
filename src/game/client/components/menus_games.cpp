@@ -167,6 +167,7 @@ namespace
 		FUN_GAME_FLOWMANIA,
 		FUN_GAME_UNO,
 		FUN_GAME_BILLIARDS,
+		FUN_GAME_CASINO,
 		NUM_FUN_GAMES
 	};
 
@@ -267,9 +268,11 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 		{"Battleship", FONT_ICON_MAP, "Find and sink enemy ships"},
 		{"Flowmania", FONT_ICON_ARROWS_ROTATE, "Connect color pairs without crossing"},
 		{"UNO", FONT_ICON_LAYER_GROUP, "Match color or number cards"},
-		{"Billiards", FONT_ICON_TABLE_TENNIS_PADDLE_BALL, "Pocket all balls with precision"}};
+		{"Billiards", FONT_ICON_TABLE_TENNIS_PADDLE_BALL, "Pocket all balls with precision"},
+		{"Casino", FONT_ICON_DICE_SIX, "Spin the reels, bet & win"}};
 
-	static constexpr std::array<EFunGame, 14> s_aVisibleGames = {
+	static constexpr std::array<EFunGame, 15> s_aVisibleGames = {
+		FUN_GAME_CASINO,
 		FUN_GAME_SNAKE,
 		FUN_GAME_MINESWEEPER,
 		FUN_GAME_2048,
@@ -301,7 +304,7 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 	};
 
-	static int s_SelectedGame = FUN_GAME_SNAKE;
+	static int s_SelectedGame = FUN_GAME_CASINO;
 	static int s_LastSelectedGame = -1;
 	static CButtonContainer s_aGameButtons[NUM_FUN_GAMES];
 	static CScrollRegion s_GameListScroll;
@@ -8060,6 +8063,296 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 				CUIRect Overlay = Table;
 				Overlay.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.35f), IGraphics::CORNER_ALL, 10.0f);
 				Ui()->DoLabel(&Overlay, TCLocalize("Table cleared"), HEADLINE_FONT_SIZE, TEXTALIGN_MC);
+			}
+		}
+	}
+
+	else if(s_SelectedGame == FUN_GAME_CASINO)
+	{
+		struct SCasinoState
+		{
+			int m_aSymbols[7] = {};
+			bool m_aLocked[7] = {};
+			float m_aScrollY[7] = {};
+			int m_aScrollSym[7] = {};
+			int m_MultiplierIdx = 0;
+			bool m_Spinning = false;
+			float m_SpinTimer = 0.f;
+			bool m_ShowResult = false;
+			bool m_Won = false;
+			int m_WinAmount = 0;
+			float m_ResultTimer = 0.f;
+			int m_SpinStreak = 0;
+		};
+		static SCasinoState s_Casino;
+		static CButtonContainer s_SpinBtn;
+		static CButtonContainer s_ClaimBtn;
+		static CButtonContainer s_aMulBtn[5];
+
+		struct SSymbol { const char *m_pIcon; ColorRGBA m_Color; const char *m_pName; int m_Payout; bool m_IsIcon; };
+		static const SSymbol s_aSym[6] = {
+			{"7",                ColorRGBA(1.f, 0.85f, 0.1f, 1.f),   "Seven", 50, false},
+			{FONT_ICON_STAR,     ColorRGBA(1.f, 0.95f, 0.2f, 1.f),   "Star",  20, true},
+			{FONT_ICON_HEART,    ColorRGBA(1.f, 0.25f, 0.3f, 1.f),   "Heart", 10, true},
+			{FONT_ICON_DICE_SIX, ColorRGBA(0.3f, 0.65f, 1.f, 1.f),   "Dice",   5, true},
+			{FONT_ICON_KEY,      ColorRGBA(0.45f, 0.9f, 0.45f, 1.f), "Key",    4, true},
+			{FONT_ICON_BOMB,     ColorRGBA(0.75f, 0.75f, 0.8f, 1.f), "Bomb",   3, true},
+		};
+
+		const float DeltaTime = Client()->RenderFrameTime();
+		const int aMults[5] = {1, 2, 5, 10, 25};
+		const int MulIdx = s_Casino.m_MultiplierIdx;
+		const int CurMult = aMults[MulIdx];
+		const int BaseBet = 10;
+		const int ActualBet = BaseBet * CurMult;
+		// x1→3, x2→4, x5→5, x10→6, x25→7
+		const int ActualReels = minimum(2 + MulIdx + 1, 7);
+		// streak bonus: +1% chance per losing spin, resets on win
+		const float StreakBonus = s_Casino.m_SpinStreak * 0.01f;
+		auto CalcWinChance = [&](int Mult) -> float { return std::clamp(0.22f - Mult * 0.015f + StreakBonus, 0.02f, 0.55f); };
+
+		if(s_Casino.m_Spinning)
+		{
+			s_Casino.m_SpinTimer += DeltaTime;
+			const float ScrollSpeed = 9.f;
+			for(int i = 0; i < ActualReels; ++i)
+			{
+				const float StopTime = 0.7f + i * 0.35f;
+				if(!s_Casino.m_aLocked[i])
+				{
+					s_Casino.m_aScrollY[i] += ScrollSpeed * DeltaTime;
+					while(s_Casino.m_aScrollY[i] >= 1.f)
+					{
+						s_Casino.m_aScrollY[i] -= 1.f;
+						s_Casino.m_aScrollSym[i] = (s_Casino.m_aScrollSym[i] + 1) % 6;
+					}
+					if(s_Casino.m_SpinTimer >= StopTime)
+					{
+						s_Casino.m_aLocked[i] = true;
+						s_Casino.m_aScrollY[i] = 0.f;
+						// center slot = (ScrollSym+1)%6, so align to target symbol
+						s_Casino.m_aScrollSym[i] = (s_Casino.m_aSymbols[i] + 5) % 6;
+					}
+				}
+			}
+			const float LastStop = 0.7f + (ActualReels - 1) * 0.35f;
+			if(s_Casino.m_SpinTimer >= LastStop)
+			{
+				s_Casino.m_Spinning = false;
+				s_Casino.m_ShowResult = true;
+				s_Casino.m_ResultTimer = 3.f;
+				bool AllSame = true;
+				for(int i = 1; i < ActualReels; ++i)
+					if(s_Casino.m_aSymbols[i] != s_Casino.m_aSymbols[0]) { AllSame = false; break; }
+				if(AllSame)
+				{
+					s_Casino.m_Won = true;
+					s_Casino.m_WinAmount = ActualBet * s_aSym[s_Casino.m_aSymbols[0]].m_Payout;
+					g_Config.m_BcCasinoBalance += s_Casino.m_WinAmount;
+					s_Casino.m_SpinStreak = 0;
+				}
+				else
+				{
+					s_Casino.m_Won = false;
+					s_Casino.m_WinAmount = 0;
+					s_Casino.m_SpinStreak = minimum(s_Casino.m_SpinStreak + 1, 50);
+				}
+			}
+		}
+		if(s_Casino.m_ShowResult)
+		{ s_Casino.m_ResultTimer -= DeltaTime; if(s_Casino.m_ResultTimer <= 0.f) s_Casino.m_ShowResult = false; }
+
+		CUIRect Area = GameContent;
+
+		CUIRect TopBar;
+		Area.HSplitTop(34.f, &TopBar, &Area);
+		Area.HSplitTop(MARGIN_SMALL, nullptr, &Area);
+		TopBar.Draw(ColorRGBA(0.f, 0.f, 0.f, 0.35f), IGraphics::CORNER_ALL, 6.f);
+		CUIRect TopInner; TopBar.Margin(4.f, &TopInner);
+		CUIRect BalRect, ClaimRect;
+		TopInner.VSplitRight(185.f, &BalRect, &ClaimRect);
+		ClaimRect.VSplitLeft(MARGIN_SMALL, nullptr, &ClaimRect);
+
+		char aBuf[128];
+		str_format(aBuf, sizeof(aBuf), "Balance:  $%d", g_Config.m_BcCasinoBalance);
+		TextRender()->TextColor(ColorRGBA(0.75f, 1.f, 0.55f, 1.f));
+		Ui()->DoLabel(&BalRect, aBuf, FONT_SIZE, TEXTALIGN_ML);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+		const int64_t Now = (int64_t)time_timestamp();
+		const int64_t CooldownSec = 60;
+		const int64_t Elapsed = Now - (int64_t)g_Config.m_BcCasinoLastClaim;
+		const bool CanClaim = Elapsed >= CooldownSec;
+		if(CanClaim)
+		{
+			if(DoButton_Menu(&s_ClaimBtn, TCLocalize("Get $200"), 0, &ClaimRect, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.f, 0.f, ColorRGBA(0.2f, 0.65f, 0.2f, 0.9f)))
+			{ g_Config.m_BcCasinoBalance += 200; g_Config.m_BcCasinoLastClaim = (int)Now; }
+		}
+		else
+		{
+			str_format(aBuf, sizeof(aBuf), "Get $200  (%ds)", (int)(CooldownSec - Elapsed));
+			DoButton_Menu(&s_ClaimBtn, aBuf, -1, &ClaimRect, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.f, 0.f, ColorRGBA(0.3f, 0.3f, 0.3f, 0.85f));
+		}
+		// Multiplier row
+		CUIRect MulRow;
+		Area.HSplitTop(LINE_SIZE + 4.f, &MulRow, &Area);
+		Area.HSplitTop(MARGIN_SMALL, nullptr, &Area);
+		CUIRect MulLabel;
+		MulRow.VSplitLeft(80.f, &MulLabel, &MulRow);
+		Ui()->DoLabel(&MulLabel, TCLocalize("Multiplier:"), FONT_SIZE, TEXTALIGN_ML);
+		const float MulBtnW = MulRow.w / 5.f;
+		for(int m = 0; m < 5; ++m)
+		{
+			CUIRect MB;
+			MulRow.VSplitLeft(MulBtnW, &MB, &MulRow);
+			const int Corners = m == 0 ? IGraphics::CORNER_L : (m == 4 ? IGraphics::CORNER_R : IGraphics::CORNER_NONE);
+			str_format(aBuf, sizeof(aBuf), "x%d", aMults[m]);
+			if(DoButton_Menu(&s_aMulBtn[m], aBuf, s_Casino.m_MultiplierIdx == m ? 1 : 0, &MB, BUTTONFLAG_LEFT, nullptr, Corners, 4.f, 0.f, s_Casino.m_MultiplierIdx == m ? ColorRGBA(0.22f, 0.55f, 0.9f, 0.9f) : ColorRGBA(1.f,1.f,1.f,0.18f)))
+				if(!s_Casino.m_Spinning)
+					s_Casino.m_MultiplierIdx = m;
+		}
+
+		// Bet info line
+		CUIRect BetInfo;
+		Area.HSplitTop(LINE_SIZE, &BetInfo, &Area);
+		Area.HSplitTop(MARGIN_SMALL, nullptr, &Area);
+		{
+			const int MaxWin = ActualBet * s_aSym[0].m_Payout;
+			str_format(aBuf, sizeof(aBuf), "Chance: %.0f%%   Max win: $%d%s",
+				CalcWinChance(CurMult) * 100.f,
+				MaxWin,
+				s_Casino.m_SpinStreak > 0 ? "  [streak!]" : "");
+		}
+		TextRender()->TextColor(ColorRGBA(0.85f, 0.85f, 0.85f, 0.8f));
+		Ui()->DoLabel(&BetInfo, aBuf, FONT_SIZE * 0.88f, TEXTALIGN_ML);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+		// Reels area
+		CUIRect ReelArea;
+		Area.HSplitTop(Area.h - 40.f - MARGIN_SMALL * 2.f, &ReelArea, &Area);
+		ReelArea.Draw(ColorRGBA(0.f, 0.f, 0.f, 0.45f), IGraphics::CORNER_ALL, 10.f);
+
+		const float ReelW = ReelArea.w / ActualReels;
+		const float SymFontSize = 28.f; // fixed size — prevents glyph cache rebuilds on reel count change
+		for(int i = 0; i < ActualReels; ++i)
+		{
+			CUIRect Reel;
+			Reel.x = ReelArea.x + i * ReelW + 4.f;
+			Reel.y = ReelArea.y + 4.f;
+			Reel.w = ReelW - 8.f;
+			Reel.h = ReelArea.h - 8.f;
+
+			const bool Spinning = s_Casino.m_Spinning && !s_Casino.m_aLocked[i];
+			ColorRGBA ReelBg = Spinning
+				? ColorRGBA(0.14f, 0.14f, 0.18f, 0.9f)
+				: ColorRGBA(0.10f, 0.10f, 0.14f, 0.9f);
+			Reel.Draw(ReelBg, IGraphics::CORNER_ALL, 8.f);
+
+			Ui()->ClipEnable(&Reel);
+
+			auto RenderSym = [&](int SymIdx, float OffsetY) {
+				const SSymbol &Sym = s_aSym[SymIdx % 6];
+				CUIRect R = Reel;
+				R.y += OffsetY;
+				if(Sym.m_IsIcon)
+				{
+					TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+					TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING);
+				}
+				const float Alpha = Spinning ? 0.75f : 1.f;
+				TextRender()->TextColor(ColorRGBA(Sym.m_Color.r, Sym.m_Color.g, Sym.m_Color.b, Alpha));
+				Ui()->DoLabel(&R, Sym.m_pIcon, SymFontSize, TEXTALIGN_MC);
+				TextRender()->TextColor(TextRender()->DefaultTextColor());
+				if(Sym.m_IsIcon)
+				{
+					TextRender()->SetRenderFlags(0);
+					TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+				}
+			};
+
+			if(Spinning)
+			{
+				// top symbol scrolling down, next symbol below
+				const float Off = s_Casino.m_aScrollY[i] * Reel.h;
+				RenderSym(s_Casino.m_aScrollSym[i], -Reel.h + Off);
+				RenderSym((s_Casino.m_aScrollSym[i] + 1) % 6, Off);
+				RenderSym((s_Casino.m_aScrollSym[i] + 2) % 6, Reel.h + Off);
+			}
+			else
+			{
+				RenderSym(s_Casino.m_aSymbols[i], 0.f);
+				// Locked indicator during spin
+				if(s_Casino.m_Spinning && s_Casino.m_aLocked[i])
+				{
+					CUIRect LockedLabel;
+					Reel.HSplitBottom(18.f, nullptr, &LockedLabel);
+					TextRender()->TextColor(ColorRGBA(0.5f, 0.5f, 0.5f, 0.7f));
+					Ui()->DoLabel(&LockedLabel, TCLocalize("Locked"), FONT_SIZE * 0.75f, TEXTALIGN_MC);
+					TextRender()->TextColor(TextRender()->DefaultTextColor());
+				}
+			}
+
+			Ui()->ClipDisable();
+
+			// Win highlight
+			if(s_Casino.m_ShowResult && s_Casino.m_Won)
+			{
+				const float Alpha = sinf(AnimTime * 10.f) * 0.15f + 0.25f;
+				Reel.Draw(ColorRGBA(1.f, 0.85f, 0.1f, Alpha), IGraphics::CORNER_ALL, 8.f);
+			}
+		}
+
+		// Result overlay
+		if(s_Casino.m_ShowResult)
+		{
+			CUIRect ResLabel = ReelArea;
+			ResLabel.y = ReelArea.y + ReelArea.h * 0.72f;
+			ResLabel.h = 26.f;
+			if(s_Casino.m_Won)
+			{
+				str_format(aBuf, sizeof(aBuf), "+ $%d", s_Casino.m_WinAmount);
+				TextRender()->TextColor(ColorRGBA(0.3f, 1.f, 0.3f, 1.f));
+			}
+			else
+			{
+				str_format(aBuf, sizeof(aBuf), "- $%d", ActualBet);
+				TextRender()->TextColor(ColorRGBA(1.f, 0.3f, 0.3f, 1.f));
+			}
+			Ui()->DoLabel(&ResLabel, aBuf, 18.f, TEXTALIGN_MC);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+		}
+
+		// Spin button
+		Area.HSplitTop(MARGIN_SMALL, nullptr, &Area);
+		CUIRect SpinBtn;
+		Area.HSplitTop(34.f, &SpinBtn, &Area);
+		const bool NotEnoughFunds = g_Config.m_BcCasinoBalance < ActualBet;
+		if(s_Casino.m_Spinning || NotEnoughFunds)
+		{
+			const char *pLabel = NotEnoughFunds ? TCLocalize("Not enough funds") : TCLocalize("Spinning...");
+			DoButton_Menu(&s_SpinBtn, pLabel, -1, &SpinBtn, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.f, 0.f, ColorRGBA(0.3f,0.3f,0.3f,0.85f));
+		}
+		else
+		{
+			str_format(aBuf, sizeof(aBuf), "%s  (Bet $%d)", TCLocalize("SPIN"), ActualBet);
+			if(DoButton_Menu(&s_SpinBtn, aBuf, 0, &SpinBtn, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 6.f, 0.f, ColorRGBA(0.7f, 0.25f, 0.25f, 0.92f)) ||
+				Input()->KeyPress(KEY_SPACE))
+			{
+				g_Config.m_BcCasinoBalance -= ActualBet;
+				s_Casino.m_Spinning = true;
+				s_Casino.m_SpinTimer = 0.f;
+				s_Casino.m_ShowResult = false;
+				for(int i = 0; i < ActualReels; ++i)
+				{
+					s_Casino.m_aLocked[i] = false;
+					s_Casino.m_aScrollY[i] = 0.f;
+					s_Casino.m_aScrollSym[i] = s_Casino.m_aSymbols[i];
+					const float WinChance = CalcWinChance(CurMult);
+					if(i > 0 && (rand() % 1000) < (int)(WinChance * 1000.f))
+						s_Casino.m_aSymbols[i] = s_Casino.m_aSymbols[0];
+					else
+						s_Casino.m_aSymbols[i] = rand() % 6;
+				}
 			}
 		}
 	}
