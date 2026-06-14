@@ -403,11 +403,11 @@ void CEffects::Explosion(vec2 Pos, float Alpha)
 	}
 }
 
-void CEffects::HammerHit(vec2 Pos, float Alpha, float Volume)
+void CEffects::HammerHit(vec2 Pos, float Alpha, float Volume, bool OtherPlayer)
 {
 	if(g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideEffects)
 	{
-		if(g_Config.m_SndGame && g_Config.m_ClHammerHitEffectSound)
+		if(g_Config.m_SndGame && g_Config.m_ClHammerHitEffectSound && !(OtherPlayer && g_Config.m_BcMuteOthersHammer))
 			GameClient()->m_Sounds.PlayAt(CSounds::CHN_WORLD, SOUND_HAMMER_HIT, 1.0f, Pos);
 		return;
 	}
@@ -424,7 +424,7 @@ void CEffects::HammerHit(vec2 Pos, float Alpha, float Volume)
 	p.m_Color.a = Alpha;
 	p.m_StartAlpha = Alpha;
 	GameClient()->m_Particles.Add(CParticles::GROUP_EXPLOSIONS, &p);
-	if(g_Config.m_SndGame)
+	if(g_Config.m_SndGame && !(OtherPlayer && g_Config.m_BcMuteOthersHammer))
 		GameClient()->m_Sounds.PlayAt(CSounds::CHN_WORLD, SOUND_HAMMER_HIT, Volume, Pos);
 }
 

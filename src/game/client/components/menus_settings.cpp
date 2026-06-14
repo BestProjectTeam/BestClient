@@ -1421,6 +1421,14 @@ void CMenus::RenderSettingsSound(CUIRect MainView)
 		g_Config.m_SndGame ^= 1;
 
 	MainView.HSplitTop(20.0f, &Button, &MainView);
+	if(DoButton_CheckBox(&g_Config.m_BcMuteOthersHook, Localize("Mute hook sounds of other players"), g_Config.m_BcMuteOthersHook, &Button))
+		g_Config.m_BcMuteOthersHook ^= 1;
+
+	MainView.HSplitTop(20.0f, &Button, &MainView);
+	if(DoButton_CheckBox(&g_Config.m_BcMuteOthersHammer, Localize("Mute hammer sounds of other players"), g_Config.m_BcMuteOthersHammer, &Button))
+		g_Config.m_BcMuteOthersHammer ^= 1;
+
+	MainView.HSplitTop(20.0f, &Button, &MainView);
 	if(DoButton_CheckBox(&g_Config.m_SndGun, Localize("Enable gun sound"), g_Config.m_SndGun, &Button))
 		g_Config.m_SndGun ^= 1;
 

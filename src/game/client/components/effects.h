@@ -31,7 +31,7 @@ public:
 	void SmokeTrail(vec2 Pos, vec2 Vel, float Alpha, float TimePassed);
 	void SkidTrail(vec2 Pos, vec2 Vel, int Direction, float Alpha, float Volume);
 	void Explosion(vec2 Pos, float Alpha);
-	void HammerHit(vec2 Pos, float Alpha, float Volume);
+	void HammerHit(vec2 Pos, float Alpha, float Volume, bool OtherPlayer = false);
 	void AirJump(vec2 Pos, float Alpha, float Volume);
 	void DamageIndicator(vec2 Pos, vec2 Dir, float Alpha);
 	void PlayerSpawn(vec2 Pos, float Alpha, float Volume);

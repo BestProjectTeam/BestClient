@@ -2091,6 +2091,26 @@ void CGameClient::ProcessEvents()
 	if(m_SuppressEvents)
 		return;
 
+	// Determine if any local player just hooked something or fired hammer this snapshot.
+	// NOTE: ProcessEvents() is called before m_Snap.m_aCharacters is populated (InvalidateSnapshot
+	// zeroes m_Snap first), so we read directly from the raw snapshot items via SnapFindItem.
+	bool LocalJustGrabbed = false;
+	bool LocalJustFiredHammer = false;
+	for(int Dummy = 0; Dummy < NUM_DUMMIES; Dummy++)
+	{
+		const int LocalId = m_aLocalIds[Dummy];
+		if(LocalId < 0 || LocalId >= MAX_CLIENTS)
+			continue;
+		const auto *pCur = static_cast<const CNetObj_Character *>(Client()->SnapFindItem(IClient::SNAP_CURRENT, NETOBJTYPE_CHARACTER, LocalId));
+		const auto *pPrev = static_cast<const CNetObj_Character *>(Client()->SnapFindItem(IClient::SNAP_PREV, NETOBJTYPE_CHARACTER, LocalId));
+		if(!pCur || !pPrev)
+			continue;
+		if(pCur->m_HookState == HOOK_GRABBED && pPrev->m_HookState != HOOK_GRABBED)
+			LocalJustGrabbed = true;
+		if(pCur->m_AttackTick != pPrev->m_AttackTick && pCur->m_Weapon == WEAPON_HAMMER)
+			LocalJustFiredHammer = true;
+	}
+
 	int SnapType = IClient::SNAP_CURRENT;
 	int Num = Client()->SnapNumItems(SnapType);
 	for(int Index = 0; Index < Num; Index++)
@@ -2128,7 +2148,7 @@ void CGameClient::ProcessEvents()
 			vec2 HammerHitPos = vec2(pEvent->m_X, pEvent->m_Y);
 			if(!m_PredictedWorld.CheckPredictedEventHandled(CGameWorld::CPredictedEvent(Item.m_Type, HammerHitPos, -1, Client()->GameTick(g_Config.m_ClDummy))))
 			{
-				m_Effects.HammerHit(HammerHitPos, Alpha, Volume);
+				m_Effects.HammerHit(HammerHitPos, Alpha, Volume, !LocalJustFiredHammer);
 			}
 
 			// Hook combo (hammer mode): count only our own hammer attacks, not when we get hit.
@@ -2178,6 +2198,14 @@ void CGameClient::ProcessEvents()
 
 			if(m_GameInfo.m_RaceSounds && ((pEvent->m_SoundId == SOUND_GUN_FIRE && !g_Config.m_SndGun) || (pEvent->m_SoundId == SOUND_PLAYER_PAIN_LONG && !g_Config.m_SndLongPain)))
 				continue;
+
+			if(g_Config.m_BcMuteOthersHook)
+			{
+				if(pEvent->m_SoundId == SOUND_HOOK_ATTACH_GROUND || pEvent->m_SoundId == SOUND_HOOK_NOATTACH)
+					continue;
+				if(pEvent->m_SoundId == SOUND_HOOK_ATTACH_PLAYER && !LocalJustGrabbed)
+					continue;
+			}
 
 			vec2 SoundPos = vec2(pEvent->m_X, pEvent->m_Y);
 			if(!m_PredictedWorld.CheckPredictedEventHandled(CGameWorld::CPredictedEvent(Item.m_Type, SoundPos, -1, Client()->GameTick(g_Config.m_ClDummy), pEvent->m_SoundId)))
