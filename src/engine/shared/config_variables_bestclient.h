@@ -75,6 +75,9 @@ MACRO_CONFIG_INT(BcMastersrv, bc_mastersrv, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SA
 MACRO_CONFIG_INT(BcUseShortKogServerName, bc_use_short_kog_server_name, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use short name for KoG gores servers in browser list")
 MACRO_CONFIG_INT(BcStreamerFlags, bc_streamer_flags, 64, 0, 127, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Bitmask of BestClient streamer mode options")
 
+// Auto update
+MACRO_CONFIG_INT(BcAutoUpdate, bc_auto_update, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically download and apply updates on startup")
+
 // Fast input
 MACRO_CONFIG_INT(BcFastInputMode, bc_fast_input_mode, 0, 0, 4, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fast input mode (0 = fast input, 1 = delta input, 3 = best input, 4 = saiko+; legacy gamma mode maps to best input)")
 MACRO_CONFIG_INT(BcFastInputDeltaInput, bc_fast_input_delta_input, 0, 0, 500, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Delta input amount in 0.01 ticks")

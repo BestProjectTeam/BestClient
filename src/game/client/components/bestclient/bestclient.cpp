@@ -13,6 +13,7 @@
 #include <engine/shared/config.h>
 #include <engine/shared/json.h>
 #include <engine/storage.h>
+#include <engine/updater.h>
 
 #include <game/client/components/binds.h>
 #include <game/client/components/hud_layout.h>
@@ -688,6 +689,26 @@ void CBestClient::OnRender()
 		}
 	}
 
+#if defined(CONF_AUTOUPDATE)
+	if(m_bAutoUpdateArmed)
+	{
+		const IUpdater::EUpdaterState State = Updater()->GetCurrentState();
+		if(NeedUpdate() && State == IUpdater::CLEAN)
+		{
+			m_bAutoUpdateArmed = false;
+			Updater()->InitiateUpdate();
+		}
+		else if(!NeedUpdate())
+		{
+			m_bAutoUpdateArmed = false;
+		}
+	}
+	if(g_Config.m_BcAutoUpdate && Updater()->GetCurrentState() == IUpdater::NEED_RESTART)
+	{
+		Updater()->ApplyUpdateAndRestart();
+	}
+#endif
+
 	if(HasHookComboWork())
 		UpdateHookCombo();
 
@@ -1286,6 +1307,18 @@ bool CBestClient::NeedUpdate()
 	return str_comp(m_aVersionStr, "0") != 0;
 }
 
+bool CBestClient::IsAutoUpdating() const
+{
+#if defined(CONF_AUTOUPDATE)
+	if(!g_Config.m_BcAutoUpdate)
+		return false;
+	const IUpdater::EUpdaterState State = Updater()->GetCurrentState();
+	return State >= IUpdater::GETTING_MANIFEST && State < IUpdater::NEED_RESTART;
+#else
+	return false;
+#endif
+}
+
 void CBestClient::ResetBestClientInfoTask()
 {
 	if(m_pBestClientInfoTask)
@@ -1331,6 +1364,9 @@ void CBestClient::FinishBestClientInfo()
 	}
 
 	m_FetchedBestClientInfo = true;
+#if defined(CONF_AUTOUPDATE)
+	m_bAutoUpdateArmed = g_Config.m_BcAutoUpdate != 0;
+#endif
 	json_value_free(pJson);
 }
 

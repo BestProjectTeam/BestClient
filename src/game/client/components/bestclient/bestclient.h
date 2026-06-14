@@ -167,7 +167,9 @@ public:
 	std::shared_ptr<CHttpRequest> m_pBestClientInfoTask = nullptr;
 	void FetchBestClientInfo();
 	bool NeedUpdate();
+	bool IsAutoUpdating() const;
 	bool m_FetchedBestClientInfo = false;
+	bool m_bAutoUpdateArmed = false;
 	char m_aVersionStr[64] = "0";
 };
 

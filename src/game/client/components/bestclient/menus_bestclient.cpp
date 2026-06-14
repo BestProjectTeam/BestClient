@@ -2722,7 +2722,12 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			const bool ShowRealHitboxEnabled = g_Config.m_BcShowRealHitbox != 0;
 			const float ColorPickerHeight = ShowRealHitboxEnabled ? (ColorPickerLineSize + ColorPickerLineSpacing) : 0.0f;
 			const float AutoLockDelayHeight = g_Config.m_BcAutoTeamLock ? LineSize : 0.0f;
-			const float ContentHeight = LineSize + MarginSmall + 16.0f * LineSize + ColorPickerHeight + AutoLockDelayHeight;
+#if defined(CONF_AUTOUPDATE)
+			const float AutoUpdateHeight = LineSize;
+#else
+			const float AutoUpdateHeight = 0.0f;
+#endif
+			const float ContentHeight = LineSize + MarginSmall + 16.0f * LineSize + ColorPickerHeight + AutoLockDelayHeight + AutoUpdateHeight;
 			CUIRect Content, Label, Row;
 			BeginBlock(Column, ContentHeight, Content);
 
@@ -2802,6 +2807,9 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				Content.HSplitTop(LineSize, &Row, &Content);
 				Ui()->DoScrollbarOption(&g_Config.m_BcAutoTeamLockDelay, &g_Config.m_BcAutoTeamLockDelay, &Row, BCLocalize("Auto lock delay"), 0, 30, &CUi::ms_LinearScrollbarScale, 0, "s");
 			}
+#if defined(CONF_AUTOUPDATE)
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcAutoUpdate, BCLocalize("Automatic update"), &g_Config.m_BcAutoUpdate, &Content, LineSize);
+#endif
 			Content.HSplitTop(LineSize, &Row, &Content);
 			Ui()->DoScrollbarOption(&g_Config.m_UiScale, &g_Config.m_UiScale, &Row, BCLocalize("UI scale"), 50, 200, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_DELAYUPDATE, "%");
 			if(g_Config.m_BcShowRealHitbox)
@@ -3404,9 +3412,10 @@ void CMenus::RenderSettingsBestClientInfo(CUIRect MainView)
 #if defined(CONF_AUTOUPDATE)
 	const bool NeedUpdate = GameClient()->m_BestClient.NeedUpdate();
 	const IUpdater::EUpdaterState UpdateState = Updater()->GetCurrentState();
-	const bool ShowDownloadButton = NeedUpdate && UpdateState == IUpdater::CLEAN;
-	const bool ShowRetryButton = NeedUpdate && UpdateState == IUpdater::FAIL;
-	const bool ShowRestartButton = UpdateState == IUpdater::NEED_RESTART;
+	const bool AutoUpdateActive = g_Config.m_BcAutoUpdate != 0;
+	const bool ShowDownloadButton = NeedUpdate && UpdateState == IUpdater::CLEAN && !AutoUpdateActive;
+	const bool ShowRetryButton = NeedUpdate && UpdateState == IUpdater::FAIL && !AutoUpdateActive;
+	const bool ShowRestartButton = UpdateState == IUpdater::NEED_RESTART && !AutoUpdateActive;
 	const bool ShowUpdateProgress = UpdateState >= IUpdater::GETTING_MANIFEST && UpdateState < IUpdater::NEED_RESTART;
 	if(ShowDownloadButton || ShowRetryButton || ShowRestartButton || ShowUpdateProgress || UpdateState == IUpdater::FAIL)
 	{
