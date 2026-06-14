@@ -1272,6 +1272,49 @@ void CHud::RenderScoreHud(bool ForcePreview)
 		Graphics()->DrawRect(X, Y, W, H, ThemeHudColor(GameClient(), Color, ForcePreview, 1.0f), Corners, Rounding);
 	};
 
+	// BestClient: render the player name, applying the skin-color gradient when enabled
+	auto RenderPlayerName = [&](int Id, float X, float Y, float Size, const char *pName) {
+		CTextCursor Cursor;
+		Cursor.SetPosition(vec2(X, Y));
+		Cursor.m_FontSize = Size;
+		if(Id >= 0 && Id < MAX_CLIENTS && g_Config.m_BcNameplateGradient)
+		{
+			const auto &RenderInfo = GameClient()->m_aClients[Id].m_RenderInfo;
+			ColorRGBA Body, Feet;
+			if(RenderInfo.m_CustomColoredSkin)
+			{
+				Body = RenderInfo.m_ColorBody;
+				Feet = RenderInfo.m_ColorFeet;
+			}
+			else
+			{
+				Body = RenderInfo.m_BloodColor;
+				Feet = ColorRGBA(1, 1, 1);
+			}
+			size_t ByteSize, Count;
+			str_utf8_stats(pName, str_length(pName) + 1, SIZE_MAX, &ByteSize, &Count);
+			if(Count > 1)
+			{
+				const char *pStr = pName;
+				for(size_t i = 0; i < Count; i++)
+				{
+					int ByteOffset = (int)(pStr - pName);
+					const char *pPrev = pStr;
+					str_utf8_decode(&pStr);
+					int ByteLen = (int)(pStr - pPrev);
+					float t = (float)i / (float)(Count - 1);
+					ColorRGBA Col(Body.r + t * (Feet.r - Body.r), Body.g + t * (Feet.g - Body.g), Body.b + t * (Feet.b - Body.b), 1.0f);
+					Cursor.m_vColorSplits.emplace_back(Cursor.m_CharCount + ByteOffset, ByteLen, Col);
+				}
+			}
+			else if(Count == 1)
+			{
+				Cursor.m_vColorSplits.emplace_back(Cursor.m_CharCount, -1, Body);
+			}
+		}
+		TextRender()->TextEx(&Cursor, pName);
+	};
+
 	if(GameClient()->IsTeamPlay() && GameClient()->m_Snap.m_pGameDataObj)
 	{
 		char aScoreTeam[2][16];
@@ -1325,12 +1368,12 @@ void CHud::RenderScoreHud(bool ForcePreview)
 					GameClient()->m_BestClient.SanitizePlayerName(GameClient()->m_aClients[Id].m_aName, aSanitizedName, sizeof(aSanitizedName), Id, true);
 					const char *pName = aSanitizedName;
 					const float NameWidth = TextRender()->TextWidth(NameTextSize, pName, -1, -1.0f);
-					TextRender()->Text(
+					RenderPlayerName(
+						Id,
 						minimum(RightEdge - NameWidth - 1.0f * Scale, BoxX),
 						RowY + 20.0f * Scale - 2.0f * Scale,
 						NameTextSize,
-						pName,
-						-1.0f);
+						pName);
 
 					CTeeRenderInfo TeeInfo = GameClient()->m_aClients[Id].m_RenderInfo;
 					TeeInfo.m_Size = ScoreSingleBoxHeight;
@@ -1439,12 +1482,12 @@ void CHud::RenderScoreHud(bool ForcePreview)
 				GameClient()->m_BestClient.SanitizePlayerName(GameClient()->m_aClients[Id].m_aName, aSanitizedName, sizeof(aSanitizedName), Id, true);
 				const char *pName = aSanitizedName;
 				const float NameWidth = TextRender()->TextWidth(NameTextSize, pName, -1, -1.0f);
-				TextRender()->Text(
+				RenderPlayerName(
+					Id,
 					minimum(RightEdge - NameWidth - 1.0f * Scale, BoxX),
 					RowY + 20.0f * Scale - 2.0f * Scale,
 					NameTextSize,
-					pName,
-					-1.0f);
+					pName);
 
 				CTeeRenderInfo TeeInfo = GameClient()->m_aClients[Id].m_RenderInfo;
 				TeeInfo.m_Size = ScoreSingleBoxHeight;
