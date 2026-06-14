@@ -2732,6 +2732,9 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			Ui()->DoLabel(&Label, BCLocalize("Misc"), HeadlineFontSize, TEXTALIGN_ML);
 			Content.HSplitTop(MarginSmall, nullptr, &Content);
 
+#if defined(CONF_AUTOUPDATE)
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcAutoUpdate, BCLocalize("Automatic update"), &g_Config.m_BcAutoUpdate, &Content, LineSize);
+#endif
 			static CButtonContainer s_SettingsLayoutButton;
 			int UseNewMenuLayout = g_Config.m_BcSettingsLayout == 0 ? 1 : 0;
 			DoButton_CheckBoxAutoVMarginAndSet(&s_SettingsLayoutButton, BCLocalize("Use new menu layout"), &UseNewMenuLayout, &Content, LineSize);
@@ -2804,9 +2807,6 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				Content.HSplitTop(LineSize, &Row, &Content);
 				Ui()->DoScrollbarOption(&g_Config.m_BcAutoTeamLockDelay, &g_Config.m_BcAutoTeamLockDelay, &Row, BCLocalize("Auto lock delay"), 0, 30, &CUi::ms_LinearScrollbarScale, 0, "s");
 			}
-#if defined(CONF_AUTOUPDATE)
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcAutoUpdate, BCLocalize("Automatic update"), &g_Config.m_BcAutoUpdate, &Content, LineSize);
-#endif
 			Content.HSplitTop(LineSize, &Row, &Content);
 			Ui()->DoScrollbarOption(&g_Config.m_UiScale, &g_Config.m_UiScale, &Row, BCLocalize("UI scale"), 50, 200, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_DELAYUPDATE, "%");
 			if(g_Config.m_BcShowRealHitbox)
