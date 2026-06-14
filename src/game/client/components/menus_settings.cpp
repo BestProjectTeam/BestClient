@@ -1592,8 +1592,6 @@ bool CMenus::RenderLanguageSelection(CUIRect MainView)
 void CMenus::RenderSettings(CUIRect MainView)
 {
 	const bool BestClientPageVisible = g_Config.m_UiSettingsPage == SETTINGS_BESTCLIENT;
-	if(!BestClientPageVisible)
-		SetBestClientShopVisible(false);
 	if(!BestClientPageVisible && (m_AssetsEditorState.m_VisualsEditorOpen || m_AssetsEditorState.m_VisualsEditorInitialized))
 		m_AssetsEditorState.m_VisualsEditorOpen = false;
 	if(!BestClientPageVisible && m_ComponentsEditorState.m_Open)
@@ -1601,13 +1599,11 @@ void CMenus::RenderSettings(CUIRect MainView)
 
 	if(g_Config.m_UiSettingsPage == SETTINGS_BESTCLIENT && m_AssetsEditorState.m_VisualsEditorOpen && m_AssetsEditorState.m_FullscreenOpen)
 	{
-		SetBestClientShopVisible(false);
 		RenderSettingsBestClient(MainView);
 		return;
 	}
 	if(g_Config.m_UiSettingsPage == SETTINGS_BESTCLIENT && m_ComponentsEditorState.m_Open && m_ComponentsEditorState.m_FullscreenOpen)
 	{
-		SetBestClientShopVisible(false);
 		RenderSettingsBestClient(MainView);
 		return;
 	}

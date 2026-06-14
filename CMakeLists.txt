@@ -2819,7 +2819,6 @@ if(CLIENT)
     components/bestclient/hud_editor.cpp
     components/bestclient/hud_editor.h
     components/bestclient/menus_bestclient.cpp
-    components/bestclient/menus_bestclient_shop.cpp
     components/bestclient/music_player.cpp
     components/bestclient/music_player.h
     components/bestclient/r_jelly.cpp

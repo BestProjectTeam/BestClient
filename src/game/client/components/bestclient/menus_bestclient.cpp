@@ -189,13 +189,11 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 
 	if(m_AssetsEditorState.m_VisualsEditorOpen && m_AssetsEditorState.m_FullscreenOpen)
 	{
-		SetBestClientShopVisible(false);
 		RenderAssetsEditorScreen(*Ui()->Screen());
 		return;
 	}
 	if(m_ComponentsEditorState.m_Open && m_ComponentsEditorState.m_FullscreenOpen)
 	{
-		SetBestClientShopVisible(false);
 		RenderComponentsEditorScreen(*Ui()->Screen());
 		return;
 	}
@@ -207,7 +205,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		Badge.HMargin(1.5f, &Badge);
 		// New layout has no extra top margin, so top-align the hint to remove the
 		// empty space above it instead of centering it in the bar.
-		Ui()->DoLabel(&Badge, BCLocalize("assets & components editors/fun/shop \xe2\x86\x92 Info"), 14.0f, NewLayout ? TEXTALIGN_TL : TEXTALIGN_ML);
+		Ui()->DoLabel(&Badge, BCLocalize("assets & components editors/fun \xe2\x86\x92 Info"), 14.0f, NewLayout ? TEXTALIGN_TL : TEXTALIGN_ML);
 	}
 	if(!NewLayout)
 		MainView.HSplitTop(4.0f, nullptr, &MainView);
@@ -267,12 +265,11 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			s_CurTab = Tab;
 		}
 		if(Tab == BESTCLIENT_TAB_INFO)
-			GameClient()->m_Tooltips.DoToolTip(&s_aPageTabs[Tab], &TabButton, BCLocalize("Fun and Shop moved here"));
+			GameClient()->m_Tooltips.DoToolTip(&s_aPageTabs[Tab], &TabButton, BCLocalize("Fun moved here"));
 		VisibleIndex++;
 	}
 
 	MainView.HSplitTop(10.0f, nullptr, &MainView);
-	SetBestClientShopVisible(false);
 
 	if(s_CurTab == BESTCLIENT_TAB_VISUALS)
 	{
@@ -3333,7 +3330,6 @@ void CMenus::RenderSettingsBestClientInfo(CUIRect MainView)
 	enum
 	{
 		INFO_SUBTAB_FUN = 0,
-		INFO_SUBTAB_SHOP,
 		INFO_SUBTAB_INFO,
 		NUM_INFO_SUBTABS,
 	};
@@ -3352,7 +3348,6 @@ void CMenus::RenderSettingsBestClientInfo(CUIRect MainView)
 	MainView.HSplitTop(24.0f, &SubTabBar, &MainView);
 	const char *apSubTabNames[NUM_INFO_SUBTABS] = {
 		BCLocalize("Fun"),
-		BCLocalize("Shop"),
 		BCLocalize("Info"),
 	};
 	const float SubTabWidth = SubTabBar.w / (float)NUM_INFO_SUBTABS;
@@ -3365,16 +3360,9 @@ void CMenus::RenderSettingsBestClientInfo(CUIRect MainView)
 	}
 	MainView.HSplitTop(10.0f, nullptr, &MainView);
 
-	SetBestClientShopVisible(s_CurSubTab == INFO_SUBTAB_SHOP);
-
 	if(s_CurSubTab == INFO_SUBTAB_FUN)
 	{
 		RenderSettingsBestClientFun(MainView);
-		return;
-	}
-	if(s_CurSubTab == INFO_SUBTAB_SHOP)
-	{
-		RenderSettingsBestClientShop(MainView);
 		return;
 	}
 
