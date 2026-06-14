@@ -3,6 +3,7 @@
 #define GAME_CLIENT_COMPONENTS_BESTCLIENT_GRAFFITY_GRAFFITY_H
 
 #include <base/color.h>
+#include <base/net.h>
 
 #include <engine/console.h>
 #include <engine/graphics.h>
@@ -176,6 +177,11 @@ private:
 	char m_aLastError[256] = "";
 	int64_t m_LastConnectAttempt = 0;
 	int64_t m_LastPlacementErrorTick = 0;
+
+	// Protects m_NetworkSocket so StopNetwork() can close it to interrupt
+	// a blocking net_tcp_connect() and avoid freezing the main thread.
+	NETSOCKET m_NetworkSocket = nullptr;
+	std::mutex m_SocketMutex;
 };
 
 #endif

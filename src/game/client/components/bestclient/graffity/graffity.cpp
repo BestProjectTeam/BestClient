@@ -802,6 +802,17 @@ void CGraffity::StopNetwork()
 {
 	m_StopThread = true;
 	m_NetCv.notify_all();
+	// Close the socket under lock so the network thread's blocking
+	// net_tcp_connect() is interrupted immediately, preventing the main
+	// thread from freezing during map changes.
+	{
+		std::lock_guard<std::mutex> Lock(m_SocketMutex);
+		if(m_NetworkSocket != nullptr)
+		{
+			net_tcp_close(m_NetworkSocket);
+			m_NetworkSocket = nullptr;
+		}
+	}
 	if(m_NetworkThread.joinable())
 		m_NetworkThread.join();
 	m_NetworkRunning = false;
@@ -821,6 +832,13 @@ void CGraffity::JoinNetworkThreadIfNeeded()
 
 void CGraffity::NetworkMain(std::string GameServerAddress, std::string OwnerId)
 {
+	// Early-out before starting a potentially slow DNS lookup.
+	if(m_StopThread.load())
+	{
+		m_NetworkRunning = false;
+		return;
+	}
+
 	NETADDR ServerAddr;
 	if(!ParseAddress(ConfiguredGraffityServerAddress().c_str(), ServerAddr))
 	{
@@ -839,10 +857,34 @@ void CGraffity::NetworkMain(std::string GameServerAddress, std::string OwnerId)
 		return;
 	}
 
+	// Register the socket so StopNetwork() can close it to interrupt
+	// the blocking net_tcp_connect() below without joining.
+	{
+		std::lock_guard<std::mutex> Lock(m_SocketMutex);
+		if(m_StopThread.load())
+		{
+			// StopNetwork was called between DNS and socket registration.
+			net_tcp_close(Socket);
+			m_NetworkRunning = false;
+			return;
+		}
+		m_NetworkSocket = Socket;
+	}
+
 	if(net_tcp_connect(Socket, &ServerAddr) != 0)
 	{
-		net_tcp_close(Socket);
-		str_copy(m_aLastError, "Could not connect to graffity server", sizeof(m_aLastError));
+		// Connection failed — may be because StopNetwork closed our socket.
+		{
+			std::lock_guard<std::mutex> Lock(m_SocketMutex);
+			if(m_NetworkSocket == Socket)
+			{
+				m_NetworkSocket = nullptr;
+				net_tcp_close(Socket);
+			}
+			// Otherwise StopNetwork already closed it; don't double-close.
+		}
+		if(!m_StopThread.load())
+			str_copy(m_aLastError, "Could not connect to graffity server", sizeof(m_aLastError));
 		m_NetworkRunning = false;
 		return;
 	}
@@ -924,7 +966,15 @@ void CGraffity::NetworkMain(std::string GameServerAddress, std::string OwnerId)
 		}
 	}
 
-	net_tcp_close(Socket);
+	{
+		std::lock_guard<std::mutex> Lock(m_SocketMutex);
+		if(m_NetworkSocket == Socket)
+		{
+			m_NetworkSocket = nullptr;
+			net_tcp_close(Socket);
+		}
+		// If StopNetwork already closed it, skip to avoid double-close.
+	}
 	m_NetworkConnected = false;
 	m_NetworkRunning = false;
 }
