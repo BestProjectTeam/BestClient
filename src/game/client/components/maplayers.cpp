@@ -55,6 +55,8 @@ void CMapLayers::OnRender()
 {
 	if(m_OnlineOnly && Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return;
+	if(g_Config.m_BcRaycast && g_Config.m_BcRaycastBlackout && !GameClient()->m_Menus.IsActive() && !GameClient()->m_Scoreboard.IsActive())
+		return;
 
 	// dynamic parameters for ingame rendering
 	m_Params.m_EntityOverlayVal = m_Type == RENDERTYPE_FULL_DESIGN ? 0 : g_Config.m_ClOverlayEntities;

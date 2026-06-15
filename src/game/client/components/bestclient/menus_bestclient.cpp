@@ -97,6 +97,7 @@ static const SBestClientComponentEntry gs_aBestClientComponentEntries[] = {
 	{CBestClient::COMPONENT_VISUALS_ANIMATIONS, "Animations", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_VISUALS_ASPECT_RATIO, "Aspect Ratio", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_VISUALS_EYE_COMFORT, "Eye Comfort", COMPONENTS_GROUP_VISUALS},
+	{CBestClient::COMPONENT_VISUALS_RAYCAST, "Raycast", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_VISUALS_MOTION_BLUR, "Motion Blur", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_VISUALS_FLYING_NAMEPLATES, "Flying Nameplates", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_GAMEPLAY_HOOK_COMBO, "Hook Combo", COMPONENTS_GROUP_VISUALS},
@@ -1734,6 +1735,61 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				s_CustomPendingAspectValue = -1;
 				s_LastAppliedAspectValue = -1;
 			}
+		}
+
+		Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
+
+		// Raycast (right column block)
+		if(!GameClient()->m_BestClient.IsComponentDisabled(CBestClient::COMPONENT_VISUALS_RAYCAST))
+		{
+			const float ColorPickerLineSize = 25.0f;
+			const float ColorPickerLabelSize = 13.0f;
+			const float ColorPickerSpacing = 5.0f;
+			static float s_RaycastPhase = 0.0f;
+			const bool RaycastEnabled = g_Config.m_BcRaycast != 0;
+			UpdateRevealPhase(s_RaycastPhase, RaycastEnabled);
+			const float ExpandedTargetHeight = MarginSmall + (ColorPickerLineSize + ColorPickerSpacing) * 3.0f + LineSize * 3.0f;
+			const float ExpandedHeight = ExpandedTargetHeight * s_RaycastPhase;
+			const float ContentHeight = LineSize + MarginSmall + LineSize + ExpandedHeight;
+			CUIRect Content, Label, Visible;
+			BeginBlock(Column, ContentHeight, Content);
+
+			Content.HSplitTop(LineSize, &Label, &Content);
+			Ui()->DoLabel(&Label, BCLocalize("Raycast"), HeadlineFontSize, TEXTALIGN_ML);
+			Content.HSplitTop(MarginSmall, nullptr, &Content);
+
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcRaycast, BCLocalize("Enable Raycast"), &g_Config.m_BcRaycast, &Content, LineSize);
+
+			if(ExpandedHeight > 0.0f)
+			{
+				Content.HSplitTop(ExpandedHeight, &Visible, &Content);
+				Ui()->ClipEnable(&Visible);
+				struct SScopedClip
+				{
+					CUi *m_pUi;
+					~SScopedClip() { m_pUi->ClipDisable(); }
+				} ClipGuard{Ui()};
+
+				CUIRect Expand = {Visible.x, Visible.y, Visible.w, ExpandedTargetHeight};
+				Expand.HSplitTop(MarginSmall, nullptr, &Expand);
+
+				static CButtonContainer s_RaycastColorHookableButton;
+				static CButtonContainer s_RaycastColorUnhookableButton;
+				static CButtonContainer s_RaycastColorFreezeButton;
+				DoLine_ColorPicker(&s_RaycastColorHookableButton, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerSpacing, &Expand, BCLocalize("Hookable color"), &g_Config.m_BcRaycastColorHookable, ColorRGBA(0.51f, 0.91f, 0.63f, 1.0f), false);
+				DoLine_ColorPicker(&s_RaycastColorUnhookableButton, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerSpacing, &Expand, BCLocalize("Unhookable color"), &g_Config.m_BcRaycastColorUnhookable, ColorRGBA(1.0f, 0.0f, 0.0f, 1.0f), false);
+				DoLine_ColorPicker(&s_RaycastColorFreezeButton, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerSpacing, &Expand, BCLocalize("Freeze color"), &g_Config.m_BcRaycastColorFreeze, ColorRGBA(1.0f, 0.55f, 0.0f, 1.0f), false);
+
+				CUIRect Button;
+				Expand.HSplitTop(LineSize, &Button, &Expand);
+				DoSliderWithScaledValue(&g_Config.m_BcRaycastLength, &g_Config.m_BcRaycastLength, &Button, BCLocalize("Ray length"), 1, 100, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, " tiles");
+
+				Expand.HSplitTop(LineSize, &Button, &Expand);
+				DoSliderWithScaledValue(&g_Config.m_BcRaycastAlpha, &g_Config.m_BcRaycastAlpha, &Button, BCLocalize("Opacity"), 0, 100, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "%");
+
+				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcRaycastBlackout, BCLocalize("World blackout (tee + hook only)"), &g_Config.m_BcRaycastBlackout, &Expand, LineSize);
+			}
+			Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
 		}
 
 		const float RightColumnEndY = Column.y;

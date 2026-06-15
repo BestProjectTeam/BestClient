@@ -5,6 +5,7 @@
 
 #include <base/color.h>
 #include <base/log.h>
+#include <base/math.h>
 #include <base/system.h>
 
 #include <engine/client.h>
@@ -21,6 +22,9 @@
 #include <game/client/gameclient.h>
 #include <game/localization.h>
 #include <game/version.h>
+
+#include <game/collision.h>
+#include <game/mapitems.h>
 
 #include <algorithm>
 #include <cctype>
@@ -713,6 +717,7 @@ void CBestClient::OnRender()
 		UpdateHookCombo();
 
 	UpdateSpecMoved();
+	RenderWorldBlackout();
 }
 
 bool CBestClient::OnInput(const IInput::CEvent &Event)
@@ -1145,6 +1150,253 @@ void CBestClient::RenderHookCombo(bool ForcePreview)
 		RenderPopup(*It);
 
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
+}
+
+void CBestClient::RenderWorldBlackout()
+{
+	if(!g_Config.m_BcRaycast || !g_Config.m_BcRaycastBlackout)
+		return;
+	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
+		return;
+	if(GameClient()->m_Scoreboard.IsActive() || GameClient()->m_Menus.IsActive())
+		return;
+
+	float Width = 0.0f, Height = 0.0f;
+	Graphics()->CalcScreenParams(Graphics()->ScreenAspect(), GameClient()->m_Camera.m_Zoom, &Width, &Height);
+	const vec2 &Center = GameClient()->m_Camera.m_Center;
+	Graphics()->MapScreen(Center.x - Width * 0.5f, Center.y - Height * 0.5f, Center.x + Width * 0.5f, Center.y + Height * 0.5f);
+
+	Graphics()->DrawRect(Center.x - Width * 0.5f, Center.y - Height * 0.5f, Width, Height, ColorRGBA(0.0f, 0.0f, 0.0f, 1.0f), IGraphics::CORNER_NONE, 0.0f);
+}
+
+void CBestClient::RenderRaycast()
+{
+	if(IsComponentDisabled(COMPONENT_VISUALS_RAYCAST))
+		return;
+	if(!g_Config.m_BcRaycast)
+		return;
+	if(GameClient()->m_Scoreboard.IsActive() || GameClient()->m_Menus.IsActive())
+		return;
+	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
+		return;
+
+	int LocalId = -1;
+	const bool IsDemoPlayback = Client()->State() == IClient::STATE_DEMOPLAYBACK;
+	if(IsDemoPlayback && GameClient()->m_Snap.m_SpecInfo.m_Active)
+	{
+		const int SpectatorId = GameClient()->m_Snap.m_SpecInfo.m_SpectatorId;
+		if(SpectatorId > SPEC_FREEVIEW && SpectatorId < MAX_CLIENTS && GameClient()->m_Snap.m_aCharacters[SpectatorId].m_Active)
+			LocalId = SpectatorId;
+	}
+	else if(!GameClient()->m_Snap.m_SpecInfo.m_Active)
+	{
+		LocalId = GameClient()->m_aLocalIds[g_Config.m_ClDummy];
+		if(LocalId < 0 || LocalId >= MAX_CLIENTS)
+			LocalId = GameClient()->m_Snap.m_LocalClientId;
+	}
+
+	if(LocalId < 0 || LocalId >= MAX_CLIENTS || !GameClient()->m_aClients[LocalId].m_Active)
+		return;
+
+	const vec2 PlayerPos = GameClient()->m_aClients[LocalId].m_RenderPos;
+	if(!GameClient()->OptimizerAllowRenderPos(PlayerPos))
+		return;
+
+	const float RayLength = (float)g_Config.m_BcRaycastLength * 32.0f;
+	const float Alpha = g_Config.m_BcRaycastAlpha / 100.0f;
+
+	ColorRGBA HookableColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_BcRaycastColorHookable));
+	ColorRGBA UnhookableColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_BcRaycastColorUnhookable));
+	ColorRGBA FreezeColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_BcRaycastColorFreeze));
+	HookableColor.a *= Alpha;
+	UnhookableColor.a *= Alpha;
+	FreezeColor.a *= Alpha;
+
+	if(HookableColor.a <= 0.0f && UnhookableColor.a <= 0.0f && FreezeColor.a <= 0.0f)
+		return;
+
+	const int MapWidth = Collision()->GetWidth();
+	const int MapHeight = Collision()->GetHeight();
+
+	auto IsFreezeTile = [&](vec2 Pos) -> bool {
+		const int Nx = std::clamp(round_to_int(Pos.x) / 32, 0, MapWidth - 1);
+		const int Ny = std::clamp(round_to_int(Pos.y) / 32, 0, MapHeight - 1);
+		const int Idx = Ny * MapWidth + Nx;
+		const int TileId = Collision()->GetTileIndex(Idx);
+		if(TileId == TILE_FREEZE || TileId == TILE_DFREEZE)
+			return true;
+		const int FrontId = Collision()->GetFrontTileIndex(Idx);
+		if(FrontId == TILE_FREEZE || FrontId == TILE_DFREEZE || FrontId == TILE_LFREEZE)
+			return true;
+		return false;
+	};
+
+	std::vector<IGraphics::CLineItem> vHookableLines;
+	std::vector<IGraphics::CLineItem> vUnhookableLines;
+	std::vector<IGraphics::CLineItem> vFreezeLines;
+
+	const int TileRadius = (int)(RayLength / 32.0f) + 1;
+	const int PlayerTileX = (int)std::floor(PlayerPos.x / 32.0f);
+	const int PlayerTileY = (int)std::floor(PlayerPos.y / 32.0f);
+
+	auto IsSolidAt = [&](int Tx, int Ty) -> bool {
+		if(Tx < 0 || Ty < 0 || Tx >= MapWidth || Ty >= MapHeight)
+			return false;
+		const int Id = Collision()->GetTileIndex(Ty * MapWidth + Tx);
+		return Id == TILE_SOLID || Id == TILE_NOHOOK;
+	};
+
+	for(int TileY = PlayerTileY - TileRadius; TileY <= PlayerTileY + TileRadius; TileY++)
+	{
+		for(int TileX = PlayerTileX - TileRadius; TileX <= PlayerTileX + TileRadius; TileX++)
+		{
+			if(TileX < 0 || TileY < 0 || TileX >= MapWidth || TileY >= MapHeight)
+				continue;
+
+			const int Idx = TileY * MapWidth + TileX;
+			const int TileId = Collision()->GetTileIndex(Idx);
+			if(TileId != TILE_SOLID && TileId != TILE_NOHOOK)
+				continue;
+
+			// Skip interior tiles — all 4 cardinal neighbors solid means this tile has no exposed face
+			if(IsSolidAt(TileX - 1, TileY) && IsSolidAt(TileX + 1, TileY) &&
+			   IsSolidAt(TileX, TileY - 1) && IsSolidAt(TileX, TileY + 1))
+				continue;
+
+			// Tile-based DDA — O(tiles traversed) instead of O(pixels) like IntersectLine
+			const float DX = TileX * 32.0f + 16.0f - PlayerPos.x;
+			const float DY = TileY * 32.0f + 16.0f - PlayerPos.y;
+			const float Dist = std::sqrt(DX * DX + DY * DY);
+			if(Dist > RayLength || Dist < 0.001f)
+				continue;
+
+			const float InvDist = 1.0f / Dist;
+			const float DirX = DX * InvDist;
+			const float DirY = DY * InvDist;
+			const int DdaStepX = DirX >= 0 ? 1 : -1;
+			const int DdaStepY = DirY >= 0 ? 1 : -1;
+			const float AbsDirX = std::abs(DirX);
+			const float AbsDirY = std::abs(DirY);
+			const float tDeltaX = AbsDirX > 1e-6f ? 32.0f / AbsDirX : 1e9f;
+			const float tDeltaY = AbsDirY > 1e-6f ? 32.0f / AbsDirY : 1e9f;
+			float tMaxX = AbsDirX > 1e-6f ? (DdaStepX > 0 ? (PlayerTileX + 1) * 32.0f - PlayerPos.x : PlayerPos.x - PlayerTileX * 32.0f) / AbsDirX : 1e9f;
+			float tMaxY = AbsDirY > 1e-6f ? (DdaStepY > 0 ? (PlayerTileY + 1) * 32.0f - PlayerPos.y : PlayerPos.y - PlayerTileY * 32.0f) / AbsDirY : 1e9f;
+
+			int DdaTx = PlayerTileX;
+			int DdaTy = PlayerTileY;
+			float tBoundary = 0.0f;
+			int HitTileType = 0;
+
+			while(true)
+			{
+				if(tMaxX < tMaxY)
+				{
+					tBoundary = tMaxX;
+					DdaTx += DdaStepX;
+					tMaxX += tDeltaX;
+				}
+				else
+				{
+					tBoundary = tMaxY;
+					DdaTy += DdaStepY;
+					tMaxY += tDeltaY;
+				}
+
+				if(tBoundary > Dist + 16.0f || DdaTx < 0 || DdaTy < 0 || DdaTx >= MapWidth || DdaTy >= MapHeight)
+					break;
+
+				const int DdaId = Collision()->GetTileIndex(DdaTy * MapWidth + DdaTx);
+				if(DdaId == TILE_SOLID || DdaId == TILE_NOHOOK)
+				{
+					if(DdaTx == TileX && DdaTy == TileY)
+						HitTileType = DdaId;
+					break;
+				}
+			}
+
+			if(!HitTileType)
+				continue;
+
+			const vec2 HitPos = PlayerPos + vec2(DirX, DirY) * tBoundary;
+			const float RayDist = tBoundary;
+			if(RayDist < 1.0f)
+				continue;
+
+			const bool HitHookable = (HitTileType == TILE_SOLID);
+			const vec2 StepDir = (HitPos - PlayerPos) / RayDist;
+			const float StepSize = 16.0f;
+			const int NumSteps = (int)(RayDist / StepSize) + 1;
+
+			bool CurFreeze = IsFreezeTile(PlayerPos);
+			vec2 SegStart = PlayerPos;
+
+			auto EmitSeg = [&](vec2 Start, vec2 End2, bool IsFreeze) {
+				if(IsFreeze)
+				{
+					if(FreezeColor.a > 0.0f)
+						vFreezeLines.emplace_back(Start.x, Start.y, End2.x, End2.y);
+				}
+				else if(HitHookable)
+				{
+					if(HookableColor.a > 0.0f)
+						vHookableLines.emplace_back(Start.x, Start.y, End2.x, End2.y);
+				}
+				else
+				{
+					if(UnhookableColor.a > 0.0f)
+						vUnhookableLines.emplace_back(Start.x, Start.y, End2.x, End2.y);
+				}
+			};
+
+			for(int s = 1; s <= NumSteps; s++)
+			{
+				const float t = std::min((float)s * StepSize, RayDist);
+				const vec2 SamplePos = PlayerPos + StepDir * t;
+				const bool ThisFreeze = IsFreezeTile(SamplePos);
+
+				if(ThisFreeze != CurFreeze)
+				{
+					EmitSeg(SegStart, SamplePos, CurFreeze);
+					SegStart = SamplePos;
+					CurFreeze = ThisFreeze;
+				}
+			}
+			EmitSeg(SegStart, HitPos, CurFreeze);
+		}
+	}
+
+	if(vHookableLines.empty() && vUnhookableLines.empty() && vFreezeLines.empty())
+		return;
+
+	float PrevX0, PrevY0, PrevX1, PrevY1;
+	Graphics()->GetScreen(&PrevX0, &PrevY0, &PrevX1, &PrevY1);
+
+	float Width = 0.0f, Height = 0.0f;
+	Graphics()->CalcScreenParams(Graphics()->ScreenAspect(), GameClient()->m_Camera.m_Zoom, &Width, &Height);
+	const vec2 &Center = GameClient()->m_Camera.m_Center;
+	Graphics()->MapScreen(Center.x - Width * 0.5f, Center.y - Height * 0.5f, Center.x + Width * 0.5f, Center.y + Height * 0.5f);
+
+	Graphics()->TextureClear();
+	Graphics()->LinesBegin();
+
+	if(!vHookableLines.empty())
+	{
+		Graphics()->SetColor(HookableColor);
+		Graphics()->LinesDraw(vHookableLines.data(), (int)vHookableLines.size());
+	}
+	if(!vUnhookableLines.empty())
+	{
+		Graphics()->SetColor(UnhookableColor);
+		Graphics()->LinesDraw(vUnhookableLines.data(), (int)vUnhookableLines.size());
+	}
+	if(!vFreezeLines.empty())
+	{
+		Graphics()->SetColor(FreezeColor);
+		Graphics()->LinesDraw(vFreezeLines.data(), (int)vFreezeLines.size());
+	}
+
+	Graphics()->LinesEnd();
+	Graphics()->MapScreen(PrevX0, PrevY0, PrevX1, PrevY1);
 }
 
 bool CBestClient::IsComponentDisabledByMask(int Component, int MaskLo, int MaskHi)

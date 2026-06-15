@@ -135,6 +135,7 @@ public:
 		COMPONENT_VISUALS_FLYING_NAMEPLATES,
 		COMPONENT_VISUALS_KEYSTROKES,
 		COMPONENT_VISUALS_EYE_COMFORT,
+		COMPONENT_VISUALS_RAYCAST,
 		NUM_COMPONENTS_EDITOR_COMPONENTS,
 	};
 
@@ -163,6 +164,8 @@ public:
 	static bool IsComponentDisabledByMask(int Component, int MaskLo, int MaskHi);
 	void RenderHookCombo(bool ForcePreview = false);
 	void RenderSpecMoved();
+	void RenderRaycast();
+	void RenderWorldBlackout();
 
 	std::shared_ptr<CHttpRequest> m_pBestClientInfoTask = nullptr;
 	void FetchBestClientInfo();
