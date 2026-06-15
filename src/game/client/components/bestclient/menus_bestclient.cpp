@@ -1116,7 +1116,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			Ui()->DoLabel(&TitleLabel, BCLocalize("Motion Blur"), HeadlineFontSize, TEXTALIGN_ML);
 			Content.HSplitTop(MarginSmall, nullptr, &Content);
 
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcMotionBlur, BCLocalize("Enable motion blur (frame blend)"), &g_Config.m_BcMotionBlur, &Content, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcMotionBlur, BCLocalize("Enable motion blur"), &g_Config.m_BcMotionBlur, &Content, LineSize);
 
 			const float ExtraHeight = ExtraTargetHeight * s_MotionBlurPhase;
 			if(!MotionBlurResetClicked && ExtraHeight > 0.0f)
