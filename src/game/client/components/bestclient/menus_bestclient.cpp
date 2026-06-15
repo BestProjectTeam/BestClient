@@ -180,6 +180,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		BESTCLIENT_TAB_VISUALS = 0,
 		BESTCLIENT_TAB_GAMEPLAY,
 		BESTCLIENT_TAB_OTHERS,
+		BESTCLIENT_TAB_FUN,
 		BESTCLIENT_TAB_INFO,
 		NUM_BESTCLIENT_TABS,
 	};
@@ -198,17 +199,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		return;
 	}
 
-	{
-		CUIRect HintBar, Badge;
-		MainView.HSplitTop(18.0f, &HintBar, &MainView);
-		HintBar.VSplitLeft(310.0f, &Badge, nullptr);
-		Badge.HMargin(1.5f, &Badge);
-		// New layout has no extra top margin, so top-align the hint to remove the
-		// empty space above it instead of centering it in the bar.
-		Ui()->DoLabel(&Badge, BCLocalize("assets & components editors/fun \xe2\x86\x92 Info"), 14.0f, NewLayout ? TEXTALIGN_TL : TEXTALIGN_ML);
-	}
-	if(!NewLayout)
-		MainView.HSplitTop(4.0f, nullptr, &MainView);
+	MainView.HSplitTop(8.0f, nullptr, &MainView);
 
 	CUIRect TabBar, TabButton;
 	MainView.HSplitTop(24.0f, &TabBar, &MainView);
@@ -216,12 +207,14 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		BCLocalize("Visuals"),
 		BCLocalize("Gameplay"),
 		BCLocalize("Others"),
+		BCLocalize("Fun"),
 		BCLocalize("Info"),
 	};
 	const int aTabOrder[NUM_BESTCLIENT_TABS] = {
 		BESTCLIENT_TAB_VISUALS,
 		BESTCLIENT_TAB_GAMEPLAY,
 		BESTCLIENT_TAB_OTHERS,
+		BESTCLIENT_TAB_FUN,
 		BESTCLIENT_TAB_INFO,
 	};
 
@@ -264,8 +257,6 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		{
 			s_CurTab = Tab;
 		}
-		if(Tab == BESTCLIENT_TAB_INFO)
-			GameClient()->m_Tooltips.DoToolTip(&s_aPageTabs[Tab], &TabButton, BCLocalize("Fun moved here"));
 		VisibleIndex++;
 	}
 
@@ -3034,6 +3025,10 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		s_BestClientOthersScrollRegion.AddRect(ScrollRegion);
 		s_BestClientOthersScrollRegion.End();
 	}
+	else if(s_CurTab == BESTCLIENT_TAB_FUN)
+	{
+		RenderSettingsBestClientFun(MainView);
+	}
 	else if(s_CurTab == BESTCLIENT_TAB_INFO)
 	{
 		RenderSettingsBestClientInfo(MainView);
@@ -3323,19 +3318,10 @@ void CMenus::RenderSettingsBestClientInfo(CUIRect MainView)
 		BESTCLIENT_TAB_VISUALS = 0,
 		BESTCLIENT_TAB_GAMEPLAY,
 		BESTCLIENT_TAB_OTHERS,
+		BESTCLIENT_TAB_FUN,
 		BESTCLIENT_TAB_INFO,
 		NUM_BESTCLIENT_TABS,
 	};
-
-	enum
-	{
-		INFO_SUBTAB_FUN = 0,
-		INFO_SUBTAB_INFO,
-		NUM_INFO_SUBTABS,
-	};
-
-	static int s_CurSubTab = INFO_SUBTAB_INFO;
-	static CButtonContainer s_aSubTabButtons[NUM_INFO_SUBTABS] = {};
 
 	const float LineSize = 20.0f;
 	const float MarginSmall = 5.0f;
@@ -3343,31 +3329,8 @@ void CMenus::RenderSettingsBestClientInfo(CUIRect MainView)
 	const float HeadlineFontSize = 20.0f;
 	const float HeadlineHeight = HeadlineFontSize;
 
-	// Sub-tab bar
-	CUIRect SubTabBar, SubTabButton;
-	MainView.HSplitTop(24.0f, &SubTabBar, &MainView);
-	const char *apSubTabNames[NUM_INFO_SUBTABS] = {
-		BCLocalize("Fun"),
-		BCLocalize("Info"),
-	};
-	const float SubTabWidth = SubTabBar.w / (float)NUM_INFO_SUBTABS;
-	for(int i = 0; i < NUM_INFO_SUBTABS; i++)
-	{
-		SubTabBar.VSplitLeft(SubTabWidth, &SubTabButton, &SubTabBar);
-		const int Corners = i == 0 ? IGraphics::CORNER_L : (i == NUM_INFO_SUBTABS - 1 ? IGraphics::CORNER_R : IGraphics::CORNER_NONE);
-		if(DoButton_MenuTab(&s_aSubTabButtons[i], apSubTabNames[i], s_CurSubTab == i, &SubTabButton, Corners, nullptr, nullptr, nullptr, nullptr, 4.0f))
-			s_CurSubTab = i;
-	}
-	MainView.HSplitTop(10.0f, nullptr, &MainView);
-
-	if(s_CurSubTab == INFO_SUBTAB_FUN)
-	{
-		RenderSettingsBestClientFun(MainView);
-		return;
-	}
-
 	CUIRect LeftView, RightView, Button, Label, LowerLeftView;
-	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+	MainView.HSplitTop(20.0f, nullptr, &MainView);
 
 	MainView.VSplitMid(&LeftView, &RightView, MarginBetweenViews);
 	LeftView.VSplitLeft(MarginSmall, nullptr, &LeftView);
@@ -3564,12 +3527,14 @@ void CMenus::RenderSettingsBestClientInfo(CUIRect MainView)
 		BCLocalize("Visuals"),
 		BCLocalize("Gameplay"),
 		BCLocalize("Others"),
+		BCLocalize("Fun"),
 		BCLocalize("Info"),
 	};
 	const int aTabOrder[NUM_BESTCLIENT_TABS] = {
 		BESTCLIENT_TAB_VISUALS,
 		BESTCLIENT_TAB_GAMEPLAY,
 		BESTCLIENT_TAB_OTHERS,
+		BESTCLIENT_TAB_FUN,
 		BESTCLIENT_TAB_INFO,
 	};
 
@@ -3591,4 +3556,5 @@ void CMenus::RenderSettingsBestClientInfo(CUIRect MainView)
 	}
 	const int HideableRows = (HideableTabCount + 1) / 2;
 	RightView.HSplitTop(LineSize * (HideableRows + 0.5f), nullptr, &RightView);
+
 }
