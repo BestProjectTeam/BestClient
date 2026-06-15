@@ -37,9 +37,12 @@ static_assert(COLOR_SPACE == SWS_CS_ITU709);
 
 static int64_t DefaultVideoBitrate(int Width, int Height, int Fps)
 {
-	// Keep enough bitrate for sharp 2D content while avoiding extreme output sizes.
-	const int64_t RawBitrate = (int64_t)((double)Width * Height * Fps * 0.14 + 0.5);
-	return std::clamp<int64_t>(RawBitrate, 2'000'000, 50'000'000);
+	// This path is used when no libx264 (CRF) encoder is available and we fall back
+	// to a fixed-bitrate codec like MPEG-4 Part 2. Such codecs need roughly twice the
+	// bitrate of H.264 for comparable sharpness on 2D content, so budget accordingly
+	// while still avoiding extreme output sizes.
+	const int64_t RawBitrate = (int64_t)((double)Width * Height * Fps * 0.30 + 0.5);
+	return std::clamp<int64_t>(RawBitrate, 4'000'000, 80'000'000);
 }
 
 static LEVEL AvLevelToLogLevel(int Level)
