@@ -1619,6 +1619,12 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 					g_Config.m_BcCustomAspectRatioMode = 2;
 					if(g_Config.m_BcCustomAspectRatio < 100)
 						g_Config.m_BcCustomAspectRatio = 178;
+					if(g_Config.m_BcCustomAspectRatioNum <= 0 || g_Config.m_BcCustomAspectRatioDen <= 0)
+					{
+						g_Config.m_BcCustomAspectRatioNum = 16;
+						g_Config.m_BcCustomAspectRatioDen = 9;
+						g_Config.m_BcCustomAspectRatio = 178;
+					}
 				}
 				else
 				{
@@ -1652,34 +1658,23 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			const int EffectiveAspectMode = g_Config.m_BcCustomAspectRatioMode >= 0 ? g_Config.m_BcCustomAspectRatioMode : (g_Config.m_BcCustomAspectRatio > 0 ? 1 : 0);
 			static CLineInputNumber s_CustomAspectNumeratorInput;
 			static CLineInputNumber s_CustomAspectDenominatorInput;
-			static int s_CustomPendingAspectValue = -1;
-			static bool s_CustomPendingDirty = false;
-			static int s_LastAppliedAspectValue = -1;
+			static bool s_CustomAspectInitialized = false;
+			static int s_LastSyncedNum = -1;
+			static int s_LastSyncedDen = -1;
 			if(EffectiveAspectMode == 2)
 			{
-				const int AppliedAspectValue = maximum(g_Config.m_BcCustomAspectRatio, 100);
-				if(!s_CustomPendingDirty && s_LastAppliedAspectValue != AppliedAspectValue)
+				// The exact numerator/denominator the user typed are the source of truth,
+				// so the displayed value is never normalized or rounded away.
+				const int CfgNum = g_Config.m_BcCustomAspectRatioNum > 0 ? g_Config.m_BcCustomAspectRatioNum : 16;
+				const int CfgDen = g_Config.m_BcCustomAspectRatioDen > 0 ? g_Config.m_BcCustomAspectRatioDen : 9;
+				if(!s_CustomAspectNumeratorInput.IsActive() && !s_CustomAspectDenominatorInput.IsActive() &&
+					(!s_CustomAspectInitialized || s_LastSyncedNum != CfgNum || s_LastSyncedDen != CfgDen))
 				{
-					s_CustomPendingAspectValue = AppliedAspectValue;
-					s_LastAppliedAspectValue = AppliedAspectValue;
-				}
-
-				const int DisplayAspectValue = maximum(s_CustomPendingAspectValue, 100);
-				if(!s_CustomAspectNumeratorInput.IsActive() && !s_CustomAspectDenominatorInput.IsActive() && DisplayAspectValue != s_LastAppliedAspectValue)
-				{
-					s_CustomPendingAspectValue = DisplayAspectValue;
-					s_LastAppliedAspectValue = DisplayAspectValue;
-				}
-
-				if(!s_CustomAspectNumeratorInput.IsActive() && !s_CustomAspectDenominatorInput.IsActive())
-				{
-					const int Denominator = 1080;
-					const int Numerator = maximum(1, (int)std::lround((double)maximum(s_CustomPendingAspectValue, 100) * (double)Denominator / 100.0));
-					if(s_CustomAspectNumeratorInput.GetInteger() != Numerator || s_CustomAspectDenominatorInput.GetInteger() != Denominator)
-					{
-						s_CustomAspectNumeratorInput.SetInteger(Numerator);
-						s_CustomAspectDenominatorInput.SetInteger(Denominator);
-					}
+					s_CustomAspectNumeratorInput.SetInteger(CfgNum);
+					s_CustomAspectDenominatorInput.SetInteger(CfgDen);
+					s_LastSyncedNum = CfgNum;
+					s_LastSyncedDen = CfgDen;
+					s_CustomAspectInitialized = true;
 				}
 
 				Content.HSplitTop(MarginSmall, nullptr, &Content);
@@ -1698,23 +1693,14 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				RatioControls.VSplitLeft(Gap, nullptr, &RatioControls);
 				RatioControls.VSplitLeft(FieldWidth, &DenominatorRect, nullptr);
 
-				const bool NumeratorChanged = Ui()->DoEditBox(&s_CustomAspectNumeratorInput, &NumeratorRect, 14.0f);
+				Ui()->DoEditBox(&s_CustomAspectNumeratorInput, &NumeratorRect, 14.0f);
 				Ui()->DoLabel(&SeparatorRect, ":", 14.0f, TEXTALIGN_MC);
-				const bool DenominatorChanged = Ui()->DoEditBox(&s_CustomAspectDenominatorInput, &DenominatorRect, 14.0f);
+				Ui()->DoEditBox(&s_CustomAspectDenominatorInput, &DenominatorRect, 14.0f);
 
-				if(NumeratorChanged || DenominatorChanged)
-				{
-					const int Numerator = maximum(1, s_CustomAspectNumeratorInput.GetInteger());
-					const int Denominator = maximum(1, s_CustomAspectDenominatorInput.GetInteger());
-					const int NewAspectValue = std::clamp((int)std::lround((double)Numerator * 100.0 / (double)Denominator), 100, 300);
-					if(NewAspectValue != s_CustomPendingAspectValue)
-					{
-						s_CustomPendingAspectValue = NewAspectValue;
-						s_CustomPendingDirty = s_CustomPendingAspectValue != g_Config.m_BcCustomAspectRatio;
-					}
-				}
+				const int InputNum = maximum(1, s_CustomAspectNumeratorInput.GetInteger());
+				const int InputDen = maximum(1, s_CustomAspectDenominatorInput.GetInteger());
+				const bool HasPendingCustomChange = InputNum != g_Config.m_BcCustomAspectRatioNum || InputDen != g_Config.m_BcCustomAspectRatioDen;
 
-				const bool HasPendingCustomChange = s_CustomPendingAspectValue >= 100 && s_CustomPendingAspectValue != g_Config.m_BcCustomAspectRatio;
 				Content.HSplitTop(MarginSmall, nullptr, &Content);
 				Content.HSplitTop(LineSize, &Row, &Content);
 				CUIRect ButtonSpace, ApplyButton;
@@ -1723,17 +1709,19 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				static CButtonContainer s_AspectApplyButton;
 				if(DoButton_Menu(&s_AspectApplyButton, BCLocalize("Apply"), HasPendingCustomChange ? 0 : -1, &ApplyButton) && HasPendingCustomChange)
 				{
-					g_Config.m_BcCustomAspectRatio = s_CustomPendingAspectValue;
-					s_CustomPendingDirty = false;
-					s_LastAppliedAspectValue = g_Config.m_BcCustomAspectRatio;
+					g_Config.m_BcCustomAspectRatioNum = InputNum;
+					g_Config.m_BcCustomAspectRatioDen = InputDen;
+					g_Config.m_BcCustomAspectRatio = std::clamp((int)std::lround((double)InputNum * 100.0 / (double)InputDen), 100, 1000);
+					s_LastSyncedNum = InputNum;
+					s_LastSyncedDen = InputDen;
 					GameClient()->m_TClient.SetForcedAspect();
 				}
 			}
 			else
 			{
-				s_CustomPendingDirty = false;
-				s_CustomPendingAspectValue = -1;
-				s_LastAppliedAspectValue = -1;
+				s_CustomAspectInitialized = false;
+				s_LastSyncedNum = -1;
+				s_LastSyncedDen = -1;
 			}
 		}
 
