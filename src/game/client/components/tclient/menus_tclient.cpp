@@ -1151,8 +1151,14 @@ void CMenus::RenderSettingsTClientSettings(CUIRect MainView)
 		Column.HSplitTop(LineSize * 2.0f, &Button, &Column);
 		Ui()->DoScrollbarOption(&g_Config.m_TcBgDrawWidth, &g_Config.m_TcBgDrawWidth, &Button, TCLocalize("Width"), 1, 50, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE);
 
+		Column.HSplitTop(LineSize * 2.0f, &Button, &Column);
+		Ui()->DoScrollbarOption(&g_Config.m_TcBgDrawEraserSize, &g_Config.m_TcBgDrawEraserSize, &Button, TCLocalize("Eraser size"), 1, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_MULTILINE);
+
 		static CButtonContainer s_ReaderButtonDraw, s_ClearButtonDraw;
 		DoLine_KeyReader(Column, s_ReaderButtonDraw, s_ClearButtonDraw, TCLocalize("Draw where mouse is"), "+bg_draw");
+
+		static CButtonContainer s_ReaderButtonErase, s_ClearButtonErase;
+		DoLine_KeyReader(Column, s_ReaderButtonErase, s_ClearButtonErase, TCLocalize("Erase where mouse is"), "+bg_draw_erase");
 
 		s_SectionBoxes.back().h = Column.y - s_SectionBoxes.back().y;
 		Column.HSplitTop(MarginSmall, nullptr, &Column);

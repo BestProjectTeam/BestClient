@@ -269,6 +269,48 @@ public:
 		}
 		return false;
 	}
+	// Erase points covered by the eraser stroke [A, B] with the given radius.
+	// Surviving sub-paths are appended to vOutSegments. Returns true if anything was erased.
+	bool Erase(vec2 A, vec2 B, float Radius, std::vector<CBgDrawItemData> &vOutSegments) const
+	{
+		bool Erased = false;
+		CBgDrawItemData Segment;
+		for(const CBgDrawItemDataPoint &Point : m_Data)
+		{
+			vec2 Closest;
+			float Dist;
+			if(closest_point_on_line(A, B, Point.Pos(), Closest))
+				Dist = distance(Closest, Point.Pos());
+			else
+				Dist = distance(A, Point.Pos());
+			if(Dist < Radius + Point.w)
+			{
+				Erased = true;
+				if(!Segment.empty())
+				{
+					vOutSegments.push_back(Segment);
+					Segment.clear();
+				}
+			}
+			else
+			{
+				Segment.push_back(Point);
+			}
+		}
+		if(Erased && !Segment.empty())
+			vOutSegments.push_back(Segment);
+		return Erased;
+	}
+	// Replace the path with the given data and rebuild it (used for erase remnants)
+	void SetData(const CBgDrawItemData &Data)
+	{
+		m_Data = Data;
+		m_BoundingBox = CBoundingBox();
+		for(const CBgDrawItemDataPoint &Point : m_Data)
+			m_BoundingBox.ExtendBoundingBox(Point.Pos(), Point.w);
+		m_Drawing = false;
+		m_PathContainer.Update(m_Data);
+	}
 	void Render()
 	{
 		m_PathContainer.Render();
@@ -529,18 +571,29 @@ void CBgDraw::OnRender()
 		std::optional<vec2> &LastPos = m_aLastPos[Dummy];
 		if(Input == InputMode::ERASE)
 		{
-			if(LastPos.has_value())
+			const float EraserRadius = (float)g_Config.m_TcBgDrawEraserSize * GameClient()->m_Camera.m_Zoom;
+			const vec2 EraseFrom = LastPos.value_or(Pos);
+			std::vector<CBgDrawItemData> vNewSegments;
+			for(CBgDrawItem &Item : *m_pvItems)
 			{
-				for(CBgDrawItem &Item : *m_pvItems)
-					if(Item.LineIntersect(*LastPos, Pos))
-						Item.m_Killed = true;
+				if(Item.m_Killed)
+					continue;
+				// Don't erase items that are currently being drawn
+				if(std::any_of(std::begin(m_apActiveItems), std::end(m_apActiveItems), [&](const std::optional<CBgDrawItem *> &ActiveItem) {
+					   return ActiveItem.value_or(nullptr) == &Item;
+				   }))
+					continue;
+				// Erase only the covered part, keeping the surviving pieces
+				if(Item.Erase(EraseFrom, Pos, EraserRadius, vNewSegments))
+					Item.m_Killed = true;
 			}
-			else
+			for(const CBgDrawItemData &Segment : vNewSegments)
 			{
-				for(CBgDrawItem &Item : *m_pvItems)
-					if(Item.PointIntersect(Pos, 2.0f))
-						Item.m_Killed = true;
+				CBgDrawItem *pItem = AddItem(*GameClient(), Segment.front());
+				if(pItem)
+					pItem->SetData(Segment);
 			}
+			LastPos = Pos;
 		}
 		else
 		{
