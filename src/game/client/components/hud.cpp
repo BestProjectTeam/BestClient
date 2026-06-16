@@ -4147,7 +4147,6 @@ void CHud::OnRender()
 		GameClient()->m_VoiceChat.RenderHudTalkingIndicator(m_Width, m_Height);
 		GameClient()->m_BestClient.RenderHookCombo();
 		GameClient()->m_BestClient.RenderSpecMoved();
-		GameClient()->m_BestClient.RenderRaycast();
 	}
 	GameClient()->m_Graffity.RenderOverlayUi();
 	RenderCursor();

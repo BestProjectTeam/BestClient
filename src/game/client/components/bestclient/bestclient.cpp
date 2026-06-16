@@ -718,6 +718,7 @@ void CBestClient::OnRender()
 
 	UpdateSpecMoved();
 	RenderWorldBlackout();
+	RenderRaycast();
 }
 
 bool CBestClient::OnInput(const IInput::CEvent &Event)
@@ -1158,7 +1159,7 @@ void CBestClient::RenderWorldBlackout()
 		return;
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return;
-	if(GameClient()->m_Scoreboard.IsActive() || GameClient()->m_Menus.IsActive())
+	if(GameClient()->m_Scoreboard.IsActive())
 		return;
 
 	float Width = 0.0f, Height = 0.0f;
@@ -1175,7 +1176,7 @@ void CBestClient::RenderRaycast()
 		return;
 	if(!g_Config.m_BcRaycast)
 		return;
-	if(GameClient()->m_Scoreboard.IsActive() || GameClient()->m_Menus.IsActive())
+	if(GameClient()->m_Scoreboard.IsActive())
 		return;
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return;
@@ -1246,6 +1247,46 @@ void CBestClient::RenderRaycast()
 		return Id == TILE_SOLID || Id == TILE_NOHOOK;
 	};
 
+	auto EmitLine = [&](vec2 Start, vec2 End2, bool IsFreeze, bool IsHookable) {
+		if(IsFreeze)
+		{
+			if(FreezeColor.a > 0.0f)
+				vFreezeLines.emplace_back(Start.x, Start.y, End2.x, End2.y);
+		}
+		else if(IsHookable)
+		{
+			if(HookableColor.a > 0.0f)
+				vHookableLines.emplace_back(Start.x, Start.y, End2.x, End2.y);
+		}
+		else
+		{
+			if(UnhookableColor.a > 0.0f)
+				vUnhookableLines.emplace_back(Start.x, Start.y, End2.x, End2.y);
+		}
+	};
+
+	auto DrawRay = [&](vec2 HitPos, float RayDist, bool IsHookable) {
+		if(RayDist < 1.0f)
+			return;
+		const vec2 StepDir = (HitPos - PlayerPos) / RayDist;
+		const int NumSteps = (int)(RayDist / 16.0f) + 1;
+		bool CurFreeze = IsFreezeTile(PlayerPos);
+		vec2 SegStart = PlayerPos;
+		for(int s = 1; s <= NumSteps; s++)
+		{
+			const float t = std::min((float)s * 16.0f, RayDist);
+			const vec2 SamplePos = PlayerPos + StepDir * t;
+			const bool ThisFreeze = IsFreezeTile(SamplePos);
+			if(ThisFreeze != CurFreeze)
+			{
+				EmitLine(SegStart, SamplePos, CurFreeze, IsHookable);
+				SegStart = SamplePos;
+				CurFreeze = ThisFreeze;
+			}
+		}
+		EmitLine(SegStart, HitPos, CurFreeze, IsHookable);
+	};
+
 	for(int TileY = PlayerTileY - TileRadius; TileY <= PlayerTileY + TileRadius; TileY++)
 	{
 		for(int TileX = PlayerTileX - TileRadius; TileX <= PlayerTileX + TileRadius; TileX++)
@@ -1258,110 +1299,140 @@ void CBestClient::RenderRaycast()
 			if(TileId != TILE_SOLID && TileId != TILE_NOHOOK)
 				continue;
 
-			// Skip interior tiles — all 4 cardinal neighbors solid means this tile has no exposed face
-			if(IsSolidAt(TileX - 1, TileY) && IsSolidAt(TileX + 1, TileY) &&
-			   IsSolidAt(TileX, TileY - 1) && IsSolidAt(TileX, TileY + 1))
-				continue;
-
-			// Tile-based DDA — O(tiles traversed) instead of O(pixels) like IntersectLine
-			const float DX = TileX * 32.0f + 16.0f - PlayerPos.x;
-			const float DY = TileY * 32.0f + 16.0f - PlayerPos.y;
-			const float Dist = std::sqrt(DX * DX + DY * DY);
-			if(Dist > RayLength || Dist < 0.001f)
-				continue;
-
-			const float InvDist = 1.0f / Dist;
-			const float DirX = DX * InvDist;
-			const float DirY = DY * InvDist;
-			const int DdaStepX = DirX >= 0 ? 1 : -1;
-			const int DdaStepY = DirY >= 0 ? 1 : -1;
-			const float AbsDirX = std::abs(DirX);
-			const float AbsDirY = std::abs(DirY);
-			const float tDeltaX = AbsDirX > 1e-6f ? 32.0f / AbsDirX : 1e9f;
-			const float tDeltaY = AbsDirY > 1e-6f ? 32.0f / AbsDirY : 1e9f;
-			float tMaxX = AbsDirX > 1e-6f ? (DdaStepX > 0 ? (PlayerTileX + 1) * 32.0f - PlayerPos.x : PlayerPos.x - PlayerTileX * 32.0f) / AbsDirX : 1e9f;
-			float tMaxY = AbsDirY > 1e-6f ? (DdaStepY > 0 ? (PlayerTileY + 1) * 32.0f - PlayerPos.y : PlayerPos.y - PlayerTileY * 32.0f) / AbsDirY : 1e9f;
-
-			int DdaTx = PlayerTileX;
-			int DdaTy = PlayerTileY;
-			float tBoundary = 0.0f;
-			int HitTileType = 0;
-
-			while(true)
+			const bool AllCardinalSolid = IsSolidAt(TileX - 1, TileY) && IsSolidAt(TileX + 1, TileY) &&
+			                              IsSolidAt(TileX, TileY - 1) && IsSolidAt(TileX, TileY + 1);
+			if(AllCardinalSolid)
 			{
-				if(tMaxX < tMaxY)
+				// Truly interior (all 8 neighbors solid) — skip
+				if(IsSolidAt(TileX - 1, TileY - 1) && IsSolidAt(TileX + 1, TileY - 1) &&
+				   IsSolidAt(TileX - 1, TileY + 1) && IsSolidAt(TileX + 1, TileY + 1))
+					continue;
+
+				// Concave corner: find closest exposed diagonal corner
+				static const int DiagDx[4] = {-1, 1, -1, 1};
+				static const int DiagDy[4] = {-1, -1, 1, 1};
+				const float CwX[4] = {TileX * 32.0f + 1.0f, (TileX + 1) * 32.0f - 1.0f, TileX * 32.0f + 1.0f, (TileX + 1) * 32.0f - 1.0f};
+				const float CwY[4] = {TileY * 32.0f + 1.0f, TileY * 32.0f + 1.0f, (TileY + 1) * 32.0f - 1.0f, (TileY + 1) * 32.0f - 1.0f};
+				float CornerX = -1.0f, CornerY = -1.0f, MinCornerDist = 1e9f;
+				for(int d = 0; d < 4; d++)
 				{
-					tBoundary = tMaxX;
-					DdaTx += DdaStepX;
-					tMaxX += tDeltaX;
+					if(IsSolidAt(TileX + DiagDx[d], TileY + DiagDy[d]))
+						continue;
+					const float Ddx = CwX[d] - PlayerPos.x, Ddy = CwY[d] - PlayerPos.y;
+					const float D = std::sqrt(Ddx * Ddx + Ddy * Ddy);
+					if(D < MinCornerDist)
+					{
+						MinCornerDist = D;
+						CornerX = CwX[d];
+						CornerY = CwY[d];
+					}
 				}
-				else
+				if(MinCornerDist > RayLength || MinCornerDist < 0.001f)
+					continue;
+
+				// DDA check: ensure no external obstacle blocks the path to the corner
 				{
-					tBoundary = tMaxY;
-					DdaTy += DdaStepY;
-					tMaxY += tDeltaY;
+					const float CDirX = (CornerX - PlayerPos.x) / MinCornerDist;
+					const float CDirY = (CornerY - PlayerPos.y) / MinCornerDist;
+					const int CDdaStepX = CDirX >= 0 ? 1 : -1;
+					const int CDdaStepY = CDirY >= 0 ? 1 : -1;
+					const float CAbsX = std::abs(CDirX), CAbsY = std::abs(CDirY);
+					const float CtDeltaX = CAbsX > 1e-6f ? 32.0f / CAbsX : 1e9f;
+					const float CtDeltaY = CAbsY > 1e-6f ? 32.0f / CAbsY : 1e9f;
+					float CtMaxX = CAbsX > 1e-6f ? (CDdaStepX > 0 ? (PlayerTileX + 1) * 32.0f - PlayerPos.x : PlayerPos.x - PlayerTileX * 32.0f) / CAbsX : 1e9f;
+					float CtMaxY = CAbsY > 1e-6f ? (CDdaStepY > 0 ? (PlayerTileY + 1) * 32.0f - PlayerPos.y : PlayerPos.y - PlayerTileY * 32.0f) / CAbsY : 1e9f;
+					int CDdaTx = PlayerTileX, CDdaTy = PlayerTileY;
+					bool CornerBlocked = false;
+					while(true)
+					{
+						float CtBoundary;
+						if(CtMaxX < CtMaxY) { CtBoundary = CtMaxX; CDdaTx += CDdaStepX; CtMaxX += CtDeltaX; }
+						else { CtBoundary = CtMaxY; CDdaTy += CDdaStepY; CtMaxY += CtDeltaY; }
+						if(CtBoundary > MinCornerDist + 1.0f || CDdaTx < 0 || CDdaTy < 0 || CDdaTx >= MapWidth || CDdaTy >= MapHeight)
+							break;
+						const int CDdaId = Collision()->GetTileIndex(CDdaTy * MapWidth + CDdaTx);
+						if(CDdaId == TILE_SOLID || CDdaId == TILE_NOHOOK)
+						{
+							// Cardinal neighbor of the target blocks → expected for corners; external → occlusion
+							const bool IsNeighbor = (CDdaTx == TileX && std::abs(CDdaTy - TileY) <= 1) ||
+							                        (CDdaTy == TileY && std::abs(CDdaTx - TileX) <= 1);
+							if(!IsNeighbor)
+								CornerBlocked = true;
+							break;
+						}
+					}
+					if(CornerBlocked)
+						continue;
 				}
 
-				if(tBoundary > Dist + 16.0f || DdaTx < 0 || DdaTy < 0 || DdaTx >= MapWidth || DdaTy >= MapHeight)
-					break;
+				DrawRay(vec2(CornerX, CornerY), MinCornerDist, TileId == TILE_SOLID);
+				continue;
+			}
 
-				const int DdaId = Collision()->GetTileIndex(DdaTy * MapWidth + DdaTx);
-				if(DdaId == TILE_SOLID || DdaId == TILE_NOHOOK)
+			// Normal tile: try each exposed face center via DDA.
+			// Targeting face centers (not tile center) correctly handles staircase/diagonal tiles
+			// where the center ray is blocked by an adjacent solid tile.
+			static const float FaceOffX[4] = {0.0f, 32.0f, 16.0f, 16.0f}; // left, right, top, bottom
+			static const float FaceOffY[4] = {16.0f, 16.0f, 0.0f, 32.0f};
+			static const int FaceNbrDx[4] = {-1, 1, 0, 0};
+			static const int FaceNbrDy[4] = {0, 0, -1, 1};
+
+			vec2 HitPos = {};
+			float RayDist = 0.0f;
+			bool FoundHit = false;
+
+			for(int f = 0; f < 4 && !FoundHit; f++)
+			{
+				if(IsSolidAt(TileX + FaceNbrDx[f], TileY + FaceNbrDy[f]))
+					continue;
+
+				const float TargetX = TileX * 32.0f + FaceOffX[f];
+				const float TargetY = TileY * 32.0f + FaceOffY[f];
+				const float FDX = TargetX - PlayerPos.x;
+				const float FDY = TargetY - PlayerPos.y;
+				const float FDist = std::sqrt(FDX * FDX + FDY * FDY);
+				if(FDist > RayLength || FDist < 0.001f)
+					continue;
+
+				const float InvDist = 1.0f / FDist;
+				const float DirX = FDX * InvDist, DirY = FDY * InvDist;
+				const int DdaStepX = DirX >= 0 ? 1 : -1;
+				const int DdaStepY = DirY >= 0 ? 1 : -1;
+				const float AbsDirX = std::abs(DirX), AbsDirY = std::abs(DirY);
+				const float tDeltaX = AbsDirX > 1e-6f ? 32.0f / AbsDirX : 1e9f;
+				const float tDeltaY = AbsDirY > 1e-6f ? 32.0f / AbsDirY : 1e9f;
+				float tMaxX = AbsDirX > 1e-6f ? (DdaStepX > 0 ? (PlayerTileX + 1) * 32.0f - PlayerPos.x : PlayerPos.x - PlayerTileX * 32.0f) / AbsDirX : 1e9f;
+				float tMaxY = AbsDirY > 1e-6f ? (DdaStepY > 0 ? (PlayerTileY + 1) * 32.0f - PlayerPos.y : PlayerPos.y - PlayerTileY * 32.0f) / AbsDirY : 1e9f;
+
+				int DdaTx = PlayerTileX, DdaTy = PlayerTileY;
+				float tBoundary = 0.0f;
+
+				while(true)
 				{
-					if(DdaTx == TileX && DdaTy == TileY)
-						HitTileType = DdaId;
-					break;
+					if(tMaxX < tMaxY) { tBoundary = tMaxX; DdaTx += DdaStepX; tMaxX += tDeltaX; }
+					else { tBoundary = tMaxY; DdaTy += DdaStepY; tMaxY += tDeltaY; }
+
+					if(tBoundary > FDist + 32.0f || DdaTx < 0 || DdaTy < 0 || DdaTx >= MapWidth || DdaTy >= MapHeight)
+						break;
+
+					const int DdaId = Collision()->GetTileIndex(DdaTy * MapWidth + DdaTx);
+					if(DdaId == TILE_SOLID || DdaId == TILE_NOHOOK)
+					{
+						if(DdaTx == TileX && DdaTy == TileY)
+						{
+							FoundHit = true;
+							HitPos = PlayerPos + vec2(DirX, DirY) * tBoundary;
+							RayDist = tBoundary;
+						}
+						break;
+					}
 				}
 			}
 
-			if(!HitTileType)
+			if(!FoundHit || RayDist < 1.0f)
 				continue;
 
-			const vec2 HitPos = PlayerPos + vec2(DirX, DirY) * tBoundary;
-			const float RayDist = tBoundary;
-			if(RayDist < 1.0f)
-				continue;
-
-			const bool HitHookable = (HitTileType == TILE_SOLID);
-			const vec2 StepDir = (HitPos - PlayerPos) / RayDist;
-			const float StepSize = 16.0f;
-			const int NumSteps = (int)(RayDist / StepSize) + 1;
-
-			bool CurFreeze = IsFreezeTile(PlayerPos);
-			vec2 SegStart = PlayerPos;
-
-			auto EmitSeg = [&](vec2 Start, vec2 End2, bool IsFreeze) {
-				if(IsFreeze)
-				{
-					if(FreezeColor.a > 0.0f)
-						vFreezeLines.emplace_back(Start.x, Start.y, End2.x, End2.y);
-				}
-				else if(HitHookable)
-				{
-					if(HookableColor.a > 0.0f)
-						vHookableLines.emplace_back(Start.x, Start.y, End2.x, End2.y);
-				}
-				else
-				{
-					if(UnhookableColor.a > 0.0f)
-						vUnhookableLines.emplace_back(Start.x, Start.y, End2.x, End2.y);
-				}
-			};
-
-			for(int s = 1; s <= NumSteps; s++)
-			{
-				const float t = std::min((float)s * StepSize, RayDist);
-				const vec2 SamplePos = PlayerPos + StepDir * t;
-				const bool ThisFreeze = IsFreezeTile(SamplePos);
-
-				if(ThisFreeze != CurFreeze)
-				{
-					EmitSeg(SegStart, SamplePos, CurFreeze);
-					SegStart = SamplePos;
-					CurFreeze = ThisFreeze;
-				}
-			}
-			EmitSeg(SegStart, HitPos, CurFreeze);
+			DrawRay(HitPos, RayDist, TileId == TILE_SOLID);
 		}
 	}
 
