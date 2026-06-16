@@ -147,11 +147,8 @@ namespace
 		FUN_GAME_MINESWEEPER,
 		FUN_GAME_CHESS,
 		FUN_GAME_SUDOKU,
-		FUN_GAME_TICTACTOE,
 		FUN_GAME_MEMORY,
 		FUN_GAME_DICE3D,
-		FUN_GAME_BLOCKBLAST,
-		FUN_GAME_TETRIS,
 		FUN_GAME_PONG,
 		FUN_GAME_DINOSAUR,
 		FUN_GAME_BRICK_BREAKER,
@@ -166,23 +163,6 @@ namespace
 		NUM_FUN_GAMES
 	};
 
-	bool IsPsj3IdeaGame(EFunGame Game)
-	{
-		switch(Game)
-		{
-		case FUN_GAME_BRICK_BREAKER:
-		case FUN_GAME_FOUR_IN_A_ROW:
-		case FUN_GAME_MINI_GOLF:
-		case FUN_GAME_CHECKERS:
-		case FUN_GAME_BATTLESHIP:
-		case FUN_GAME_FLOWMANIA:
-		case FUN_GAME_UNO:
-		case FUN_GAME_BILLIARDS:
-			return true;
-		default:
-			return false;
-		}
-	}
 
 	struct SFunGameInfo
 	{
@@ -244,11 +224,8 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 		{"Minesweeper", FONT_ICON_BOMB, "LMB open, RMB flag, hover hints"},
 		{"Chess", FONT_ICON_CHESS_KING, "Font Awesome chess pieces"},
 		{"Sudoku", FONT_ICON_BORDER_ALL, "Click cell, type digits 1-9"},
-		{"Tic-Tac-Toe", FONT_ICON_XMARK, "Play with friend or bot"},
 		{"Memory", FONT_ICON_LAYER_GROUP, "Find all matching pairs"},
 		{"3D Dice", FONT_ICON_DICE_SIX, "Roll animated 3D dice"},
-		{"BlockBlast", FONT_ICON_CUBES, "Drag or click blocks to fill lines"},
-		{"Tetris", FONT_ICON_BORDER_ALL, "Arrows/WASD move, Up rotate"},
 		{"Pong", FONT_ICON_TABLE_TENNIS_PADDLE_BALL, "W/S or Up/Down to move paddle"},
 		{"Dinosaur", FONT_ICON_DRAGON, "Space/W/Up to jump over cacti"},
 		{"Brick Breaker", FONT_ICON_BORDER_ALL, "Break all bricks with the ball"},
@@ -261,15 +238,12 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 		{"Billiards", FONT_ICON_TABLE_TENNIS_PADDLE_BALL, "Pocket all balls with precision"},
 		{"Casino", FONT_ICON_DICE_SIX, "Spin the reels, bet & win"}};
 
-	static constexpr std::array<EFunGame, 10> s_aVisibleGames = {
+	static constexpr std::array<EFunGame, 7> s_aVisibleGames = {
 		FUN_GAME_CASINO,
 		FUN_GAME_SNAKE,
 		FUN_GAME_MINESWEEPER,
 		FUN_GAME_CHESS,
-		FUN_GAME_TICTACTOE,
 		FUN_GAME_MEMORY,
-		FUN_GAME_BLOCKBLAST,
-		FUN_GAME_TETRIS,
 		FUN_GAME_PONG,
 		FUN_GAME_BRICK_BREAKER,
 	};
@@ -290,139 +264,91 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 	};
 
 	static int s_SelectedGame = FUN_GAME_CASINO;
-	static int s_LastSelectedGame = -1;
 	static CButtonContainer s_aGameButtons[NUM_FUN_GAMES];
-	static CScrollRegion s_GameListScroll;
 	const float AnimTime = time_get() / (float)time_freq();
 
 	if(!IsVisibleGame(s_SelectedGame))
 		s_SelectedGame = (int)s_aVisibleGames[0];
 
-	CUIRect Header;
-	MainView.HSplitTop(HEADLINE_HEIGHT, &Header, &MainView);
-	Ui()->DoLabel(&Header, TCLocalize("Fun"), HEADLINE_FONT_SIZE, TEXTALIGN_ML);
-	MainView.HSplitTop(MARGIN_SMALL, nullptr, &MainView);
+	// Horizontal top bar with square game selector buttons (icon above, name below)
+	const int NumVisible = (int)s_aVisibleGames.size();
+	const float BtnGap = MARGIN_SMALL;
+	const float BtnSize = minimum(80.0f, (MainView.w - BtnGap * (NumVisible + 1)) / (float)NumVisible);
+	const float TopBarH = BtnSize + MARGIN_SMALL;
 
-	CUIRect SideBar, GameArea;
-	MainView.VSplitLeft(minimum(240.0f, MainView.w * 0.3f), &SideBar, &GameArea);
-	GameArea.VSplitLeft(MARGIN_BETWEEN_VIEWS, nullptr, &GameArea);
+	CUIRect TopBar, GameArea;
+	MainView.HSplitTop(TopBarH, &TopBar, &GameArea);
+	GameArea.HSplitTop(MARGIN_SMALL, nullptr, &GameArea);
 
-	const ColorRGBA SideColor = ColorRGBA(0.0f, 0.0f, 0.0f, 0.26f);
 	const ColorRGBA AreaColor = ColorRGBA(0.0f, 0.0f, 0.0f, 0.24f);
-	SideBar.Draw(SideColor, IGraphics::CORNER_ALL, 8.0f);
 	GameArea.Draw(AreaColor, IGraphics::CORNER_ALL, 8.0f);
 
-	CUIRect SideContent;
-	SideBar.Margin(MARGIN_SMALL, &SideContent);
-	CUIRect Label;
-	SideContent.HSplitTop(LINE_SIZE, &Label, &SideContent);
-	RenderIconLabel(Label, FONT_ICON_GAMEPAD, FONT_SIZE, TEXTALIGN_ML);
-	CUIRect LabelText = Label;
-	LabelText.VSplitLeft(22.0f, nullptr, &LabelText);
-	Ui()->DoLabel(&LabelText, TCLocalize("Games"), FONT_SIZE, TEXTALIGN_ML);
-	SideContent.HSplitTop(MARGIN_SMALL, nullptr, &SideContent);
-
-	CScrollRegionParams ScrollParams;
-	ScrollParams.m_ScrollbarWidth = 14.0f;
-	ScrollParams.m_ScrollbarMargin = 2.0f;
-	ScrollParams.m_ScrollUnit = LINE_SIZE * 1.35f;
-	ScrollParams.m_RailBgColor = ColorRGBA(0.15f, 0.15f, 0.15f, 0.45f);
-	ScrollParams.m_SliderColor = ColorRGBA(0.72f, 0.72f, 0.72f, 0.72f);
-	ScrollParams.m_SliderColorHover = ColorRGBA(0.82f, 0.82f, 0.82f, 0.90f);
-	ScrollParams.m_SliderColorGrabbed = ColorRGBA(0.92f, 0.92f, 0.92f, 0.96f);
-	ScrollParams.m_ScrollbarBgColor = ColorRGBA(0.0f, 0.0f, 0.0f, 0.08f);
-	ScrollParams.m_Flags = CScrollRegionParams::FLAG_CONTENT_STATIC_WIDTH;
-	vec2 ScrollOffset(0.0f, 0.0f);
-	CUIRect SideList = SideContent;
-	s_GameListScroll.Begin(&SideList, &ScrollOffset, &ScrollParams);
-	if(Ui()->MouseInside(&SideList))
+	// Draw buttons horizontally, centered
 	{
-		if(Input()->KeyPress(KEY_MOUSE_WHEEL_UP))
-			s_GameListScroll.ScrollRelative(CScrollRegion::SCROLLRELATIVE_UP);
-		else if(Input()->KeyPress(KEY_MOUSE_WHEEL_DOWN))
-			s_GameListScroll.ScrollRelative(CScrollRegion::SCROLLRELATIVE_DOWN);
-	}
-	CUIRect ScrollContent = SideList;
-	ScrollContent.y += ScrollOffset.y;
-	const bool ScrollToSelected = s_LastSelectedGame != s_SelectedGame;
+		const float TotalW = BtnSize * NumVisible + BtnGap * (NumVisible - 1);
+		float BtnX = TopBar.x + (TopBar.w - TotalW) * 0.5f;
+		const float BtnY = TopBar.y;
 
-	for(EFunGame VisibleGame : s_aVisibleGames)
-	{
-		const int i = (int)VisibleGame;
-		CUIRect Button;
-		ScrollContent.HSplitTop(LINE_SIZE * 1.35f, &Button, &ScrollContent);
-		const bool Visible = s_GameListScroll.AddRect(Button, ScrollToSelected && s_SelectedGame == i);
-		if(!Visible)
+		for(EFunGame VisibleGame : s_aVisibleGames)
 		{
-			ScrollContent.HSplitTop(MARGIN_EXTRA_SMALL, nullptr, &ScrollContent);
-			continue;
+			const int i = (int)VisibleGame;
+			const bool Active = s_SelectedGame == i;
+			CUIRect Button;
+			Button.x = BtnX;
+			Button.y = BtnY;
+			Button.w = BtnSize;
+			Button.h = BtnSize;
+			const bool Hovered = Ui()->MouseInside(&Button);
+			const ColorRGBA BtnBg = Active ? ColorRGBA(0.25f, 0.25f, 0.28f, 0.90f) : ColorRGBA(0.10f, 0.10f, 0.12f, 0.70f);
+			Button.Draw(BtnBg, IGraphics::CORNER_ALL, 7.0f);
+			if(Hovered && !Active)
+				Button.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.06f), IGraphics::CORNER_ALL, 7.0f);
+
+			if(DoButton_Menu(&s_aGameButtons[i], "", 0, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 7.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.0f)))
+				s_SelectedGame = i;
+
+			// Icon (top 60% of button)
+			CUIRect IconArea;
+			IconArea.x = BtnX;
+			IconArea.y = BtnY + (Active ? sinf(AnimTime * 5.2f + i) * 1.2f : 0.0f);
+			IconArea.w = BtnSize;
+			IconArea.h = BtnSize * 0.60f;
+			const ColorRGBA IconColor = Active ? ColorRGBA(0.95f, 0.95f, 0.95f, 0.95f) : Hovered ? ColorRGBA(0.92f, 0.92f, 0.92f, 0.85f) : ColorRGBA(0.80f, 0.80f, 0.85f, 0.72f);
+			RenderIconLabel(IconArea, s_aGames[i].m_pIcon, IconArea.h * 0.72f, TEXTALIGN_MC, &IconColor);
+
+			// Name (bottom 40% of button)
+			CUIRect NameArea;
+			NameArea.x = BtnX;
+			NameArea.y = BtnY + BtnSize * 0.62f;
+			NameArea.w = BtnSize;
+			NameArea.h = BtnSize * 0.38f;
+			const ColorRGBA NameColor = Active ? ColorRGBA(1.0f, 1.0f, 1.0f, 0.95f) : ColorRGBA(0.85f, 0.85f, 0.88f, 0.72f);
+			TextRender()->TextColor(NameColor);
+			Ui()->DoLabel(&NameArea, TCLocalize(s_aGames[i].m_pName), FONT_SIZE * 0.78f, TEXTALIGN_MC);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+			BtnX += BtnSize + BtnGap;
 		}
-		const int Active = s_SelectedGame == i;
-		const bool Hovered = Ui()->MouseInside(&Button);
-		if(DoButton_Menu(&s_aGameButtons[i], TCLocalize(s_aGames[i].m_pName), 0, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(1.0f, 1.0f, 1.0f, 0.35f)))
-			s_SelectedGame = i;
-		if(Hovered)
-		{
-			Button.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.06f), IGraphics::CORNER_ALL, 5.0f);
-		}
-		CUIRect IconRect;
-		Button.VSplitLeft(30.0f, &IconRect, nullptr);
-		if(Active)
-			IconRect.y += sinf(AnimTime * 5.2f + i) * 1.2f;
-		const ColorRGBA IconColor = Active ? ColorRGBA(0.95f, 0.95f, 0.95f, 0.95f) : Hovered ? ColorRGBA(0.92f, 0.92f, 0.92f, 0.9f) :
-												      ColorRGBA(0.9f, 0.9f, 0.92f, 0.78f);
-		RenderIconLabel(IconRect, s_aGames[i].m_pIcon, IconRect.h * 0.62f, TEXTALIGN_MC, &IconColor);
-		ScrollContent.HSplitTop(MARGIN_EXTRA_SMALL, nullptr, &ScrollContent);
 	}
-	s_GameListScroll.End();
-	s_LastSelectedGame = s_SelectedGame;
 
 	CUIRect GameContent;
 	GameArea.Margin(MARGIN_SMALL, &GameContent);
-	CUIRect GameTitle, GameHint;
-	GameContent.HSplitTop(LINE_SIZE, &GameTitle, &GameContent);
+	CUIRect GameHint;
 	GameContent.HSplitTop(LINE_SIZE, &GameHint, &GameContent);
 	GameContent.HSplitTop(MARGIN_SMALL, nullptr, &GameContent);
 
-	const ColorRGBA TitleIconColor = ColorRGBA(0.95f, 0.95f, 0.95f, 0.95f);
-	RenderIconLabel(GameTitle, s_aGames[s_SelectedGame].m_pIcon, FONT_SIZE, TEXTALIGN_ML, &TitleIconColor);
-	CUIRect GameTitleText = GameTitle;
-	GameTitleText.VSplitLeft(24.0f, nullptr, &GameTitleText);
-	Ui()->DoLabel(&GameTitleText, TCLocalize(s_aGames[s_SelectedGame].m_pName), FONT_SIZE, TEXTALIGN_ML);
 	Ui()->DoLabel(&GameHint, TCLocalize(s_aGames[s_SelectedGame].m_pHint), FONT_SIZE, TEXTALIGN_ML);
-	auto PrepareSetupView = [&](CUIRect &SetupView) {
-		SetupView.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.34f), IGraphics::CORNER_ALL, 8.0f);
-		CUIRect Inner = SetupView;
-		Inner.Margin(1.0f, &Inner);
-		Inner.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.06f), IGraphics::CORNER_ALL, 7.0f);
-		SetupView.Margin(MARGIN, &SetupView);
-		CUIRect SetupHeader;
-		SetupView.HSplitTop(LINE_SIZE, &SetupHeader, &SetupView);
-		const ColorRGBA SetupIconColor = ColorRGBA(0.95f, 0.95f, 0.95f, 0.92f);
-		RenderIconLabel(SetupHeader, FONT_ICON_GEAR, FONT_SIZE, TEXTALIGN_ML, &SetupIconColor);
-		CUIRect SetupText = SetupHeader;
-		SetupText.VSplitLeft(24.0f, nullptr, &SetupText);
-		Ui()->DoLabel(&SetupText, TCLocalize("Setup"), FONT_SIZE, TEXTALIGN_ML);
-		if(IsPsj3IdeaGame((EFunGame)s_SelectedGame))
-		{
-			const ColorRGBA IdeaColor = ColorRGBA(0.95f, 0.95f, 0.95f, 0.72f);
-			TextRender()->TextColor(IdeaColor);
-			Ui()->DoLabel(&SetupHeader, "Psj_3 idea", FONT_SIZE * 0.9f, TEXTALIGN_MR);
-			TextRender()->TextColor(TextRender()->DefaultTextColor());
-		}
-		SetupView.HSplitTop(MARGIN_SMALL, nullptr, &SetupView);
-	};
 
 	if(s_SelectedGame == FUN_GAME_SNAKE)
 	{
 		struct SSnakeState
 		{
-			bool m_InGame = false;
 			int m_SizePreset = 1;
 			int m_SpeedPreset = 1;
 			int m_Wrap = 0;
 
 			bool m_Initialized = false;
+			bool m_Waiting = true;
 			int m_BoardW = 20;
 			int m_BoardH = 14;
 			std::deque<ivec2> m_Body;
@@ -439,9 +365,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 		};
 
 		static SSnakeState s_Snake;
-		static CButtonContainer s_SnakeStartButton;
-		static CButtonContainer s_SnakeRestartButton;
-		static CButtonContainer s_SnakeSetupButton;
 
 		auto ApplySnakePreset = [&]() {
 			if(s_Snake.m_SizePreset == 0)
@@ -491,6 +414,7 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 		auto ResetSnake = [&](bool KeepBestScore) {
 			ApplySnakePreset();
 			s_Snake.m_Initialized = true;
+			s_Snake.m_Waiting = true;
 			s_Snake.m_Body.clear();
 			s_Snake.m_Dir = ivec2(1, 0);
 			s_Snake.m_HasQueuedDir = false;
@@ -518,33 +442,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			s_Snake.m_HasQueuedDir = true;
 		};
 
-		if(!s_Snake.m_InGame)
-		{
-			CUIRect SetupView = GameContent;
-			CUIRect Option;
-			PrepareSetupView(SetupView);
-
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			int SizeClick = DoButton_CheckBox_Number(&s_Snake.m_SizePreset, TCLocalize("Field Size"), s_Snake.m_SizePreset + 1, &Option);
-			UpdateSettingByClick(SizeClick, s_Snake.m_SizePreset, 0, 2);
-
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			int SpeedClick = DoButton_CheckBox_Number(&s_Snake.m_SpeedPreset, TCLocalize("Start Speed"), s_Snake.m_SpeedPreset + 1, &Option);
-			UpdateSettingByClick(SpeedClick, s_Snake.m_SpeedPreset, 0, 2);
-
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			DoButton_CheckBoxAutoVMarginAndSet(&s_Snake.m_Wrap, TCLocalize("Wrap Through Walls"), &s_Snake.m_Wrap, &SetupView, LINE_SIZE);
-
-			SetupView.HSplitTop(MARGIN, nullptr, &SetupView);
-			SetupView.HSplitTop(LINE_SIZE * 1.5f, &Option, &SetupView);
-			if(DoButton_Menu(&s_SnakeStartButton, TCLocalize("Start"), 0, &Option))
-			{
-				s_Snake.m_InGame = true;
-				ResetSnake(true);
-			}
-		}
-		else
-		{
 			if(!s_Snake.m_Initialized)
 				ResetSnake(true);
 
@@ -552,19 +449,16 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			GameContent.HSplitTop(LINE_SIZE * 1.2f, &TopBar, &BoardArea);
 			BoardArea.HSplitTop(MARGIN_SMALL, nullptr, &BoardArea);
 
-			CUIRect ScoreLabel, BtnArea, RestartButton, SetupButton;
+			CUIRect ScoreLabel, BtnArea, RestartButton;
 			TopBar.VSplitLeft(250.0f, &ScoreLabel, &BtnArea);
-			BtnArea.VSplitRight(220.0f, &BtnArea, &SetupButton);
 			BtnArea.VSplitRight(110.0f, &BtnArea, &RestartButton);
-			SetupButton.VSplitLeft(10.0f, nullptr, &SetupButton);
 
 			char aScore[128];
 			str_format(aScore, sizeof(aScore), "Score: %d   Best: %d", s_Snake.m_Score, s_Snake.m_BestScore);
 			Ui()->DoLabel(&ScoreLabel, aScore, FONT_SIZE, TEXTALIGN_ML);
+			static CButtonContainer s_SnakeRestartButton;
 			if(DoButton_Menu(&s_SnakeRestartButton, TCLocalize("Restart"), 0, &RestartButton))
 				ResetSnake(true);
-			if(DoButton_Menu(&s_SnakeSetupButton, TCLocalize("Setup"), 0, &SetupButton))
-				s_Snake.m_InGame = false;
 
 			const float CellSize = minimum(BoardArea.w / s_Snake.m_BoardW, BoardArea.h / s_Snake.m_BoardH);
 			CUIRect Board;
@@ -573,18 +467,37 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			Board.x = BoardArea.x + (BoardArea.w - Board.w) / 2.0f;
 			Board.y = BoardArea.y + (BoardArea.h - Board.h) / 2.0f;
 
-			if(Input()->KeyPress(KEY_UP) || Input()->KeyPress(KEY_W))
-				QueueSnakeDir(ivec2(0, -1));
-			if(Input()->KeyPress(KEY_DOWN) || Input()->KeyPress(KEY_S))
-				QueueSnakeDir(ivec2(0, 1));
-			if(Input()->KeyPress(KEY_LEFT) || Input()->KeyPress(KEY_A))
-				QueueSnakeDir(ivec2(-1, 0));
-			if(Input()->KeyPress(KEY_RIGHT) || Input()->KeyPress(KEY_D))
-				QueueSnakeDir(ivec2(1, 0));
+			const bool AnyKey = Input()->KeyPress(KEY_UP) || Input()->KeyPress(KEY_W) ||
+				Input()->KeyPress(KEY_DOWN) || Input()->KeyPress(KEY_S) ||
+				Input()->KeyPress(KEY_LEFT) || Input()->KeyPress(KEY_A) ||
+				Input()->KeyPress(KEY_RIGHT) || Input()->KeyPress(KEY_D) ||
+				Input()->KeyPress(KEY_SPACE) || Input()->KeyPress(KEY_RETURN) || Input()->KeyPress(KEY_KP_ENTER) ||
+				(Ui()->MouseButtonClicked(0) && Ui()->MouseInside(&Board));
+
+			if(s_Snake.m_Waiting)
+			{
+				if(AnyKey)
+				{
+					s_Snake.m_Waiting = false;
+					s_Snake.m_LastTick = time_get();
+				}
+			}
+
+			if(!s_Snake.m_Waiting)
+			{
+				if(Input()->KeyPress(KEY_UP) || Input()->KeyPress(KEY_W))
+					QueueSnakeDir(ivec2(0, -1));
+				if(Input()->KeyPress(KEY_DOWN) || Input()->KeyPress(KEY_S))
+					QueueSnakeDir(ivec2(0, 1));
+				if(Input()->KeyPress(KEY_LEFT) || Input()->KeyPress(KEY_A))
+					QueueSnakeDir(ivec2(-1, 0));
+				if(Input()->KeyPress(KEY_RIGHT) || Input()->KeyPress(KEY_D))
+					QueueSnakeDir(ivec2(1, 0));
+			}
 
 			const bool PressRestart = Input()->KeyPress(KEY_SPACE) || Input()->KeyPress(KEY_RETURN) || Input()->KeyPress(KEY_KP_ENTER);
 			const int64_t Now = time_get();
-			float Dt = (Now - s_Snake.m_LastTick) / (float)time_freq();
+			float Dt = s_Snake.m_Waiting ? 0.0f : (Now - s_Snake.m_LastTick) / (float)time_freq();
 			s_Snake.m_LastTick = Now;
 			Dt = std::clamp(Dt, 0.0f, 0.05f);
 			s_Snake.m_TickAccumulator += Dt;
@@ -689,19 +602,23 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 				IsHead = false;
 			}
 
-			if(s_Snake.m_GameOver)
+			if(s_Snake.m_Waiting)
+			{
+				CUIRect Overlay = Board;
+				Overlay.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.5f), IGraphics::CORNER_ALL, 4.0f);
+				Ui()->DoLabel(&Overlay, TCLocalize("Press any key to start"), HEADLINE_FONT_SIZE, TEXTALIGN_MC);
+			}
+			else if(s_Snake.m_GameOver)
 			{
 				CUIRect Overlay = Board;
 				Overlay.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.45f), IGraphics::CORNER_ALL, 4.0f);
 				Ui()->DoLabel(&Overlay, TCLocalize("Game Over"), HEADLINE_FONT_SIZE, TEXTALIGN_MC);
 			}
-		}
 	}
 	else if(s_SelectedGame == FUN_GAME_MINESWEEPER)
 	{
 		struct SMinesweeperState
 		{
-			bool m_InGame = false;
 			int m_Difficulty = 1;
 
 			bool m_Initialized = false;
@@ -719,9 +636,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 		};
 
 		static SMinesweeperState s_Mines;
-		static CButtonContainer s_MinesStartButton;
-		static CButtonContainer s_MinesRestartButton;
-		static CButtonContainer s_MinesSetupButton;
 
 		auto SetMinesDifficulty = [&]() {
 			if(s_Mines.m_Difficulty == 0)
@@ -849,36 +763,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 						s_Mines.m_vRevealed[Idx(x, y)] = 1;
 		};
 
-		if(!s_Mines.m_InGame)
-		{
-			CUIRect SetupView = GameContent;
-			CUIRect Option;
-			PrepareSetupView(SetupView);
-
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			int DiffClick = DoButton_CheckBox_Number(&s_Mines.m_Difficulty, TCLocalize("Difficulty"), s_Mines.m_Difficulty + 1, &Option);
-			UpdateSettingByClick(DiffClick, s_Mines.m_Difficulty, 0, 2);
-
-			char aDiffInfo[128];
-			if(s_Mines.m_Difficulty == 0)
-				str_copy(aDiffInfo, "9x9, 10 bombs", sizeof(aDiffInfo));
-			else if(s_Mines.m_Difficulty == 1)
-				str_copy(aDiffInfo, "12x10, 18 bombs", sizeof(aDiffInfo));
-			else
-				str_copy(aDiffInfo, "16x12, 32 bombs", sizeof(aDiffInfo));
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			Ui()->DoLabel(&Option, aDiffInfo, FONT_SIZE, TEXTALIGN_ML);
-
-			SetupView.HSplitTop(MARGIN, nullptr, &SetupView);
-			SetupView.HSplitTop(LINE_SIZE * 1.5f, &Option, &SetupView);
-			if(DoButton_Menu(&s_MinesStartButton, TCLocalize("Start"), 0, &Option))
-			{
-				s_Mines.m_InGame = true;
-				ResetMines();
-			}
-		}
-		else
-		{
 			if(!s_Mines.m_Initialized)
 				ResetMines();
 
@@ -886,19 +770,16 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			GameContent.HSplitTop(LINE_SIZE * 1.2f, &TopBar, &BoardArea);
 			BoardArea.HSplitTop(MARGIN_SMALL, nullptr, &BoardArea);
 
-			CUIRect Stats, BtnArea, RestartButton, SetupButton;
+			CUIRect Stats, BtnArea, RestartButton;
 			TopBar.VSplitLeft(280.0f, &Stats, &BtnArea);
-			BtnArea.VSplitRight(220.0f, &BtnArea, &SetupButton);
 			BtnArea.VSplitRight(110.0f, &BtnArea, &RestartButton);
-			SetupButton.VSplitLeft(10.0f, nullptr, &SetupButton);
 
 			char aStats[128];
 			str_format(aStats, sizeof(aStats), "Bombs: %d   Flags: %d", s_Mines.m_Bombs, s_Mines.m_Flags);
 			Ui()->DoLabel(&Stats, aStats, FONT_SIZE, TEXTALIGN_ML);
+			static CButtonContainer s_MinesRestartButton;
 			if(DoButton_Menu(&s_MinesRestartButton, TCLocalize("Restart"), 0, &RestartButton))
 				ResetMines();
-			if(DoButton_Menu(&s_MinesSetupButton, TCLocalize("Setup"), 0, &SetupButton))
-				s_Mines.m_InGame = false;
 
 			const float CellSize = minimum(BoardArea.w / s_Mines.m_W, BoardArea.h / s_Mines.m_H);
 			CUIRect Board;
@@ -1066,7 +947,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 				Overlay.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.4f), IGraphics::CORNER_ALL, 4.0f);
 				Ui()->DoLabel(&Overlay, s_Mines.m_Won ? TCLocalize("Victory") : TCLocalize("Game Over"), HEADLINE_FONT_SIZE, TEXTALIGN_MC);
 			}
-		}
 	}
 	else if(s_SelectedGame == FUN_GAME_CHESS)
 	{
@@ -1080,8 +960,7 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 
 		struct SChessState
 		{
-			bool m_InGame = false;
-			int m_Mode = 0; // 0 local, 1 bot
+			int m_Mode = 1; // 0 local, 1 bot
 			int m_ShowMoves = 1;
 
 			bool m_Initialized = false;
@@ -1122,9 +1001,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 		};
 
 		static SChessState s_Chess;
-		static CButtonContainer s_ChessStartButton;
-		static CButtonContainer s_ChessRestartButton;
-		static CButtonContainer s_ChessSetupButton;
 
 		auto IsWhitePiece = [](char Piece) { return Piece >= 'A' && Piece <= 'Z'; };
 		auto IsBlackPiece = [](char Piece) { return Piece >= 'a' && Piece <= 'z'; };
@@ -1780,30 +1656,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			}
 		};
 
-		if(!s_Chess.m_InGame)
-		{
-			CUIRect SetupView = GameContent;
-			CUIRect Option;
-			PrepareSetupView(SetupView);
-
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			int ModeClick = DoButton_CheckBox_Number(&s_Chess.m_Mode, TCLocalize("Mode"), s_Chess.m_Mode + 1, &Option);
-			UpdateSettingByClick(ModeClick, s_Chess.m_Mode, 0, 1);
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			Ui()->DoLabel(&Option, s_Chess.m_Mode == 0 ? TCLocalize("1 = Local two players") : TCLocalize("2 = Versus smart bot"), FONT_SIZE, TEXTALIGN_ML);
-
-			DoButton_CheckBoxAutoVMarginAndSet(&s_Chess.m_ShowMoves, TCLocalize("Show legal moves"), &s_Chess.m_ShowMoves, &SetupView, LINE_SIZE);
-
-			SetupView.HSplitTop(MARGIN, nullptr, &SetupView);
-			SetupView.HSplitTop(LINE_SIZE * 1.5f, &Option, &SetupView);
-			if(DoButton_Menu(&s_ChessStartButton, TCLocalize("Start"), 0, &Option))
-			{
-				s_Chess.m_InGame = true;
-				ResetChess();
-			}
-		}
-		else
-		{
 			if(!s_Chess.m_Initialized)
 				ResetChess();
 
@@ -1811,11 +1663,9 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			GameContent.HSplitTop(LINE_SIZE * 1.2f, &TopBar, &BoardArea);
 			BoardArea.HSplitTop(MARGIN_SMALL, nullptr, &BoardArea);
 
-			CUIRect TurnLabel, BtnArea, RestartButton, SetupButton;
+			CUIRect TurnLabel, BtnArea, RestartButton;
 			TopBar.VSplitLeft(320.0f, &TurnLabel, &BtnArea);
-			BtnArea.VSplitRight(220.0f, &BtnArea, &SetupButton);
 			BtnArea.VSplitRight(110.0f, &BtnArea, &RestartButton);
-			SetupButton.VSplitLeft(10.0f, nullptr, &SetupButton);
 
 			const char *pStatus;
 			if(s_Chess.m_GameOver)
@@ -1834,10 +1684,9 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 				pStatus = s_Chess.m_WhiteTurn ? TCLocalize("Turn: White") : TCLocalize("Turn: Black");
 			}
 			Ui()->DoLabel(&TurnLabel, pStatus, FONT_SIZE, TEXTALIGN_ML);
+			static CButtonContainer s_ChessRestartButton;
 			if(DoButton_Menu(&s_ChessRestartButton, TCLocalize("Restart"), 0, &RestartButton))
 				ResetChess();
-			if(DoButton_Menu(&s_ChessSetupButton, TCLocalize("Setup"), 0, &SetupButton))
-				s_Chess.m_InGame = false;
 
 			const float BoardSize = minimum(BoardArea.w, BoardArea.h);
 			const float CellSize = BoardSize / 8.0f;
@@ -2029,13 +1878,11 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 
 				Ui()->DoLabel(&Overlay, pResult, HEADLINE_FONT_SIZE, TEXTALIGN_MC);
 			}
-		}
 	}
 	else if(s_SelectedGame == FUN_GAME_SUDOKU)
 	{
 		struct SSudokuState
 		{
-			bool m_InGame = false;
 			int m_Difficulty = 1;
 			int m_ShowConflicts = 1;
 
@@ -2051,9 +1898,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 		};
 
 		static SSudokuState s_Sudoku;
-		static CButtonContainer s_SudokuStartButton;
-		static CButtonContainer s_SudokuRestartButton;
-		static CButtonContainer s_SudokuSetupButton;
 
 		auto SudokuIndex = [](int X, int Y) { return Y * 9 + X; };
 		auto UpdateSudokuConflicts = [&]() {
@@ -2159,27 +2003,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			return true;
 		};
 
-		if(!s_Sudoku.m_InGame)
-		{
-			CUIRect SetupView = GameContent;
-			CUIRect Option;
-			PrepareSetupView(SetupView);
-
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			int DiffClick = DoButton_CheckBox_Number(&s_Sudoku.m_Difficulty, TCLocalize("Difficulty"), s_Sudoku.m_Difficulty + 1, &Option);
-			UpdateSettingByClick(DiffClick, s_Sudoku.m_Difficulty, 0, 2);
-			DoButton_CheckBoxAutoVMarginAndSet(&s_Sudoku.m_ShowConflicts, TCLocalize("Show conflicts"), &s_Sudoku.m_ShowConflicts, &SetupView, LINE_SIZE);
-
-			SetupView.HSplitTop(MARGIN, nullptr, &SetupView);
-			SetupView.HSplitTop(LINE_SIZE * 1.5f, &Option, &SetupView);
-			if(DoButton_Menu(&s_SudokuStartButton, TCLocalize("Start"), 0, &Option))
-			{
-				s_Sudoku.m_InGame = true;
-				ResetSudoku();
-			}
-		}
-		else
-		{
 			if(!s_Sudoku.m_Initialized)
 				ResetSudoku();
 
@@ -2187,19 +2010,16 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			GameContent.HSplitTop(LINE_SIZE * 1.2f, &TopBar, &BoardArea);
 			BoardArea.HSplitTop(MARGIN_SMALL, nullptr, &BoardArea);
 
-			CUIRect Stats, BtnArea, RestartButton, SetupButton;
+			CUIRect Stats, BtnArea, RestartButton;
 			TopBar.VSplitLeft(280.0f, &Stats, &BtnArea);
-			BtnArea.VSplitRight(220.0f, &BtnArea, &SetupButton);
 			BtnArea.VSplitRight(110.0f, &BtnArea, &RestartButton);
-			SetupButton.VSplitLeft(10.0f, nullptr, &SetupButton);
 
 			char aStats[128];
 			str_format(aStats, sizeof(aStats), "Mistakes: %d", s_Sudoku.m_Mistakes);
 			Ui()->DoLabel(&Stats, aStats, FONT_SIZE, TEXTALIGN_ML);
+			static CButtonContainer s_SudokuRestartButton;
 			if(DoButton_Menu(&s_SudokuRestartButton, TCLocalize("Restart"), 0, &RestartButton))
 				ResetSudoku();
-			if(DoButton_Menu(&s_SudokuSetupButton, TCLocalize("Setup"), 0, &SetupButton))
-				s_Sudoku.m_InGame = false;
 
 			const float BoardSize = minimum(BoardArea.w, BoardArea.h);
 			const float CellSize = BoardSize / 9.0f;
@@ -2320,275 +2140,11 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 				Overlay.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.30f), IGraphics::CORNER_ALL, 4.0f);
 				Ui()->DoLabel(&Overlay, TCLocalize("Solved"), HEADLINE_FONT_SIZE, TEXTALIGN_MC);
 			}
-		}
-	}
-	else if(s_SelectedGame == FUN_GAME_TICTACTOE)
-	{
-		struct STicTacToeState
-		{
-			bool m_InGame = false;
-			int m_Mode = 1; // 0 local, 1 bot
-			bool m_Initialized = false;
-			std::array<char, 9> m_aBoard{};
-			bool m_XTurn = true;
-			bool m_GameOver = false;
-			char m_Winner = '.';
-			int m_WinLine = -1;
-			int m_LastMove = -1;
-			float m_LastMoveAnimStart = 0.0f;
-		};
-
-		static STicTacToeState s_Ttt;
-		static CButtonContainer s_TttStartButton;
-		static CButtonContainer s_TttRestartButton;
-		static CButtonContainer s_TttSetupButton;
-
-		auto ResetTtt = [&]() {
-			s_Ttt.m_Initialized = true;
-			s_Ttt.m_aBoard.fill('.');
-			s_Ttt.m_XTurn = true;
-			s_Ttt.m_GameOver = false;
-			s_Ttt.m_Winner = '.';
-			s_Ttt.m_WinLine = -1;
-			s_Ttt.m_LastMove = -1;
-			s_Ttt.m_LastMoveAnimStart = 0.0f;
-		};
-
-		auto EvaluateTtt = [&]() {
-			static const int s_aLines[8][3] = {
-				{0, 1, 2}, {3, 4, 5}, {6, 7, 8},
-				{0, 3, 6}, {1, 4, 7}, {2, 5, 8},
-				{0, 4, 8}, {2, 4, 6}};
-			for(const auto &Line : s_aLines)
-			{
-				const char A = s_Ttt.m_aBoard[Line[0]];
-				if(A != '.' && A == s_Ttt.m_aBoard[Line[1]] && A == s_Ttt.m_aBoard[Line[2]])
-					return A;
-			}
-			for(char Cell : s_Ttt.m_aBoard)
-				if(Cell == '.')
-					return '.';
-			return 'D';
-		};
-		auto FindWinLine = [&]() {
-			static const int s_aLines[8][3] = {
-				{0, 1, 2}, {3, 4, 5}, {6, 7, 8},
-				{0, 3, 6}, {1, 4, 7}, {2, 5, 8},
-				{0, 4, 8}, {2, 4, 6}};
-			for(int i = 0; i < 8; ++i)
-			{
-				const int *pLine = s_aLines[i];
-				const char A = s_Ttt.m_aBoard[pLine[0]];
-				if(A != '.' && A == s_Ttt.m_aBoard[pLine[1]] && A == s_Ttt.m_aBoard[pLine[2]])
-					return i;
-			}
-			return -1;
-		};
-
-		auto BotMove = [&]() {
-			// try win, then block, then center, then random
-			auto TryComplete = [&](char Piece) {
-				static const int s_aLines[8][3] = {
-					{0, 1, 2}, {3, 4, 5}, {6, 7, 8},
-					{0, 3, 6}, {1, 4, 7}, {2, 5, 8},
-					{0, 4, 8}, {2, 4, 6}};
-				for(const auto &Line : s_aLines)
-				{
-					int Own = 0;
-					int EmptyIdx = -1;
-					for(int i = 0; i < 3; ++i)
-					{
-						const char Cur = s_Ttt.m_aBoard[Line[i]];
-						if(Cur == Piece)
-							Own++;
-						else if(Cur == '.')
-							EmptyIdx = Line[i];
-					}
-					if(Own == 2 && EmptyIdx >= 0)
-						return EmptyIdx;
-				}
-				return -1;
-			};
-
-			int Move = TryComplete('O');
-			if(Move < 0)
-				Move = TryComplete('X');
-			if(Move < 0 && s_Ttt.m_aBoard[4] == '.')
-				Move = 4;
-			if(Move < 0)
-			{
-				std::vector<int> vEmpty;
-				for(int i = 0; i < 9; ++i)
-					if(s_Ttt.m_aBoard[i] == '.')
-						vEmpty.push_back(i);
-				if(!vEmpty.empty())
-					Move = vEmpty[rand() % vEmpty.size()];
-			}
-			if(Move >= 0)
-			{
-				s_Ttt.m_aBoard[Move] = 'O';
-				s_Ttt.m_LastMove = Move;
-				s_Ttt.m_LastMoveAnimStart = AnimTime;
-			}
-		};
-
-		if(!s_Ttt.m_InGame)
-		{
-			CUIRect SetupView = GameContent;
-			CUIRect Option;
-			PrepareSetupView(SetupView);
-
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			int ModeClick = DoButton_CheckBox_Number(&s_Ttt.m_Mode, TCLocalize("Mode"), s_Ttt.m_Mode + 1, &Option);
-			UpdateSettingByClick(ModeClick, s_Ttt.m_Mode, 0, 1);
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			Ui()->DoLabel(&Option, s_Ttt.m_Mode == 0 ? TCLocalize("1 = Local two players") : TCLocalize("2 = Versus bot"), FONT_SIZE, TEXTALIGN_ML);
-
-			SetupView.HSplitTop(MARGIN, nullptr, &SetupView);
-			SetupView.HSplitTop(LINE_SIZE * 1.5f, &Option, &SetupView);
-			if(DoButton_Menu(&s_TttStartButton, TCLocalize("Start"), 0, &Option))
-			{
-				s_Ttt.m_InGame = true;
-				ResetTtt();
-			}
-		}
-		else
-		{
-			if(!s_Ttt.m_Initialized)
-				ResetTtt();
-
-			CUIRect TopBar, BoardArea;
-			GameContent.HSplitTop(LINE_SIZE * 1.2f, &TopBar, &BoardArea);
-			BoardArea.HSplitTop(MARGIN_SMALL, nullptr, &BoardArea);
-
-			CUIRect Status, BtnArea, RestartButton, SetupButton;
-			TopBar.VSplitLeft(260.0f, &Status, &BtnArea);
-			BtnArea.VSplitRight(220.0f, &BtnArea, &SetupButton);
-			BtnArea.VSplitRight(110.0f, &BtnArea, &RestartButton);
-			SetupButton.VSplitLeft(10.0f, nullptr, &SetupButton);
-
-			const char *pStatus = s_Ttt.m_GameOver ? (s_Ttt.m_Winner == 'D' ? TCLocalize("Draw") : (s_Ttt.m_Winner == 'X' ? TCLocalize("X wins") : TCLocalize("O wins"))) : (s_Ttt.m_XTurn ? TCLocalize("Turn: X") : TCLocalize("Turn: O"));
-			Ui()->DoLabel(&Status, pStatus, FONT_SIZE, TEXTALIGN_ML);
-			if(DoButton_Menu(&s_TttRestartButton, TCLocalize("Restart"), 0, &RestartButton))
-				ResetTtt();
-			if(DoButton_Menu(&s_TttSetupButton, TCLocalize("Setup"), 0, &SetupButton))
-				s_Ttt.m_InGame = false;
-
-			const float BoardSize = minimum(BoardArea.w, BoardArea.h);
-			const float CellSize = BoardSize / 3.0f;
-			CUIRect Board;
-			Board.w = BoardSize;
-			Board.h = BoardSize;
-			Board.x = BoardArea.x + (BoardArea.w - Board.w) / 2.0f;
-			Board.y = BoardArea.y + (BoardArea.h - Board.h) / 2.0f;
-			Board.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.18f), IGraphics::CORNER_ALL, 4.0f);
-
-			if(!s_Ttt.m_GameOver)
-			{
-				const bool BotTurn = s_Ttt.m_Mode == 1 && !s_Ttt.m_XTurn;
-				if(BotTurn)
-				{
-					BotMove();
-					s_Ttt.m_XTurn = true;
-				}
-				else if(Ui()->MouseInside(&Board) && Ui()->MouseButtonClicked(0))
-				{
-					const vec2 Mouse = Ui()->MousePos();
-					const int X = std::clamp((int)((Mouse.x - Board.x) / CellSize), 0, 2);
-					const int Y = std::clamp((int)((Mouse.y - Board.y) / CellSize), 0, 2);
-					const int Idx = Y * 3 + X;
-					if(s_Ttt.m_aBoard[Idx] == '.')
-					{
-						s_Ttt.m_aBoard[Idx] = s_Ttt.m_XTurn ? 'X' : 'O';
-						s_Ttt.m_LastMove = Idx;
-						s_Ttt.m_LastMoveAnimStart = AnimTime;
-						s_Ttt.m_XTurn = !s_Ttt.m_XTurn;
-					}
-				}
-
-				const char Result = EvaluateTtt();
-				if(Result != '.')
-				{
-					s_Ttt.m_GameOver = true;
-					s_Ttt.m_Winner = Result;
-					s_Ttt.m_WinLine = Result == 'D' ? -1 : FindWinLine();
-				}
-			}
-
-			for(int y = 0; y < 3; ++y)
-			{
-				for(int x = 0; x < 3; ++x)
-				{
-					const int Idx = y * 3 + x;
-					CUIRect Cell;
-					Cell.x = Board.x + x * CellSize;
-					Cell.y = Board.y + y * CellSize;
-					Cell.w = CellSize;
-					Cell.h = CellSize;
-					Cell.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.05f), IGraphics::CORNER_NONE, 0.0f);
-					Cell.DrawOutline(ColorRGBA(0.0f, 0.0f, 0.0f, 0.35f));
-
-					if(s_Ttt.m_aBoard[Idx] == 'X')
-					{
-						const ColorRGBA XColor(0.95f, 0.45f, 0.45f, 1.0f);
-						CUIRect Symbol = Cell;
-						if(Idx == s_Ttt.m_LastMove)
-						{
-							const float T = std::clamp((AnimTime - s_Ttt.m_LastMoveAnimStart) / 0.22f, 0.0f, 1.0f);
-							const float Scale = 0.7f + 0.3f * (1.0f - powf(1.0f - T, 3.0f));
-							const float Pad = Cell.w * (1.0f - Scale) * 0.5f;
-							Symbol.Margin(Pad, &Symbol);
-						}
-						RenderIconLabel(Symbol, FONT_ICON_XMARK, Symbol.h * 0.54f, TEXTALIGN_MC, &XColor);
-					}
-					else if(s_Ttt.m_aBoard[Idx] == 'O')
-					{
-						const ColorRGBA OColor(0.45f, 0.75f, 1.0f, 1.0f);
-						CUIRect Symbol = Cell;
-						if(Idx == s_Ttt.m_LastMove)
-						{
-							const float T = std::clamp((AnimTime - s_Ttt.m_LastMoveAnimStart) / 0.22f, 0.0f, 1.0f);
-							const float Scale = 0.7f + 0.3f * (1.0f - powf(1.0f - T, 3.0f));
-							const float Pad = Cell.w * (1.0f - Scale) * 0.5f;
-							Symbol.Margin(Pad, &Symbol);
-						}
-						RenderIconLabel(Symbol, FONT_ICON_CIRCLE, Symbol.h * 0.52f, TEXTALIGN_MC, &OColor);
-					}
-				}
-			}
-
-			if(s_Ttt.m_GameOver && s_Ttt.m_Winner != 'D' && s_Ttt.m_WinLine >= 0)
-			{
-				static const int s_aLines[8][3] = {
-					{0, 1, 2}, {3, 4, 5}, {6, 7, 8},
-					{0, 3, 6}, {1, 4, 7}, {2, 5, 8},
-					{0, 4, 8}, {2, 4, 6}};
-				const int *pLine = s_aLines[s_Ttt.m_WinLine];
-				const int StartIdx = pLine[0];
-				const int EndIdx = pLine[2];
-				const int StartX = StartIdx % 3;
-				const int StartY = StartIdx / 3;
-				const int EndX = EndIdx % 3;
-				const int EndY = EndIdx / 3;
-				const vec2 Start(Board.x + (StartX + 0.5f) * CellSize, Board.y + (StartY + 0.5f) * CellSize);
-				const vec2 End(Board.x + (EndX + 0.5f) * CellSize, Board.y + (EndY + 0.5f) * CellSize);
-				const float T = std::clamp((AnimTime - s_Ttt.m_LastMoveAnimStart) / 0.28f, 0.0f, 1.0f);
-				const vec2 Mid = Start + (End - Start) * T;
-				Graphics()->TextureClear();
-				Graphics()->LinesBegin();
-				const ColorRGBA LineColor = s_Ttt.m_Winner == 'X' ? ColorRGBA(1.0f, 0.45f, 0.45f, 0.95f) : ColorRGBA(0.45f, 0.75f, 1.0f, 0.95f);
-				Graphics()->SetColor(LineColor.r, LineColor.g, LineColor.b, LineColor.a);
-				IGraphics::CLineItem Line(Start.x, Start.y, Mid.x, Mid.y);
-				Graphics()->LinesDraw(&Line, 1);
-				Graphics()->LinesEnd();
-			}
-		}
 	}
 	else if(s_SelectedGame == FUN_GAME_MEMORY)
 	{
 		struct SMemoryState
 		{
-			bool m_InGame = false;
 			int m_SizePreset = 0; // 0 = 4x4, 1 = 6x6
 			bool m_Initialized = false;
 			int m_Size = 4;
@@ -2604,9 +2160,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 		};
 
 		static SMemoryState s_Memory;
-		static CButtonContainer s_MemoryStartButton;
-		static CButtonContainer s_MemoryRestartButton;
-		static CButtonContainer s_MemorySetupButton;
 
 		auto SetMemoryPreset = [&]() {
 			s_Memory.m_Size = s_Memory.m_SizePreset == 0 ? 4 : 6;
@@ -2664,26 +2217,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			s_Memory.m_PendingResolveAt = 0;
 		};
 
-		if(!s_Memory.m_InGame)
-		{
-			CUIRect SetupView = GameContent;
-			CUIRect Option;
-			PrepareSetupView(SetupView);
-
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			int SizeClick = DoButton_CheckBox_Number(&s_Memory.m_SizePreset, TCLocalize("Board Size"), s_Memory.m_SizePreset == 0 ? 4 : 6, &Option);
-			UpdateSettingByClick(SizeClick, s_Memory.m_SizePreset, 0, 1);
-
-			SetupView.HSplitTop(MARGIN, nullptr, &SetupView);
-			SetupView.HSplitTop(LINE_SIZE * 1.5f, &Option, &SetupView);
-			if(DoButton_Menu(&s_MemoryStartButton, TCLocalize("Start"), 0, &Option))
-			{
-				s_Memory.m_InGame = true;
-				ResetMemory();
-			}
-		}
-		else
-		{
 			if(!s_Memory.m_Initialized)
 				ResetMemory();
 			ResolvePendingPair();
@@ -2692,19 +2225,16 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			GameContent.HSplitTop(LINE_SIZE * 1.2f, &TopBar, &BoardArea);
 			BoardArea.HSplitTop(MARGIN_SMALL, nullptr, &BoardArea);
 
-			CUIRect StatsLabel, BtnArea, RestartButton, SetupButton;
+			CUIRect StatsLabel, BtnArea, RestartButton;
 			TopBar.VSplitLeft(300.0f, &StatsLabel, &BtnArea);
-			BtnArea.VSplitRight(220.0f, &BtnArea, &SetupButton);
 			BtnArea.VSplitRight(110.0f, &BtnArea, &RestartButton);
-			SetupButton.VSplitLeft(10.0f, nullptr, &SetupButton);
 
 			char aStats[128];
 			str_format(aStats, sizeof(aStats), "Moves: %d   Pairs: %d/%d", s_Memory.m_Moves, s_Memory.m_PairsFound, (int)s_Memory.m_vCards.size() / 2);
 			Ui()->DoLabel(&StatsLabel, aStats, FONT_SIZE, TEXTALIGN_ML);
+			static CButtonContainer s_MemoryRestartButton;
 			if(DoButton_Menu(&s_MemoryRestartButton, TCLocalize("Restart"), 0, &RestartButton))
 				ResetMemory();
-			if(DoButton_Menu(&s_MemorySetupButton, TCLocalize("Setup"), 0, &SetupButton))
-				s_Memory.m_InGame = false;
 
 			const float GridSize = minimum(BoardArea.w, BoardArea.h);
 			const float CellSize = GridSize / s_Memory.m_Size;
@@ -2782,7 +2312,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 				Overlay.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.28f), IGraphics::CORNER_ALL, 4.0f);
 				Ui()->DoLabel(&Overlay, TCLocalize("All pairs found"), HEADLINE_FONT_SIZE, TEXTALIGN_MC);
 			}
-		}
 	}
 	else if(s_SelectedGame == FUN_GAME_DICE3D)
 	{
@@ -2801,7 +2330,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 
 		struct SDice3DState
 		{
-			bool m_InGame = false;
 			int m_DiceCount = 2;
 			bool m_Initialized = false;
 			bool m_Rolling = false;
@@ -2848,10 +2376,7 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			{{0, 4, 7, 3}, {-1.0f, 0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}, 4, ColorRGBA(0.88f, 0.88f, 0.92f, 1.0f)}};
 
 		static SDice3DState s_Dice3D;
-		static CButtonContainer s_DiceStartButton;
 		static CButtonContainer s_DiceRollButton;
-		static CButtonContainer s_DiceRestartButton;
-		static CButtonContainer s_DiceSetupButton;
 
 		auto Rotate3 = [&](const SVec3 &V, float Pitch, float Yaw, float Roll) {
 			const float CX = cosf(Pitch);
@@ -3077,26 +2602,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			}
 		};
 
-		if(!s_Dice3D.m_InGame)
-		{
-			CUIRect SetupView = GameContent;
-			CUIRect Option;
-			PrepareSetupView(SetupView);
-
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			int DiceClick = DoButton_CheckBox_Number(&s_Dice3D.m_DiceCount, TCLocalize("Dice Count"), s_Dice3D.m_DiceCount, &Option);
-			UpdateSettingByClick(DiceClick, s_Dice3D.m_DiceCount, 1, 2);
-
-			SetupView.HSplitTop(MARGIN, nullptr, &SetupView);
-			SetupView.HSplitTop(LINE_SIZE * 1.5f, &Option, &SetupView);
-			if(DoButton_Menu(&s_DiceStartButton, TCLocalize("Start"), 0, &Option))
-			{
-				s_Dice3D.m_InGame = true;
-				ResetDice3D();
-			}
-		}
-		else
-		{
 			if(!s_Dice3D.m_Initialized)
 				ResetDice3D();
 
@@ -3104,7 +2609,7 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			GameContent.HSplitTop(LINE_SIZE * 1.2f, &TopBar, &BoardArea);
 			BoardArea.HSplitTop(MARGIN_SMALL, nullptr, &BoardArea);
 
-			CUIRect StatusLabel, ButtonsArea, RollButton, RestartButton, SetupButton;
+			CUIRect StatusLabel, ButtonsArea, RollButton, RestartButton;
 			const float ButtonsWidth = minimum(430.0f, TopBar.w * 0.62f);
 			TopBar.VSplitRight(ButtonsWidth, &StatusLabel, &ButtonsArea);
 			ButtonsArea.VSplitLeft(8.0f, nullptr, &ButtonsArea);
@@ -3114,7 +2619,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			ButtonsArea.VSplitLeft(ButtonGap, nullptr, &ButtonsArea);
 			ButtonsArea.VSplitLeft(ButtonW, &RestartButton, &ButtonsArea);
 			ButtonsArea.VSplitLeft(ButtonGap, nullptr, &ButtonsArea);
-			ButtonsArea.VSplitLeft(ButtonW, &SetupButton, &ButtonsArea);
 
 			if(s_Dice3D.m_Rolling)
 			{
@@ -3146,10 +2650,9 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			const bool RollHotkey = Input()->KeyPress(KEY_SPACE);
 			if((DoButton_Menu(&s_DiceRollButton, TCLocalize("Roll"), 0, &RollButton) || RollHotkey) && !s_Dice3D.m_Rolling)
 				StartDiceRoll();
+			static CButtonContainer s_DiceRestartButton;
 			if(DoButton_Menu(&s_DiceRestartButton, TCLocalize("Restart"), 0, &RestartButton))
 				ResetDice3D();
-			if(DoButton_Menu(&s_DiceSetupButton, TCLocalize("Setup"), 0, &SetupButton))
-				s_Dice3D.m_InGame = false;
 
 			BoardArea.Draw(ColorRGBA(0.01f, 0.05f, 0.1f, 0.24f), IGraphics::CORNER_ALL, 8.0f);
 			const float DrawAreaSize = minimum(BoardArea.w, BoardArea.h);
@@ -3197,833 +2700,11 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 				str_format(aRight, sizeof(aRight), "%d", s_Dice3D.m_aTopValues[1]);
 				Ui()->DoLabel(&RightValue, aRight, FONT_SIZE + 1.0f, TEXTALIGN_MC);
 			}
-		}
-	}
-	else if(s_SelectedGame == FUN_GAME_BLOCKBLAST)
-	{
-		struct SBlockShape
-		{
-			int m_CellCount = 0;
-			int m_aX[5] = {0};
-			int m_aY[5] = {0};
-			int m_W = 1;
-			int m_H = 1;
-		};
-
-		static constexpr int BLOCKBLAST_BOARD_SIZE = 8;
-
-		struct SBlockBlastState
-		{
-			bool m_InGame = false;
-			int m_Mode = 1;
-			bool m_Initialized = false;
-			std::array<uint8_t, BLOCKBLAST_BOARD_SIZE * BLOCKBLAST_BOARD_SIZE> m_aBoard{};
-			int m_aOffer[3] = {0, 0, 0};
-			uint8_t m_aOfferUsed[3] = {1, 1, 1};
-			int m_SelectedOffer = -1;
-			int m_Score = 0;
-			int m_BestScore = 0;
-			bool m_GameOver = false;
-			bool m_Dragging = false;
-			int m_DragOffer = -1;
-			vec2 m_DragMouse = vec2(0.0f, 0.0f);
-			std::array<uint8_t, BLOCKBLAST_BOARD_SIZE> m_aClearRows{};
-			std::array<uint8_t, BLOCKBLAST_BOARD_SIZE> m_aClearCols{};
-			float m_ClearAnimStart = -10.0f;
-		};
-
-		static const SBlockShape s_aShapes[] = {
-			{1, {0}, {0}, 1, 1},
-			{2, {0, 1}, {0, 0}, 2, 1},
-			{2, {0, 0}, {0, 1}, 1, 2},
-			{3, {0, 1, 2}, {0, 0, 0}, 3, 1},
-			{3, {0, 0, 0}, {0, 1, 2}, 1, 3},
-			{4, {0, 1, 0, 1}, {0, 0, 1, 1}, 2, 2},
-			{3, {0, 0, 1}, {0, 1, 1}, 2, 2},
-			{3, {0, 1, 1}, {0, 0, 1}, 2, 2},
-			{4, {0, 1, 2, 3}, {0, 0, 0, 0}, 4, 1},
-			{4, {0, 0, 0, 0}, {0, 1, 2, 3}, 1, 4},
-			{4, {0, 1, 2, 1}, {0, 0, 0, 1}, 3, 2},
-			{5, {0, 1, 2, 1, 1}, {1, 1, 1, 0, 2}, 3, 3}};
-
-		static SBlockBlastState s_BlockBlast;
-		static CButtonContainer s_BlockBlastStartButton;
-		static CButtonContainer s_BlockBlastRestartButton;
-		static CButtonContainer s_BlockBlastSetupButton;
-		static CButtonContainer s_aOfferButtons[3];
-
-		auto BlockIdx = [&](int X, int Y) {
-			return Y * BLOCKBLAST_BOARD_SIZE + X;
-		};
-		auto FillOffers = [&]() {
-			const int ShapeCount = (int)std::size(s_aShapes);
-			const int PoolStart = s_BlockBlast.m_Mode == 2 ? 4 : 0;
-			const int PoolEnd = s_BlockBlast.m_Mode == 0 ? minimum(8, ShapeCount) : ShapeCount;
-			for(int i = 0; i < 3; ++i)
-			{
-				s_BlockBlast.m_aOffer[i] = PoolStart + rand() % maximum(1, PoolEnd - PoolStart);
-				s_BlockBlast.m_aOfferUsed[i] = 0;
-			}
-			s_BlockBlast.m_SelectedOffer = 0;
-		};
-		auto CanPlaceShape = [&](const SBlockShape &Shape, int BaseX, int BaseY) {
-			for(int i = 0; i < Shape.m_CellCount; ++i)
-			{
-				const int X = BaseX + Shape.m_aX[i];
-				const int Y = BaseY + Shape.m_aY[i];
-				if(X < 0 || Y < 0 || X >= BLOCKBLAST_BOARD_SIZE || Y >= BLOCKBLAST_BOARD_SIZE)
-					return false;
-				if(s_BlockBlast.m_aBoard[BlockIdx(X, Y)] != 0)
-					return false;
-			}
-			return true;
-		};
-		auto HasAnyMove = [&]() {
-			for(int o = 0; o < 3; ++o)
-			{
-				if(s_BlockBlast.m_aOfferUsed[o])
-					continue;
-				const SBlockShape &Shape = s_aShapes[s_BlockBlast.m_aOffer[o]];
-				for(int y = 0; y < BLOCKBLAST_BOARD_SIZE; ++y)
-					for(int x = 0; x < BLOCKBLAST_BOARD_SIZE; ++x)
-						if(CanPlaceShape(Shape, x, y))
-							return true;
-			}
-			return false;
-		};
-		auto ClearLines = [&]() {
-			s_BlockBlast.m_aClearRows.fill(0);
-			s_BlockBlast.m_aClearCols.fill(0);
-			int ClearedRows = 0;
-			int ClearedCols = 0;
-			for(int y = 0; y < BLOCKBLAST_BOARD_SIZE; ++y)
-			{
-				bool Full = true;
-				for(int x = 0; x < BLOCKBLAST_BOARD_SIZE; ++x)
-				{
-					if(!s_BlockBlast.m_aBoard[BlockIdx(x, y)])
-					{
-						Full = false;
-						break;
-					}
-				}
-				if(Full)
-				{
-					s_BlockBlast.m_aClearRows[y] = 1;
-					ClearedRows++;
-				}
-			}
-			for(int x = 0; x < BLOCKBLAST_BOARD_SIZE; ++x)
-			{
-				bool Full = true;
-				for(int y = 0; y < BLOCKBLAST_BOARD_SIZE; ++y)
-				{
-					if(!s_BlockBlast.m_aBoard[BlockIdx(x, y)])
-					{
-						Full = false;
-						break;
-					}
-				}
-				if(Full)
-				{
-					s_BlockBlast.m_aClearCols[x] = 1;
-					ClearedCols++;
-				}
-			}
-
-			if(ClearedRows == 0 && ClearedCols == 0)
-				return 0;
-
-			for(int y = 0; y < BLOCKBLAST_BOARD_SIZE; ++y)
-				for(int x = 0; x < BLOCKBLAST_BOARD_SIZE; ++x)
-					if(s_BlockBlast.m_aClearRows[y] || s_BlockBlast.m_aClearCols[x])
-						s_BlockBlast.m_aBoard[BlockIdx(x, y)] = 0;
-
-			s_BlockBlast.m_ClearAnimStart = AnimTime;
-			return ClearedRows + ClearedCols;
-		};
-		auto TryPlaceSelectedShape = [&](int BaseX, int BaseY) {
-			if(s_BlockBlast.m_SelectedOffer < 0 || s_BlockBlast.m_SelectedOffer >= 3)
-				return false;
-			if(s_BlockBlast.m_aOfferUsed[s_BlockBlast.m_SelectedOffer])
-				return false;
-			const int Offer = s_BlockBlast.m_SelectedOffer;
-			const SBlockShape &Shape = s_aShapes[s_BlockBlast.m_aOffer[Offer]];
-			if(!CanPlaceShape(Shape, BaseX, BaseY))
-				return false;
-
-			for(int i = 0; i < Shape.m_CellCount; ++i)
-			{
-				const int X = BaseX + Shape.m_aX[i];
-				const int Y = BaseY + Shape.m_aY[i];
-				s_BlockBlast.m_aBoard[BlockIdx(X, Y)] = 1;
-			}
-
-			s_BlockBlast.m_aOfferUsed[Offer] = 1;
-			s_BlockBlast.m_Score += Shape.m_CellCount * 8;
-			const int ClearedLines = ClearLines();
-			s_BlockBlast.m_Score += ClearedLines * ClearedLines * 28;
-			s_BlockBlast.m_BestScore = maximum(s_BlockBlast.m_BestScore, s_BlockBlast.m_Score);
-
-			bool AllUsed = true;
-			for(int i = 0; i < 3; ++i)
-				AllUsed = AllUsed && s_BlockBlast.m_aOfferUsed[i] != 0;
-			if(AllUsed)
-				FillOffers();
-
-			if(!HasAnyMove())
-				s_BlockBlast.m_GameOver = true;
-
-			if(!s_BlockBlast.m_aOfferUsed[s_BlockBlast.m_SelectedOffer])
-				return true;
-			for(int i = 0; i < 3; ++i)
-			{
-				if(!s_BlockBlast.m_aOfferUsed[i])
-				{
-					s_BlockBlast.m_SelectedOffer = i;
-					return true;
-				}
-			}
-			s_BlockBlast.m_SelectedOffer = -1;
-			return true;
-		};
-		auto ResetBlockBlast = [&]() {
-			s_BlockBlast.m_Initialized = true;
-			s_BlockBlast.m_aBoard.fill(0);
-			s_BlockBlast.m_Score = 0;
-			s_BlockBlast.m_GameOver = false;
-			s_BlockBlast.m_Dragging = false;
-			s_BlockBlast.m_DragOffer = -1;
-			s_BlockBlast.m_ClearAnimStart = -10.0f;
-			FillOffers();
-		};
-
-		if(!s_BlockBlast.m_InGame)
-		{
-			CUIRect SetupView = GameContent;
-			CUIRect Option;
-			PrepareSetupView(SetupView);
-
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			int ModeClick = DoButton_CheckBox_Number(&s_BlockBlast.m_Mode, TCLocalize("Mode"), s_BlockBlast.m_Mode + 1, &Option);
-			UpdateSettingByClick(ModeClick, s_BlockBlast.m_Mode, 0, 2);
-
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			Ui()->DoLabel(&Option, s_BlockBlast.m_Mode == 0 ? TCLocalize("Calm board") : s_BlockBlast.m_Mode == 1 ? TCLocalize("Classic block blast") :
-																TCLocalize("Hard patterns"),
-				FONT_SIZE, TEXTALIGN_ML);
-
-			SetupView.HSplitTop(MARGIN, nullptr, &SetupView);
-			SetupView.HSplitTop(LINE_SIZE * 1.5f, &Option, &SetupView);
-			if(DoButton_Menu(&s_BlockBlastStartButton, TCLocalize("Start"), 0, &Option))
-			{
-				s_BlockBlast.m_InGame = true;
-				ResetBlockBlast();
-			}
-		}
-		else
-		{
-			if(!s_BlockBlast.m_Initialized)
-				ResetBlockBlast();
-
-			CUIRect TopBar, ContentArea;
-			GameContent.HSplitTop(LINE_SIZE * 1.2f, &TopBar, &ContentArea);
-			ContentArea.HSplitTop(MARGIN_SMALL, nullptr, &ContentArea);
-
-			CUIRect Stats, BtnArea, RestartButton, SetupButton;
-			TopBar.VSplitLeft(320.0f, &Stats, &BtnArea);
-			BtnArea.VSplitRight(220.0f, &BtnArea, &SetupButton);
-			BtnArea.VSplitRight(110.0f, &BtnArea, &RestartButton);
-			SetupButton.VSplitLeft(10.0f, nullptr, &SetupButton);
-
-			char aStats[128];
-			str_format(aStats, sizeof(aStats), "Score: %d   Best: %d", s_BlockBlast.m_Score, s_BlockBlast.m_BestScore);
-			Ui()->DoLabel(&Stats, aStats, FONT_SIZE, TEXTALIGN_ML);
-			if(DoButton_Menu(&s_BlockBlastRestartButton, TCLocalize("Restart"), 0, &RestartButton))
-				ResetBlockBlast();
-			if(DoButton_Menu(&s_BlockBlastSetupButton, TCLocalize("Setup"), 0, &SetupButton))
-				s_BlockBlast.m_InGame = false;
-
-			CUIRect BoardArea, OffersArea;
-			ContentArea.HSplitBottom(136.0f, &BoardArea, &OffersArea);
-			BoardArea.HSplitBottom(MARGIN_SMALL, &BoardArea, nullptr);
-
-			const float GridSize = minimum(BoardArea.w, BoardArea.h);
-			const float CellSize = GridSize / BLOCKBLAST_BOARD_SIZE;
-			CUIRect Board;
-			Board.w = GridSize;
-			Board.h = GridSize;
-			Board.x = BoardArea.x + (BoardArea.w - Board.w) * 0.5f;
-			Board.y = BoardArea.y + (BoardArea.h - Board.h) * 0.5f;
-			Board.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.28f), IGraphics::CORNER_ALL, 6.0f);
-
-			int HoverX = -1;
-			int HoverY = -1;
-			if(Ui()->MouseInside(&Board))
-			{
-				const vec2 Mouse = Ui()->MousePos();
-				HoverX = std::clamp((int)((Mouse.x - Board.x) / CellSize), 0, BLOCKBLAST_BOARD_SIZE - 1);
-				HoverY = std::clamp((int)((Mouse.y - Board.y) / CellSize), 0, BLOCKBLAST_BOARD_SIZE - 1);
-			}
-
-			if(s_BlockBlast.m_Dragging && (s_BlockBlast.m_DragOffer < 0 || s_BlockBlast.m_DragOffer >= 3 || s_BlockBlast.m_aOfferUsed[s_BlockBlast.m_DragOffer]))
-			{
-				s_BlockBlast.m_Dragging = false;
-				s_BlockBlast.m_DragOffer = -1;
-			}
-			if(s_BlockBlast.m_Dragging)
-			{
-				s_BlockBlast.m_SelectedOffer = s_BlockBlast.m_DragOffer;
-				s_BlockBlast.m_DragMouse = Ui()->MousePos();
-			}
-
-			bool IsDraggingOffer = s_BlockBlast.m_Dragging && s_BlockBlast.m_DragOffer >= 0 && s_BlockBlast.m_DragOffer < 3 && !s_BlockBlast.m_aOfferUsed[s_BlockBlast.m_DragOffer];
-			const bool HasSelection = s_BlockBlast.m_SelectedOffer >= 0 && s_BlockBlast.m_SelectedOffer < 3 && !s_BlockBlast.m_aOfferUsed[s_BlockBlast.m_SelectedOffer];
-			bool CanPlaceHover = false;
-			if(HasSelection && HoverX >= 0 && HoverY >= 0)
-				CanPlaceHover = CanPlaceShape(s_aShapes[s_BlockBlast.m_aOffer[s_BlockBlast.m_SelectedOffer]], HoverX, HoverY);
-
-			std::array<uint8_t, BLOCKBLAST_BOARD_SIZE> aPreviewRows{};
-			std::array<uint8_t, BLOCKBLAST_BOARD_SIZE> aPreviewCols{};
-			if(HasSelection && HoverX >= 0 && HoverY >= 0 && CanPlaceHover)
-			{
-				const SBlockShape &Shape = s_aShapes[s_BlockBlast.m_aOffer[s_BlockBlast.m_SelectedOffer]];
-				auto PreviewCellFilled = [&](int X, int Y) {
-					if(s_BlockBlast.m_aBoard[BlockIdx(X, Y)] != 0)
-						return true;
-					for(int i = 0; i < Shape.m_CellCount; ++i)
-					{
-						if(X == HoverX + Shape.m_aX[i] && Y == HoverY + Shape.m_aY[i])
-							return true;
-					}
-					return false;
-				};
-				for(int y = 0; y < BLOCKBLAST_BOARD_SIZE; ++y)
-				{
-					bool Full = true;
-					for(int x = 0; x < BLOCKBLAST_BOARD_SIZE; ++x)
-					{
-						if(!PreviewCellFilled(x, y))
-						{
-							Full = false;
-							break;
-						}
-					}
-					if(Full)
-						aPreviewRows[y] = 1;
-				}
-				for(int x = 0; x < BLOCKBLAST_BOARD_SIZE; ++x)
-				{
-					bool Full = true;
-					for(int y = 0; y < BLOCKBLAST_BOARD_SIZE; ++y)
-					{
-						if(!PreviewCellFilled(x, y))
-						{
-							Full = false;
-							break;
-						}
-					}
-					if(Full)
-						aPreviewCols[x] = 1;
-				}
-			}
-
-			if(!s_BlockBlast.m_GameOver && HasSelection && !IsDraggingOffer && HoverX >= 0 && HoverY >= 0 && Ui()->MouseButtonClicked(0))
-				TryPlaceSelectedShape(HoverX, HoverY);
-			const bool ReleasedLmb = !Ui()->MouseButton(0) && Ui()->LastMouseButton(0);
-			if(!s_BlockBlast.m_GameOver && IsDraggingOffer && ReleasedLmb && HoverX >= 0 && HoverY >= 0)
-				TryPlaceSelectedShape(HoverX, HoverY);
-			if(IsDraggingOffer && ReleasedLmb)
-			{
-				s_BlockBlast.m_Dragging = false;
-				s_BlockBlast.m_DragOffer = -1;
-				IsDraggingOffer = false;
-			}
-
-			const float ClearFlash = std::clamp(1.0f - (AnimTime - s_BlockBlast.m_ClearAnimStart) / 0.2f, 0.0f, 1.0f);
-			for(int y = 0; y < BLOCKBLAST_BOARD_SIZE; ++y)
-			{
-				for(int x = 0; x < BLOCKBLAST_BOARD_SIZE; ++x)
-				{
-					CUIRect Cell;
-					Cell.x = Board.x + x * CellSize;
-					Cell.y = Board.y + y * CellSize;
-					Cell.w = CellSize;
-					Cell.h = CellSize;
-					const float Pad = maximum(1.0f, CellSize * 0.08f);
-					Cell.Margin(Pad, &Cell);
-					const bool Occupied = s_BlockBlast.m_aBoard[BlockIdx(x, y)] != 0;
-					ColorRGBA Col = Occupied ? ColorRGBA(0.36f, 0.74f, 1.0f, 0.94f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.05f);
-					if((aPreviewRows[y] || aPreviewCols[x]) && CanPlaceHover)
-						Col = BlendColors(Col, ColorRGBA(0.7f, 0.92f, 1.0f, 0.7f), 0.4f);
-					if(ClearFlash > 0.0f && (s_BlockBlast.m_aClearRows[y] || s_BlockBlast.m_aClearCols[x]))
-						Col = BlendColors(Col, ColorRGBA(1.0f, 0.95f, 0.58f, 0.95f), ClearFlash);
-					Cell.Draw(Col, IGraphics::CORNER_ALL, 2.0f);
-				}
-			}
-
-			if(HasSelection && HoverX >= 0 && HoverY >= 0)
-			{
-				const SBlockShape &Shape = s_aShapes[s_BlockBlast.m_aOffer[s_BlockBlast.m_SelectedOffer]];
-				for(int i = 0; i < Shape.m_CellCount; ++i)
-				{
-					const int X = HoverX + Shape.m_aX[i];
-					const int Y = HoverY + Shape.m_aY[i];
-					if(X < 0 || Y < 0 || X >= BLOCKBLAST_BOARD_SIZE || Y >= BLOCKBLAST_BOARD_SIZE)
-						continue;
-					CUIRect Cell;
-					Cell.x = Board.x + X * CellSize;
-					Cell.y = Board.y + Y * CellSize;
-					Cell.w = CellSize;
-					Cell.h = CellSize;
-					const float Pad = maximum(1.0f, CellSize * 0.12f);
-					Cell.Margin(Pad, &Cell);
-					const ColorRGBA Ghost = CanPlaceHover ? ColorRGBA(0.42f, 1.0f, 0.62f, 0.48f) : ColorRGBA(1.0f, 0.42f, 0.42f, 0.48f);
-					Cell.Draw(Ghost, IGraphics::CORNER_ALL, 2.0f);
-				}
-			}
-
-			OffersArea.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.18f), IGraphics::CORNER_ALL, 5.0f);
-			OffersArea.Margin(MARGIN_SMALL, &OffersArea);
-			CUIRect OfferHeader;
-			OffersArea.HSplitTop(LINE_SIZE, &OfferHeader, &OffersArea);
-			Ui()->DoLabel(&OfferHeader, TCLocalize("Available blocks"), FONT_SIZE, TEXTALIGN_ML);
-			OffersArea.HSplitTop(MARGIN_SMALL, nullptr, &OffersArea);
-
-			CUIRect OfferRow = OffersArea;
-			const float Gap = 10.0f;
-			const float CardW = (OfferRow.w - Gap * 2.0f) / 3.0f;
-			for(int i = 0; i < 3; ++i)
-			{
-				CUIRect Card;
-				OfferRow.VSplitLeft(CardW, &Card, &OfferRow);
-				if(i < 2)
-					OfferRow.VSplitLeft(Gap, nullptr, &OfferRow);
-
-				const bool Used = s_BlockBlast.m_aOfferUsed[i] != 0;
-				const bool Dragged = s_BlockBlast.m_Dragging && s_BlockBlast.m_DragOffer == i && !Used;
-				const bool Selected = (s_BlockBlast.m_SelectedOffer == i || Dragged) && !Used;
-				if(!Used && !s_BlockBlast.m_Dragging && Ui()->MouseInside(&Card) && Ui()->MouseButtonClicked(0))
-				{
-					s_BlockBlast.m_SelectedOffer = i;
-					s_BlockBlast.m_Dragging = true;
-					s_BlockBlast.m_DragOffer = i;
-					s_BlockBlast.m_DragMouse = Ui()->MousePos();
-				}
-				if(!Used && !s_BlockBlast.m_Dragging && DoButton_Menu(&s_aOfferButtons[i], "", Selected, &Card, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(1.0f, 1.0f, 1.0f, 0.08f)))
-					s_BlockBlast.m_SelectedOffer = i;
-
-				Card.Draw(Used ? ColorRGBA(0.16f, 0.16f, 0.18f, 0.86f) : Dragged ? ColorRGBA(0.48f, 0.85f, 1.0f, 0.25f) :
-										 Selected        ? ColorRGBA(0.3f, 0.66f, 1.0f, 0.2f) :
-												   ColorRGBA(1.0f, 1.0f, 1.0f, 0.05f),
-					IGraphics::CORNER_ALL, 5.0f);
-				if(Used)
-					continue;
-
-				const SBlockShape &Shape = s_aShapes[s_BlockBlast.m_aOffer[i]];
-				const float ShapeCell = minimum(Card.w / (Shape.m_W + 2.2f), Card.h / (Shape.m_H + 1.9f));
-				const float StartX = Card.x + (Card.w - Shape.m_W * ShapeCell) * 0.5f;
-				const float StartY = Card.y + (Card.h - Shape.m_H * ShapeCell) * 0.52f;
-				for(int c = 0; c < Shape.m_CellCount; ++c)
-				{
-					CUIRect Cell;
-					Cell.x = StartX + Shape.m_aX[c] * ShapeCell;
-					Cell.y = StartY + Shape.m_aY[c] * ShapeCell;
-					Cell.w = ShapeCell;
-					Cell.h = ShapeCell;
-					const float Pad = maximum(1.0f, ShapeCell * 0.12f);
-					Cell.Margin(Pad, &Cell);
-					Cell.Draw(Selected ? ColorRGBA(0.56f, 0.9f, 1.0f, 0.96f) : ColorRGBA(0.5f, 0.82f, 1.0f, 0.93f), IGraphics::CORNER_ALL, 2.0f);
-				}
-			}
-
-			if(IsDraggingOffer)
-			{
-				const SBlockShape &Shape = s_aShapes[s_BlockBlast.m_aOffer[s_BlockBlast.m_DragOffer]];
-				const float DragCell = CellSize * 0.62f;
-				const float StartX = s_BlockBlast.m_DragMouse.x - Shape.m_W * DragCell * 0.5f;
-				const float StartY = s_BlockBlast.m_DragMouse.y - Shape.m_H * DragCell * 0.5f;
-				const bool HoveringBoard = HoverX >= 0 && HoverY >= 0;
-				const ColorRGBA DragColor = HoveringBoard ? (CanPlaceHover ? ColorRGBA(0.42f, 1.0f, 0.62f, 0.6f) : ColorRGBA(1.0f, 0.42f, 0.42f, 0.6f)) : ColorRGBA(0.56f, 0.9f, 1.0f, 0.76f);
-				for(int c = 0; c < Shape.m_CellCount; ++c)
-				{
-					CUIRect Cell;
-					Cell.x = StartX + Shape.m_aX[c] * DragCell;
-					Cell.y = StartY + Shape.m_aY[c] * DragCell;
-					Cell.w = DragCell;
-					Cell.h = DragCell;
-					const float Pad = maximum(1.0f, DragCell * 0.14f);
-					Cell.Margin(Pad, &Cell);
-					Cell.Draw(DragColor, IGraphics::CORNER_ALL, 2.0f);
-				}
-			}
-
-			if(s_BlockBlast.m_GameOver)
-			{
-				CUIRect Overlay = Board;
-				Overlay.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.42f), IGraphics::CORNER_ALL, 5.0f);
-				Ui()->DoLabel(&Overlay, TCLocalize("No space for blocks"), HEADLINE_FONT_SIZE, TEXTALIGN_MC);
-			}
-		}
-	}
-	else if(s_SelectedGame == FUN_GAME_TETRIS)
-	{
-		struct STetrisState
-		{
-			bool m_InGame = false;
-			int m_SpeedPreset = 1;
-			bool m_Initialized = false;
-			int m_W = 10;
-			int m_H = 20;
-			std::vector<int> m_vBoard;
-			int m_PieceType = 0;
-			int m_PieceRot = 0;
-			int m_PieceX = 0;
-			int m_PieceY = 0;
-			int m_NextPiece = 0;
-			int m_Score = 0;
-			int m_Lines = 0;
-			int m_BestScore = 0;
-			bool m_GameOver = false;
-			float m_TickAccumulator = 0.0f;
-			int64_t m_LastTick = 0;
-		};
-
-		static const int s_TetPieceCount = 10;
-		static const char *s_apTetrimino[s_TetPieceCount] = {
-			"..X...X...X...X.",
-			"..X..XX...X.....",
-			".....XX..XX.....",
-			"..X..XX..X......",
-			".X...XX...X.....",
-			".X...X...XX.....",
-			"..X...X..XX.....",
-			".X..XXX..X......",
-			"XX...X...X...X..",
-			"XX...XX...X....."};
-
-		static STetrisState s_Tetris;
-		static CButtonContainer s_TetrisStartButton;
-		static CButtonContainer s_TetrisRestartButton;
-		static CButtonContainer s_TetrisSetupButton;
-
-		auto TetrisIndex = [&](int X, int Y) {
-			return Y * s_Tetris.m_W + X;
-		};
-		auto RotatePieceIndex = [](int X, int Y, int Rotation) {
-			switch(Rotation & 3)
-			{
-			case 0: return Y * 4 + X;
-			case 1: return 12 + Y - X * 4;
-			case 2: return 15 - Y * 4 - X;
-			default: return 3 - Y + X * 4;
-			}
-		};
-		auto DoesPieceFit = [&](int PieceType, int Rotation, int PosX, int PosY) {
-			for(int py = 0; py < 4; ++py)
-			{
-				for(int px = 0; px < 4; ++px)
-				{
-					if(s_apTetrimino[PieceType][RotatePieceIndex(px, py, Rotation)] != 'X')
-						continue;
-					const int BoardX = PosX + px;
-					const int BoardY = PosY + py;
-					if(BoardX < 0 || BoardX >= s_Tetris.m_W || BoardY >= s_Tetris.m_H)
-						return false;
-					if(BoardY >= 0 && s_Tetris.m_vBoard[TetrisIndex(BoardX, BoardY)] != 0)
-						return false;
-				}
-			}
-			return true;
-		};
-		auto SpawnNextPiece = [&]() {
-			s_Tetris.m_PieceType = s_Tetris.m_NextPiece;
-			s_Tetris.m_NextPiece = rand() % s_TetPieceCount;
-			s_Tetris.m_PieceRot = 0;
-			s_Tetris.m_PieceX = s_Tetris.m_W / 2 - 2;
-			s_Tetris.m_PieceY = -1;
-			if(!DoesPieceFit(s_Tetris.m_PieceType, s_Tetris.m_PieceRot, s_Tetris.m_PieceX, s_Tetris.m_PieceY))
-				s_Tetris.m_GameOver = true;
-		};
-		auto ResetTetris = [&]() {
-			s_Tetris.m_Initialized = true;
-			s_Tetris.m_vBoard.assign((size_t)s_Tetris.m_W * s_Tetris.m_H, 0);
-			s_Tetris.m_Score = 0;
-			s_Tetris.m_Lines = 0;
-			s_Tetris.m_GameOver = false;
-			s_Tetris.m_TickAccumulator = 0.0f;
-			s_Tetris.m_LastTick = time_get();
-			s_Tetris.m_NextPiece = rand() % s_TetPieceCount;
-			SpawnNextPiece();
-		};
-		auto PlaceCurrentPiece = [&]() {
-			for(int py = 0; py < 4; ++py)
-				for(int px = 0; px < 4; ++px)
-				{
-					if(s_apTetrimino[s_Tetris.m_PieceType][RotatePieceIndex(px, py, s_Tetris.m_PieceRot)] != 'X')
-						continue;
-					const int X = s_Tetris.m_PieceX + px;
-					const int Y = s_Tetris.m_PieceY + py;
-					if(X < 0 || X >= s_Tetris.m_W || Y < 0 || Y >= s_Tetris.m_H)
-						continue;
-					s_Tetris.m_vBoard[TetrisIndex(X, Y)] = s_Tetris.m_PieceType + 1;
-				}
-
-			int Cleared = 0;
-			for(int y = s_Tetris.m_H - 1; y >= 0; --y)
-			{
-				bool Full = true;
-				for(int x = 0; x < s_Tetris.m_W; ++x)
-				{
-					if(s_Tetris.m_vBoard[TetrisIndex(x, y)] == 0)
-					{
-						Full = false;
-						break;
-					}
-				}
-				if(!Full)
-					continue;
-
-				Cleared++;
-				for(int ty = y; ty > 0; --ty)
-					for(int x = 0; x < s_Tetris.m_W; ++x)
-						s_Tetris.m_vBoard[TetrisIndex(x, ty)] = s_Tetris.m_vBoard[TetrisIndex(x, ty - 1)];
-				for(int x = 0; x < s_Tetris.m_W; ++x)
-					s_Tetris.m_vBoard[TetrisIndex(x, 0)] = 0;
-				y++;
-			}
-
-			s_Tetris.m_Lines += Cleared;
-			s_Tetris.m_Score += 20 + Cleared * Cleared * 120;
-			s_Tetris.m_BestScore = maximum(s_Tetris.m_BestScore, s_Tetris.m_Score);
-			SpawnNextPiece();
-		};
-		auto TryMovePiece = [&](int DX, int DY) {
-			if(DoesPieceFit(s_Tetris.m_PieceType, s_Tetris.m_PieceRot, s_Tetris.m_PieceX + DX, s_Tetris.m_PieceY + DY))
-			{
-				s_Tetris.m_PieceX += DX;
-				s_Tetris.m_PieceY += DY;
-				return true;
-			}
-			return false;
-		};
-		auto TryRotatePiece = [&]() {
-			for(int Kick : {0, -1, 1, -2, 2})
-			{
-				if(DoesPieceFit(s_Tetris.m_PieceType, s_Tetris.m_PieceRot + 1, s_Tetris.m_PieceX + Kick, s_Tetris.m_PieceY))
-				{
-					s_Tetris.m_PieceRot += 1;
-					s_Tetris.m_PieceX += Kick;
-					return true;
-				}
-			}
-			return false;
-		};
-
-		if(!s_Tetris.m_InGame)
-		{
-			CUIRect SetupView = GameContent;
-			CUIRect Option;
-			PrepareSetupView(SetupView);
-
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			int SpeedClick = DoButton_CheckBox_Number(&s_Tetris.m_SpeedPreset, TCLocalize("Start Speed"), s_Tetris.m_SpeedPreset + 1, &Option);
-			UpdateSettingByClick(SpeedClick, s_Tetris.m_SpeedPreset, 0, 2);
-
-			SetupView.HSplitTop(MARGIN, nullptr, &SetupView);
-			SetupView.HSplitTop(LINE_SIZE * 1.5f, &Option, &SetupView);
-			if(DoButton_Menu(&s_TetrisStartButton, TCLocalize("Start"), 0, &Option))
-			{
-				s_Tetris.m_InGame = true;
-				ResetTetris();
-			}
-		}
-		else
-		{
-			if(!s_Tetris.m_Initialized)
-				ResetTetris();
-
-			CUIRect TopBar, BoardArea;
-			GameContent.HSplitTop(LINE_SIZE * 1.2f, &TopBar, &BoardArea);
-			BoardArea.HSplitTop(MARGIN_SMALL, nullptr, &BoardArea);
-
-			CUIRect Stats, BtnArea, RestartButton, SetupButton;
-			TopBar.VSplitLeft(360.0f, &Stats, &BtnArea);
-			BtnArea.VSplitRight(220.0f, &BtnArea, &SetupButton);
-			BtnArea.VSplitRight(110.0f, &BtnArea, &RestartButton);
-			SetupButton.VSplitLeft(10.0f, nullptr, &SetupButton);
-
-			char aStats[128];
-			str_format(aStats, sizeof(aStats), "Score: %d   Lines: %d   Best: %d", s_Tetris.m_Score, s_Tetris.m_Lines, s_Tetris.m_BestScore);
-			Ui()->DoLabel(&Stats, aStats, FONT_SIZE, TEXTALIGN_ML);
-			if(DoButton_Menu(&s_TetrisRestartButton, TCLocalize("Restart"), 0, &RestartButton))
-				ResetTetris();
-			if(DoButton_Menu(&s_TetrisSetupButton, TCLocalize("Setup"), 0, &SetupButton))
-				s_Tetris.m_InGame = false;
-
-			if(!s_Tetris.m_GameOver)
-			{
-				if(Input()->KeyPress(KEY_LEFT) || Input()->KeyPress(KEY_A))
-					TryMovePiece(-1, 0);
-				if(Input()->KeyPress(KEY_RIGHT) || Input()->KeyPress(KEY_D))
-					TryMovePiece(1, 0);
-				if(Input()->KeyPress(KEY_DOWN) || Input()->KeyPress(KEY_S))
-					TryMovePiece(0, 1);
-				if(Input()->KeyPress(KEY_UP) || Input()->KeyPress(KEY_W))
-					TryRotatePiece();
-				if(Input()->KeyPress(KEY_SPACE))
-				{
-					while(TryMovePiece(0, 1))
-						;
-					PlaceCurrentPiece();
-				}
-
-				const int64_t Now = time_get();
-				float Dt = (Now - s_Tetris.m_LastTick) / (float)time_freq();
-				s_Tetris.m_LastTick = Now;
-				Dt = std::clamp(Dt, 0.0f, 0.05f);
-				s_Tetris.m_TickAccumulator += Dt;
-
-				const float BaseStep = s_Tetris.m_SpeedPreset == 0 ? 0.56f : s_Tetris.m_SpeedPreset == 1 ? 0.44f :
-															   0.32f;
-				const float Step = maximum(0.08f, BaseStep - s_Tetris.m_Lines * 0.008f);
-				while(s_Tetris.m_TickAccumulator >= Step && !s_Tetris.m_GameOver)
-				{
-					s_Tetris.m_TickAccumulator -= Step;
-					if(!TryMovePiece(0, 1))
-						PlaceCurrentPiece();
-				}
-			}
-
-			CUIRect BoardRect, SideRect;
-			BoardArea.VSplitLeft(BoardArea.w * 0.72f, &BoardRect, &SideRect);
-			BoardRect.Margin(4.0f, &BoardRect);
-			SideRect.Margin(8.0f, &SideRect);
-
-			const float CellSize = minimum(BoardRect.w / s_Tetris.m_W, BoardRect.h / s_Tetris.m_H);
-			CUIRect Board;
-			Board.w = CellSize * s_Tetris.m_W;
-			Board.h = CellSize * s_Tetris.m_H;
-			Board.x = BoardRect.x + (BoardRect.w - Board.w) * 0.5f;
-			Board.y = BoardRect.y + (BoardRect.h - Board.h) * 0.5f;
-			Board.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.28f), IGraphics::CORNER_ALL, 4.0f);
-
-			static const ColorRGBA s_aTetColors[11] = {
-				ColorRGBA(0.0f, 0.0f, 0.0f, 0.0f),
-				ColorRGBA(0.38f, 0.90f, 1.0f, 0.96f),
-				ColorRGBA(0.70f, 0.47f, 1.0f, 0.96f),
-				ColorRGBA(1.0f, 0.93f, 0.34f, 0.96f),
-				ColorRGBA(0.36f, 0.89f, 0.52f, 0.96f),
-				ColorRGBA(1.0f, 0.44f, 0.45f, 0.96f),
-				ColorRGBA(0.34f, 0.56f, 1.0f, 0.96f),
-				ColorRGBA(1.0f, 0.66f, 0.36f, 0.96f),
-				ColorRGBA(0.92f, 0.82f, 0.31f, 0.96f),
-				ColorRGBA(0.42f, 0.86f, 0.73f, 0.96f),
-				ColorRGBA(0.86f, 0.48f, 0.88f, 0.96f)};
-
-			for(int y = 0; y < s_Tetris.m_H; ++y)
-			{
-				for(int x = 0; x < s_Tetris.m_W; ++x)
-				{
-					const int Value = s_Tetris.m_vBoard[TetrisIndex(x, y)];
-					CUIRect Cell;
-					Cell.x = Board.x + x * CellSize;
-					Cell.y = Board.y + y * CellSize;
-					Cell.w = CellSize;
-					Cell.h = CellSize;
-					const float Pad = maximum(1.0f, CellSize * 0.07f);
-					Cell.Margin(Pad, &Cell);
-					Cell.Draw(Value == 0 ? ColorRGBA(1.0f, 1.0f, 1.0f, 0.05f) : s_aTetColors[Value], IGraphics::CORNER_ALL, 2.0f);
-				}
-			}
-
-			if(!s_Tetris.m_GameOver)
-			{
-				int GhostY = s_Tetris.m_PieceY;
-				while(DoesPieceFit(s_Tetris.m_PieceType, s_Tetris.m_PieceRot, s_Tetris.m_PieceX, GhostY + 1))
-					GhostY++;
-
-				for(int py = 0; py < 4; ++py)
-					for(int px = 0; px < 4; ++px)
-					{
-						if(s_apTetrimino[s_Tetris.m_PieceType][RotatePieceIndex(px, py, s_Tetris.m_PieceRot)] != 'X')
-							continue;
-						const int X = s_Tetris.m_PieceX + px;
-						const int Y = GhostY + py;
-						if(X < 0 || X >= s_Tetris.m_W || Y < 0 || Y >= s_Tetris.m_H)
-							continue;
-						CUIRect Cell;
-						Cell.x = Board.x + X * CellSize;
-						Cell.y = Board.y + Y * CellSize;
-						Cell.w = CellSize;
-						Cell.h = CellSize;
-						const float Pad = maximum(1.0f, CellSize * 0.17f);
-						Cell.Margin(Pad, &Cell);
-						Cell.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.16f), IGraphics::CORNER_ALL, 1.0f);
-					}
-
-				for(int py = 0; py < 4; ++py)
-					for(int px = 0; px < 4; ++px)
-					{
-						if(s_apTetrimino[s_Tetris.m_PieceType][RotatePieceIndex(px, py, s_Tetris.m_PieceRot)] != 'X')
-							continue;
-						const int X = s_Tetris.m_PieceX + px;
-						const int Y = s_Tetris.m_PieceY + py;
-						if(X < 0 || X >= s_Tetris.m_W || Y < 0 || Y >= s_Tetris.m_H)
-							continue;
-						CUIRect Cell;
-						Cell.x = Board.x + X * CellSize;
-						Cell.y = Board.y + Y * CellSize;
-						Cell.w = CellSize;
-						Cell.h = CellSize;
-						const float Pad = maximum(1.0f, CellSize * 0.07f);
-						Cell.Margin(Pad, &Cell);
-						Cell.Draw(s_aTetColors[s_Tetris.m_PieceType + 1], IGraphics::CORNER_ALL, 2.0f);
-					}
-			}
-
-			SideRect.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.18f), IGraphics::CORNER_ALL, 4.0f);
-			CUIRect NextLabel, NextPreview;
-			SideRect.HSplitTop(LINE_SIZE, &NextLabel, &NextPreview);
-			Ui()->DoLabel(&NextLabel, TCLocalize("Next"), FONT_SIZE, TEXTALIGN_ML);
-			NextPreview.HSplitTop(MARGIN_SMALL, nullptr, &NextPreview);
-
-			const float PreviewCell = minimum(NextPreview.w, NextPreview.h) / 5.5f;
-			CUIRect PreviewRect;
-			PreviewRect.w = PreviewCell * 4.0f;
-			PreviewRect.h = PreviewCell * 4.0f;
-			PreviewRect.x = NextPreview.x + (NextPreview.w - PreviewRect.w) * 0.5f;
-			PreviewRect.y = NextPreview.y + MARGIN_SMALL;
-			PreviewRect.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.04f), IGraphics::CORNER_ALL, 3.0f);
-
-			for(int py = 0; py < 4; ++py)
-				for(int px = 0; px < 4; ++px)
-				{
-					if(s_apTetrimino[s_Tetris.m_NextPiece][RotatePieceIndex(px, py, 0)] != 'X')
-						continue;
-					CUIRect Cell;
-					Cell.x = PreviewRect.x + px * PreviewCell;
-					Cell.y = PreviewRect.y + py * PreviewCell;
-					Cell.w = PreviewCell;
-					Cell.h = PreviewCell;
-					const float Pad = maximum(1.0f, PreviewCell * 0.08f);
-					Cell.Margin(Pad, &Cell);
-					Cell.Draw(s_aTetColors[s_Tetris.m_NextPiece + 1], IGraphics::CORNER_ALL, 2.0f);
-				}
-
-			if(s_Tetris.m_GameOver)
-			{
-				CUIRect Overlay = Board;
-				Overlay.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.42f), IGraphics::CORNER_ALL, 4.0f);
-				Ui()->DoLabel(&Overlay, TCLocalize("Game Over"), HEADLINE_FONT_SIZE, TEXTALIGN_MC);
-			}
-		}
 	}
 	else if(s_SelectedGame == FUN_GAME_PONG)
 	{
 		struct SPongState
 		{
-			bool m_InGame = false;
 			int m_Difficulty = 1;
 			bool m_Initialized = false;
 			float m_PlayerY = 0.5f;
@@ -4034,13 +2715,11 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			int m_BotScore = 0;
 			int m_BestScore = 0;
 			bool m_GameOver = false;
+			bool m_Waiting = true;
 			int64_t m_LastTick = 0;
 		};
 
 		static SPongState s_Pong;
-		static CButtonContainer s_PongStartButton;
-		static CButtonContainer s_PongRestartButton;
-		static CButtonContainer s_PongSetupButton;
 
 		auto ResetPongRound = [&](int DirectionSign) {
 			s_Pong.m_BallPos = vec2(0.5f, 0.5f);
@@ -4054,30 +2733,11 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			s_Pong.m_PlayerScore = 0;
 			s_Pong.m_BotScore = 0;
 			s_Pong.m_GameOver = false;
+			s_Pong.m_Waiting = true;
 			s_Pong.m_LastTick = time_get();
 			ResetPongRound(rand() % 2 == 0 ? -1 : 1);
 		};
 
-		if(!s_Pong.m_InGame)
-		{
-			CUIRect SetupView = GameContent;
-			CUIRect Option;
-			PrepareSetupView(SetupView);
-
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			int DiffClick = DoButton_CheckBox_Number(&s_Pong.m_Difficulty, TCLocalize("Bot Skill"), s_Pong.m_Difficulty + 1, &Option);
-			UpdateSettingByClick(DiffClick, s_Pong.m_Difficulty, 0, 2);
-
-			SetupView.HSplitTop(MARGIN, nullptr, &SetupView);
-			SetupView.HSplitTop(LINE_SIZE * 1.5f, &Option, &SetupView);
-			if(DoButton_Menu(&s_PongStartButton, TCLocalize("Start"), 0, &Option))
-			{
-				s_Pong.m_InGame = true;
-				ResetPong();
-			}
-		}
-		else
-		{
 			if(!s_Pong.m_Initialized)
 				ResetPong();
 
@@ -4085,19 +2745,16 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			GameContent.HSplitTop(LINE_SIZE * 1.2f, &TopBar, &ArenaArea);
 			ArenaArea.HSplitTop(MARGIN_SMALL, nullptr, &ArenaArea);
 
-			CUIRect Stats, BtnArea, RestartButton, SetupButton;
+			CUIRect Stats, BtnArea, RestartButton;
 			TopBar.VSplitLeft(280.0f, &Stats, &BtnArea);
-			BtnArea.VSplitRight(220.0f, &BtnArea, &SetupButton);
 			BtnArea.VSplitRight(110.0f, &BtnArea, &RestartButton);
-			SetupButton.VSplitLeft(10.0f, nullptr, &SetupButton);
 
 			char aStats[128];
 			str_format(aStats, sizeof(aStats), "You %d : %d Bot", s_Pong.m_PlayerScore, s_Pong.m_BotScore);
 			Ui()->DoLabel(&Stats, aStats, FONT_SIZE, TEXTALIGN_ML);
+			static CButtonContainer s_PongRestartButton;
 			if(DoButton_Menu(&s_PongRestartButton, TCLocalize("Restart"), 0, &RestartButton))
 				ResetPong();
-			if(DoButton_Menu(&s_PongSetupButton, TCLocalize("Setup"), 0, &SetupButton))
-				s_Pong.m_InGame = false;
 
 			CUIRect Arena = ArenaArea;
 			const float PreferredW = minimum(ArenaArea.w, ArenaArea.h * 1.8f);
@@ -4108,7 +2765,19 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			Arena.Draw(ColorRGBA(0.02f, 0.05f, 0.09f, 0.92f), IGraphics::CORNER_ALL, 6.0f);
 			Arena.DrawOutline(ColorRGBA(0.35f, 0.78f, 1.0f, 0.35f));
 
-			if(!s_Pong.m_GameOver)
+			{
+				const bool AnyKey = Input()->KeyPress(KEY_W) || Input()->KeyPress(KEY_S) ||
+					Input()->KeyPress(KEY_UP) || Input()->KeyPress(KEY_DOWN) ||
+					Input()->KeyPress(KEY_SPACE) || Input()->KeyPress(KEY_RETURN) || Input()->KeyPress(KEY_KP_ENTER) ||
+					(Ui()->MouseButtonClicked(0) && Ui()->MouseInside(&Arena));
+				if(s_Pong.m_Waiting && AnyKey)
+				{
+					s_Pong.m_Waiting = false;
+					s_Pong.m_LastTick = time_get();
+				}
+			}
+
+			if(!s_Pong.m_Waiting && !s_Pong.m_GameOver)
 			{
 				const int64_t Now = time_get();
 				float Dt = (Now - s_Pong.m_LastTick) / (float)time_freq();
@@ -4230,13 +2899,18 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			Ball.y = Arena.y + Arena.h * s_Pong.m_BallPos.y - Ball.h * 0.5f;
 			Ball.Draw(ColorRGBA(0.98f, 0.98f, 1.0f, 0.98f), IGraphics::CORNER_ALL, Ball.h * 0.5f);
 
-			if(s_Pong.m_GameOver)
+			if(s_Pong.m_Waiting)
+			{
+				CUIRect Overlay = Arena;
+				Overlay.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.5f), IGraphics::CORNER_ALL, 6.0f);
+				Ui()->DoLabel(&Overlay, TCLocalize("Press any key to start"), HEADLINE_FONT_SIZE, TEXTALIGN_MC);
+			}
+			else if(s_Pong.m_GameOver)
 			{
 				CUIRect Overlay = Arena;
 				Overlay.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.42f), IGraphics::CORNER_ALL, 6.0f);
 				Ui()->DoLabel(&Overlay, s_Pong.m_PlayerScore > s_Pong.m_BotScore ? TCLocalize("You Win") : TCLocalize("Bot Wins"), HEADLINE_FONT_SIZE, TEXTALIGN_MC);
 			}
-		}
 	}
 	else if(s_SelectedGame == FUN_GAME_DINOSAUR)
 	{
@@ -4249,7 +2923,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 
 		struct SDinosaurState
 		{
-			bool m_InGame = false;
 			int m_Difficulty = 1;
 			bool m_Initialized = false;
 			float m_DinoY = 0.0f;
@@ -4263,9 +2936,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 		};
 
 		static SDinosaurState s_Dino;
-		static CButtonContainer s_DinoStartButton;
-		static CButtonContainer s_DinoRestartButton;
-		static CButtonContainer s_DinoSetupButton;
 
 		auto DinoRandom = [&](float Min, float Max) {
 			return Min + (rand() / (float)RAND_MAX) * (Max - Min);
@@ -4281,26 +2951,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			s_Dino.m_LastTick = time_get();
 		};
 
-		if(!s_Dino.m_InGame)
-		{
-			CUIRect SetupView = GameContent;
-			CUIRect Option;
-			PrepareSetupView(SetupView);
-
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			int DiffClick = DoButton_CheckBox_Number(&s_Dino.m_Difficulty, TCLocalize("Speed"), s_Dino.m_Difficulty + 1, &Option);
-			UpdateSettingByClick(DiffClick, s_Dino.m_Difficulty, 0, 2);
-
-			SetupView.HSplitTop(MARGIN, nullptr, &SetupView);
-			SetupView.HSplitTop(LINE_SIZE * 1.5f, &Option, &SetupView);
-			if(DoButton_Menu(&s_DinoStartButton, TCLocalize("Start"), 0, &Option))
-			{
-				s_Dino.m_InGame = true;
-				ResetDino();
-			}
-		}
-		else
-		{
 			if(!s_Dino.m_Initialized)
 				ResetDino();
 
@@ -4308,20 +2958,17 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			GameContent.HSplitTop(LINE_SIZE * 1.2f, &TopBar, &ArenaArea);
 			ArenaArea.HSplitTop(MARGIN_SMALL, nullptr, &ArenaArea);
 
-			CUIRect Stats, BtnArea, RestartButton, SetupButton;
+			CUIRect Stats, BtnArea, RestartButton;
 			TopBar.VSplitLeft(280.0f, &Stats, &BtnArea);
-			BtnArea.VSplitRight(220.0f, &BtnArea, &SetupButton);
 			BtnArea.VSplitRight(110.0f, &BtnArea, &RestartButton);
-			SetupButton.VSplitLeft(10.0f, nullptr, &SetupButton);
 
 			const int CurrentScore = round_to_int(s_Dino.m_Score);
 			char aStats[128];
 			str_format(aStats, sizeof(aStats), "Score: %d   Best: %d", CurrentScore, s_Dino.m_BestScore);
 			Ui()->DoLabel(&Stats, aStats, FONT_SIZE, TEXTALIGN_ML);
+			static CButtonContainer s_DinoRestartButton;
 			if(DoButton_Menu(&s_DinoRestartButton, TCLocalize("Restart"), 0, &RestartButton))
 				ResetDino();
-			if(DoButton_Menu(&s_DinoSetupButton, TCLocalize("Setup"), 0, &SetupButton))
-				s_Dino.m_InGame = false;
 
 			CUIRect Arena = ArenaArea;
 			const float PreferredW = minimum(ArenaArea.w, ArenaArea.h * 2.4f);
@@ -4450,13 +3097,11 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 				Overlay.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.32f), IGraphics::CORNER_ALL, 6.0f);
 				Ui()->DoLabel(&Overlay, TCLocalize("You hit a cactus"), HEADLINE_FONT_SIZE, TEXTALIGN_MC);
 			}
-		}
 	}
 	else if(s_SelectedGame == FUN_GAME_BRICK_BREAKER)
 	{
 		struct SBrickBreakerState
 		{
-			bool m_InGame = false;
 			int m_RowPreset = 1;
 			int m_LivesPreset = 1;
 			bool m_Initialized = false;
@@ -4479,9 +3124,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 		};
 
 		static SBrickBreakerState s_Brick;
-		static CButtonContainer s_BrickStartButton;
-		static CButtonContainer s_BrickRestartButton;
-		static CButtonContainer s_BrickSetupButton;
 
 		auto BrickIdx = [&](int X, int Y) {
 			return Y * s_Brick.m_Cols + X;
@@ -4512,34 +3154,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			ResetBrickRound();
 		};
 
-		if(!s_Brick.m_InGame)
-		{
-			CUIRect SetupView = GameContent;
-			CUIRect Option;
-			PrepareSetupView(SetupView);
-
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			int RowsClick = DoButton_CheckBox_Number(&s_Brick.m_RowPreset, TCLocalize("Brick Rows"), s_Brick.m_RowPreset == 0 ? 4 : s_Brick.m_RowPreset == 1 ? 6 :
-																					   8,
-				&Option);
-			UpdateSettingByClick(RowsClick, s_Brick.m_RowPreset, 0, 2);
-
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			int LivesClick = DoButton_CheckBox_Number(&s_Brick.m_LivesPreset, TCLocalize("Lives"), s_Brick.m_LivesPreset == 0 ? 2 : s_Brick.m_LivesPreset == 1 ? 3 :
-																					     5,
-				&Option);
-			UpdateSettingByClick(LivesClick, s_Brick.m_LivesPreset, 0, 2);
-
-			SetupView.HSplitTop(MARGIN, nullptr, &SetupView);
-			SetupView.HSplitTop(LINE_SIZE * 1.5f, &Option, &SetupView);
-			if(DoButton_Menu(&s_BrickStartButton, TCLocalize("Start"), 0, &Option))
-			{
-				s_Brick.m_InGame = true;
-				ResetBrickBreaker();
-			}
-		}
-		else
-		{
 			if(!s_Brick.m_Initialized)
 				ResetBrickBreaker();
 
@@ -4547,19 +3161,16 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			GameContent.HSplitTop(LINE_SIZE * 1.2f, &TopBar, &ArenaArea);
 			ArenaArea.HSplitTop(MARGIN_SMALL, nullptr, &ArenaArea);
 
-			CUIRect Stats, BtnArea, RestartButton, SetupButton;
+			CUIRect Stats, BtnArea, RestartButton;
 			TopBar.VSplitLeft(380.0f, &Stats, &BtnArea);
-			BtnArea.VSplitRight(220.0f, &BtnArea, &SetupButton);
 			BtnArea.VSplitRight(110.0f, &BtnArea, &RestartButton);
-			SetupButton.VSplitLeft(10.0f, nullptr, &SetupButton);
 
 			char aStats[160];
 			str_format(aStats, sizeof(aStats), "Score: %d   Bricks: %d   Lives: %d   Best: %d", s_Brick.m_Score, s_Brick.m_RemainingBricks, s_Brick.m_Lives, s_Brick.m_BestScore);
 			Ui()->DoLabel(&Stats, aStats, FONT_SIZE, TEXTALIGN_ML);
+			static CButtonContainer s_BrickRestartButton;
 			if(DoButton_Menu(&s_BrickRestartButton, TCLocalize("Restart"), 0, &RestartButton))
 				ResetBrickBreaker();
-			if(DoButton_Menu(&s_BrickSetupButton, TCLocalize("Setup"), 0, &SetupButton))
-				s_Brick.m_InGame = false;
 
 			CUIRect Arena = ArenaArea;
 			const float PreferredW = minimum(ArenaArea.w, ArenaArea.h * 1.35f);
@@ -4732,13 +3343,11 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 				Overlay.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.40f), IGraphics::CORNER_ALL, 6.0f);
 				Ui()->DoLabel(&Overlay, s_Brick.m_Won ? TCLocalize("All bricks cleared") : TCLocalize("Game Over"), HEADLINE_FONT_SIZE, TEXTALIGN_MC);
 			}
-		}
 	}
 	else if(s_SelectedGame == FUN_GAME_FOUR_IN_A_ROW)
 	{
 		struct SConnect4State
 		{
-			bool m_InGame = false;
 			int m_Mode = 1; // 0 local, 1 bot
 			bool m_Initialized = false;
 			int m_W = 7;
@@ -4752,9 +3361,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 		};
 
 		static SConnect4State s_Connect4;
-		static CButtonContainer s_Connect4StartButton;
-		static CButtonContainer s_Connect4RestartButton;
-		static CButtonContainer s_Connect4SetupButton;
 
 		auto C4Idx = [&](int X, int Y) {
 			return Y * s_Connect4.m_W + X;
@@ -4836,28 +3442,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			return -1;
 		};
 
-		if(!s_Connect4.m_InGame)
-		{
-			CUIRect SetupView = GameContent;
-			CUIRect Option;
-			PrepareSetupView(SetupView);
-
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			int ModeClick = DoButton_CheckBox_Number(&s_Connect4.m_Mode, TCLocalize("Mode"), s_Connect4.m_Mode + 1, &Option);
-			UpdateSettingByClick(ModeClick, s_Connect4.m_Mode, 0, 1);
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			Ui()->DoLabel(&Option, s_Connect4.m_Mode == 0 ? TCLocalize("1 = Local two players") : TCLocalize("2 = Versus bot"), FONT_SIZE, TEXTALIGN_ML);
-
-			SetupView.HSplitTop(MARGIN, nullptr, &SetupView);
-			SetupView.HSplitTop(LINE_SIZE * 1.5f, &Option, &SetupView);
-			if(DoButton_Menu(&s_Connect4StartButton, TCLocalize("Start"), 0, &Option))
-			{
-				s_Connect4.m_InGame = true;
-				ResetConnect4();
-			}
-		}
-		else
-		{
 			if(!s_Connect4.m_Initialized)
 				ResetConnect4();
 
@@ -4865,20 +3449,17 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			GameContent.HSplitTop(LINE_SIZE * 1.2f, &TopBar, &BoardArea);
 			BoardArea.HSplitTop(MARGIN_SMALL, nullptr, &BoardArea);
 
-			CUIRect Status, BtnArea, RestartButton, SetupButton;
+			CUIRect Status, BtnArea, RestartButton;
 			TopBar.VSplitLeft(360.0f, &Status, &BtnArea);
-			BtnArea.VSplitRight(220.0f, &BtnArea, &SetupButton);
 			BtnArea.VSplitRight(110.0f, &BtnArea, &RestartButton);
-			SetupButton.VSplitLeft(10.0f, nullptr, &SetupButton);
 
 			const char *pStatus = s_Connect4.m_GameOver ? (s_Connect4.m_Winner == 1 ? TCLocalize("Red wins") : s_Connect4.m_Winner == 2 ? TCLocalize("Yellow wins") :
 																		      TCLocalize("Draw")) :
 								      (s_Connect4.m_Turn == 1 ? TCLocalize("Turn: Red") : TCLocalize("Turn: Yellow"));
 			Ui()->DoLabel(&Status, pStatus, FONT_SIZE, TEXTALIGN_ML);
+			static CButtonContainer s_Connect4RestartButton;
 			if(DoButton_Menu(&s_Connect4RestartButton, TCLocalize("Restart"), 0, &RestartButton))
 				ResetConnect4();
-			if(DoButton_Menu(&s_Connect4SetupButton, TCLocalize("Setup"), 0, &SetupButton))
-				s_Connect4.m_InGame = false;
 
 			CUIRect Board;
 			const float BoardW = minimum(BoardArea.w, BoardArea.h * (7.0f / 6.0f));
@@ -4986,7 +3567,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 					break;
 				}
 			}
-		}
 	}
 	else if(s_SelectedGame == FUN_GAME_MINI_GOLF)
 	{
@@ -5000,7 +3580,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 
 		struct SMiniGolfState
 		{
-			bool m_InGame = false;
 			int m_StartLevelPreset = 0;
 			bool m_Initialized = false;
 			int m_CurrentLevel = 0;
@@ -5021,9 +3600,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 		};
 
 		static SMiniGolfState s_Golf;
-		static CButtonContainer s_GolfStartButton;
-		static CButtonContainer s_GolfRestartButton;
-		static CButtonContainer s_GolfSetupButton;
 
 		auto IsBallMoving = [&]() {
 			return fabs(s_Golf.m_BallVel.x) + fabs(s_Golf.m_BallVel.y) > 0.001f;
@@ -5082,26 +3658,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			StartGolfLevel();
 		};
 
-		if(!s_Golf.m_InGame)
-		{
-			CUIRect SetupView = GameContent;
-			CUIRect Option;
-			PrepareSetupView(SetupView);
-
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			int LevelClick = DoButton_CheckBox_Number(&s_Golf.m_StartLevelPreset, TCLocalize("Start Level"), s_Golf.m_StartLevelPreset + 1, &Option);
-			UpdateSettingByClick(LevelClick, s_Golf.m_StartLevelPreset, 0, 2);
-
-			SetupView.HSplitTop(MARGIN, nullptr, &SetupView);
-			SetupView.HSplitTop(LINE_SIZE * 1.5f, &Option, &SetupView);
-			if(DoButton_Menu(&s_GolfStartButton, TCLocalize("Start"), 0, &Option))
-			{
-				s_Golf.m_InGame = true;
-				ResetMiniGolf();
-			}
-		}
-		else
-		{
 			if(!s_Golf.m_Initialized)
 				ResetMiniGolf();
 
@@ -5109,11 +3665,9 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			GameContent.HSplitTop(LINE_SIZE * 1.2f, &TopBar, &ArenaArea);
 			ArenaArea.HSplitTop(MARGIN_SMALL, nullptr, &ArenaArea);
 
-			CUIRect Stats, BtnArea, RestartButton, SetupButton;
+			CUIRect Stats, BtnArea, RestartButton;
 			TopBar.VSplitLeft(470.0f, &Stats, &BtnArea);
-			BtnArea.VSplitRight(220.0f, &BtnArea, &SetupButton);
 			BtnArea.VSplitRight(110.0f, &BtnArea, &RestartButton);
-			SetupButton.VSplitLeft(10.0f, nullptr, &SetupButton);
 
 			char aBest[32];
 			if(s_Golf.m_BestTotal > 0)
@@ -5123,10 +3677,9 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			char aStats[196];
 			str_format(aStats, sizeof(aStats), "Level: %d/%d   Level strokes: %d   Total: %d   Best: %s", s_Golf.m_CurrentLevel + 1, s_Golf.m_TotalLevels, s_Golf.m_LevelStrokes, s_Golf.m_TotalStrokes, aBest);
 			Ui()->DoLabel(&Stats, aStats, FONT_SIZE, TEXTALIGN_ML);
+			static CButtonContainer s_GolfRestartButton;
 			if(DoButton_Menu(&s_GolfRestartButton, TCLocalize("Restart"), 0, &RestartButton))
 				ResetMiniGolf();
-			if(DoButton_Menu(&s_GolfSetupButton, TCLocalize("Setup"), 0, &SetupButton))
-				s_Golf.m_InGame = false;
 
 			CUIRect Arena = ArenaArea;
 			const float PreferredW = minimum(ArenaArea.w, ArenaArea.h * 1.9f);
@@ -5332,7 +3885,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 				Overlay.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.34f), IGraphics::CORNER_ALL, 8.0f);
 				Ui()->DoLabel(&Overlay, TCLocalize("Course complete"), HEADLINE_FONT_SIZE, TEXTALIGN_MC);
 			}
-		}
 	}
 	else if(s_SelectedGame == FUN_GAME_CHECKERS)
 	{
@@ -5345,7 +3897,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 
 		struct SCheckersState
 		{
-			bool m_InGame = false;
 			int m_Mode = 1; // 0 local, 1 bot
 			bool m_Initialized = false;
 			std::array<int, 64> m_aBoard{};
@@ -5357,9 +3908,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 		};
 
 		static SCheckersState s_Checkers;
-		static CButtonContainer s_CheckersStartButton;
-		static CButtonContainer s_CheckersRestartButton;
-		static CButtonContainer s_CheckersSetupButton;
 
 		auto ChIdx = [&](int X, int Y) {
 			return Y * 8 + X;
@@ -5494,28 +4042,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			}
 		};
 
-		if(!s_Checkers.m_InGame)
-		{
-			CUIRect SetupView = GameContent;
-			CUIRect Option;
-			PrepareSetupView(SetupView);
-
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			int ModeClick = DoButton_CheckBox_Number(&s_Checkers.m_Mode, TCLocalize("Mode"), s_Checkers.m_Mode + 1, &Option);
-			UpdateSettingByClick(ModeClick, s_Checkers.m_Mode, 0, 1);
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			Ui()->DoLabel(&Option, s_Checkers.m_Mode == 0 ? TCLocalize("1 = Local two players") : TCLocalize("2 = Versus bot"), FONT_SIZE, TEXTALIGN_ML);
-
-			SetupView.HSplitTop(MARGIN, nullptr, &SetupView);
-			SetupView.HSplitTop(LINE_SIZE * 1.5f, &Option, &SetupView);
-			if(DoButton_Menu(&s_CheckersStartButton, TCLocalize("Start"), 0, &Option))
-			{
-				s_Checkers.m_InGame = true;
-				ResetCheckers();
-			}
-		}
-		else
-		{
 			if(!s_Checkers.m_Initialized)
 				ResetCheckers();
 
@@ -5523,18 +4049,15 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			GameContent.HSplitTop(LINE_SIZE * 1.2f, &TopBar, &BoardArea);
 			BoardArea.HSplitTop(MARGIN_SMALL, nullptr, &BoardArea);
 
-			CUIRect Status, BtnArea, RestartButton, SetupButton;
+			CUIRect Status, BtnArea, RestartButton;
 			TopBar.VSplitLeft(380.0f, &Status, &BtnArea);
-			BtnArea.VSplitRight(220.0f, &BtnArea, &SetupButton);
 			BtnArea.VSplitRight(110.0f, &BtnArea, &RestartButton);
-			SetupButton.VSplitLeft(10.0f, nullptr, &SetupButton);
 
 			const char *pStatus = s_Checkers.m_GameOver ? (s_Checkers.m_Winner > 0 ? TCLocalize("White wins") : TCLocalize("Black wins")) : (s_Checkers.m_Turn > 0 ? TCLocalize("Turn: White") : TCLocalize("Turn: Black"));
 			Ui()->DoLabel(&Status, pStatus, FONT_SIZE, TEXTALIGN_ML);
+			static CButtonContainer s_CheckersRestartButton;
 			if(DoButton_Menu(&s_CheckersRestartButton, TCLocalize("Restart"), 0, &RestartButton))
 				ResetCheckers();
-			if(DoButton_Menu(&s_CheckersSetupButton, TCLocalize("Setup"), 0, &SetupButton))
-				s_Checkers.m_InGame = false;
 
 			CUIRect Board;
 			const float BoardSize = minimum(BoardArea.w, BoardArea.h);
@@ -5631,13 +4154,11 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 						RenderIconLabel(Disc, FONT_ICON_CHESS_KING, Disc.h * 0.46f, TEXTALIGN_MC, &KingColor);
 					}
 				}
-		}
 	}
 	else if(s_SelectedGame == FUN_GAME_BATTLESHIP)
 	{
 		struct SBattleshipState
 		{
-			bool m_InGame = false;
 			int m_SizePreset = 1;
 			bool m_Initialized = false;
 			int m_Size = 10;
@@ -5651,9 +4172,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 		};
 
 		static SBattleshipState s_Battle;
-		static CButtonContainer s_BattleStartButton;
-		static CButtonContainer s_BattleRestartButton;
-		static CButtonContainer s_BattleSetupButton;
 
 		auto BsIdx = [&](int X, int Y) {
 			return Y * s_Battle.m_Size + X;
@@ -5728,26 +4246,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 				s_Battle.m_TotalShipCells += Cell ? 1 : 0;
 		};
 
-		if(!s_Battle.m_InGame)
-		{
-			CUIRect SetupView = GameContent;
-			CUIRect Option;
-			PrepareSetupView(SetupView);
-
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			int SizeClick = DoButton_CheckBox_Number(&s_Battle.m_SizePreset, TCLocalize("Board Size"), s_Battle.m_SizePreset == 0 ? 8 : 10, &Option);
-			UpdateSettingByClick(SizeClick, s_Battle.m_SizePreset, 0, 1);
-
-			SetupView.HSplitTop(MARGIN, nullptr, &SetupView);
-			SetupView.HSplitTop(LINE_SIZE * 1.5f, &Option, &SetupView);
-			if(DoButton_Menu(&s_BattleStartButton, TCLocalize("Start"), 0, &Option))
-			{
-				s_Battle.m_InGame = true;
-				ResetBattleship();
-			}
-		}
-		else
-		{
 			if(!s_Battle.m_Initialized)
 				ResetBattleship();
 
@@ -5755,11 +4253,9 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			GameContent.HSplitTop(LINE_SIZE * 1.2f, &TopBar, &BoardArea);
 			BoardArea.HSplitTop(MARGIN_SMALL, nullptr, &BoardArea);
 
-			CUIRect Stats, BtnArea, RestartButton, SetupButton;
+			CUIRect Stats, BtnArea, RestartButton;
 			TopBar.VSplitLeft(440.0f, &Stats, &BtnArea);
-			BtnArea.VSplitRight(220.0f, &BtnArea, &SetupButton);
 			BtnArea.VSplitRight(110.0f, &BtnArea, &RestartButton);
-			SetupButton.VSplitLeft(10.0f, nullptr, &SetupButton);
 
 			char aBest[32];
 			if(s_Battle.m_BestShots > 0)
@@ -5769,10 +4265,9 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			char aStats[160];
 			str_format(aStats, sizeof(aStats), "Hits: %d/%d   Shots: %d   Best: %s", s_Battle.m_Hits, s_Battle.m_TotalShipCells, s_Battle.m_Shots, aBest);
 			Ui()->DoLabel(&Stats, aStats, FONT_SIZE, TEXTALIGN_ML);
+			static CButtonContainer s_BattleRestartButton;
 			if(DoButton_Menu(&s_BattleRestartButton, TCLocalize("Restart"), 0, &RestartButton))
 				ResetBattleship();
-			if(DoButton_Menu(&s_BattleSetupButton, TCLocalize("Setup"), 0, &SetupButton))
-				s_Battle.m_InGame = false;
 
 			CUIRect Board;
 			const float BoardSize = minimum(BoardArea.w, BoardArea.h);
@@ -5853,13 +4348,11 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 				Overlay.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.30f), IGraphics::CORNER_ALL, 6.0f);
 				Ui()->DoLabel(&Overlay, TCLocalize("Fleet destroyed"), HEADLINE_FONT_SIZE, TEXTALIGN_MC);
 			}
-		}
 	}
 	else if(s_SelectedGame == FUN_GAME_FLOWMANIA)
 	{
 		struct SFlowmaniaState
 		{
-			bool m_InGame = false;
 			int m_Preset = 0;
 			bool m_Initialized = false;
 			int m_Size = 5;
@@ -5874,9 +4367,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 		};
 
 		static SFlowmaniaState s_Flow;
-		static CButtonContainer s_FlowStartButton;
-		static CButtonContainer s_FlowRestartButton;
-		static CButtonContainer s_FlowSetupButton;
 
 		auto FlIdx = [&](int X, int Y) {
 			return Y * s_Flow.m_Size + X;
@@ -5981,26 +4471,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			return true;
 		};
 
-		if(!s_Flow.m_InGame)
-		{
-			CUIRect SetupView = GameContent;
-			CUIRect Option;
-			PrepareSetupView(SetupView);
-
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			int PresetClick = DoButton_CheckBox_Number(&s_Flow.m_Preset, TCLocalize("Puzzle Set"), s_Flow.m_Preset + 1, &Option);
-			UpdateSettingByClick(PresetClick, s_Flow.m_Preset, 0, 2);
-
-			SetupView.HSplitTop(MARGIN, nullptr, &SetupView);
-			SetupView.HSplitTop(LINE_SIZE * 1.5f, &Option, &SetupView);
-			if(DoButton_Menu(&s_FlowStartButton, TCLocalize("Start"), 0, &Option))
-			{
-				s_Flow.m_InGame = true;
-				ResetFlowmania();
-			}
-		}
-		else
-		{
 			if(!s_Flow.m_Initialized)
 				ResetFlowmania();
 
@@ -6008,19 +4478,16 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			GameContent.HSplitTop(LINE_SIZE * 1.2f, &TopBar, &BoardArea);
 			BoardArea.HSplitTop(MARGIN_SMALL, nullptr, &BoardArea);
 
-			CUIRect Status, BtnArea, RestartButton, SetupButton;
+			CUIRect Status, BtnArea, RestartButton;
 			TopBar.VSplitLeft(420.0f, &Status, &BtnArea);
-			BtnArea.VSplitRight(220.0f, &BtnArea, &SetupButton);
 			BtnArea.VSplitRight(110.0f, &BtnArea, &RestartButton);
-			SetupButton.VSplitLeft(10.0f, nullptr, &SetupButton);
 
 			char aStatus[180];
 			str_format(aStatus, sizeof(aStatus), "Active color: %d   Moves: %d", s_Flow.m_ActiveColor, s_Flow.m_Moves);
 			Ui()->DoLabel(&Status, aStatus, FONT_SIZE, TEXTALIGN_ML);
+			static CButtonContainer s_FlowRestartButton;
 			if(DoButton_Menu(&s_FlowRestartButton, TCLocalize("Restart"), 0, &RestartButton))
 				ResetFlowmania();
-			if(DoButton_Menu(&s_FlowSetupButton, TCLocalize("Setup"), 0, &SetupButton))
-				s_Flow.m_InGame = false;
 
 			CUIRect Board;
 			const float BoardSize = minimum(BoardArea.w, BoardArea.h);
@@ -6168,13 +4635,11 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 				Overlay.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.34f), IGraphics::CORNER_ALL, 6.0f);
 				Ui()->DoLabel(&Overlay, TCLocalize("All pairs connected"), HEADLINE_FONT_SIZE, TEXTALIGN_MC);
 			}
-		}
 	}
 	else if(s_SelectedGame == FUN_GAME_UNO)
 	{
 		struct SUnoState
 		{
-			bool m_InGame = false;
 			bool m_Initialized = false;
 			std::vector<int> m_vDeck;
 			std::vector<int> m_vPlayer;
@@ -6189,9 +4654,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 		};
 
 		static SUnoState s_Uno;
-		static CButtonContainer s_UnoStartButton;
-		static CButtonContainer s_UnoRestartButton;
-		static CButtonContainer s_UnoSetupButton;
 		static CButtonContainer s_UnoDrawButton;
 
 		auto CardColor = [&](int Card) {
@@ -6247,27 +4709,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 				s_Uno.m_BotWins++;
 		};
 
-		if(!s_Uno.m_InGame)
-		{
-			CUIRect SetupView = GameContent;
-			CUIRect Option;
-			PrepareSetupView(SetupView);
-
-			SetupView.HSplitTop(LINE_SIZE * 1.2f, &Option, &SetupView);
-			Ui()->DoLabel(&Option, TCLocalize("Simplified UNO: colors and numbers 0-9"), FONT_SIZE, TEXTALIGN_ML);
-			SetupView.HSplitTop(LINE_SIZE * 1.2f, &Option, &SetupView);
-			Ui()->DoLabel(&Option, TCLocalize("Play same color or same number"), FONT_SIZE, TEXTALIGN_ML);
-
-			SetupView.HSplitTop(MARGIN, nullptr, &SetupView);
-			SetupView.HSplitTop(LINE_SIZE * 1.5f, &Option, &SetupView);
-			if(DoButton_Menu(&s_UnoStartButton, TCLocalize("Start"), 0, &Option))
-			{
-				s_Uno.m_InGame = true;
-				ResetUno();
-			}
-		}
-		else
-		{
 			if(!s_Uno.m_Initialized)
 				ResetUno();
 
@@ -6282,22 +4723,19 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			GameContent.HSplitTop(LINE_SIZE * 1.2f, &TopBar, &ArenaArea);
 			ArenaArea.HSplitTop(MARGIN_SMALL, nullptr, &ArenaArea);
 
-			CUIRect Status, BtnArea, DrawButton, RestartButton, SetupButton;
+			CUIRect Status, BtnArea, DrawButton, RestartButton;
 			TopBar.VSplitLeft(360.0f, &Status, &BtnArea);
-			BtnArea.VSplitRight(330.0f, &BtnArea, &SetupButton);
 			BtnArea.VSplitRight(220.0f, &BtnArea, &RestartButton);
 			BtnArea.VSplitRight(110.0f, &BtnArea, &DrawButton);
-			SetupButton.VSplitLeft(10.0f, nullptr, &SetupButton);
 			RestartButton.VSplitLeft(10.0f, nullptr, &RestartButton);
 
 			char aStatus[160];
 			str_format(aStatus, sizeof(aStatus), "Your cards: %d   Bot cards: %d   Score %d:%d", (int)s_Uno.m_vPlayer.size(), (int)s_Uno.m_vBot.size(), s_Uno.m_PlayerWins, s_Uno.m_BotWins);
 			Ui()->DoLabel(&Status, aStatus, FONT_SIZE, TEXTALIGN_ML);
 
+			static CButtonContainer s_UnoRestartButton;
 			if(DoButton_Menu(&s_UnoRestartButton, TCLocalize("Restart"), 0, &RestartButton))
 				ResetUno();
-			if(DoButton_Menu(&s_UnoSetupButton, TCLocalize("Setup"), 0, &SetupButton))
-				s_Uno.m_InGame = false;
 
 			bool DrawPressed = false;
 			if(DoButton_Menu(&s_UnoDrawButton, TCLocalize("Draw"), 0, &DrawButton))
@@ -6465,7 +4903,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 				Overlay.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.34f), IGraphics::CORNER_ALL, 8.0f);
 				Ui()->DoLabel(&Overlay, s_Uno.m_Winner == 1 ? TCLocalize("You win") : TCLocalize("Bot wins"), HEADLINE_FONT_SIZE, TEXTALIGN_MC);
 			}
-		}
 	}
 	else if(s_SelectedGame == FUN_GAME_BILLIARDS)
 	{
@@ -6480,7 +4917,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 
 		struct SBilliardsState
 		{
-			bool m_InGame = false;
 			int m_BallPreset = 1;
 			bool m_Initialized = false;
 			std::vector<SBilliardBall> m_vBalls;
@@ -6494,9 +4930,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 		};
 
 		static SBilliardsState s_Billiards;
-		static CButtonContainer s_BilliardsStartButton;
-		static CButtonContainer s_BilliardsRestartButton;
-		static CButtonContainer s_BilliardsSetupButton;
 
 		auto GetCueBall = [&]() -> SBilliardBall * {
 			for(SBilliardBall &Ball : s_Billiards.m_vBalls)
@@ -6556,28 +4989,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			s_Billiards.m_Remaining = ObjectCount;
 		};
 
-		if(!s_Billiards.m_InGame)
-		{
-			CUIRect SetupView = GameContent;
-			CUIRect Option;
-			PrepareSetupView(SetupView);
-
-			SetupView.HSplitTop(LINE_SIZE, &Option, &SetupView);
-			int BallClick = DoButton_CheckBox_Number(&s_Billiards.m_BallPreset, TCLocalize("Object Balls"), s_Billiards.m_BallPreset == 0 ? 5 : s_Billiards.m_BallPreset == 1 ? 8 :
-																							    12,
-				&Option);
-			UpdateSettingByClick(BallClick, s_Billiards.m_BallPreset, 0, 2);
-
-			SetupView.HSplitTop(MARGIN, nullptr, &SetupView);
-			SetupView.HSplitTop(LINE_SIZE * 1.5f, &Option, &SetupView);
-			if(DoButton_Menu(&s_BilliardsStartButton, TCLocalize("Start"), 0, &Option))
-			{
-				s_Billiards.m_InGame = true;
-				ResetBilliards();
-			}
-		}
-		else
-		{
 			if(!s_Billiards.m_Initialized)
 				ResetBilliards();
 
@@ -6585,11 +4996,9 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			GameContent.HSplitTop(LINE_SIZE * 1.2f, &TopBar, &ArenaArea);
 			ArenaArea.HSplitTop(MARGIN_SMALL, nullptr, &ArenaArea);
 
-			CUIRect Stats, BtnArea, RestartButton, SetupButton;
+			CUIRect Stats, BtnArea, RestartButton;
 			TopBar.VSplitLeft(420.0f, &Stats, &BtnArea);
-			BtnArea.VSplitRight(220.0f, &BtnArea, &SetupButton);
 			BtnArea.VSplitRight(110.0f, &BtnArea, &RestartButton);
-			SetupButton.VSplitLeft(10.0f, nullptr, &SetupButton);
 
 			char aBest[32];
 			if(s_Billiards.m_BestShots > 0)
@@ -6599,10 +5008,9 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			char aStats[180];
 			str_format(aStats, sizeof(aStats), "Remaining: %d   Shots: %d   Best: %s", s_Billiards.m_Remaining, s_Billiards.m_Shots, aBest);
 			Ui()->DoLabel(&Stats, aStats, FONT_SIZE, TEXTALIGN_ML);
+			static CButtonContainer s_BilliardsRestartButton;
 			if(DoButton_Menu(&s_BilliardsRestartButton, TCLocalize("Restart"), 0, &RestartButton))
 				ResetBilliards();
-			if(DoButton_Menu(&s_BilliardsSetupButton, TCLocalize("Setup"), 0, &SetupButton))
-				s_Billiards.m_InGame = false;
 
 			CUIRect Table = ArenaArea;
 			const float PreferredW = minimum(ArenaArea.w, ArenaArea.h * 2.1f);
@@ -6809,7 +5217,6 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 				Overlay.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.35f), IGraphics::CORNER_ALL, 10.0f);
 				Ui()->DoLabel(&Overlay, TCLocalize("Table cleared"), HEADLINE_FONT_SIZE, TEXTALIGN_MC);
 			}
-		}
 	}
 
 	else if(s_SelectedGame == FUN_GAME_CASINO)
