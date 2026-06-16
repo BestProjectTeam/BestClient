@@ -623,6 +623,79 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
 		}
 
+		// Raycast (left column block)
+		if(!GameClient()->m_BestClient.IsComponentDisabled(CBestClient::COMPONENT_VISUALS_RAYCAST))
+		{
+			const float ColorPickerLineSize = 25.0f;
+			const float ColorPickerLabelSize = 13.0f;
+			const float ColorPickerSpacing = 5.0f;
+			static float s_RaycastPhase = 0.0f;
+			const bool RaycastEnabled = g_Config.m_BcRaycast != 0;
+			UpdateRevealPhase(s_RaycastPhase, RaycastEnabled);
+			const float ExpandedTargetHeight = MarginSmall + (ColorPickerLineSize + ColorPickerSpacing) * 3.0f + LineSize * 3.0f;
+			const float ExpandedHeight = ExpandedTargetHeight * s_RaycastPhase;
+			const float ContentHeight = LineSize + MarginSmall + LineSize + ExpandedHeight;
+			CUIRect Content, Label, Visible;
+			BeginBlock(Column, ContentHeight, Content);
+
+			Content.HSplitTop(LineSize, &Label, &Content);
+			{
+				const float BadgeSpacing = 4.0f;
+				CUIRect TitleLabel, BadgeBeta, BadgeNew;
+				Label.VSplitLeft(TextRender()->TextWidth(HeadlineFontSize, BCLocalize("Raycast")) + BadgeSpacing, &TitleLabel, &Label);
+				Label.VSplitLeft(52.0f, &BadgeBeta, &Label);
+				Label.VSplitLeft(BadgeSpacing, nullptr, &Label);
+				Label.VSplitLeft(52.0f, &BadgeNew, &Label);
+				Ui()->DoLabel(&TitleLabel, BCLocalize("Raycast"), HeadlineFontSize, TEXTALIGN_ML);
+				BadgeBeta.HMargin(1.5f, &BadgeBeta);
+				Graphics()->DrawRect4(BadgeBeta.x, BadgeBeta.y, BadgeBeta.w, BadgeBeta.h,
+					ColorRGBA(0.85f, 0.15f, 0.15f, 1.0f), ColorRGBA(0.65f, 0.05f, 0.05f, 1.0f),
+					ColorRGBA(0.85f, 0.15f, 0.15f, 1.0f), ColorRGBA(0.65f, 0.05f, 0.05f, 1.0f),
+					IGraphics::CORNER_ALL, 5.0f);
+				Ui()->DoLabel(&BadgeBeta, "BETA", 11.0f, TEXTALIGN_MC);
+				BadgeNew.HMargin(1.5f, &BadgeNew);
+				Graphics()->DrawRect4(BadgeNew.x, BadgeNew.y, BadgeNew.w, BadgeNew.h,
+					ColorRGBA(1.00f, 0.76f, 0.16f, 1.0f), ColorRGBA(0.92f, 0.56f, 0.02f, 1.0f),
+					ColorRGBA(1.00f, 0.76f, 0.16f, 1.0f), ColorRGBA(0.92f, 0.56f, 0.02f, 1.0f),
+					IGraphics::CORNER_ALL, 5.0f);
+				Ui()->DoLabel(&BadgeNew, "NEW", 11.0f, TEXTALIGN_MC);
+			}
+			Content.HSplitTop(MarginSmall, nullptr, &Content);
+
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcRaycast, BCLocalize("Enable Raycast"), &g_Config.m_BcRaycast, &Content, LineSize);
+
+			if(ExpandedHeight > 0.0f)
+			{
+				Content.HSplitTop(ExpandedHeight, &Visible, &Content);
+				Ui()->ClipEnable(&Visible);
+				struct SScopedClip
+				{
+					CUi *m_pUi;
+					~SScopedClip() { m_pUi->ClipDisable(); }
+				} ClipGuard{Ui()};
+
+				CUIRect Expand = {Visible.x, Visible.y, Visible.w, ExpandedTargetHeight};
+				Expand.HSplitTop(MarginSmall, nullptr, &Expand);
+
+				static CButtonContainer s_RaycastColorHookableButton;
+				static CButtonContainer s_RaycastColorUnhookableButton;
+				static CButtonContainer s_RaycastColorFreezeButton;
+				DoLine_ColorPicker(&s_RaycastColorHookableButton, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerSpacing, &Expand, BCLocalize("Hookable color"), &g_Config.m_BcRaycastColorHookable, ColorRGBA(0.51f, 0.91f, 0.63f, 1.0f), false);
+				DoLine_ColorPicker(&s_RaycastColorUnhookableButton, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerSpacing, &Expand, BCLocalize("Unhookable color"), &g_Config.m_BcRaycastColorUnhookable, ColorRGBA(1.0f, 0.0f, 0.0f, 1.0f), false);
+				DoLine_ColorPicker(&s_RaycastColorFreezeButton, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerSpacing, &Expand, BCLocalize("Freeze color"), &g_Config.m_BcRaycastColorFreeze, ColorRGBA(1.0f, 0.55f, 0.0f, 1.0f), false);
+
+				CUIRect Button;
+				Expand.HSplitTop(LineSize, &Button, &Expand);
+				DoSliderWithScaledValue(&g_Config.m_BcRaycastLength, &g_Config.m_BcRaycastLength, &Button, BCLocalize("Ray length"), 1, 100, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, " tiles");
+
+				Expand.HSplitTop(LineSize, &Button, &Expand);
+				DoSliderWithScaledValue(&g_Config.m_BcRaycastAlpha, &g_Config.m_BcRaycastAlpha, &Button, BCLocalize("Opacity"), 0, 100, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "%");
+
+				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcRaycastBlackout, BCLocalize("World blackout (tee + hook only)"), &g_Config.m_BcRaycastBlackout, &Expand, LineSize);
+			}
+			Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
+		}
+
 		// Media background (left column block)
 		if(!GameClient()->m_BestClient.IsComponentDisabled(CBestClient::COMPONENT_VISUALS_MEDIA_BACKGROUND))
 		{
@@ -1725,61 +1798,6 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			}
 		}
 
-		Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
-
-		// Raycast (right column block)
-		if(!GameClient()->m_BestClient.IsComponentDisabled(CBestClient::COMPONENT_VISUALS_RAYCAST))
-		{
-			const float ColorPickerLineSize = 25.0f;
-			const float ColorPickerLabelSize = 13.0f;
-			const float ColorPickerSpacing = 5.0f;
-			static float s_RaycastPhase = 0.0f;
-			const bool RaycastEnabled = g_Config.m_BcRaycast != 0;
-			UpdateRevealPhase(s_RaycastPhase, RaycastEnabled);
-			const float ExpandedTargetHeight = MarginSmall + (ColorPickerLineSize + ColorPickerSpacing) * 3.0f + LineSize * 3.0f;
-			const float ExpandedHeight = ExpandedTargetHeight * s_RaycastPhase;
-			const float ContentHeight = LineSize + MarginSmall + LineSize + ExpandedHeight;
-			CUIRect Content, Label, Visible;
-			BeginBlock(Column, ContentHeight, Content);
-
-			Content.HSplitTop(LineSize, &Label, &Content);
-			Ui()->DoLabel(&Label, BCLocalize("Raycast"), HeadlineFontSize, TEXTALIGN_ML);
-			Content.HSplitTop(MarginSmall, nullptr, &Content);
-
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcRaycast, BCLocalize("Enable Raycast"), &g_Config.m_BcRaycast, &Content, LineSize);
-
-			if(ExpandedHeight > 0.0f)
-			{
-				Content.HSplitTop(ExpandedHeight, &Visible, &Content);
-				Ui()->ClipEnable(&Visible);
-				struct SScopedClip
-				{
-					CUi *m_pUi;
-					~SScopedClip() { m_pUi->ClipDisable(); }
-				} ClipGuard{Ui()};
-
-				CUIRect Expand = {Visible.x, Visible.y, Visible.w, ExpandedTargetHeight};
-				Expand.HSplitTop(MarginSmall, nullptr, &Expand);
-
-				static CButtonContainer s_RaycastColorHookableButton;
-				static CButtonContainer s_RaycastColorUnhookableButton;
-				static CButtonContainer s_RaycastColorFreezeButton;
-				DoLine_ColorPicker(&s_RaycastColorHookableButton, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerSpacing, &Expand, BCLocalize("Hookable color"), &g_Config.m_BcRaycastColorHookable, ColorRGBA(0.51f, 0.91f, 0.63f, 1.0f), false);
-				DoLine_ColorPicker(&s_RaycastColorUnhookableButton, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerSpacing, &Expand, BCLocalize("Unhookable color"), &g_Config.m_BcRaycastColorUnhookable, ColorRGBA(1.0f, 0.0f, 0.0f, 1.0f), false);
-				DoLine_ColorPicker(&s_RaycastColorFreezeButton, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerSpacing, &Expand, BCLocalize("Freeze color"), &g_Config.m_BcRaycastColorFreeze, ColorRGBA(1.0f, 0.55f, 0.0f, 1.0f), false);
-
-				CUIRect Button;
-				Expand.HSplitTop(LineSize, &Button, &Expand);
-				DoSliderWithScaledValue(&g_Config.m_BcRaycastLength, &g_Config.m_BcRaycastLength, &Button, BCLocalize("Ray length"), 1, 100, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, " tiles");
-
-				Expand.HSplitTop(LineSize, &Button, &Expand);
-				DoSliderWithScaledValue(&g_Config.m_BcRaycastAlpha, &g_Config.m_BcRaycastAlpha, &Button, BCLocalize("Opacity"), 0, 100, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "%");
-
-				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcRaycastBlackout, BCLocalize("World blackout (tee + hook only)"), &g_Config.m_BcRaycastBlackout, &Expand, LineSize);
-			}
-			Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
-		}
-
 		const float RightColumnEndY = Column.y;
 		CUIRect ScrollRegion;
 		ScrollRegion.x = MainView.x;
@@ -2768,7 +2786,20 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			Content.HSplitTop(MarginSmall, nullptr, &Content);
 
 #if defined(CONF_AUTOUPDATE)
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcAutoUpdate, BCLocalize("Automatic update"), &g_Config.m_BcAutoUpdate, &Content, LineSize);
+			{
+				CUIRect CheckBoxRow, BadgeRect;
+				Content.HSplitTop(LineSize, &CheckBoxRow, &Content);
+				if(DoButton_CheckBox_Common(&g_Config.m_BcAutoUpdate, BCLocalize("Automatic update"), g_Config.m_BcAutoUpdate ? "X" : "", &CheckBoxRow, BUTTONFLAG_LEFT))
+					g_Config.m_BcAutoUpdate ^= 1;
+				const float BadgeWidth = 40.0f;
+				CheckBoxRow.VSplitRight(BadgeWidth, nullptr, &BadgeRect);
+				BadgeRect.HMargin(2.0f, &BadgeRect);
+				Graphics()->DrawRect4(BadgeRect.x, BadgeRect.y, BadgeRect.w, BadgeRect.h,
+					ColorRGBA(1.00f, 0.76f, 0.16f, 1.0f), ColorRGBA(0.92f, 0.56f, 0.02f, 1.0f),
+					ColorRGBA(1.00f, 0.76f, 0.16f, 1.0f), ColorRGBA(0.92f, 0.56f, 0.02f, 1.0f),
+					IGraphics::CORNER_ALL, 5.0f);
+				Ui()->DoLabel(&BadgeRect, "NEW", 9.0f, TEXTALIGN_MC);
+			}
 #endif
 			static CButtonContainer s_SettingsLayoutButton;
 			int UseNewMenuLayout = g_Config.m_BcSettingsLayout == 0 ? 1 : 0;
@@ -2805,34 +2836,8 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcSilentTyping, BCLocalize("Silent typing"), &g_Config.m_BcSilentTyping, &Content, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatAltCommandLayout, BCLocalize("Commands in other layout"), &g_Config.m_BcChatAltCommandLayout, &Content, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcCinematicCamera, BCLocalize("Cinematic camera"), &g_Config.m_BcCinematicCamera, &Content, LineSize);
-			{
-				CUIRect CheckBoxRow, BadgeRect;
-				Content.HSplitTop(LineSize, &CheckBoxRow, &Content);
-				if(DoButton_CheckBox_Common(&g_Config.m_BcNameplateGradient, BCLocalize("Gradient nicknames"), g_Config.m_BcNameplateGradient ? "X" : "", &CheckBoxRow, BUTTONFLAG_LEFT))
-					g_Config.m_BcNameplateGradient ^= 1;
-				const float BadgeWidth = 40.0f;
-				CheckBoxRow.VSplitRight(BadgeWidth, nullptr, &BadgeRect);
-				BadgeRect.HMargin(2.0f, &BadgeRect);
-				Graphics()->DrawRect4(BadgeRect.x, BadgeRect.y, BadgeRect.w, BadgeRect.h,
-					ColorRGBA(1.00f, 0.76f, 0.16f, 1.0f), ColorRGBA(0.92f, 0.56f, 0.02f, 1.0f),
-					ColorRGBA(1.00f, 0.76f, 0.16f, 1.0f), ColorRGBA(0.92f, 0.56f, 0.02f, 1.0f),
-					IGraphics::CORNER_ALL, 5.0f);
-				Ui()->DoLabel(&BadgeRect, "NEW", 9.0f, TEXTALIGN_MC);
-			}
-			{
-				CUIRect CheckBoxRow, BadgeRect;
-				Content.HSplitTop(LineSize, &CheckBoxRow, &Content);
-				if(DoButton_CheckBox_Common(&g_Config.m_BcScoreboardTeamGradients, BCLocalize("Gradient team colors"), g_Config.m_BcScoreboardTeamGradients ? "X" : "", &CheckBoxRow, BUTTONFLAG_LEFT))
-					g_Config.m_BcScoreboardTeamGradients ^= 1;
-				const float BadgeWidth = 40.0f;
-				CheckBoxRow.VSplitRight(BadgeWidth, nullptr, &BadgeRect);
-				BadgeRect.HMargin(2.0f, &BadgeRect);
-				Graphics()->DrawRect4(BadgeRect.x, BadgeRect.y, BadgeRect.w, BadgeRect.h,
-					ColorRGBA(1.00f, 0.76f, 0.16f, 1.0f), ColorRGBA(0.92f, 0.56f, 0.02f, 1.0f),
-					ColorRGBA(1.00f, 0.76f, 0.16f, 1.0f), ColorRGBA(0.92f, 0.56f, 0.02f, 1.0f),
-					IGraphics::CORNER_ALL, 5.0f);
-				Ui()->DoLabel(&BadgeRect, "NEW", 9.0f, TEXTALIGN_MC);
-			}
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcNameplateGradient, BCLocalize("Gradient nicknames"), &g_Config.m_BcNameplateGradient, &Content, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcScoreboardTeamGradients, BCLocalize("Gradient team colors"), &g_Config.m_BcScoreboardTeamGradients, &Content, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcMastersrv, BCLocalize("Use BestClient MasterServer"), &g_Config.m_BcMastersrv, &Content, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowhudDummyCoordIndicator, BCLocalize("Show player below indicator"), &g_Config.m_BcShowhudDummyCoordIndicator, &Content, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowRealHitbox, BCLocalize("Show real hitbox"), &g_Config.m_BcShowRealHitbox, &Content, LineSize);
