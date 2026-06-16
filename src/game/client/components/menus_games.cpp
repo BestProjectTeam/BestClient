@@ -273,8 +273,9 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 	// Horizontal top bar with square game selector buttons (icon above, name below)
 	const int NumVisible = (int)s_aVisibleGames.size();
 	const float BtnGap = MARGIN_SMALL;
-	const float BtnSize = minimum(80.0f, (MainView.w - BtnGap * (NumVisible + 1)) / (float)NumVisible);
-	const float TopBarH = BtnSize + MARGIN_SMALL;
+	const float BtnW = (MainView.w - BtnGap * (NumVisible - 1)) / (float)NumVisible;
+	const float BtnH = minimum(BtnW, 95.0f);
+	const float TopBarH = BtnH + MARGIN_SMALL;
 
 	CUIRect TopBar, GameArea;
 	MainView.HSplitTop(TopBarH, &TopBar, &GameArea);
@@ -283,10 +284,8 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 	const ColorRGBA AreaColor = ColorRGBA(0.0f, 0.0f, 0.0f, 0.24f);
 	GameArea.Draw(AreaColor, IGraphics::CORNER_ALL, 8.0f);
 
-	// Draw buttons horizontally, centered
 	{
-		const float TotalW = BtnSize * NumVisible + BtnGap * (NumVisible - 1);
-		float BtnX = TopBar.x + (TopBar.w - TotalW) * 0.5f;
+		float BtnX = TopBar.x;
 		const float BtnY = TopBar.y;
 
 		for(EFunGame VisibleGame : s_aVisibleGames)
@@ -296,8 +295,8 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			CUIRect Button;
 			Button.x = BtnX;
 			Button.y = BtnY;
-			Button.w = BtnSize;
-			Button.h = BtnSize;
+			Button.w = BtnW;
+			Button.h = BtnH;
 			const bool Hovered = Ui()->MouseInside(&Button);
 			const ColorRGBA BtnBg = Active ? ColorRGBA(0.25f, 0.25f, 0.28f, 0.90f) : ColorRGBA(0.10f, 0.10f, 0.12f, 0.70f);
 			Button.Draw(BtnBg, IGraphics::CORNER_ALL, 7.0f);
@@ -307,27 +306,25 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			if(DoButton_Menu(&s_aGameButtons[i], "", 0, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 7.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.0f)))
 				s_SelectedGame = i;
 
-			// Icon (top 60% of button)
 			CUIRect IconArea;
 			IconArea.x = BtnX;
 			IconArea.y = BtnY + (Active ? sinf(AnimTime * 5.2f + i) * 1.2f : 0.0f);
-			IconArea.w = BtnSize;
-			IconArea.h = BtnSize * 0.60f;
+			IconArea.w = BtnW;
+			IconArea.h = BtnH * 0.60f;
 			const ColorRGBA IconColor = Active ? ColorRGBA(0.95f, 0.95f, 0.95f, 0.95f) : Hovered ? ColorRGBA(0.92f, 0.92f, 0.92f, 0.85f) : ColorRGBA(0.80f, 0.80f, 0.85f, 0.72f);
 			RenderIconLabel(IconArea, s_aGames[i].m_pIcon, IconArea.h * 0.72f, TEXTALIGN_MC, &IconColor);
 
-			// Name (bottom 40% of button)
 			CUIRect NameArea;
 			NameArea.x = BtnX;
-			NameArea.y = BtnY + BtnSize * 0.62f;
-			NameArea.w = BtnSize;
-			NameArea.h = BtnSize * 0.38f;
+			NameArea.y = BtnY + BtnH * 0.62f;
+			NameArea.w = BtnW;
+			NameArea.h = BtnH * 0.38f;
 			const ColorRGBA NameColor = Active ? ColorRGBA(1.0f, 1.0f, 1.0f, 0.95f) : ColorRGBA(0.85f, 0.85f, 0.88f, 0.72f);
 			TextRender()->TextColor(NameColor);
 			Ui()->DoLabel(&NameArea, TCLocalize(s_aGames[i].m_pName), FONT_SIZE * 0.78f, TEXTALIGN_MC);
 			TextRender()->TextColor(TextRender()->DefaultTextColor());
 
-			BtnX += BtnSize + BtnGap;
+			BtnX += BtnW + BtnGap;
 		}
 	}
 
