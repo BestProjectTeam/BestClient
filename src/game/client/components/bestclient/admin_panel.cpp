@@ -18,7 +18,10 @@
 #include <game/gamecore.h>
 #include <game/localization.h>
 
+#include "voice/voice.h"
+
 #include <cmath>
+#include <cstdint>
 #include <ctime>
 #include <vector>
 
@@ -44,7 +47,8 @@ enum
 	TAB_TUNINGS = 2,
 	TAB_FAST_ACTIONS = 3,
 	TAB_LOGS = 4,
-	TAB_COUNT = 5,
+	TAB_VOICE = 5,
+	TAB_COUNT = 6,
 };
 
 enum
@@ -1325,6 +1329,171 @@ void CAdminPanel::RenderTunings(CUIRect View, int LocalAuth)
 	Ui()->DoLabel(&RightInner, BCLocalize("Changes apply to global tunings (tune)."), 12.0f, TEXTALIGN_ML);
 }
 
+void CAdminPanel::RenderVoiceMod(CUIRect View)
+{
+	CVoiceChat &Voice = GameClient()->m_VoiceChat;
+	const float RowH = 26.0f;
+	const float Pad = 6.0f;
+
+	View.Margin(PANEL_PADDING, &View);
+
+	CUIRect Row;
+
+	if(!Voice.IsVoiceRegistered())
+	{
+		View.HSplitTop(RowH, &Row, &View);
+		Ui()->DoLabel(&Row, BCLocalize("Not connected to voice server"), 13.0f, TEXTALIGN_MC);
+		return;
+	}
+
+	if(!Voice.IsVoiceModAuthed())
+	{
+		// Pre-fill key from config if input is empty
+		if(m_VoiceModKeyInput.IsEmpty() && g_Config.m_BcVoiceModKey[0] != '\0')
+			m_VoiceModKeyInput.Set(g_Config.m_BcVoiceModKey);
+
+		// Title
+		View.HSplitTop(RowH, &Row, &View);
+		Ui()->DoLabel(&Row, BCLocalize("Voice Moderator Login"), 14.0f, TEXTALIGN_MC);
+		View.HSplitTop(Pad, nullptr, &View);
+
+		// Key field
+		CUIRect LabelRect, FieldRect;
+		View.HSplitTop(RowH, &Row, &View);
+		Row.VSplitLeft(80.0f, &LabelRect, &FieldRect);
+		Ui()->DoLabel(&LabelRect, BCLocalize("Mod key:"), 12.0f, TEXTALIGN_ML);
+		FieldRect.HMargin(2.0f, &FieldRect);
+		m_VoiceModKeyInput.SetHidden(true);
+		Ui()->DoEditBox(&m_VoiceModKeyInput, &FieldRect, 12.0f);
+
+		View.HSplitTop(Pad, nullptr, &View);
+		View.HSplitTop(RowH, &Row, &View);
+
+		auto DoLogin = [&]() {
+			const char *pKey = m_VoiceModKeyInput.GetString();
+			str_copy(g_Config.m_BcVoiceModKey, pKey, sizeof(g_Config.m_BcVoiceModKey));
+			Voice.VoiceModAuth(pKey);
+		};
+
+		if(Voice.IsVoiceModAuthPending())
+		{
+			Ui()->DoLabel(&Row, BCLocalize("Authenticating..."), 12.0f, TEXTALIGN_MC);
+		}
+		else if(Voice.IsVoiceModAuthFailed())
+		{
+			CUIRect MsgRect, BtnRect;
+			Row.VSplitRight(110.0f, &MsgRect, &BtnRect);
+			TextRender()->TextColor(ColorRGBA(1.0f, 0.3f, 0.3f, 1.0f));
+			Ui()->DoLabel(&MsgRect, BCLocalize("Wrong key"), 12.0f, TEXTALIGN_ML);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+			if(GameClient()->m_Menus.DoButton_Menu(&m_VoiceModAuthButton, BCLocalize("Try again"), 0, &BtnRect))
+				DoLogin();
+		}
+		else
+		{
+			if(GameClient()->m_Menus.DoButton_Menu(&m_VoiceModAuthButton, BCLocalize("Login as Voice Mod"), 0, &Row))
+				DoLogin();
+		}
+		return;
+	}
+
+	// Authenticated — show header + player list
+	{
+		CUIRect TitleRect, RefreshBtn;
+		View.HSplitTop(RowH, &Row, &View);
+		Row.VSplitRight(90.0f, &TitleRect, &RefreshBtn);
+		Ui()->DoLabel(&TitleRect, BCLocalize("Voice players on this server"), 13.0f, TEXTALIGN_ML);
+		if(GameClient()->m_Menus.DoButton_Menu(&m_VoiceModRefreshButton, BCLocalize("Refresh"), 0, &RefreshBtn))
+		{
+			Voice.VoiceModRefresh();
+			m_LastVoiceModRefreshTick = time_get();
+		}
+	}
+
+	// Auto-refresh every 3 seconds while tab is visible
+	{
+		const int64_t Now = time_get();
+		const int64_t Interval = time_freq() * 3;
+		if(m_LastVoiceModRefreshTick == 0 || Now - m_LastVoiceModRefreshTick > Interval)
+		{
+			Voice.VoiceModRefresh();
+			m_LastVoiceModRefreshTick = time_get();
+		}
+	}
+
+	View.HSplitTop(Pad, nullptr, &View);
+
+	const auto &Players = Voice.GetVoiceModPlayers();
+
+	if(Players.empty())
+	{
+		View.HSplitTop(RowH, &Row, &View);
+		Ui()->DoLabel(&Row, BCLocalize("No players in current voice room"), 12.0f, TEXTALIGN_MC);
+		return;
+	}
+
+	if(m_vVoiceModMuteButtons.size() != Players.size())
+		m_vVoiceModMuteButtons.resize(Players.size());
+
+	// Column headers
+	{
+		CUIRect NCol, MCol;
+		View.HSplitTop(18.0f, &Row, &View);
+		Row.VSplitRight(80.0f, &NCol, &MCol);
+		TextRender()->TextColor(ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f));
+		Ui()->DoLabel(&NCol, BCLocalize("Player"), 11.0f, TEXTALIGN_ML);
+		Ui()->DoLabel(&MCol, BCLocalize("Action"), 11.0f, TEXTALIGN_MC);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+	}
+
+	static CScrollRegion s_VoiceModScroll;
+	static vec2 s_VoiceModScrollOffset(0.0f, 0.0f);
+	CScrollRegionParams ScrollParams;
+	ScrollParams.m_ScrollUnit = RowH + 4.0f;
+	ScrollParams.m_Flags = CScrollRegionParams::FLAG_CONTENT_STATIC_WIDTH;
+	ScrollParams.m_ScrollbarMargin = 4.0f;
+	s_VoiceModScroll.Begin(&View, &s_VoiceModScrollOffset, &ScrollParams);
+	View.y += s_VoiceModScrollOffset.y;
+
+	for(size_t i = 0; i < Players.size(); ++i)
+	{
+		const CVoiceChat::SModPlayer &Player = Players[i];
+		CUIRect PlayerRow;
+		View.HSplitTop(RowH, &PlayerRow, &View);
+		const bool Visible = s_VoiceModScroll.AddRect(PlayerRow);
+		CUIRect Spacing;
+		View.HSplitTop(4.0f, &Spacing, &View);
+		s_VoiceModScroll.AddRect(Spacing);
+		if(!Visible)
+			continue;
+
+		PlayerRow.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f), IGraphics::CORNER_ALL, 4.0f);
+
+		CUIRect NameRect, MuteBtn;
+		PlayerRow.VSplitRight(80.0f, &NameRect, &MuteBtn);
+		NameRect.VMargin(4.0f, &NameRect);
+		MuteBtn.HMargin(3.0f, &MuteBtn);
+
+		char aName[96];
+		if(Player.m_Name.empty())
+			str_format(aName, sizeof(aName), BCLocalize("[slot %d]"), (int)Player.m_GameClientId);
+		else
+			str_copy(aName, Player.m_Name.c_str(), sizeof(aName));
+
+		if(Player.m_IsMuted)
+			TextRender()->TextColor(ColorRGBA(1.0f, 0.4f, 0.4f, 1.0f));
+		Ui()->DoLabel(&NameRect, aName, 11.5f, TEXTALIGN_ML);
+		if(Player.m_IsMuted)
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+		const char *pBtnLabel = Player.m_IsMuted ? BCLocalize("Unmute") : BCLocalize("Mute");
+		if(GameClient()->m_Menus.DoButton_Menu(&m_vVoiceModMuteButtons[i], pBtnLabel, 0, &MuteBtn))
+			Voice.VoiceModMute(Player.m_SessionId, !Player.m_IsMuted);
+	}
+
+	s_VoiceModScroll.End();
+}
+
 void CAdminPanel::RenderPanel(const CUIRect &Screen)
 {
 	const float Target = m_Active ? 1.0f : 0.0f;
@@ -1475,8 +1644,12 @@ void CAdminPanel::RenderPanel(const CUIRect &Screen)
 		if(GameClient()->m_Menus.DoButton_MenuTab(&m_TabFastActionsButton, BCLocalize("Fast actions"), m_ActiveTab == TAB_FAST_ACTIONS, &Button, IGraphics::CORNER_NONE, nullptr, &s_TabDefault, &s_TabActive, &s_TabHover, 6.0f))
 			SetActiveTab(TAB_FAST_ACTIONS);
 
-		if(GameClient()->m_Menus.DoButton_MenuTab(&m_TabLogsButton, BCLocalize("Logs"), m_ActiveTab == TAB_LOGS, &TabBar, IGraphics::CORNER_R, nullptr, &s_TabDefault, &s_TabActive, &s_TabHover, 6.0f))
+		TabBar.VSplitLeft(TabWidth, &Button, &TabBar);
+		if(GameClient()->m_Menus.DoButton_MenuTab(&m_TabLogsButton, BCLocalize("Logs"), m_ActiveTab == TAB_LOGS, &Button, IGraphics::CORNER_NONE, nullptr, &s_TabDefault, &s_TabActive, &s_TabHover, 6.0f))
 			SetActiveTab(TAB_LOGS);
+
+		if(GameClient()->m_Menus.DoButton_MenuTab(&m_TabVoiceButton, BCLocalize("Voice"), m_ActiveTab == TAB_VOICE, &TabBar, IGraphics::CORNER_R, nullptr, &s_TabDefault, &s_TabActive, &s_TabHover, 6.0f))
+			SetActiveTab(TAB_VOICE);
 
 		Panel.HSplitTop(8.0f, nullptr, &Panel);
 	}
@@ -1506,6 +1679,12 @@ void CAdminPanel::RenderPanel(const CUIRect &Screen)
 	{
 		RenderLogs(Panel);
 		RenderActionPopup(Screen, LocalAuth);
+		return;
+	}
+
+	if(m_ActiveTab == TAB_VOICE)
+	{
+		RenderVoiceMod(Panel);
 		return;
 	}
 

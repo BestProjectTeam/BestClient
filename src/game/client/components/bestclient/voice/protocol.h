@@ -39,7 +39,21 @@ enum EPacketType : uint8_t
 	// Challenge-response handshake (protocol v4.1+)
 	PACKET_HELLO_CHALLENGE = 21,
 	PACKET_HELLO_RESPONSE = 22,
+	// Moderator control (protocol v4.2+)
+	PACKET_MOD_AUTH_REQ = 23,
+	PACKET_MOD_AUTH_ACK = 24,
+	PACKET_MOD_PLAYER_LIST_REQ = 25,
+	PACKET_MOD_PLAYER_LIST = 26,
+	PACKET_MOD_MUTE_REQ = 27,
+	PACKET_MOD_MUTE_ACK = 28,
+	PACKET_YOU_ARE_MUTED = 29,
+	// Challenge-response for mod auth (protocol v4.3+)
+	PACKET_MOD_AUTH_CHALLENGE = 30,
+	PACKET_MOD_AUTH_RESPONSE = 31,
 };
+
+constexpr int MAX_PLAYER_NAME_LENGTH = 64;
+constexpr int MOD_NONCE_SIZE = 16;
 
 inline void WriteU8(std::vector<uint8_t> &vOut, uint8_t Value)
 {

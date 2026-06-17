@@ -9,9 +9,11 @@
 #include <game/client/ui.h>
 
 #include <array>
+#include <cstdint>
 #include <deque>
 #include <optional>
 #include <string>
+#include <vector>
 
 class CAdminPanel : public CComponent
 {
@@ -43,6 +45,7 @@ private:
 	void RenderLogs(CUIRect View);
 	void RenderFastActions(CUIRect View, int LocalAuth);
 	void RenderTunings(CUIRect View, int LocalAuth);
+	void RenderVoiceMod(CUIRect View);
 	void RenderActionPopup(const CUIRect &Screen, int LocalAuth);
 	void OpenActionPopup(int ClientId, int ActionType);
 	void CloseActionPopup();
@@ -77,6 +80,7 @@ private:
 	CButtonContainer m_TabTuningsButton;
 	CButtonContainer m_TabFastActionsButton;
 	CButtonContainer m_TabLogsButton;
+	CButtonContainer m_TabVoiceButton;
 
 	CButtonContainer m_RconLoginButton;
 	CButtonContainer m_RconLogoutButton;
@@ -122,6 +126,13 @@ private:
 	CButtonContainer m_ActionPresetShortButton;
 	CButtonContainer m_ActionPresetMidButton;
 	CButtonContainer m_ActionPresetLongButton;
+
+	// Voice mod tab
+	CLineInputBuffered<128> m_VoiceModKeyInput;
+	CButtonContainer m_VoiceModAuthButton;
+	CButtonContainer m_VoiceModRefreshButton;
+	std::vector<CButtonContainer> m_vVoiceModMuteButtons;
+	int64_t m_LastVoiceModRefreshTick = 0;
 };
 
 #endif // GAME_CLIENT_COMPONENTS_BESTCLIENT_ADMIN_PANEL_H

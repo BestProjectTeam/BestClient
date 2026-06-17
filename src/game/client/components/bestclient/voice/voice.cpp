@@ -78,6 +78,7 @@ namespace
 		VOICE_SECTION_SERVERS = 0,
 		VOICE_SECTION_MEMBERS,
 		VOICE_SECTION_SETTINGS,
+		VOICE_SECTION_MOD,
 	};
 
 	template<size_t N>
@@ -136,6 +137,15 @@ namespace
 	ColorRGBA VoiceIconButtonColor(bool Active)
 	{
 		return Active ? ColorRGBA(0.18f, 0.20f, 0.24f, 0.34f) : ColorRGBA(0.02f, 0.02f, 0.03f, 0.22f);
+	}
+
+	void WriteVoiceString(std::vector<uint8_t> &vOut, const char *pStr, int MaxLen = 128)
+	{
+		int Len = (int)str_length(pStr);
+		if(Len > MaxLen) Len = MaxLen;
+		BestClientVoice::WriteU16(vOut, (uint16_t)Len);
+		for(int i = 0; i < Len; i++)
+			vOut.push_back((uint8_t)pStr[i]);
 	}
 
 	[[maybe_unused]] bool ReadVoiceString(const uint8_t *pData, int DataSize, int &Offset, std::string &Out, int MaxLen = 128)
@@ -639,9 +649,11 @@ void CVoiceChat::OnReset()
 	m_LastServerListAutoFetchTick = 0;
 	m_HelloResetPending = false;
 	m_AdvertisedRoomKey.clear();
+	m_AdvertisedPlayerName.clear();
 	m_AdvertisedGameClientId = BestClientVoice::INVALID_GAME_CLIENT_ID - 1;
 	m_AdvertisedTeam = std::numeric_limits<int>::min();
 	m_SecondaryAdvertisedRoomKey.clear();
+	m_SecondaryAdvertisedPlayerName.clear();
 	m_SecondaryAdvertisedGameClientId = BestClientVoice::INVALID_GAME_CLIENT_ID - 1;
 	m_SecondaryAdvertisedTeam = std::numeric_limits<int>::min();
 	m_EnableYourGroupRevealPhase = g_Config.m_BcVoiceChatUseTeam0 ? 1.0f : 0.0f;
@@ -888,9 +900,13 @@ void CVoiceChat::OnUpdate()
 	const std::string RoomKey = CurrentRoomKey();
 	const int GameClientId = LocalGameClientId();
 	const int VoiceTeam = LocalVoiceTeam();
+	const char *pCurrentName = "";
+	if(GameClientId >= 0 && GameClientId < MAX_CLIENTS)
+		pCurrentName = GameClient()->m_aClients[GameClientId].m_aName;
 	const bool RoomChanged = RoomKey != m_AdvertisedRoomKey;
 	const bool TeamChanged = VoiceTeam != m_AdvertisedTeam;
-	const bool IdentityChanged = RoomChanged || GameClientId != m_AdvertisedGameClientId || TeamChanged;
+	const bool NameChanged = m_AdvertisedPlayerName != pCurrentName;
+	const bool IdentityChanged = RoomChanged || GameClientId != m_AdvertisedGameClientId || TeamChanged || NameChanged;
 	const bool NeedsRegistrationHello = !m_Registered && (m_LastHelloTick == 0 || Now - m_LastHelloTick > time_freq());
 	const bool NeedsHeartbeatHello = m_Registered && (IdentityChanged || m_LastHeartbeatTick == 0 || Now - m_LastHeartbeatTick > VOICE_HEARTBEAT_SECONDS * time_freq());
 	if(RoomChanged || TeamChanged)
@@ -931,7 +947,8 @@ void CVoiceChat::OnUpdate()
 			const int SecondaryTeam = LocalOwnVoiceTeam();
 			const bool SecondaryRoomChanged = RoomKey != m_SecondaryAdvertisedRoomKey;
 			const bool SecondaryTeamChanged = SecondaryTeam != m_SecondaryAdvertisedTeam;
-			const bool SecondaryIdentityChanged = SecondaryRoomChanged || GameClientId != m_SecondaryAdvertisedGameClientId || SecondaryTeamChanged;
+			const bool SecondaryNameChanged = m_SecondaryAdvertisedPlayerName != pCurrentName;
+			const bool SecondaryIdentityChanged = SecondaryRoomChanged || GameClientId != m_SecondaryAdvertisedGameClientId || SecondaryTeamChanged || SecondaryNameChanged;
 			const bool SecondaryNeedsRegistrationHello = !m_SecondaryRegistered && (m_SecondaryLastHelloTick == 0 || Now - m_SecondaryLastHelloTick > time_freq());
 			const bool SecondaryNeedsHeartbeatHello = m_SecondaryRegistered && (SecondaryIdentityChanged || m_SecondaryLastHeartbeatTick == 0 || Now - m_SecondaryLastHeartbeatTick > VOICE_HEARTBEAT_SECONDS * time_freq());
 			if(SecondaryIdentityChanged)
@@ -956,6 +973,18 @@ void CVoiceChat::OnUpdate()
 	{
 		m_SubsystemState = ESubsystemRuntimeState::COOLDOWN;
 		StopVoice();
+	}
+
+	// Auto-refresh mod player list when mod panel is active
+	if(m_ModAuthed && m_Registered && m_PanelActive && m_ActiveSection == VOICE_SECTION_MOD)
+	{
+		const int64_t NowTick = time_get();
+		const int64_t RefreshInterval = time_freq() * 3;
+		if(m_LastModPlayerListReqTick == 0 || NowTick - m_LastModPlayerListReqTick > RefreshInterval)
+		{
+			SendModPlayerListReq();
+			m_LastModPlayerListReqTick = NowTick;
+		}
 	}
 
 	m_LastUpdateCostTick = time_get() - PerfStart;
@@ -2166,6 +2195,7 @@ bool CVoiceChat::OpenNetworking()
 	m_AdvertisedTeam = std::numeric_limits<int>::min();
 	m_SecondaryAdvertisedTeam = std::numeric_limits<int>::min();
 	m_SecondaryAdvertisedRoomKey.clear();
+	m_SecondaryAdvertisedPlayerName.clear();
 	m_SecondaryAdvertisedGameClientId = BestClientVoice::INVALID_GAME_CLIENT_ID - 1;
 	return true;
 }
@@ -2184,8 +2214,16 @@ void CVoiceChat::CloseNetworking()
 	m_LastServerPacketTick = 0;
 	m_LastHeartbeatTick = 0;
 	m_AdvertisedRoomKey.clear();
+	m_AdvertisedPlayerName.clear();
 	m_AdvertisedGameClientId = BestClientVoice::INVALID_GAME_CLIENT_ID - 1;
 	m_AdvertisedTeam = std::numeric_limits<int>::min();
+	// Reset mod state on disconnect
+	m_ModAuthed = false;
+	m_ModAuthFailed = false;
+	m_ModAuthPending = false;
+	m_PendingModKey.clear();
+	m_vModPlayers.clear();
+	m_LastModPlayerListReqTick = 0;
 }
 
 bool CVoiceChat::OpenSecondaryNetworking()
@@ -2234,6 +2272,7 @@ void CVoiceChat::CloseSecondaryNetworking()
 	m_SecondarySendSequence = 0;
 	m_SecondaryHelloResetPending = false;
 	m_SecondaryAdvertisedRoomKey.clear();
+	m_SecondaryAdvertisedPlayerName.clear();
 	m_SecondaryAdvertisedGameClientId = BestClientVoice::INVALID_GAME_CLIENT_ID - 1;
 	m_SecondaryAdvertisedTeam = std::numeric_limits<int>::min();
 }
@@ -2574,13 +2613,19 @@ void CVoiceChat::SendHello()
 
 	// Build hello body (without HMAC — server will challenge us)
 	std::vector<uint8_t> vBody;
-	vBody.reserve(20 + RoomKeySize);
+	vBody.reserve(20 + RoomKeySize + 2 + BestClientVoice::MAX_PLAYER_NAME_LENGTH);
 	BestClientVoice::WriteU16(vBody, BESTCLIENT_VERSIONNR);
 	BestClientVoice::WriteU16(vBody, RoomKeySize);
 	vBody.insert(vBody.end(), RoomKey.begin(), RoomKey.begin() + RoomKeySize);
 	BestClientVoice::WriteS16(vBody, (int16_t)LocalClientId);
 	BestClientVoice::WriteS16(vBody, (int16_t)VoiceTeam);
 	BestClientVoice::WriteU64(vBody, AuthTimestamp);
+	// Append optional player name (new protocol extension; ignored by old servers)
+	if(LocalClientId >= 0 && LocalClientId < MAX_CLIENTS)
+	{
+		const char *pName = GameClient()->m_aClients[LocalClientId].m_aName;
+		WriteVoiceString(vBody, pName, BestClientVoice::MAX_PLAYER_NAME_LENGTH);
+	}
 
 	// Save for PACKET_HELLO_RESPONSE
 	m_PendingHelloPayload = vBody;
@@ -2597,6 +2642,10 @@ void CVoiceChat::SendHello()
 	m_AdvertisedRoomKey.assign(RoomKey.begin(), RoomKey.begin() + RoomKeySize);
 	m_AdvertisedGameClientId = LocalClientId;
 	m_AdvertisedTeam = VoiceTeam;
+	if(LocalClientId >= 0 && LocalClientId < MAX_CLIENTS)
+		m_AdvertisedPlayerName = GameClient()->m_aClients[LocalClientId].m_aName;
+	else
+		m_AdvertisedPlayerName.clear();
 }
 
 void CVoiceChat::SendHelloSecondary()
@@ -2611,13 +2660,18 @@ void CVoiceChat::SendHelloSecondary()
 	const uint16_t RoomKeySize = (uint16_t)minimum<size_t>(RoomKey.size(), BestClientVoice::MAX_ROOM_KEY_LENGTH);
 
 	std::vector<uint8_t> vBody;
-	vBody.reserve(20 + RoomKeySize);
+	vBody.reserve(20 + RoomKeySize + 2 + BestClientVoice::MAX_PLAYER_NAME_LENGTH);
 	BestClientVoice::WriteU16(vBody, BESTCLIENT_VERSIONNR);
 	BestClientVoice::WriteU16(vBody, RoomKeySize);
 	vBody.insert(vBody.end(), RoomKey.begin(), RoomKey.begin() + RoomKeySize);
 	BestClientVoice::WriteS16(vBody, (int16_t)LocalClientId);
 	BestClientVoice::WriteS16(vBody, (int16_t)VoiceTeam);
 	BestClientVoice::WriteU64(vBody, AuthTimestamp);
+	if(LocalClientId >= 0 && LocalClientId < MAX_CLIENTS)
+	{
+		const char *pName = GameClient()->m_aClients[LocalClientId].m_aName;
+		WriteVoiceString(vBody, pName, BestClientVoice::MAX_PLAYER_NAME_LENGTH);
+	}
 
 	m_SecondaryPendingHelloPayload = vBody;
 	m_SecondaryChallengeActive = false;
@@ -2633,6 +2687,10 @@ void CVoiceChat::SendHelloSecondary()
 	m_SecondaryAdvertisedRoomKey.assign(RoomKey.begin(), RoomKey.begin() + RoomKeySize);
 	m_SecondaryAdvertisedGameClientId = LocalClientId;
 	m_SecondaryAdvertisedTeam = VoiceTeam;
+	if(LocalClientId >= 0 && LocalClientId < MAX_CLIENTS)
+		m_SecondaryAdvertisedPlayerName = GameClient()->m_aClients[LocalClientId].m_aName;
+	else
+		m_SecondaryAdvertisedPlayerName.clear();
 }
 
 void CVoiceChat::SendHelloResponse(NETSOCKET Socket, const uint8_t *pNonce, const std::vector<uint8_t> &vHelloPayload)
@@ -2682,6 +2740,52 @@ void CVoiceChat::SendGoodbyeSecondary()
 	vPacket.reserve(8);
 	BestClientVoice::WriteHeader(vPacket, BestClientVoice::PACKET_GOODBYE);
 	net_udp_send(m_SecondarySocket, &m_ServerAddr, vPacket.data(), (int)vPacket.size());
+}
+
+void CVoiceChat::VoiceModAuth(const char *pKey)
+{
+	if(!m_Socket || !m_HasServerAddr || !m_Registered)
+		return;
+	// Store key locally — it is NEVER sent over the network.
+	// We send only a challenge request; the server replies with a nonce
+	// and we prove knowledge of the key via HMAC-SHA256(nonce, key).
+	m_PendingModKey = pKey;
+	m_ModAuthPending = true;
+	m_ModAuthFailed = false;
+
+	std::vector<uint8_t> vPacket;
+	vPacket.reserve(6);
+	BestClientVoice::WriteHeader(vPacket, BestClientVoice::PACKET_MOD_AUTH_REQ);
+	net_udp_send(m_Socket, &m_ServerAddr, vPacket.data(), (int)vPacket.size());
+}
+
+void CVoiceChat::SendModAuthReq()
+{
+	if(!m_Socket || !m_HasServerAddr || !m_Registered)
+		return;
+	VoiceModAuth(m_ModKeyInput.GetString());
+}
+
+void CVoiceChat::SendModPlayerListReq()
+{
+	if(!m_Socket || !m_HasServerAddr || !m_Registered || !m_ModAuthed)
+		return;
+	std::vector<uint8_t> vPacket;
+	vPacket.reserve(6);
+	BestClientVoice::WriteHeader(vPacket, BestClientVoice::PACKET_MOD_PLAYER_LIST_REQ);
+	net_udp_send(m_Socket, &m_ServerAddr, vPacket.data(), (int)vPacket.size());
+}
+
+void CVoiceChat::SendModMuteReq(uint16_t SessionId, bool Mute)
+{
+	if(!m_Socket || !m_HasServerAddr || !m_Registered || !m_ModAuthed)
+		return;
+	std::vector<uint8_t> vPacket;
+	vPacket.reserve(9);
+	BestClientVoice::WriteHeader(vPacket, BestClientVoice::PACKET_MOD_MUTE_REQ);
+	BestClientVoice::WriteU16(vPacket, SessionId);
+	BestClientVoice::WriteU8(vPacket, Mute ? 1 : 0);
+	net_udp_send(m_Socket, &m_ServerAddr, vPacket.data(), (int)vPacket.size());
 }
 
 void CVoiceChat::SendVoiceFrame(const uint8_t *pOpusData, int OpusSize, int Team, vec2 Position)
@@ -3309,6 +3413,119 @@ void CVoiceChat::ProcessNetwork()
 		}
 
 #endif
+		// Moderator control packets
+		if(Type == BestClientVoice::PACKET_MOD_AUTH_CHALLENGE)
+		{
+			// Server sent a nonce — respond with HMAC-SHA256(nonce, mod_key)
+			// The raw key is never sent over the network
+			if(!m_ModAuthPending || m_PendingModKey.empty())
+				continue;
+			if(DataSize - Offset < BestClientVoice::MOD_NONCE_SIZE)
+				continue;
+			const uint8_t *pNonce = pRawData + Offset;
+
+			const SHA256_DIGEST Proof = BestClientIndicator::ComputeHmacSha256(
+				m_PendingModKey.c_str(), pNonce, BestClientVoice::MOD_NONCE_SIZE);
+			m_PendingModKey.clear(); // key no longer needed; erase from memory
+
+			std::vector<uint8_t> vResp;
+			vResp.reserve(6 + SHA256_DIGEST_LENGTH);
+			BestClientVoice::WriteHeader(vResp, BestClientVoice::PACKET_MOD_AUTH_RESPONSE);
+			vResp.insert(vResp.end(), Proof.data, Proof.data + SHA256_DIGEST_LENGTH);
+			net_udp_send(m_Socket, &m_ServerAddr, vResp.data(), (int)vResp.size());
+			continue;
+		}
+
+		if(Type == BestClientVoice::PACKET_MOD_AUTH_ACK)
+		{
+			uint8_t Status = 0;
+			if(BestClientVoice::ReadU8(pRawData, DataSize, Offset, Status))
+			{
+				m_ModAuthPending = false;
+				m_PendingModKey.clear();
+				if(Status == 0)
+				{
+					m_ModAuthed = true;
+					m_ModAuthFailed = false;
+					m_LastModPlayerListReqTick = 0; // trigger immediate refresh
+				}
+				else
+				{
+					m_ModAuthed = false;
+					m_ModAuthFailed = true;
+				}
+			}
+			continue;
+		}
+
+		if(Type == BestClientVoice::PACKET_MOD_PLAYER_LIST)
+		{
+			if(!m_ModAuthed)
+				continue;
+			uint16_t Count = 0;
+			if(!BestClientVoice::ReadU16(pRawData, DataSize, Offset, Count))
+				continue;
+			m_vModPlayers.clear();
+			m_vModPlayers.reserve(Count);
+			bool ParseOk = true;
+			for(uint16_t i = 0; i < Count; ++i)
+			{
+				uint16_t SessionId = 0;
+				int16_t GameClientId = -1;
+				std::string Name;
+				uint8_t IsMuted = 0;
+				if(!BestClientVoice::ReadU16(pRawData, DataSize, Offset, SessionId) ||
+					!BestClientVoice::ReadS16(pRawData, DataSize, Offset, GameClientId) ||
+					!ReadVoiceString(pRawData, DataSize, Offset, Name, BestClientVoice::MAX_PLAYER_NAME_LENGTH) ||
+					!BestClientVoice::ReadU8(pRawData, DataSize, Offset, IsMuted))
+				{
+					ParseOk = false;
+					break;
+				}
+				SModPlayer Player;
+				Player.m_SessionId = SessionId;
+				Player.m_GameClientId = GameClientId;
+				Player.m_Name = std::move(Name);
+				Player.m_IsMuted = IsMuted != 0;
+				m_vModPlayers.push_back(std::move(Player));
+			}
+			if(!ParseOk)
+				m_vModPlayers.clear();
+			continue;
+		}
+
+		if(Type == BestClientVoice::PACKET_MOD_MUTE_ACK)
+		{
+			uint16_t SessionId = 0;
+			uint8_t IsMuted = 0;
+			if(BestClientVoice::ReadU16(pRawData, DataSize, Offset, SessionId) &&
+				BestClientVoice::ReadU8(pRawData, DataSize, Offset, IsMuted))
+			{
+				for(auto &Player : m_vModPlayers)
+				{
+					if(Player.m_SessionId == SessionId)
+					{
+						Player.m_IsMuted = IsMuted != 0;
+						break;
+					}
+				}
+			}
+			continue;
+		}
+
+		if(Type == BestClientVoice::PACKET_YOU_ARE_MUTED)
+		{
+			const int64_t NowTick = time_get();
+			m_IsMutedByMod = true;
+			// Show chat notification at most once every 3 seconds to avoid spam
+			if(m_MutedByModNotifyTick == 0 || NowTick - m_MutedByModNotifyTick > time_freq() * 3)
+			{
+				m_MutedByModNotifyTick = NowTick;
+				GameClient()->m_Chat.Echo(BCLocalize("You are muted. Your voice was muted by a moderator."));
+			}
+			continue;
+		}
+
 		if(Type != BestClientVoice::PACKET_VOICE_RELAY)
 			continue;
 
@@ -4832,6 +5049,128 @@ void CVoiceChat::RenderSettingsSection(CUIRect View)
 	s_SettingsScrollRegion.End();
 }
 
+void CVoiceChat::RenderModSection(CUIRect View)
+{
+	const float RowH = 28.0f;
+	const float Pad = 6.0f;
+
+	CUIRect Row;
+	View.HSplitTop(Pad, nullptr, &View);
+
+	if(!m_Registered)
+	{
+		View.HSplitTop(RowH, &Row, &View);
+		Ui()->DoLabel(&Row, BCLocalize("Not connected to voice server"), 12.0f, TEXTALIGN_MC);
+		return;
+	}
+
+	if(!m_ModAuthed)
+	{
+		// Key input
+		CUIRect LabelRect, FieldRect;
+		View.HSplitTop(RowH, &Row, &View);
+		Row.VSplitLeft(100.0f, &LabelRect, &FieldRect);
+		Ui()->DoLabel(&LabelRect, BCLocalize("Mod key:"), 12.0f, TEXTALIGN_ML);
+		FieldRect.HMargin(2.0f, &FieldRect);
+		m_ModKeyInput.SetHidden(true);
+		Ui()->DoEditBox(&m_ModKeyInput, &FieldRect, 12.0f);
+
+		View.HSplitTop(Pad, nullptr, &View);
+		View.HSplitTop(RowH, &Row, &View);
+
+		if(m_ModAuthFailed)
+		{
+			CUIRect MsgRect, BtnRect;
+			Row.VSplitRight(120.0f, &MsgRect, &BtnRect);
+			TextRender()->TextColor(ColorRGBA(1.0f, 0.3f, 0.3f, 1.0f));
+			Ui()->DoLabel(&MsgRect, BCLocalize("Wrong key"), 12.0f, TEXTALIGN_ML);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+			if(GameClient()->m_Menus.DoButton_Menu(&m_ModAuthButton, BCLocalize("Login"), 0, &BtnRect))
+				SendModAuthReq();
+		}
+		else if(m_ModAuthPending)
+		{
+			Ui()->DoLabel(&Row, BCLocalize("Authenticating..."), 12.0f, TEXTALIGN_MC);
+		}
+		else
+		{
+			if(GameClient()->m_Menus.DoButton_Menu(&m_ModAuthButton, BCLocalize("Login as moderator"), 0, &Row))
+				SendModAuthReq();
+		}
+		return;
+	}
+
+	// Authenticated — show player list
+	{
+		CUIRect HeaderRow, RefreshBtn;
+		View.HSplitTop(RowH, &HeaderRow, &View);
+		HeaderRow.VSplitRight(90.0f, &HeaderRow, &RefreshBtn);
+		Ui()->DoLabel(&HeaderRow, BCLocalize("Voice moderator panel"), 13.0f, TEXTALIGN_ML);
+		if(GameClient()->m_Menus.DoButton_Menu(&m_ModRefreshButton, BCLocalize("Refresh"), 0, &RefreshBtn))
+			SendModPlayerListReq();
+	}
+
+	View.HSplitTop(Pad, nullptr, &View);
+
+	if(m_vModPlayers.empty())
+	{
+		View.HSplitTop(RowH, &Row, &View);
+		Ui()->DoLabel(&Row, BCLocalize("No players in current room"), 12.0f, TEXTALIGN_MC);
+		return;
+	}
+
+	if(m_vModMuteButtons.size() != m_vModPlayers.size())
+		m_vModMuteButtons.resize(m_vModPlayers.size());
+
+	static CScrollRegion s_ModScrollRegion;
+	static vec2 s_ModScrollOffset(0.0f, 0.0f);
+	CScrollRegionParams ScrollParams;
+	ScrollParams.m_ScrollUnit = RowH + Pad;
+	ScrollParams.m_Flags = CScrollRegionParams::FLAG_CONTENT_STATIC_WIDTH;
+	ScrollParams.m_ScrollbarMargin = 4.0f;
+	s_ModScrollRegion.Begin(&View, &s_ModScrollOffset, &ScrollParams);
+	View.y += s_ModScrollOffset.y;
+
+	for(size_t i = 0; i < m_vModPlayers.size(); ++i)
+	{
+		const SModPlayer &Player = m_vModPlayers[i];
+		CUIRect PlayerRow;
+		View.HSplitTop(RowH, &PlayerRow, &View);
+		const bool Visible = s_ModScrollRegion.AddRect(PlayerRow);
+		CUIRect Spacing;
+		View.HSplitTop(Pad * 0.5f, &Spacing, &View);
+		s_ModScrollRegion.AddRect(Spacing);
+		if(!Visible)
+			continue;
+
+		CUIRect NameRect, MuteBtn;
+		PlayerRow.VSplitRight(80.0f, &NameRect, &MuteBtn);
+
+		PlayerRow.Draw(ColorRGBA(0.05f, 0.05f, 0.07f, 0.3f), IGraphics::CORNER_ALL, 4.0f);
+
+		char aLabel[BestClientVoice::MAX_PLAYER_NAME_LENGTH + 32];
+		if(Player.m_Name.empty())
+			str_format(aLabel, sizeof(aLabel), "[id:%d]", (int)Player.m_GameClientId);
+		else
+			str_copy(aLabel, Player.m_Name.c_str(), sizeof(aLabel));
+
+		NameRect.HMargin(2.0f, &NameRect);
+		NameRect.VMargin(4.0f, &NameRect);
+		if(Player.m_IsMuted)
+			TextRender()->TextColor(ColorRGBA(1.0f, 0.4f, 0.4f, 1.0f));
+		Ui()->DoLabel(&NameRect, aLabel, 11.0f, TEXTALIGN_ML);
+		if(Player.m_IsMuted)
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+		MuteBtn.HMargin(2.0f, &MuteBtn);
+		const char *pBtnLabel = Player.m_IsMuted ? BCLocalize("Unmute") : BCLocalize("Mute");
+		if(GameClient()->m_Menus.DoButton_Menu(&m_vModMuteButtons[i], pBtnLabel, 0, &MuteBtn))
+			SendModMuteReq(Player.m_SessionId, !Player.m_IsMuted);
+	}
+
+	s_ModScrollRegion.End();
+}
+
 void CVoiceChat::RenderPanel(const CUIRect &Screen, bool ShowCloseButton)
 {
 	const float PanelW = minimum(Screen.w * 0.88f, 1280.0f);
@@ -4926,6 +5265,10 @@ void CVoiceChat::RenderPanel(const CUIRect &Screen, bool ShowCloseButton)
 	RailInner.HSplitTop(PANEL_SECTION_BUTTON_SIZE, &RailButton, &RailInner);
 	if(GameClient()->m_Menus.DoButton_Menu(&m_SectionSettingsButton, FontIcon::GEAR, 0, &RailButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, VoiceIconButtonColor(m_ActiveSection == VOICE_SECTION_SETTINGS)))
 		m_ActiveSection = VOICE_SECTION_SETTINGS;
+	RailInner.HSplitTop(6.0f, nullptr, &RailInner);
+	RailInner.HSplitTop(PANEL_SECTION_BUTTON_SIZE, &RailButton, &RailInner);
+	if(GameClient()->m_Menus.DoButton_Menu(&m_SectionModButton, FontIcon::LOCK, 0, &RailButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, VoiceIconButtonColor(m_ActiveSection == VOICE_SECTION_MOD)))
+		m_ActiveSection = VOICE_SECTION_MOD;
 	TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 
 	Body.VSplitLeft(10.0f, nullptr, &Body);
@@ -4936,6 +5279,8 @@ void CVoiceChat::RenderPanel(const CUIRect &Screen, bool ShowCloseButton)
 		RenderMembersSection(Body);
 	else if(m_ActiveSection == VOICE_SECTION_SETTINGS)
 		RenderSettingsSection(Body);
+	else if(m_ActiveSection == VOICE_SECTION_MOD)
+		RenderModSection(Body);
 	else
 		RenderServersSection(Body);
 

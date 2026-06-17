@@ -26,6 +26,8 @@
 #include <unordered_set>
 #include <vector>
 
+#include <game/client/lineinput.h>
+
 struct OpusEncoder;
 struct OpusDecoder;
 class CHttpRequest;
@@ -34,6 +36,24 @@ class CVoiceChat : public CComponent
 {
 public:
 	int Sizeof() const override { return sizeof(*this); }
+
+	// Voice moderation — public interface for admin panel
+	struct SModPlayer
+	{
+		uint16_t m_SessionId = 0;
+		int16_t m_GameClientId = -1;
+		std::string m_Name;
+		bool m_IsMuted = false;
+	};
+	bool IsVoiceRegistered() const { return m_Registered; }
+	bool IsVoiceModAuthed() const { return m_ModAuthed; }
+	bool IsVoiceModAuthFailed() const { return m_ModAuthFailed; }
+	bool IsVoiceModAuthPending() const { return m_ModAuthPending; }
+	const std::vector<SModPlayer> &GetVoiceModPlayers() const { return m_vModPlayers; }
+	void VoiceModAuth(const char *pKey);
+	void VoiceModRefresh() { SendModPlayerListReq(); }
+	void VoiceModMute(uint16_t SessionId, bool Mute) { SendModMuteReq(SessionId, Mute); }
+
 	void OnConsoleInit() override;
 	void OnReset() override;
 	void OnStateChange(int NewState, int OldState) override;
@@ -270,14 +290,28 @@ private:
 	std::shared_ptr<CHttpRequest> m_pServerListTask = nullptr;
 	int m_SelectedServerIndex = -1;
 	std::string m_AdvertisedRoomKey;
+	std::string m_AdvertisedPlayerName;
 	int m_AdvertisedGameClientId = BestClientVoice::INVALID_GAME_CLIENT_ID - 1;
 	int m_AdvertisedTeam = std::numeric_limits<int>::min();
 	std::string m_SecondaryAdvertisedRoomKey;
+	std::string m_SecondaryAdvertisedPlayerName;
 	int m_SecondaryAdvertisedGameClientId = BestClientVoice::INVALID_GAME_CLIENT_ID - 1;
 	int m_SecondaryAdvertisedTeam = std::numeric_limits<int>::min();
 	float m_EnableYourGroupRevealPhase = 0.0f;
 	bool m_LastUseTeam0Mode = false;
 	bool m_LastEnableYourGroup = false;
+
+	// Voice moderation
+	bool m_ModAuthed = false;
+	bool m_ModAuthFailed = false;
+	bool m_ModAuthPending = false;
+	std::string m_PendingModKey; // key held in memory until challenge arrives; cleared after response
+	bool m_IsMutedByMod = false;
+	int64_t m_MutedByModNotifyTick = 0;
+	std::vector<SModPlayer> m_vModPlayers;
+	int64_t m_LastModPlayerListReqTick = 0;
+	CLineInputBuffered<128> m_ModKeyInput;
+	std::vector<CButtonContainer> m_vModMuteButtons;
 
 	std::vector<uint16_t> m_vSortedPeerIds;
 	std::vector<uint16_t> m_vVisibleMemberPeerIds;
@@ -294,7 +328,10 @@ private:
 	CButtonContainer m_SectionRoomButton;
 	CButtonContainer m_SectionMembersButton;
 	CButtonContainer m_SectionSettingsButton;
+	CButtonContainer m_SectionModButton;
 	CButtonContainer m_ClosePanelButton;
+	CButtonContainer m_ModAuthButton;
+	CButtonContainer m_ModRefreshButton;
 	CButtonContainer m_MicMuteButton;
 	CButtonContainer m_HeadphonesMuteButton;
 	CButtonContainer m_MicCheckButton;
@@ -388,6 +425,11 @@ private:
 	bool IsManagedServerConfig() const;
 	uint64_t CurrentHelloAuthTimestamp() const;
 	void AppendHelloAuthProof(std::vector<uint8_t> &vPacket) const;
+
+	void SendModAuthReq();
+	void SendModPlayerListReq();
+	void SendModMuteReq(uint16_t SessionId, bool Mute);
+	void RenderModSection(CUIRect View);
 
 	static void ConVoiceConnect(IConsole::IResult *pResult, void *pUserData);
 	static void ConVoiceDisconnect(IConsole::IResult *pResult, void *pUserData);
