@@ -999,7 +999,6 @@ void CGameClient::OnInit()
 void CGameClient::OnUpdate()
 {
 	HandleLanguageChanged();
-	MaybeShowSnapTapBlockedPopup();
 
 	CUIElementBase::Init(Ui()); // update static pointer because game and editor use separate UI
 
@@ -1133,7 +1132,6 @@ void CGameClient::PrepareInputForSend(int *pData, int Size, bool Dummy)
 void CGameClient::OnConnected()
 {
 	m_FastPractice.InvalidateBufferedInputState();
-	MaybeShowSnapTapBlockedPopup();
 	const char *pConnectCaption = DemoPlayer()->IsPlaying() ? Localize("Preparing demo playback") : Localize("Connected");
 	const char *pLoadMapContent = Localize("Initializing map logic");
 	// render loading before skip is calculated
@@ -1883,7 +1881,6 @@ void CGameClient::OnStateChange(int NewState, int OldState)
 	// reset everything when not already connected (to keep gathered stuff)
 	if(NewState < IClient::STATE_ONLINE)
 	{
-		m_SnapTapBlockedPopupShown = false;
 		OnReset();
 	}
 
@@ -6748,22 +6745,19 @@ bool CGameClient::IsSnapTapBlockedByCommunity() const
 	else if(m_ConnectServerInfo.has_value() && m_ConnectServerInfo->m_aCommunityId[0] != '\0')
 		pCommunityId = m_ConnectServerInfo->m_aCommunityId;
 
+	if(pCommunityId == nullptr)
+	{
+		const auto *pEntry = ServerBrowser()->Find(Client()->ServerAddress());
+		if(pEntry && pEntry->m_Info.m_aCommunityId[0] != '\0')
+			pCommunityId = pEntry->m_Info.m_aCommunityId;
+	}
+
 	return pCommunityId != nullptr && str_comp_nocase(pCommunityId, IServerBrowser::COMMUNITY_DDNET) == 0;
-}
-
-void CGameClient::MaybeShowSnapTapBlockedPopup()
-{
-	if(m_SnapTapBlockedPopupShown || !IsSnapTapBlockedByCommunity())
-		return;
-
-	m_SnapTapBlockedPopupShown = true;
-	m_Menus.ShowPopupMessage("Snap Tap", Localize("Snap Tap does not work on the \"DDNet\" community."), Localize("OK"));
 }
 
 void CGameClient::SetConnectInfo(const NETADDR *pAddress)
 {
 	m_ConnectServerInfo = std::nullopt;
-	m_SnapTapBlockedPopupShown = false;
 	if(!pAddress)
 		return;
 	const auto *pEntry = ServerBrowser()->Find(*pAddress);

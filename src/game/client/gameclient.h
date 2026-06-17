@@ -1115,9 +1115,7 @@ public:
 	float m_SmoothIntraTick = 0;
 	bool CheckNewInput() override;
 	bool IsSnapTapBlockedByCommunity() const;
-	void MaybeShowSnapTapBlockedPopup();
 	std::optional<CServerInfo> m_ConnectServerInfo = std::nullopt;
-	bool m_SnapTapBlockedPopupShown = false;
 	void SetConnectInfo(const NETADDR *pAddress) override;
 };
 

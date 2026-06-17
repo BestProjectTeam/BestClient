@@ -812,13 +812,12 @@ void CClient::Connect(const char *pAddress, const char *pPassword)
 	ServerInfoRequest();
 
 	// TClient
+	m_pGameClient->SetConnectInfo(&aConnectAddrs[0]);
 	// If user has manually specified password don't run autoexec
 	if(!m_SendPassword)
 	{
-		m_pGameClient->SetConnectInfo(&aConnectAddrs[0]);
 		m_pConsole->ExecuteLine(g_Config.m_TcExecuteOnConnect, IConsole::CLIENT_ID_UNSPECIFIED);
 	}
-	m_pGameClient->SetConnectInfo(nullptr);
 
 	if(m_SendPassword)
 	{
