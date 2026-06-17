@@ -2,6 +2,7 @@
 
 #include <base/system.h>
 
+#include <engine/gfx/image_loader.h>
 #include <engine/gfx/image_manipulation.h>
 
 #include <algorithm>
@@ -231,11 +232,18 @@ namespace MediaDecoder
 
 	bool DecodeImageToRgba(IGraphics *pGraphics, const unsigned char *pData, size_t DataSize, const char *pContextName, CImageInfo &Image)
 	{
+		(void)pGraphics;
 		Image.Free();
 
 		// Try PNG loader only for actual PNG payloads to avoid noisy "signature mismatch" logs for GIF/WEBP/MP4 data.
-		if(pGraphics != nullptr && IsPngSignature(pData, DataSize) && pGraphics->LoadPng(Image, pData, DataSize, pContextName))
-			return true;
+		// Use CImageLoader directly to avoid calling pGraphics from a background thread (thread-unsafe due to AddWarning).
+		if(IsPngSignature(pData, DataSize))
+		{
+			CByteBufferReader Reader(pData, DataSize);
+			int PngliteIncompatible;
+			if(CImageLoader::LoadPng(Reader, pContextName, Image, PngliteIncompatible))
+				return true;
+		}
 
 		if(!pData || DataSize == 0)
 			return false;
@@ -817,17 +825,23 @@ namespace MediaDecoder
 
 		CImageInfo Image;
 		// Try PNG loader only for actual PNG payloads to avoid noisy "signature mismatch" logs for GIF/WEBP/MP4 data.
-		if(IsPngSignature(pData, DataSize) && pGraphics->LoadPng(Image, pData, DataSize, pContextName))
+		// Use CImageLoader directly to avoid calling pGraphics from a background thread (thread-unsafe due to AddWarning).
+		if(IsPngSignature(pData, DataSize))
 		{
-			ClampImageSize(Image, MaxDimension);
-			DecodedFrames.m_Width = (int)Image.m_Width;
-			DecodedFrames.m_Height = (int)Image.m_Height;
-			DecodedFrames.m_Animated = false;
-			DecodedFrames.m_AnimationStart = time_get();
-			SMediaRawFrame Frame;
-			Frame.m_Image = std::move(Image);
-			DecodedFrames.m_vFrames.push_back(std::move(Frame));
-			return true;
+			CByteBufferReader Reader(pData, DataSize);
+			int PngliteIncompatible;
+			if(CImageLoader::LoadPng(Reader, pContextName, Image, PngliteIncompatible))
+			{
+				ClampImageSize(Image, MaxDimension);
+				DecodedFrames.m_Width = (int)Image.m_Width;
+				DecodedFrames.m_Height = (int)Image.m_Height;
+				DecodedFrames.m_Animated = false;
+				DecodedFrames.m_AnimationStart = time_get();
+				SMediaRawFrame Frame;
+				Frame.m_Image = std::move(Image);
+				DecodedFrames.m_vFrames.push_back(std::move(Frame));
+				return true;
+			}
 		}
 
 		SMediaDecodeLimits Limits;
