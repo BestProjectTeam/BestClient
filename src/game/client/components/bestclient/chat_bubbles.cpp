@@ -267,6 +267,12 @@ void CChatBubbles::AddBubble(int ClientId, int Team, const char *pText)
 	pCursor.m_Flags = TEXTFLAG_RENDER;
 	pCursor.m_LineWidth = 500.0f - FontSize * 2.0f;
 
+	// For whisper-send, the bubble renders above the local player and the chat
+	// line's m_ClientId is the local player — fix ClientId before constructing
+	// so that m_SourceClientId matches what FindChatLine will look for.
+	if(Team == TEAM_WHISPER_SEND)
+		ClientId = GameClient()->m_Snap.m_LocalClientId;
+
 	CBubbles Bubble(aSanitizedText, pCursor, time_get(), ClientId, Team);
 
 	ColorRGBA Color = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
@@ -277,7 +283,6 @@ void CChatBubbles::AddBubble(int ClientId, int Team, const char *pText)
 	else if(Team == TEAM_WHISPER_SEND)
 	{
 		Color = ColorRGBA(0.7f, 0.7f, 1.0f, 1.0f);
-		ClientId = GameClient()->m_Snap.m_LocalClientId; // Set ClientId to local client for whisper send
 	}
 	else // regular message
 		Color = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageColor));

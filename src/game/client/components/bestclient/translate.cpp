@@ -537,8 +537,8 @@ public:
 		}
 		Json.EndObject();
 		CreateHttpRequest(Http, g_Config.m_TcTranslateEndpoint[0] == '\0' ? "localhost:5000/translate" : g_Config.m_TcTranslateEndpoint);
-		const char *pJson = Json.GetOutputString().c_str();
-		m_pHttpRequest->PostJson(pJson);
+		const std::string JsonStr = Json.GetOutputString();
+		m_pHttpRequest->PostJson(JsonStr.c_str());
 	}
 };
 
@@ -839,7 +839,7 @@ bool CTranslate::HasPendingJobs() const
 
 void CTranslate::Translate(int Id, bool ShowProgress)
 {
-	if(Id < 0 || Id > (int)std::size(GameClient()->m_aClients))
+	if(Id < 0 || Id >= (int)std::size(GameClient()->m_aClients))
 	{
 		GameClient()->m_Chat.Echo("Not a valid ID");
 		return;

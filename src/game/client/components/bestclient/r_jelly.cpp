@@ -91,14 +91,15 @@ JellyTee CRJelly::GetDeform(int ClientId, vec2 PrevVel, vec2 Vel, vec2 LookDir, 
 	const bool Disabled = !g_Config.m_BcJellyTee || g_Config.m_BcJellyTeeStrength <= 0;
 	CState *pState = StateFor(ClientId);
 
-	if(Disabled)
-	{
-		Reset();
-		return Deform;
-	}
-
 	if(pState == nullptr)
 		return Deform;
+
+	if(Disabled)
+	{
+		if(pState->m_Initialized)
+			*pState = CState();
+		return Deform;
+	}
 
 	if(!IsEnabledFor(ClientId))
 		return Deform;

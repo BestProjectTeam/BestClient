@@ -374,9 +374,6 @@ void BuildRenderBars(const SVisualizerFrame &Frame, float *pOutBars, int Request
 	for(int i = 0; i < RequestedBarCount; ++i)
 		pOutBars[i] = 0.0f;
 
-	if(RequestedBarCount == 0)
-		return;
-
 	if(RequestedBarCount == 5)
 	{
 		for(int Bar = 0; Bar < RequestedBarCount; ++Bar)

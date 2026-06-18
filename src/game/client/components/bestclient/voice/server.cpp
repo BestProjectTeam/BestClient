@@ -296,7 +296,7 @@ int main(int argc, const char **argv)
 			BestClientVoice::EPacketType Type;
 			if(!BestClientVoice::ReadHeader(pRawData, DataSize, Type, Offset))
 				continue;
-			if(Type != BestClientVoice::PACKET_HELLO && Type != BestClientVoice::PACKET_VOICE && Type != BestClientVoice::PACKET_PING && Type != BestClientVoice::PACKET_GOODBYE)
+			if(Type != BestClientVoice::PACKET_HELLO && Type != BestClientVoice::PACKET_HELLO_RESPONSE && Type != BestClientVoice::PACKET_VOICE && Type != BestClientVoice::PACKET_PING && Type != BestClientVoice::PACKET_GOODBYE)
 				continue;
 
 			const int64_t Now = time_get();

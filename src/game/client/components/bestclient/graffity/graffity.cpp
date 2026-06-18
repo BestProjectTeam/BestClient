@@ -842,7 +842,10 @@ void CGraffity::NetworkMain(std::string GameServerAddress, std::string OwnerId)
 	NETADDR ServerAddr;
 	if(!ParseAddress(ConfiguredGraffityServerAddress().c_str(), ServerAddr))
 	{
-		str_copy(m_aLastError, "Graffity server address is invalid", sizeof(m_aLastError));
+		{
+			std::lock_guard<std::mutex> Lock(m_NetMutex);
+			str_copy(m_aLastError, "Graffity server address is invalid", sizeof(m_aLastError));
+		}
 		m_NetworkRunning = false;
 		return;
 	}
@@ -852,7 +855,10 @@ void CGraffity::NetworkMain(std::string GameServerAddress, std::string OwnerId)
 	NETSOCKET Socket = net_tcp_create(BindAddr);
 	if(!Socket)
 	{
-		str_copy(m_aLastError, "Could not create graffity socket", sizeof(m_aLastError));
+		{
+			std::lock_guard<std::mutex> Lock(m_NetMutex);
+			str_copy(m_aLastError, "Could not create graffity socket", sizeof(m_aLastError));
+		}
 		m_NetworkRunning = false;
 		return;
 	}
@@ -884,14 +890,20 @@ void CGraffity::NetworkMain(std::string GameServerAddress, std::string OwnerId)
 			// Otherwise StopNetwork already closed it; don't double-close.
 		}
 		if(!m_StopThread.load())
+		{
+			std::lock_guard<std::mutex> Lock(m_NetMutex);
 			str_copy(m_aLastError, "Could not connect to graffity server", sizeof(m_aLastError));
+		}
 		m_NetworkRunning = false;
 		return;
 	}
 
 	net_set_non_blocking(Socket);
 	m_NetworkConnected = true;
-	m_aLastError[0] = '\0';
+	{
+		std::lock_guard<std::mutex> Lock(m_NetMutex);
+		m_aLastError[0] = '\0';
+	}
 
 	std::string PendingRecv;
 	PendingRecv.reserve(4096);
@@ -927,7 +939,10 @@ void CGraffity::NetworkMain(std::string GameServerAddress, std::string OwnerId)
 				const int Result = net_tcp_send(Socket, Packet.data() + Sent, (int)Packet.size() - Sent);
 				if(Result <= 0)
 				{
-					str_copy(m_aLastError, "Graffity server send failed", sizeof(m_aLastError));
+					{
+						std::lock_guard<std::mutex> Lock(m_NetMutex);
+						str_copy(m_aLastError, "Graffity server send failed", sizeof(m_aLastError));
+					}
 					m_StopThread = true;
 					break;
 				}
@@ -943,12 +958,18 @@ void CGraffity::NetworkMain(std::string GameServerAddress, std::string OwnerId)
 			if(net_would_block())
 				continue;
 
-			str_copy(m_aLastError, "Graffity server disconnected", sizeof(m_aLastError));
+			{
+				std::lock_guard<std::mutex> Lock(m_NetMutex);
+				str_copy(m_aLastError, "Graffity server disconnected", sizeof(m_aLastError));
+			}
 			break;
 		}
 		if(Received == 0)
 		{
-			str_copy(m_aLastError, "Graffity server disconnected", sizeof(m_aLastError));
+			{
+				std::lock_guard<std::mutex> Lock(m_NetMutex);
+				str_copy(m_aLastError, "Graffity server disconnected", sizeof(m_aLastError));
+			}
 			break;
 		}
 		if(Received > 0)
@@ -1411,15 +1432,22 @@ void CGraffity::EchoPlacementError(EPlacementError Error)
 		GameClient()->Echo("Graffiti: too close to another graffiti");
 		break;
 	case EPlacementError::NO_SERVER:
-		if(m_aLastError[0] != '\0')
 		{
-			char aBuf[320];
-			str_format(aBuf, sizeof(aBuf), "Graffiti: server unavailable (%s)", m_aLastError);
-			GameClient()->Echo(aBuf);
-		}
-		else
-		{
-			GameClient()->Echo("Graffiti: server unavailable");
+			char aLastError[sizeof(m_aLastError)];
+			{
+				std::lock_guard<std::mutex> Lock(m_NetMutex);
+				str_copy(aLastError, m_aLastError, sizeof(aLastError));
+			}
+			if(aLastError[0] != '\0')
+			{
+				char aBuf[320];
+				str_format(aBuf, sizeof(aBuf), "Graffiti: server unavailable (%s)", aLastError);
+				GameClient()->Echo(aBuf);
+			}
+			else
+			{
+				GameClient()->Echo("Graffiti: server unavailable");
+			}
 		}
 		break;
 	default:
