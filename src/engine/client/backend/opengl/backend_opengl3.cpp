@@ -1749,7 +1749,11 @@ void CCommandProcessorFragment_OpenGL3_3::RenderMotionBlurGL()
 
 	if(!m_MotionBlurHistoryValid)
 	{
-		// First frame — just save, no blend
+		// First frame — just save, no blend.
+		// Must bind default framebuffer before reading: a blur pass (Cmd_RenderBlurRect)
+		// may have left one of the intermediate blur FBOs bound, causing glCopyTexSubImage2D
+		// to capture garbage instead of the final composed frame.
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, m_MotionBlurTexWidth, m_MotionBlurTexHeight);
 		glBindTexture(GL_TEXTURE_2D, 0);
 		m_MotionBlurHistoryValid = true;
