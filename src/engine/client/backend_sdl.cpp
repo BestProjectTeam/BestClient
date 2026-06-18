@@ -192,18 +192,20 @@ void CGraphicsBackend_Threaded::ProcessError(const SGfxErrorContainer &Error)
 			VerboseStr.append(ErrStr.m_Err);
 	}
 
-	// Out of VRAM is an expected, user-recoverable condition (too many/too large assets),
-	// not an internal bug. Show a plain message box and exit cleanly instead of triggering
-	// the crash report dialog.
+	// Some errors are expected, user-recoverable conditions, not internal bugs.
+	// Show a plain message box and exit cleanly instead of triggering the crash report dialog.
 	const bool IsOutOfMemory =
 		Error.m_ErrorType == GFX_ERROR_TYPE_OUT_OF_MEMORY_IMAGE ||
 		Error.m_ErrorType == GFX_ERROR_TYPE_OUT_OF_MEMORY_BUFFER ||
 		Error.m_ErrorType == GFX_ERROR_TYPE_OUT_OF_MEMORY_STAGING;
-	if(IsOutOfMemory)
+	// VK_ERROR_DEVICE_LOST (e.g. caused by Discord overlay) triggers RENDER_SUBMIT_FAILED.
+	// This is an external condition, not an internal bug — handle it gracefully.
+	const bool IsGpuDeviceError = Error.m_ErrorType == GFX_ERROR_TYPE_RENDER_SUBMIT_FAILED;
+	if(IsOutOfMemory || IsGpuDeviceError)
 	{
 		log_error("gfx", "%s", VerboseStr.c_str());
 		IGraphics::CMessageBox MessageBox;
-		MessageBox.m_pTitle = m_TranslateFunc("Out of VRAM", "Graphics error");
+		MessageBox.m_pTitle = m_TranslateFunc(IsOutOfMemory ? "Out of VRAM" : "Graphics Error", "Graphics error");
 		MessageBox.m_pMessage = VerboseStr.c_str();
 		MessageBox.m_Type = IGraphics::EMessageBoxType::ERROR;
 		ShowMessageBoxWithoutGraphics(MessageBox);
@@ -344,7 +346,7 @@ void CCommandProcessor_SDL_GL::HandleError()
 		m_Error.m_vErrors.emplace_back(SGfxErrorContainer::SError{true, Localizable("A render command failed. Try to update your GPU drivers.", "Graphics error")});
 		break;
 	case GFX_ERROR_TYPE_RENDER_SUBMIT_FAILED:
-		m_Error.m_vErrors.emplace_back(SGfxErrorContainer::SError{true, Localizable("Submitting the render commands failed. Try to update your GPU drivers.", "Graphics error")});
+		m_Error.m_vErrors.emplace_back(SGfxErrorContainer::SError{true, Localizable("Submitting the render commands failed. If Discord is running, try disabling the Discord overlay (Discord Settings > Overlay). Otherwise, try to update your GPU drivers.", "Graphics error")});
 		break;
 	case GFX_ERROR_TYPE_SWAP_FAILED:
 		m_Error.m_vErrors.emplace_back(SGfxErrorContainer::SError{true, Localizable("Failed to swap framebuffers. Try to update your GPU drivers.", "Graphics error")});
