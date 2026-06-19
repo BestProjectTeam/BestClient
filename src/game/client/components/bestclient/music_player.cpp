@@ -2130,6 +2130,7 @@ public:
 	int m_ArtHeight = 0;
 	int64_t m_ArtAnimationStart = 0;
 	std::array<float, VISUALIZER_BARS> m_aVisualizerLevels{};
+	float m_VisualizerRollingPeak = 0.05f;
 	float m_CompactTextSlotWidthAnim = 0.0f;
 	CMusicPlayer::SHudReservation m_HudReservation;
 	SMusicPlayerPalette m_Palette = DefaultMusicPlayerPalette();
@@ -2171,6 +2172,7 @@ public:
 		m_VisualPositionMs = 0.0f;
 		m_VisualTrackKey.clear();
 		m_aVisualizerLevels.fill(0.18f);
+		m_VisualizerRollingPeak = 0.05f;
 		m_CompactTextSlotWidthAnim = 0.0f;
 		m_HudReservation = CMusicPlayer::SHudReservation();
 		m_DebugLastRenderPath.clear();
@@ -2688,6 +2690,20 @@ public:
 			DebugLogRenderDecision("live", Snapshot);
 			std::array<float, VISUALIZER_BARS> aTarget{};
 			BestClientVisualizer::BuildRenderBars(Snapshot.m_Visualizer, aTarget.data(), RequestedBars);
+
+			// Soft auto-gain: track rolling peak to keep bars visible at any volume
+			float PeakBar = 0.0f;
+			for(int i = 0; i < RequestedBars; ++i)
+				PeakBar = maximum(PeakBar, aTarget[i]);
+			const float PeakFloor = 0.02f;
+			if(PeakBar > m_VisualizerRollingPeak)
+				m_VisualizerRollingPeak = ApproachAnim(m_VisualizerRollingPeak, PeakBar, Delta, 10.0f);
+			else
+				m_VisualizerRollingPeak = ApproachAnim(m_VisualizerRollingPeak, maximum(PeakBar, PeakFloor), Delta, 2.0f);
+			const float BoostFactor = std::clamp(0.72f / maximum(m_VisualizerRollingPeak, 0.015f), 1.0f, 20.0f);
+			for(int i = 0; i < RequestedBars; ++i)
+				aTarget[i] = std::clamp(aTarget[i] * BoostFactor, 0.0f, 1.0f);
+
 			std::array<float, VISUALIZER_BARS> aShaped{};
 			for(int i = 0; i < RequestedBars; ++i)
 			{
@@ -3293,7 +3309,7 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 			}
 
 			const int SourceIndex = i;
-			const float HeightFactor = powf(std::clamp(m_pImpl->m_aVisualizerLevels[SourceIndex], 0.0f, 1.0f), 0.94f);
+			const float HeightFactor = powf(std::clamp(m_pImpl->m_aVisualizerLevels[SourceIndex], 0.0f, 1.0f), 0.60f);
 			const float H = minimum(LaneH, maximum(0.0f, LaneH * HeightFactor));
 			const float Y = CenterMode ? (BaseMidY - H * 0.5f) : (UpMode ? LaneY : (LaneY + LaneH - H));
 			const float LaneDrawX = SnappedLaneX;
