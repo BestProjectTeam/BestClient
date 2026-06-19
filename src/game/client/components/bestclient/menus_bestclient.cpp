@@ -2772,6 +2772,20 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcSilentTyping, BCLocalize("Silent typing"), &g_Config.m_BcSilentTyping, &Content, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatAltCommandLayout, BCLocalize("Commands in other layout"), &g_Config.m_BcChatAltCommandLayout, &Content, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcCinematicCamera, BCLocalize("Cinematic camera"), &g_Config.m_BcCinematicCamera, &Content, LineSize);
+			{
+				CUIRect CheckBoxRow, BadgeRect;
+				Content.HSplitTop(LineSize, &CheckBoxRow, &Content);
+				if(DoButton_CheckBox_Common(&g_Config.m_BcSpecMovedNotify, BCLocalize("Notify when moved in spec"), g_Config.m_BcSpecMovedNotify ? "X" : "", &CheckBoxRow, BUTTONFLAG_LEFT))
+					g_Config.m_BcSpecMovedNotify ^= 1;
+				const float BadgeWidth = 40.0f;
+				CheckBoxRow.VSplitRight(BadgeWidth, nullptr, &BadgeRect);
+				BadgeRect.HMargin(2.0f, &BadgeRect);
+				Graphics()->DrawRect4(BadgeRect.x, BadgeRect.y, BadgeRect.w, BadgeRect.h,
+					ColorRGBA(1.00f, 0.76f, 0.16f, 1.0f), ColorRGBA(0.92f, 0.56f, 0.02f, 1.0f),
+					ColorRGBA(1.00f, 0.76f, 0.16f, 1.0f), ColorRGBA(0.92f, 0.56f, 0.02f, 1.0f),
+					IGraphics::CORNER_ALL, 5.0f);
+				Ui()->DoLabel(&BadgeRect, "NEW", 9.0f, TEXTALIGN_MC);
+			}
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcNameplateGradient, BCLocalize("Gradient nicknames"), &g_Config.m_BcNameplateGradient, &Content, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcScoreboardTeamGradients, BCLocalize("Gradient team colors"), &g_Config.m_BcScoreboardTeamGradients, &Content, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcMastersrv, BCLocalize("Use BestClient MasterServer"), &g_Config.m_BcMastersrv, &Content, LineSize);
