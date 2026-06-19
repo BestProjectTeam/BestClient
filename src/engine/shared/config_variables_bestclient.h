@@ -218,10 +218,6 @@ MACRO_CONFIG_STR(BcVoiceModKey, bc_voice_mod_key, 128, "", CFGFLAG_CLIENT | CFGF
 
 MACRO_CONFIG_INT(BcMenuSfx, bc_menu_sfx, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable BestClient menu sound effects")
 MACRO_CONFIG_INT(BcMenuSfxVolume, bc_menu_sfx_volume, 70, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "BestClient menu sound effects volume")
-MACRO_CONFIG_INT(BcGraffityEnabled, bc_graffity_enabled, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable graffiti rendering and placement")
-MACRO_CONFIG_INT(BcGraffitySize, bc_graffity_size, 1, 1, 6, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Graffiti size multiplier")
-MACRO_CONFIG_INT(BcGraffitySoundVolume, bc_graffity_sound_volume, 130, 0, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Graffiti spray sound volume")
-MACRO_CONFIG_INT(BcGraffityHoldWheel, bc_graffity_hold_wheel, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Open graffiti wheel only while the key is held")
 
 // Media background
 MACRO_CONFIG_INT(BcMenuMediaBackground, bc_menu_media_background, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable custom media background in offline menus")
@@ -288,7 +284,6 @@ MACRO_CONFIG_STR(BcClientIndicatorBrowserUrl, bc_client_indicator_browser_url, 2
 MACRO_CONFIG_STR(BcClientIndicatorTokenUrl, bc_client_indicator_token_url, 256, "https://150.241.70.188:8779/token.json", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Client indicator token bootstrap URL")
 MACRO_CONFIG_STR(BcClientIndicatorSharedToken, bc_client_indicator_shared_token, 256, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Client indicator shared token for signed UDP packets")
 MACRO_CONFIG_STR(BcClientIndicatorSecretKey, bc_client_indicator_secret_key, 256, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Client indicator developer secret key")
-MACRO_CONFIG_STR(BcGraffityServerAddress, bc_graffity_server_address, 256, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Graffity TCP server address override")
 MACRO_CONFIG_INT(BrFilterBestclient, br_filter_bestclient, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Filter out servers with no BestClient users")
 
 // Optimizer

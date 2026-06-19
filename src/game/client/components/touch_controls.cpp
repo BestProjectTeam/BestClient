@@ -790,8 +790,6 @@ bool CTouchControls::OnTouchState(const std::vector<IInput::CTouchFingerState> &
 		GameClient()->m_GameConsole.IsActive() ||
 		GameClient()->m_Menus.IsActive() ||
 		GameClient()->m_Emoticon.IsActive() ||
-		GameClient()->m_Graffity.IsWheelActive() ||
-		GameClient()->m_Graffity.IsPlacementActive() ||
 		GameClient()->m_Spectator.IsActive() ||
 		m_PreviewAllButtons)
 	{
@@ -814,8 +812,6 @@ void CTouchControls::OnRender()
 		return;
 	if(GameClient()->m_Chat.IsActive() ||
 		GameClient()->m_Emoticon.IsActive() ||
-		GameClient()->m_Graffity.IsWheelActive() ||
-		GameClient()->m_Graffity.IsPlacementActive() ||
 		GameClient()->m_Spectator.IsActive())
 	{
 		return;

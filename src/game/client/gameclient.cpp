@@ -636,7 +636,6 @@ void CGameClient::OnConsoleInit()
 					      &m_3DParticles,
 					      &m_Translate, // TClient
 					      &m_Ghost,
-					      &m_Graffity,
 					      &m_BestClient, // BestClient binds
 					      &m_TClient, // TClient (Must be before chat and players)
 					      &m_Afterimage,
@@ -698,7 +697,6 @@ void CGameClient::OnConsoleInit()
 						  &m_Motd, // for pressing esc to remove it
 						  &m_Spectator,
 						  &m_FastActions,
-						  &m_Graffity,
 						  &m_BindWheel, // TClient
 						  &m_Emoticon,
 						  &m_ImportantAlert,
@@ -1415,8 +1413,6 @@ void CGameClient::OnRender()
 	{
 		if(!pComponent->IsComponentActive())
 			continue;
-		if(pComponent == &m_MusicPlayer)
-			m_Graffity.RenderOverlayWorld();
 		if(UseGameNoHudAspect && !HudAspectDisabled && pComponent == &m_MusicPlayer)
 		{
 			Graphics()->SetScreenAspectOverrideEnabled(false);

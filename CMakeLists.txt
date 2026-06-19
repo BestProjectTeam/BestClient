@@ -1187,13 +1187,6 @@ set(EXPECTED_DATA
   BestClient/fonts/Nunito-Black.ttf
   BestClient/fonts/Rubik-Regular.ttf
   BestClient/fonts/minecraft_font.ttf
-  BestClient/graffity/best_client_graffity.png
-  BestClient/graffity/cats_with_drool_graffity.png
-  BestClient/graffity/ego_graffity.png
-  BestClient/graffity/spray-apply.wv
-  BestClient/graffity/spray-open.wv
-  BestClient/graffity/spray-select.wv
-  BestClient/graffity/spray-sound-from-gta.wv
   BestClient/gui_logo.png
   BestClient/keystrokes/mouse.png
   BestClient/keystrokes/wasd.png
@@ -2814,8 +2807,6 @@ if(CLIENT)
     components/bestclient/fast_actions.h
     components/bestclient/fast_practice.cpp
     components/bestclient/fast_practice.h
-    components/bestclient/graffity/graffity.cpp
-    components/bestclient/graffity/graffity.h
     components/bestclient/hud_editor.cpp
     components/bestclient/hud_editor.h
     components/bestclient/menus_bestclient.cpp

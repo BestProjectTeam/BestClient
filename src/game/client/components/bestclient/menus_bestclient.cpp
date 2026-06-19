@@ -90,7 +90,6 @@ static const SBestClientComponentEntry gs_aBestClientComponentEntries[] = {
 	{CBestClient::COMPONENT_VISUALS_3D_PARTICLES, "3D Particles", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_VISUALS_AFTERIMAGE, "Afterimage", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_VISUALS_CRYSTAL_LASER, "Crystal Laser", COMPONENTS_GROUP_VISUALS},
-	{CBestClient::COMPONENT_VISUALS_GRAFFITI, "Graffiti", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_VISUALS_MUSIC_PLAYER, "Music Player", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_VISUALS_KEYSTROKES, "Keystrokes", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_VISUALS_MEDIA_BACKGROUND, "Media Background", COMPONENTS_GROUP_VISUALS},
@@ -894,69 +893,6 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			Ui()->DoLabel(&PreviewLabel, BCLocalize("Sand Shotgun"), 14.0f, TEXTALIGN_ML);
 			Content.HSplitTop(58.0f, &PreviewRect, &Content);
 			DoLaserPreview(&PreviewRect, ColorHSLA(g_Config.m_ClLaserShotgunOutlineColor), ColorHSLA(g_Config.m_ClLaserShotgunInnerColor), LASERTYPE_SHOTGUN);
-			Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
-		}
-
-		if(!GameClient()->m_BestClient.IsComponentDisabled(CBestClient::COMPONENT_VISUALS_GRAFFITI))
-		{
-			static float s_GraffityPhase = 0.0f;
-			const bool GraffityExpanded = g_Config.m_BcGraffityEnabled != 0;
-			UpdateRevealPhase(s_GraffityPhase, GraffityExpanded);
-			const float KeyReaderLineSize = LineSize;
-			const float ExtraTargetHeight = LineSize * 3.0f + KeyReaderLineSize + MarginSmall * 4.0f;
-			const float ContentHeight = LineSize + MarginSmall + LineSize + ExtraTargetHeight * s_GraffityPhase;
-			CUIRect Content, Label, Row, Visible;
-			BeginBlock(Column, ContentHeight, Content);
-
-			Content.HSplitTop(LineSize, &Label, &Content);
-			{
-				const float BadgeWidth = 52.0f;
-				const float BadgeSpacing = 4.0f;
-				CUIRect TitleLabel, BadgeBeta;
-				Label.VSplitLeft(TextRender()->TextWidth(HeadlineFontSize, BCLocalize("Graffiti")) + BadgeSpacing, &TitleLabel, &Label);
-				Label.VSplitLeft(BadgeWidth, &BadgeBeta, &Label);
-				Ui()->DoLabel(&TitleLabel, BCLocalize("Graffiti"), HeadlineFontSize, TEXTALIGN_ML);
-				BadgeBeta.HMargin(1.5f, &BadgeBeta);
-				Graphics()->DrawRect4(BadgeBeta.x, BadgeBeta.y, BadgeBeta.w, BadgeBeta.h,
-					ColorRGBA(0.85f, 0.15f, 0.15f, 1.0f), ColorRGBA(0.65f, 0.05f, 0.05f, 1.0f),
-					ColorRGBA(0.85f, 0.15f, 0.15f, 1.0f), ColorRGBA(0.65f, 0.05f, 0.05f, 1.0f),
-					IGraphics::CORNER_ALL, 5.0f);
-				Ui()->DoLabel(&BadgeBeta, "BETA", 11.0f, TEXTALIGN_MC);
-			}
-			Content.HSplitTop(MarginSmall, nullptr, &Content);
-
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcGraffityEnabled, BCLocalize("Enable graffiti"), &g_Config.m_BcGraffityEnabled, &Content, LineSize);
-
-			if(ExtraTargetHeight * s_GraffityPhase > 0.0f)
-			{
-				Content.HSplitTop(ExtraTargetHeight * s_GraffityPhase, &Visible, &Content);
-				Ui()->ClipEnable(&Visible);
-				struct SScopedClip
-				{
-					CUi *m_pUi;
-					~SScopedClip() { m_pUi->ClipDisable(); }
-				} ClipGuard{Ui()};
-
-				CUIRect Expand = {Visible.x, Visible.y, Visible.w, ExtraTargetHeight};
-
-				Expand.HSplitTop(MarginSmall, nullptr, &Expand);
-				Expand.HSplitTop(LineSize, &Row, &Expand);
-				Ui()->DoScrollbarOption(&g_Config.m_BcGraffitySize, &g_Config.m_BcGraffitySize, &Row, BCLocalize("Graffiti size"), 1, 6);
-
-				Expand.HSplitTop(MarginSmall, nullptr, &Expand);
-				Expand.HSplitTop(LineSize, &Row, &Expand);
-				Ui()->DoScrollbarOption(&g_Config.m_BcGraffitySoundVolume, &g_Config.m_BcGraffitySoundVolume, &Row, BCLocalize("Graffiti spray volume"), 0, 200, &CUi::ms_LogarithmicScrollbarScale, 0u, "%");
-
-				Expand.HSplitTop(MarginSmall, nullptr, &Expand);
-				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcGraffityHoldWheel, BCLocalize("Hold key for graffiti wheel"), &g_Config.m_BcGraffityHoldWheel, &Expand, LineSize);
-
-				Expand.HSplitTop(MarginSmall, nullptr, &Expand);
-				Expand.HSplitTop(KeyReaderLineSize, &Label, &Expand);
-				static CButtonContainer s_GraffityReaderButton;
-				static CButtonContainer s_GraffityClearButton;
-				DoLine_KeyReader(Label, s_GraffityReaderButton, s_GraffityClearButton, BCLocalize("Graffiti wheel key"), "+graffity");
-			}
-
 			Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
 		}
 
