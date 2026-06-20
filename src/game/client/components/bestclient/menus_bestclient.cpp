@@ -25,6 +25,7 @@
 #include <game/client/components/menus.h>
 #include <game/client/components/sounds.h>
 #include <game/client/gameclient.h>
+#include <game/client/components/bestclient/lua/lua_system.h>
 #include <game/client/skin.h>
 #include <game/client/ui.h>
 #include <game/client/ui_listbox.h>
@@ -181,6 +182,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		BESTCLIENT_TAB_GAMEPLAY,
 		BESTCLIENT_TAB_OTHERS,
 		BESTCLIENT_TAB_FUN,
+		BESTCLIENT_TAB_SCRIPTS,
 		BESTCLIENT_TAB_INFO,
 		NUM_BESTCLIENT_TABS,
 	};
@@ -208,6 +210,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		BCLocalize("Gameplay"),
 		BCLocalize("Others"),
 		BCLocalize("Fun"),
+		BCLocalize("Scripts"),
 		BCLocalize("Info"),
 	};
 	const int aTabOrder[NUM_BESTCLIENT_TABS] = {
@@ -215,6 +218,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		BESTCLIENT_TAB_GAMEPLAY,
 		BESTCLIENT_TAB_OTHERS,
 		BESTCLIENT_TAB_FUN,
+		BESTCLIENT_TAB_SCRIPTS,
 		BESTCLIENT_TAB_INFO,
 	};
 
@@ -3028,6 +3032,10 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 	{
 		RenderSettingsBestClientFun(MainView);
 	}
+	else if(s_CurTab == BESTCLIENT_TAB_SCRIPTS)
+	{
+		RenderSettingsBestClientScripts(MainView);
+	}
 	else if(s_CurTab == BESTCLIENT_TAB_INFO)
 	{
 		RenderSettingsBestClientInfo(MainView);
@@ -3318,6 +3326,7 @@ void CMenus::RenderSettingsBestClientInfo(CUIRect MainView)
 		BESTCLIENT_TAB_GAMEPLAY,
 		BESTCLIENT_TAB_OTHERS,
 		BESTCLIENT_TAB_FUN,
+		BESTCLIENT_TAB_SCRIPTS,
 		BESTCLIENT_TAB_INFO,
 		NUM_BESTCLIENT_TABS,
 	};
@@ -3527,6 +3536,7 @@ void CMenus::RenderSettingsBestClientInfo(CUIRect MainView)
 		BCLocalize("Gameplay"),
 		BCLocalize("Others"),
 		BCLocalize("Fun"),
+		BCLocalize("Scripts"),
 		BCLocalize("Info"),
 	};
 	const int aTabOrder[NUM_BESTCLIENT_TABS] = {
@@ -3534,6 +3544,7 @@ void CMenus::RenderSettingsBestClientInfo(CUIRect MainView)
 		BESTCLIENT_TAB_GAMEPLAY,
 		BESTCLIENT_TAB_OTHERS,
 		BESTCLIENT_TAB_FUN,
+		BESTCLIENT_TAB_SCRIPTS,
 		BESTCLIENT_TAB_INFO,
 	};
 
@@ -3556,4 +3567,169 @@ void CMenus::RenderSettingsBestClientInfo(CUIRect MainView)
 	const int HideableRows = (HideableTabCount + 1) / 2;
 	RightView.HSplitTop(LineSize * (HideableRows + 0.5f), nullptr, &RightView);
 
+}
+
+void CMenus::RenderSettingsBestClientScripts(CUIRect MainView)
+{
+	const float LineSize = 20.0f;
+	const float MarginSmall = 5.0f;
+	const float FontSize = 14.0f;
+	const float SmallFontSize = 12.0f;
+
+	CUIRect Row, Button, Label;
+	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+
+	// Path input + Load button + Open Folder button
+	static char s_aScriptPath[512] = "";
+	static CLineInput s_ScriptPathInput;
+	static CButtonContainer s_LoadButton;
+	static CButtonContainer s_FolderButton;
+
+	MainView.HSplitTop(LineSize, &Row, &MainView);
+	CUIRect LoadBtn, FolderBtn;
+	Row.VSplitRight(60.0f, &Row, &FolderBtn);
+	FolderBtn.VMargin(MarginSmall / 2.0f, &FolderBtn);
+	Row.VSplitRight(MarginSmall, &Row, nullptr);
+	Row.VSplitRight(70.0f, &Row, &LoadBtn);
+	LoadBtn.VMargin(MarginSmall / 2.0f, &LoadBtn);
+	s_ScriptPathInput.SetBuffer(s_aScriptPath, sizeof(s_aScriptPath));
+	s_ScriptPathInput.SetEmptyText(BCLocalize("Path to .lua file..."));
+	Ui()->DoEditBox(&s_ScriptPathInput, &Row, FontSize);
+
+	if(DoButtonLineSize_Menu(&s_LoadButton, BCLocalize("Load"), 0, &LoadBtn, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+	{
+		if(s_aScriptPath[0] != '\0')
+		{
+			GameClient()->m_ScriptSystem.LoadScript(s_aScriptPath);
+			s_aScriptPath[0] = '\0';
+			s_ScriptPathInput.Clear();
+		}
+	}
+	if(DoButtonLineSize_Menu(&s_FolderButton, BCLocalize("Folder"), 0, &FolderBtn, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+	{
+		char aBuf[IO_MAX_PATH_LENGTH];
+		Storage()->GetCompletePath(IStorage::TYPE_SAVE, "scripts", aBuf, sizeof(aBuf));
+		Client()->ViewFile(aBuf);
+	}
+
+	MainView.HSplitTop(MarginSmall * 2.0f, nullptr, &MainView);
+
+	auto &Scripts = GameClient()->m_ScriptSystem.m_Scripts;
+	if(Scripts.empty())
+	{
+		MainView.HSplitTop(LineSize, &Row, &MainView);
+		Ui()->DoLabel(&Row, BCLocalize("No scripts loaded."), FontSize, TEXTALIGN_ML);
+		return;
+	}
+
+	static std::vector<CButtonContainer> s_aUnloadBtns;
+	static std::vector<CButtonContainer> s_aReloadBtns;
+	static std::vector<CButtonContainer> s_aSettingsBtns;
+	static std::vector<CButtonContainer> s_aEditBtns;
+	s_aUnloadBtns.resize(Scripts.size());
+	s_aReloadBtns.resize(Scripts.size());
+	s_aSettingsBtns.resize(Scripts.size());
+	s_aEditBtns.resize(Scripts.size());
+
+	for(int i = 0; i < (int)Scripts.size(); i++)
+	{
+		auto &Script = Scripts[i];
+
+		MainView.HSplitTop(LineSize, &Row, &MainView);
+
+		// Unload / Reload / Settings / Edit buttons on the right
+		CUIRect UnloadBtn, ReloadBtn, SettingsBtn, EditBtn;
+		Row.VSplitRight(60.0f, &Row, &UnloadBtn);
+		UnloadBtn.VMargin(MarginSmall / 2.0f, &UnloadBtn);
+		Row.VSplitRight(MarginSmall, &Row, nullptr);
+		Row.VSplitRight(60.0f, &Row, &ReloadBtn);
+		ReloadBtn.VMargin(MarginSmall / 2.0f, &ReloadBtn);
+		Row.VSplitRight(MarginSmall, &Row, nullptr);
+		Row.VSplitRight(60.0f, &Row, &SettingsBtn);
+		SettingsBtn.VMargin(MarginSmall / 2.0f, &SettingsBtn);
+		Row.VSplitRight(MarginSmall, &Row, nullptr);
+		Row.VSplitRight(60.0f, &Row, &EditBtn);
+		EditBtn.VMargin(MarginSmall / 2.0f, &EditBtn);
+		Row.VSplitRight(MarginSmall, &Row, nullptr);
+
+		if(DoButtonLineSize_Menu(&s_aUnloadBtns[i], BCLocalize("Unload"), 0, &UnloadBtn, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+		{
+			GameClient()->m_ScriptSystem.UnloadScript(i);
+			break;
+		}
+		if(DoButtonLineSize_Menu(&s_aReloadBtns[i], BCLocalize("Reload"), 0, &ReloadBtn, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+		{
+			GameClient()->m_ScriptSystem.ReloadScript(i);
+			break;
+		}
+		if(DoButtonLineSize_Menu(&s_aSettingsBtns[i], BCLocalize(Script.m_SettingsOpen ? "Hide" : "Settings"), 0, &SettingsBtn, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+			Script.m_SettingsOpen = !Script.m_SettingsOpen;
+		if(DoButtonLineSize_Menu(&s_aEditBtns[i], BCLocalize("Edit"), 0, &EditBtn, LineSize, false, 0, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+			Client()->ViewFile(Script.m_Path.c_str());
+
+		// Toggle checkbox
+		CUIRect CheckRect;
+		Row.VSplitLeft(LineSize, &CheckRect, &Row);
+		Row.VSplitLeft(MarginSmall, nullptr, &Row);
+		if(DoButton_CheckBox(&Script, "", Script.m_Enabled ? 1 : 0, &CheckRect))
+		{
+			Script.m_Enabled = !Script.m_Enabled;
+			GameClient()->m_ScriptSystem.SaveScriptList();
+		}
+
+		// Name + version
+		char aLabel[256];
+		if(!Script.m_Version.empty())
+			str_format(aLabel, sizeof(aLabel), "%s  v%s", Script.m_Name.c_str(), Script.m_Version.c_str());
+		else
+			str_copy(aLabel, Script.m_Name.c_str(), sizeof(aLabel));
+		Ui()->DoLabel(&Row, aLabel, FontSize, TEXTALIGN_ML);
+
+		// Description or error below
+		if(!Script.m_LastError.empty())
+		{
+			MainView.HSplitTop(LineSize, &Label, &MainView);
+			Label.VMargin(LineSize + MarginSmall, &Label);
+			TextRender()->TextColor(1.0f, 0.3f, 0.3f, 1.0f);
+			Ui()->DoLabel(&Label, Script.m_LastError.c_str(), SmallFontSize, TEXTALIGN_ML);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+		}
+		else if(!Script.m_Description.empty())
+		{
+			MainView.HSplitTop(LineSize, &Label, &MainView);
+			Label.VMargin(LineSize + MarginSmall, &Label);
+			Ui()->DoLabel(&Label, Script.m_Description.c_str(), SmallFontSize, TEXTALIGN_ML);
+		}
+
+		// Script settings panel
+		if(Script.m_SettingsOpen && Script.m_Enabled)
+		{
+			Graphics()->BlendNormal();
+
+			// Draw background using previous frame's height (1-frame lag is imperceptible)
+			if(Script.m_LastSettingsH > 0.0f)
+			{
+				CUIRect BgRect{MainView.x, MainView.y, MainView.w, Script.m_LastSettingsH};
+				BgRect.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f), IGraphics::CORNER_ALL, 5.0f);
+			}
+
+			const float InnerPad = MarginSmall;
+			float HeightUsed = GameClient()->m_ScriptSystem.DispatchSettings(
+				i,
+				MainView.x + InnerPad,
+				MainView.y + InnerPad * 0.5f,
+				MainView.w - InnerPad * 2.0f);
+
+			Script.m_LastSettingsH = HeightUsed + InnerPad;
+
+			if(HeightUsed > 0.0f)
+				MainView.HSplitTop(Script.m_LastSettingsH + MarginSmall, nullptr, &MainView);
+		}
+		else
+		{
+			Script.m_LastSettingsH = 0.0f;
+		}
+
+		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+	}
 }

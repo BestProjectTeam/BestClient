@@ -680,6 +680,7 @@ void CGameClient::OnConsoleInit()
 					      &m_Menus,
 					      &m_Tooltips,
 					      &m_Scripting, // TClient
+					      &m_ScriptSystem, // BestClient Lua
 					      &m_KeyBinder,
 					      &m_GameConsole,
 					      &m_MenuBackground,

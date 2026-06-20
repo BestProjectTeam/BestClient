@@ -1146,6 +1146,7 @@ private:
 	void RenderSettingsBestClient(CUIRect MainView);
 	void RenderSettingsBestClientInfo(CUIRect MainView);
 	void RenderSettingsBestClientFun(CUIRect MainView);
+	void RenderSettingsBestClientScripts(CUIRect MainView);
 	void RenderSettingsAppearance(CUIRect MainView);
 
 	// found in menus_tclient.cpp
