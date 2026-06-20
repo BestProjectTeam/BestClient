@@ -504,6 +504,7 @@ private:
 	static CUi::EPopupMenuFunctionResult PopupConfirm(void *pContext, CUIRect View, bool Active);
 	static CUi::EPopupMenuFunctionResult PopupSelection(void *pContext, CUIRect View, bool Active);
 	static CUi::EPopupMenuFunctionResult PopupColorPicker(void *pContext, CUIRect View, bool Active);
+	static CUi::EPopupMenuFunctionResult PopupColorPickerClassic(void *pContext, CUIRect View, bool Active);
 
 	IClient *m_pClient;
 	IGraphics *m_pGraphics;
@@ -843,6 +844,7 @@ public:
 		CUi *m_pUI; // set by CUi when popup is shown
 		EColorPickerMode m_ColorMode = MODE_UNSET;
 		bool m_Alpha = false;
+		bool m_ShowAlphaSlider = true;
 		unsigned int *m_pHslaColor = nullptr; // may be nullptr
 		ColorHSVA m_HsvaColor;
 		ColorRGBA m_RgbaColor;

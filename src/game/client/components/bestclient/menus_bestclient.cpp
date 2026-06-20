@@ -2717,7 +2717,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 #else
 			const float AutoUpdateHeight = 0.0f;
 #endif
-			const float ContentHeight = LineSize + MarginSmall + 16.0f * LineSize + ColorPickerHeight + AutoLockDelayHeight + AutoUpdateHeight;
+			const float ContentHeight = LineSize + MarginSmall + 17.0f * LineSize + ColorPickerHeight + AutoLockDelayHeight + AutoUpdateHeight;
 			CUIRect Content, Label, Row;
 			BeginBlock(Column, ContentHeight, Content);
 
@@ -2776,6 +2776,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcSilentTyping, BCLocalize("Silent typing"), &g_Config.m_BcSilentTyping, &Content, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatAltCommandLayout, BCLocalize("Commands in other layout"), &g_Config.m_BcChatAltCommandLayout, &Content, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcCinematicCamera, BCLocalize("Cinematic camera"), &g_Config.m_BcCinematicCamera, &Content, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcNewColorPicker, BCLocalize("New color picker"), &g_Config.m_BcNewColorPicker, &Content, LineSize);
 			{
 				CUIRect CheckBoxRow, BadgeRect;
 				Content.HSplitTop(LineSize, &CheckBoxRow, &Content);

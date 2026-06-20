@@ -3084,6 +3084,7 @@ void CEditor::DoColorPickerButton(const void *pId, const CUIRect *pRect, ColorRG
 		m_ColorPickerPopupContext.m_HslaColor = color_cast<ColorHSLA>(Color);
 		m_ColorPickerPopupContext.m_HsvaColor = color_cast<ColorHSVA>(m_ColorPickerPopupContext.m_HslaColor);
 		m_ColorPickerPopupContext.m_Alpha = true;
+		m_ColorPickerPopupContext.m_ShowAlphaSlider = false;
 		m_pColorPickerPopupActiveId = pId;
 		Ui()->ShowPopupColorPicker(Ui()->MouseX(), Ui()->MouseY(), &m_ColorPickerPopupContext);
 	}

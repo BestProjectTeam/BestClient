@@ -55,6 +55,7 @@ MACRO_CONFIG_INT(BcChatAnimationType, bc_chat_animation_type, 3, 1, 4, CFGFLAG_C
 
 // General visuals
 MACRO_CONFIG_INT(BcSettingsLayout, bc_settings_layout, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Settings layout (0 = new, 1 = old)")
+MACRO_CONFIG_INT(BcNewColorPicker, bc_new_color_picker, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use the new wheel-style color picker")
 MACRO_CONFIG_INT(BcHideHudInSettings, bc_hide_hud_in_settings, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide HUD while settings page is open")
 MACRO_CONFIG_INT(BcEyeComfort, bc_eye_comfort, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Render a warm yellow screen overlay to reduce eye strain")
 MACRO_CONFIG_INT(BcEyeComfortStrength, bc_eye_comfort_strength, 35, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Eye comfort intensity in percent; increases warmth and lowers brightness together")
