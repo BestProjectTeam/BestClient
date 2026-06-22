@@ -97,6 +97,7 @@ class CHud : public CComponent
 		vec2 m_Pos;
 		vec2 m_Speed;
 		float m_Angle = 0.0f;
+		int m_Checkpoint = 0;
 	};
 	class SMovementInformationState
 	{
@@ -109,6 +110,7 @@ class CHud : public CComponent
 		bool m_ShowPosition = false;
 		bool m_ShowSpeed = false;
 		bool m_ShowAngle = false;
+		bool m_ShowCheckpoint = false;
 		bool m_ShowDummyPos = false;
 		bool m_ShowDummySpeed = false;
 		bool m_ShowDummyAngle = false;
@@ -280,6 +282,10 @@ private:
 	int m_PracticeModeOffset;
 	int m_Team0ModeOffset;
 	int m_LockModeOffset;
+
+	int m_TeleCheckpointTotal = 0;
+	bool m_TeleCheckpointTotalBuilt = false;
+	int ComputeTeleCheckpointTotal() const;
 };
 
 #endif

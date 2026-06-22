@@ -284,10 +284,13 @@ CUIRect CHudEditor::GetFallbackModuleRect(HudLayout::EModule Module) const
 		const bool ShowPos = g_Config.m_ClShowhudPlayerPosition != 0;
 		const bool ShowSpeed = g_Config.m_ClShowhudPlayerSpeed != 0;
 		const bool ShowAngle = g_Config.m_ClShowhudPlayerAngle != 0;
-		float BoxHeight = 3.0f * 8.0f * Scale * ((ShowPos ? 1.0f : 0.0f) + (ShowSpeed ? 1.0f : 0.0f)) + 2.0f * 8.0f * Scale * (ShowAngle ? 1.0f : 0.0f);
+		const bool ShowCheckpoint = g_Config.m_ClShowhudPlayerCheckpoint != 0;
+		float BoxHeight = 3.0f * 8.0f * Scale * ((ShowPos ? 1.0f : 0.0f) + (ShowSpeed ? 1.0f : 0.0f)) + 1.0f * 8.0f * Scale * (ShowAngle ? 1.0f : 0.0f);
+		if(ShowCheckpoint)
+			BoxHeight += 8.0f * Scale;
 		if(g_Config.m_BcShowhudDummyCoordIndicator)
 			BoxHeight += 8.0f * Scale;
-		if(ShowPos || ShowSpeed || ShowAngle)
+		if(ShowPos || ShowSpeed || ShowAngle || ShowCheckpoint)
 			BoxHeight += 2.0f * Scale;
 		BoxHeight = maximum(BoxHeight, 12.0f * Scale);
 		Rect = {Layout.m_X, Layout.m_Y, 62.0f * Scale, BoxHeight};
