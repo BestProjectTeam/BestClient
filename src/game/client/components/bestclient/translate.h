@@ -47,6 +47,7 @@ class CTranslate : public CComponent
 
 	static void ConTranslate(IConsole::IResult *pResult, void *pUserData);
 	static void ConTranslateId(IConsole::IResult *pResult, void *pUserData);
+	static void ConToggleTranslate(IConsole::IResult *pResult, void *pUserData);
 	std::unique_ptr<ITranslateBackend> CreateBackend(const char *pText, const char *pSourceLanguage, const char *pTargetLanguage) const;
 	const char *IncomingSourceLanguage() const;
 	const char *IncomingTargetLanguage() const;

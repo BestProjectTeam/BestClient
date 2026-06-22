@@ -721,6 +721,13 @@ void CTranslate::ConTranslateId(IConsole::IResult *pResult, void *pUserData)
 	pThis->Translate(pResult->GetInteger(0));
 }
 
+void CTranslate::ConToggleTranslate(IConsole::IResult *pResult, void *pUserData)
+{
+	const int NewValue = g_Config.m_TcTranslateAutoIncoming ^ 1;
+	g_Config.m_TcTranslateAutoIncoming = NewValue;
+	g_Config.m_TcTranslateAutoOutgoing = NewValue;
+}
+
 void CTranslate::OnConsoleInit()
 {
 	// Migration from legacy single toggle (tc_translate_auto) to separate toggles.
@@ -739,6 +746,7 @@ void CTranslate::OnConsoleInit()
 
 	Console()->Register("translate", "?r[name]", CFGFLAG_CLIENT, ConTranslate, this, "Translate last message (of a given name)");
 	Console()->Register("translate_id", "v[id]", CFGFLAG_CLIENT, ConTranslateId, this, "Translate last message of the person with this id");
+	Console()->Register("toggle_translate", "", CFGFLAG_CLIENT, ConToggleTranslate, this, "Toggle auto-translate incoming and outgoing chat");
 }
 
 std::unique_ptr<ITranslateBackend> CTranslate::CreateBackend(const char *pText, const char *pSourceLanguage, const char *pTargetLanguage) const

@@ -1063,8 +1063,10 @@ void CChat::RenderTranslateSettingsButton(const CUIRect &ButtonRect)
 	const bool Hovered = MousePos.x >= ButtonRect.x && MousePos.x <= ButtonRect.x + ButtonRect.w &&
 		MousePos.y >= ButtonRect.y && MousePos.y <= ButtonRect.y + ButtonRect.h;
 	const bool IsOpen = Ui()->IsPopupOpen(&m_TranslateSettingsPopupId);
+	const bool IsTranslateActive = g_Config.m_TcTranslateAutoIncoming || g_Config.m_TcTranslateAutoOutgoing;
 	const ColorRGBA ButtonColor = IsOpen ? ColorRGBA(0.35f, 0.45f, 0.70f, 0.90f) :
-		(Hovered ? ColorRGBA(0.28f, 0.28f, 0.28f, 0.90f) : ColorRGBA(0.16f, 0.16f, 0.16f, 0.82f));
+		(IsTranslateActive ? (Hovered ? ColorRGBA(0.22f, 0.58f, 0.22f, 0.92f) : ColorRGBA(0.15f, 0.48f, 0.15f, 0.85f)) :
+		(Hovered ? ColorRGBA(0.28f, 0.28f, 0.28f, 0.90f) : ColorRGBA(0.16f, 0.16f, 0.16f, 0.82f)));
 	const float ButtonRounding = maximum(3.0f, ButtonRect.h * 0.28f);
 
 	ButtonRect.Draw(ButtonColor, IGraphics::CORNER_ALL, ButtonRounding);
