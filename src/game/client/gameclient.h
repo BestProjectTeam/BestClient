@@ -40,7 +40,6 @@
 #include "components/bestclient/music_player.h"
 #include "components/bestclient/translate.h"
 #include "components/bestclient/voice/voice.h"
-#include "components/bestclient/lua/lua_system.h"
 #include "components/binds.h"
 #include "components/broadcast.h"
 #include "components/camera.h"
@@ -234,7 +233,6 @@ public:
 	CFastPractice m_FastPractice;
 	CBestClient m_BestClient;
 	CVoiceChat m_VoiceChat;
-	CScriptSystem m_ScriptSystem;
 
 	CTooltips m_Tooltips;
 

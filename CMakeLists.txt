@@ -2832,10 +2832,6 @@ if(CLIENT)
     components/bestclient/visualizer/source_pulse.cpp
     components/bestclient/visualizer/source_wasapi.cpp
     components/bestclient/visualizer/types.h
-    components/bestclient/lua/lua_api.cpp
-    components/bestclient/lua/lua_api.h
-    components/bestclient/lua/lua_system.cpp
-    components/bestclient/lua/lua_system.h
     components/bestclient/voice/protocol.h
     components/bestclient/voice/server.cpp
     components/bestclient/voice/voice.cpp
@@ -3143,32 +3139,6 @@ if(CLIENT)
 
   set(DEPS_CLIENT ${DEPS} ${GLEW_DEP} ${WAVPACK_DEP})
 
-  # BestClient: Lua 5.4
-  include(FetchContent)
-  if(POLICY CMP0169)
-    cmake_policy(SET CMP0169 OLD)
-  endif()
-  FetchContent_Declare(lua54
-    URL https://www.lua.org/ftp/lua-5.4.7.tar.gz
-    TLS_VERIFY OFF
-  )
-  FetchContent_GetProperties(lua54)
-  if(NOT lua54_POPULATED)
-    FetchContent_Populate(lua54)
-    file(GLOB LUA_CORE_SOURCES "${lua54_SOURCE_DIR}/src/*.c")
-    list(REMOVE_ITEM LUA_CORE_SOURCES
-      "${lua54_SOURCE_DIR}/src/lua.c"
-      "${lua54_SOURCE_DIR}/src/luac.c"
-    )
-    add_library(lua54 STATIC ${LUA_CORE_SOURCES})
-    target_include_directories(lua54 PUBLIC "${lua54_SOURCE_DIR}/src")
-    if(MSVC)
-      target_compile_definitions(lua54 PRIVATE _CRT_SECURE_NO_WARNINGS)
-      set_property(TARGET lua54 PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-    endif()
-  endif()
-  # sol2: header-only, placed manually at src/engine/external/sol2/sol/
-
   # Libraries
   set(LIBS_CLIENT
     ${FREETYPE_LIBRARIES}
@@ -3255,7 +3225,7 @@ if(CLIENT)
   set_property(TARGET game-client
       PROPERTY OUTPUT_NAME ${CLIENT_EXECUTABLE}
   )
-  target_link_libraries(game-client ${LIBS_CLIENT} lua54)
+  target_link_libraries(game-client ${LIBS_CLIENT})
 
   if(MSVC)
     target_compile_options(game-client PRIVATE /bigobj) # TClient, required for ChaiScript
@@ -3269,10 +3239,6 @@ if(CLIENT)
   # Silence warnings from ChaiScript
   target_include_directories(game-client SYSTEM PRIVATE
     ${PROJECT_SOURCE_DIR}/src/engine/external/chaiscript)
-
-  # BestClient: sol2 headers (src/engine/external/sol2/sol/sol.hpp)
-  target_include_directories(game-client SYSTEM PRIVATE
-    "${PROJECT_SOURCE_DIR}/src/engine/external/sol2")
 
   target_include_directories(game-client SYSTEM PRIVATE
     ${FREETYPE_INCLUDE_DIRS}
