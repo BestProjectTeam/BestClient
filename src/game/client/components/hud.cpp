@@ -656,8 +656,6 @@ void CHud::OnReset()
 	m_KeystrokesMouse1EndTime = 0;
 	m_KeystrokesWheelUpEndTime = 0;
 	m_KeystrokesWheelDownEndTime = 0;
-	m_TeleCheckpointTotal = 0;
-	m_TeleCheckpointTotalBuilt = false;
 
 	ResetHudContainers();
 }
@@ -2697,21 +2695,6 @@ inline int CHud::GetDigitsIndex(int Value, int Max)
 	return DigitsIndex;
 }
 
-int CHud::ComputeTeleCheckpointTotal() const
-{
-	if(!Collision() || !Collision()->TeleLayer())
-		return 0;
-	const int MapSize = Collision()->GetWidth() * Collision()->GetHeight();
-	const CTeleTile *pTele = Collision()->TeleLayer();
-	int Total = 0;
-	for(int i = 0; i < MapSize; i++)
-	{
-		if(pTele[i].m_Type == TILE_TELECHECK && pTele[i].m_Number > Total)
-			Total = pTele[i].m_Number;
-	}
-	return Total;
-}
-
 bool CHud::GetMovementInformationState(SMovementInformationState &State, bool ForcePreview) const
 {
 	State = SMovementInformationState{};
@@ -2771,12 +2754,11 @@ bool CHud::GetMovementInformationState(SMovementInformationState &State, bool Fo
 		}
 	}
 
-	State.m_ShowCheckpoint = !State.m_PosOnly && g_Config.m_ClShowhudPlayerCheckpoint != 0;
 	State.m_ShowDummyPos = State.m_HasDummyInfo && State.m_ShowPosition && g_Config.m_TcShowhudDummyPosition;
 	State.m_ShowDummySpeed = State.m_HasDummyInfo && State.m_ShowSpeed && g_Config.m_TcShowhudDummySpeed;
 	State.m_ShowDummyAngle = State.m_HasDummyInfo && State.m_ShowAngle && g_Config.m_TcShowhudDummyAngle;
 
-	return State.m_ShowPosition || State.m_ShowSpeed || State.m_ShowAngle || State.m_ShowCheckpoint || State.m_ShowDummyCoordIndicator || ForcePreview;
+	return State.m_ShowPosition || State.m_ShowSpeed || State.m_ShowAngle || State.m_ShowDummyCoordIndicator || ForcePreview;
 }
 
 float CHud::GetMovementInformationBoxHeight(const SMovementInformationState &State, float Scale) const
@@ -2800,18 +2782,15 @@ float CHud::GetMovementInformationBoxHeight(const SMovementInformationState &Sta
 
 	if(State.m_ShowAngle)
 	{
-		BoxHeight += 1.0f * LineHeight;
+		BoxHeight += 2.0f * LineHeight;
 		if(State.m_ShowDummyAngle)
 			BoxHeight += 1.0f * LineHeight;
 	}
 
-	if(State.m_ShowCheckpoint)
-		BoxHeight += LineHeight;
-
 	if(State.m_ShowDummyCoordIndicator)
 		BoxHeight += LineHeight;
 
-	if(State.m_ShowPosition || State.m_ShowSpeed || State.m_ShowAngle || State.m_ShowCheckpoint)
+	if(State.m_ShowPosition || State.m_ShowSpeed || State.m_ShowAngle)
 		BoxHeight += 2.0f * Scale;
 
 	return BoxHeight;
@@ -2916,10 +2895,6 @@ CHud::CMovementInformation CHud::GetMovementInformation(int ClientId, int Conn) 
 			Angle += 2.0f * pi;
 		}
 		Out.m_Angle = Angle * 180.0f / pi;
-
-		const CCharacter *pCharacter = GameClient()->m_GameWorld.GetCharacterById(ClientId);
-		if(pCharacter != nullptr)
-			Out.m_Checkpoint = pCharacter->m_TeleCheckpoint;
 	}
 	return Out;
 }
@@ -3102,6 +3077,8 @@ void CHud::RenderMovementInformation(bool ForcePreview)
 	if(State.m_ShowAngle)
 	{
 		TextRender()->Text(LeftX, y, Fontsize, Localize("Angle:"), -1.0f);
+		y += LineHeight;
+
 		UpdateMovementInformationTextContainer(m_PlayerAngleTextContainerIndex, Fontsize, State.m_Info.m_Angle, m_PlayerPrevAngle);
 		RenderMovementInformationTextContainer(m_PlayerAngleTextContainerIndex, TextRender()->DefaultTextColor(), RightX, y);
 		y += LineHeight;
@@ -3113,22 +3090,7 @@ void CHud::RenderMovementInformation(bool ForcePreview)
 			TextRender()->Text(LeftX, y, Fontsize, "DA:", -1.0f);
 			str_format(aBuf, sizeof(aBuf), "%.2f", State.m_DummyInfo.m_Angle);
 			TextRender()->Text(RightX - TextRender()->TextWidth(Fontsize, aBuf), y, Fontsize, aBuf, -1.0f);
-			y += LineHeight;
 		}
-	}
-
-	if(State.m_ShowCheckpoint)
-	{
-		char aBuf[32];
-		TextRender()->Text(LeftX, y, Fontsize, Localize("Checkpoint:"), -1.0f);
-		if(!m_TeleCheckpointTotalBuilt)
-		{
-			m_TeleCheckpointTotal = ComputeTeleCheckpointTotal();
-			m_TeleCheckpointTotalBuilt = true;
-		}
-		str_format(aBuf, sizeof(aBuf), "%d/%d", State.m_Info.m_Checkpoint, m_TeleCheckpointTotal);
-		TextRender()->Text(RightX - TextRender()->TextWidth(Fontsize, aBuf), y, Fontsize, aBuf, -1.0f);
-		y += LineHeight;
 	}
 
 	RenderPlayerBelowIndicator();
