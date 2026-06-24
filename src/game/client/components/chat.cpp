@@ -1051,27 +1051,7 @@ CUi::EPopupMenuFunctionResult CChat::PopupTranslateSettings(void *pContext, CUIR
 	View.HSplitTop(Spacing, nullptr, &View);
 	static CButtonContainer s_TranslateKeyReader;
 	static CButtonContainer s_TranslateKeyClear;
-	if(pChat->GameClient()->m_Menus.DoLine_KeyReader(View, s_TranslateKeyReader, s_TranslateKeyClear, Localize("Toggle translate"), "toggle_translate"))
-	{
-		// Force Alt modifier so the bind works while chat is open without typing a character
-		bool Done = false;
-		for(int Mod = 0; Mod < KeyModifier::COMBINATION_COUNT && !Done; Mod++)
-		{
-			for(int KeyId = 0; KeyId < KEY_LAST && !Done; KeyId++)
-			{
-				if(str_comp(pChat->GameClient()->m_Binds.Get(KeyId, Mod), "toggle_translate") == 0)
-				{
-					const int ModWithAlt = Mod | (1 << KeyModifier::ALT);
-					if(ModWithAlt != Mod)
-					{
-						pChat->GameClient()->m_Binds.Bind(KeyId, "", false, Mod);
-						pChat->GameClient()->m_Binds.Bind(KeyId, "toggle_translate", false, ModWithAlt);
-					}
-					Done = true;
-				}
-			}
-		}
-	}
+	pChat->GameClient()->m_Menus.DoLine_KeyReader(View, s_TranslateKeyReader, s_TranslateKeyClear, Localize("Toggle translate"), "toggle_translate");
 
 	return CUi::POPUP_KEEP_OPEN;
 }
