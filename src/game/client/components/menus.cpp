@@ -3173,7 +3173,32 @@ void CMenus::OnRender()
 		}
 	}
 
+	// Precompute overlay state before Render() so we can block menu interactions
+	static bool s_StuckOverlayDismissed = false;
+	static int s_StuckLastMode = -99;
+	static int s_StuckLastRatio = -99;
+	if(s_StuckLastMode != g_Config.m_BcCustomAspectRatioMode || s_StuckLastRatio != g_Config.m_BcCustomAspectRatio)
+	{
+		s_StuckOverlayDismissed = false;
+		s_StuckLastMode = g_Config.m_BcCustomAspectRatioMode;
+		s_StuckLastRatio = g_Config.m_BcCustomAspectRatio;
+	}
+	const bool AspectOverlayActive = g_Config.m_BcCustomAspectRatioApplyMode == 1 &&
+		(g_Config.m_BcCustomAspectRatioMode > 0 ||
+		(g_Config.m_BcCustomAspectRatioMode < 0 && g_Config.m_BcCustomAspectRatio > 0));
+	const bool ShowStuckOverlay = IsActive() && AspectOverlayActive && !s_StuckOverlayDismissed;
+	// Block menu button fires: clear active item so no DoButtonLogic fires this frame
+	if(ShowStuckOverlay)
+		Ui()->SetActiveItem(nullptr);
+
 	Render();
+
+	// After Render: discard buttons that became active, and suppress hot item next frame
+	if(ShowStuckOverlay)
+	{
+		Ui()->SetActiveItem(nullptr);
+		Ui()->SetHotItem(nullptr);
+	}
 
 	// render debug information
 	if(g_Config.m_Debug)
@@ -3199,71 +3224,56 @@ void CMenus::OnRender()
 	// Safety overlay: shown in menu when aspect ratio "Full" mode is active.
 	// Renders in real window coordinates so it stays readable regardless of distortion.
 	// Uses UpdatedMousePos (raw pixels) → real virtual coords to avoid the distorted m_MousePos.
-	if(IsActive())
+	if(ShowStuckOverlay)
 	{
-		const bool AspectActive = g_Config.m_BcCustomAspectRatioApplyMode == 1 &&
-			(g_Config.m_BcCustomAspectRatioMode > 0 ||
-			(g_Config.m_BcCustomAspectRatioMode < 0 && g_Config.m_BcCustomAspectRatio > 0));
-		static bool s_StuckOverlayDismissed = false;
-		static int s_StuckLastMode = -99;
-		static int s_StuckLastRatio = -99;
-		if(s_StuckLastMode != g_Config.m_BcCustomAspectRatioMode || s_StuckLastRatio != g_Config.m_BcCustomAspectRatio)
+		Ui()->SetUseGraphicsScreenAspect(false);
+		Ui()->MapScreen();
+		const CUIRect *pReal = Ui()->Screen();
+
+		// Convert raw pixel mouse to real virtual coords
+		const float WinW = (float)Graphics()->ScreenWidth();
+		const float WinH = (float)Graphics()->ScreenHeight();
+		const vec2 RawMouse = Ui()->UpdatedMousePos();
+		const vec2 RealMouse = vec2(RawMouse.x * pReal->w / WinW, RawMouse.y * pReal->h / WinH);
+
+		const float PanelW = minimum(360.0f, pReal->w - 12.0f);
+		CUIRect Panel;
+		Panel.x = pReal->x + (pReal->w - PanelW) * 0.5f;
+		Panel.y = pReal->y + 6.0f;
+		Panel.w = PanelW;
+		Panel.h = 30.0f;
+		Graphics()->DrawRect(Panel.x, Panel.y, Panel.w, Panel.h, ColorRGBA(0.0f, 0.0f, 0.0f, 0.82f), IGraphics::CORNER_ALL, 5.0f);
+		Panel.Margin(2.0f, &Panel);
+
+		CUIRect StuckBtn, CloseBtn;
+		Panel.VSplitRight(80.0f, &Panel, &CloseBtn);
+		CloseBtn.VMargin(2.0f, &CloseBtn);
+		Panel.VSplitRight(4.0f, &Panel, nullptr);
+		Panel.VSplitRight(88.0f, &Panel, &StuckBtn);
+		StuckBtn.VMargin(2.0f, &StuckBtn);
+		Panel.VSplitRight(4.0f, &Panel, nullptr);
+		Ui()->DoLabel(&Panel, "Aspect ratio: Full", 10.0f, TEXTALIGN_ML);
+
+		auto RenderOverlayBtn = [&](const CUIRect &Rect, const char *pText, ColorRGBA Normal, ColorRGBA Hovered) -> bool {
+			const bool Hover = RealMouse.x >= Rect.x && RealMouse.x < Rect.x + Rect.w &&
+				RealMouse.y >= Rect.y && RealMouse.y < Rect.y + Rect.h;
+			Graphics()->DrawRect(Rect.x, Rect.y, Rect.w, Rect.h, Hover ? Hovered : Normal, IGraphics::CORNER_ALL, 3.0f);
+			Ui()->DoLabel(&Rect, pText, 10.5f, TEXTALIGN_MC);
+			return Hover && Ui()->MouseButtonClicked(0);
+		};
+
+		if(RenderOverlayBtn(StuckBtn, "I'm stuck", ColorRGBA(0.45f, 0.18f, 0.18f, 1.0f), ColorRGBA(0.7f, 0.28f, 0.28f, 1.0f)))
 		{
-			s_StuckOverlayDismissed = false;
-			s_StuckLastMode = g_Config.m_BcCustomAspectRatioMode;
-			s_StuckLastRatio = g_Config.m_BcCustomAspectRatio;
+			g_Config.m_BcCustomAspectRatioMode = 0;
+			g_Config.m_BcCustomAspectRatio = 0;
+			GameClient()->m_TClient.SetForcedAspect();
 		}
-		if(AspectActive && !s_StuckOverlayDismissed)
-		{
-			Ui()->SetUseGraphicsScreenAspect(false);
-			Ui()->MapScreen();
-			const CUIRect *pReal = Ui()->Screen();
+		if(RenderOverlayBtn(CloseBtn, "Looks fine", ColorRGBA(0.18f, 0.36f, 0.18f, 1.0f), ColorRGBA(0.28f, 0.55f, 0.28f, 1.0f)))
+			s_StuckOverlayDismissed = true;
 
-			// Convert raw pixel mouse to real virtual coords
-			const float WinW = (float)Graphics()->ScreenWidth();
-			const float WinH = (float)Graphics()->ScreenHeight();
-			const vec2 RawMouse = Ui()->UpdatedMousePos();
-			const vec2 RealMouse = vec2(RawMouse.x * pReal->w / WinW, RawMouse.y * pReal->h / WinH);
-
-			const float PanelW = minimum(360.0f, pReal->w - 12.0f);
-			CUIRect Panel;
-			Panel.x = pReal->x + (pReal->w - PanelW) * 0.5f;
-			Panel.y = pReal->y + 6.0f;
-			Panel.w = PanelW;
-			Panel.h = 30.0f;
-			Graphics()->DrawRect(Panel.x, Panel.y, Panel.w, Panel.h, ColorRGBA(0.0f, 0.0f, 0.0f, 0.82f), IGraphics::CORNER_ALL, 5.0f);
-			Panel.Margin(2.0f, &Panel);
-
-			CUIRect StuckBtn, CloseBtn;
-			Panel.VSplitRight(80.0f, &Panel, &CloseBtn);
-			CloseBtn.VMargin(2.0f, &CloseBtn);
-			Panel.VSplitRight(4.0f, &Panel, nullptr);
-			Panel.VSplitRight(88.0f, &Panel, &StuckBtn);
-			StuckBtn.VMargin(2.0f, &StuckBtn);
-			Panel.VSplitRight(4.0f, &Panel, nullptr);
-			Ui()->DoLabel(&Panel, "Aspect ratio: Full", 10.0f, TEXTALIGN_ML);
-
-			auto RenderOverlayBtn = [&](const CUIRect &Rect, const char *pText, ColorRGBA Normal, ColorRGBA Hovered) -> bool {
-				const bool Hover = RealMouse.x >= Rect.x && RealMouse.x < Rect.x + Rect.w &&
-					RealMouse.y >= Rect.y && RealMouse.y < Rect.y + Rect.h;
-				Graphics()->DrawRect(Rect.x, Rect.y, Rect.w, Rect.h, Hover ? Hovered : Normal, IGraphics::CORNER_ALL, 3.0f);
-				Ui()->DoLabel(&Rect, pText, 10.5f, TEXTALIGN_MC);
-				return Hover && Ui()->MouseButtonClicked(0);
-			};
-
-			if(RenderOverlayBtn(StuckBtn, "I'm stuck", ColorRGBA(0.45f, 0.18f, 0.18f, 1.0f), ColorRGBA(0.7f, 0.28f, 0.28f, 1.0f)))
-			{
-				g_Config.m_BcCustomAspectRatioMode = 0;
-				g_Config.m_BcCustomAspectRatio = 0;
-				GameClient()->m_TClient.SetForcedAspect();
-			}
-			if(RenderOverlayBtn(CloseBtn, "Looks fine", ColorRGBA(0.18f, 0.36f, 0.18f, 1.0f), ColorRGBA(0.28f, 0.55f, 0.28f, 1.0f)))
-				s_StuckOverlayDismissed = true;
-
-			// Restore original coordinate system before cursor render
-			Ui()->SetUseGraphicsScreenAspect(!UseWindowAspectForUi);
-			Ui()->MapScreen();
-		}
+		// Restore original coordinate system before cursor render
+		Ui()->SetUseGraphicsScreenAspect(!UseWindowAspectForUi);
+		Ui()->MapScreen();
 	}
 
 	if(IsActive())
