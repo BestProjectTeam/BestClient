@@ -134,7 +134,6 @@ void CMenusSettingsControls::OnInterfacesInit(CGameClient *pClient)
 			{EBindOptionGroup::BEST_CLIENT, Localizable("Left jump"), "+jump; +left"},
 			{EBindOptionGroup::BEST_CLIENT, Localizable("Right jump"), "+jump; +right"},
 			{EBindOptionGroup::BEST_CLIENT, Localizable("Admin Panel"), "toggle_admin_panel"},
-			{EBindOptionGroup::BEST_CLIENT, Localizable("Toggle translate"), "toggle_translate"},
 			{EBindOptionGroup::BEST_CLIENT_VOICE, Localizable("Voice panel"), "toggle_voice_panel"},
 			{EBindOptionGroup::BEST_CLIENT_VOICE, Localizable("Push-to-talk"), "+voicechat"},
 			{EBindOptionGroup::BEST_CLIENT_VOICE, Localizable("Mute microphone"), "toggle_voice_mic_mute"},

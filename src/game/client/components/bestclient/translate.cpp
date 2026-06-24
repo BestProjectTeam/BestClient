@@ -723,9 +723,11 @@ void CTranslate::ConTranslateId(IConsole::IResult *pResult, void *pUserData)
 
 void CTranslate::ConToggleTranslate(IConsole::IResult *pResult, void *pUserData)
 {
+	CTranslate *pThis = static_cast<CTranslate *>(pUserData);
 	const int NewValue = g_Config.m_TcTranslateAutoIncoming ^ 1;
 	g_Config.m_TcTranslateAutoIncoming = NewValue;
 	g_Config.m_TcTranslateAutoOutgoing = NewValue;
+	pThis->GameClient()->m_Chat.Echo(NewValue ? "translate on" : "translate off");
 }
 
 void CTranslate::OnConsoleInit()
