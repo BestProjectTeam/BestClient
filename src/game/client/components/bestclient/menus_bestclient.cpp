@@ -2713,7 +2713,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 #else
 			const float AutoUpdateHeight = 0.0f;
 #endif
-			const float ContentHeight = LineSize + MarginSmall + 17.0f * LineSize + ColorPickerHeight + AutoLockDelayHeight + AutoUpdateHeight;
+			const float ContentHeight = LineSize + MarginSmall + 18.0f * LineSize + ColorPickerHeight + AutoLockDelayHeight + AutoUpdateHeight;
 			CUIRect Content, Label, Row;
 			BeginBlock(Column, ContentHeight, Content);
 
