@@ -3244,6 +3244,9 @@ void CMenus::RenderSettingsDDNet(CUIRect MainView)
 	if(Ui()->DoScrollbarOption(&g_Config.m_ClDefaultZoom, &g_Config.m_ClDefaultZoom, &Button, Localize("Default zoom"), 0, 20))
 		GameClient()->m_Camera.SetZoom(CCamera::ZoomStepsToValue(g_Config.m_ClDefaultZoom - 10), g_Config.m_ClSmoothZoomTime, true);
 
+	Left.HSplitTop(20.0f, &Button, &Left);
+	Ui()->DoScrollbarOption(&g_Config.m_ClMouseMaxDistance, &g_Config.m_ClMouseMaxDistance, &Button, Localize("Max cursor distance"), 1, 1000);
+
 	Right.HSplitTop(20.0f, &Button, &Right);
 	Ui()->DoScrollbarOption(&g_Config.m_ClPredictionMargin, &g_Config.m_ClPredictionMargin, &Button, Localize("Prediction margin"), 1, 300);
 
