@@ -30,9 +30,7 @@
 #include "components/background.h"
 #include "components/bestclient/3d_particles.h"
 #include "components/bestclient/admin_panel.h"
-#include "components/bestclient/afterimage.h"
 #include "components/bestclient/bestclient.h"
-#include "components/bestclient/chat_bubbles.h"
 #include "components/bestclient/clientindicator/client_indicator.h"
 #include "components/bestclient/fast_actions.h"
 #include "components/bestclient/fast_practice.h"
@@ -223,8 +221,6 @@ public:
 	CRaceDemo m_RaceDemo;
 	CGhost m_Ghost;
 	C3DParticles m_3DParticles;
-	CAfterimage m_Afterimage;
-	CChatBubbles m_ChatBubbles;
 	CClientIndicator m_ClientIndicator;
 	CMusicPlayer m_MusicPlayer;
 	CHudEditor m_HudEditor;

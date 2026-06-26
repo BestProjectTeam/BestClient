@@ -88,7 +88,6 @@ struct SBestClientComponentEntry
 static const SBestClientComponentEntry gs_aBestClientComponentEntries[] = {
 	{CBestClient::COMPONENT_VISUALS_JELLY_TEE, "Jelly Tee", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_VISUALS_3D_PARTICLES, "3D Particles", COMPONENTS_GROUP_VISUALS},
-	{CBestClient::COMPONENT_VISUALS_AFTERIMAGE, "Afterimage", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_VISUALS_CRYSTAL_LASER, "Crystal Laser", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_VISUALS_MUSIC_PLAYER, "Music Player", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_VISUALS_KEYSTROKES, "Keystrokes", COMPONENTS_GROUP_VISUALS},
@@ -96,7 +95,6 @@ static const SBestClientComponentEntry gs_aBestClientComponentEntries[] = {
 	{CBestClient::COMPONENT_VISUALS_ANIMATIONS, "Animations", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_VISUALS_ASPECT_RATIO, "Aspect Ratio", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_VISUALS_EYE_COMFORT, "Eye Comfort", COMPONENTS_GROUP_VISUALS},
-	{CBestClient::COMPONENT_VISUALS_RAYCAST, "Raycast", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_VISUALS_MOTION_BLUR, "Motion Blur", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_VISUALS_FLYING_NAMEPLATES, "Flying Nameplates", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_GAMEPLAY_HOOK_COMBO, "Hook Combo", COMPONENTS_GROUP_VISUALS},
@@ -110,7 +108,6 @@ static const SBestClientComponentEntry gs_aBestClientComponentEntries[] = {
 	{CBestClient::COMPONENT_VISUALS_FOCUS_MODE, "Focus Mode", COMPONENTS_GROUP_GAMEPLAY},
 	{CBestClient::COMPONENT_OTHERS_MISC, "Misc", COMPONENTS_GROUP_OTHERS},
 	{CBestClient::COMPONENT_OTHERS_CHAT_MEDIA, "Chat Media", COMPONENTS_GROUP_OTHERS},
-	{CBestClient::COMPONENT_VISUALS_CHAT_BUBBLES, "Chat Bubbles", COMPONENTS_GROUP_VISUALS},
 	{CBestClient::COMPONENT_OTHERS_VOICE_SETTINGS, "Voice Chat", COMPONENTS_GROUP_OTHERS},
 	{CBestClient::COMPONENT_OTHERS_VOICE_BINDS, "Voice Binds", COMPONENTS_GROUP_OTHERS},
 	{CBestClient::COMPONENT_TCLIENT_SETTINGS_TAB, "Settings tab", COMPONENTS_GROUP_TCLIENT},
@@ -622,79 +619,6 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
 		}
 
-		// Raycast (left column block)
-		if(!GameClient()->m_BestClient.IsComponentDisabled(CBestClient::COMPONENT_VISUALS_RAYCAST))
-		{
-			const float ColorPickerLineSize = 25.0f;
-			const float ColorPickerLabelSize = 13.0f;
-			const float ColorPickerSpacing = 5.0f;
-			static float s_RaycastPhase = 0.0f;
-			const bool RaycastEnabled = g_Config.m_BcRaycast != 0;
-			UpdateRevealPhase(s_RaycastPhase, RaycastEnabled);
-			const float ExpandedTargetHeight = MarginSmall + (ColorPickerLineSize + ColorPickerSpacing) * 3.0f + LineSize * 3.0f;
-			const float ExpandedHeight = ExpandedTargetHeight * s_RaycastPhase;
-			const float ContentHeight = LineSize + MarginSmall + LineSize + ExpandedHeight;
-			CUIRect Content, Label, Visible;
-			BeginBlock(Column, ContentHeight, Content);
-
-			Content.HSplitTop(LineSize, &Label, &Content);
-			{
-				const float BadgeSpacing = 4.0f;
-				CUIRect TitleLabel, BadgeBeta, BadgeNew;
-				Label.VSplitLeft(TextRender()->TextWidth(HeadlineFontSize, BCLocalize("Raycast")) + BadgeSpacing, &TitleLabel, &Label);
-				Label.VSplitLeft(52.0f, &BadgeBeta, &Label);
-				Label.VSplitLeft(BadgeSpacing, nullptr, &Label);
-				Label.VSplitLeft(52.0f, &BadgeNew, &Label);
-				Ui()->DoLabel(&TitleLabel, BCLocalize("Raycast"), HeadlineFontSize, TEXTALIGN_ML);
-				BadgeBeta.HMargin(1.5f, &BadgeBeta);
-				Graphics()->DrawRect4(BadgeBeta.x, BadgeBeta.y, BadgeBeta.w, BadgeBeta.h,
-					ColorRGBA(0.85f, 0.15f, 0.15f, 1.0f), ColorRGBA(0.65f, 0.05f, 0.05f, 1.0f),
-					ColorRGBA(0.85f, 0.15f, 0.15f, 1.0f), ColorRGBA(0.65f, 0.05f, 0.05f, 1.0f),
-					IGraphics::CORNER_ALL, 5.0f);
-				Ui()->DoLabel(&BadgeBeta, "BETA", 11.0f, TEXTALIGN_MC);
-				BadgeNew.HMargin(1.5f, &BadgeNew);
-				Graphics()->DrawRect4(BadgeNew.x, BadgeNew.y, BadgeNew.w, BadgeNew.h,
-					ColorRGBA(1.00f, 0.76f, 0.16f, 1.0f), ColorRGBA(0.92f, 0.56f, 0.02f, 1.0f),
-					ColorRGBA(1.00f, 0.76f, 0.16f, 1.0f), ColorRGBA(0.92f, 0.56f, 0.02f, 1.0f),
-					IGraphics::CORNER_ALL, 5.0f);
-				Ui()->DoLabel(&BadgeNew, "NEW", 11.0f, TEXTALIGN_MC);
-			}
-			Content.HSplitTop(MarginSmall, nullptr, &Content);
-
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcRaycast, BCLocalize("Enable Raycast"), &g_Config.m_BcRaycast, &Content, LineSize);
-
-			if(ExpandedHeight > 0.0f)
-			{
-				Content.HSplitTop(ExpandedHeight, &Visible, &Content);
-				Ui()->ClipEnable(&Visible);
-				struct SScopedClip
-				{
-					CUi *m_pUi;
-					~SScopedClip() { m_pUi->ClipDisable(); }
-				} ClipGuard{Ui()};
-
-				CUIRect Expand = {Visible.x, Visible.y, Visible.w, ExpandedTargetHeight};
-				Expand.HSplitTop(MarginSmall, nullptr, &Expand);
-
-				static CButtonContainer s_RaycastColorHookableButton;
-				static CButtonContainer s_RaycastColorUnhookableButton;
-				static CButtonContainer s_RaycastColorFreezeButton;
-				DoLine_ColorPicker(&s_RaycastColorHookableButton, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerSpacing, &Expand, BCLocalize("Hookable color"), &g_Config.m_BcRaycastColorHookable, ColorRGBA(0.51f, 0.91f, 0.63f, 1.0f), false);
-				DoLine_ColorPicker(&s_RaycastColorUnhookableButton, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerSpacing, &Expand, BCLocalize("Unhookable color"), &g_Config.m_BcRaycastColorUnhookable, ColorRGBA(1.0f, 0.0f, 0.0f, 1.0f), false);
-				DoLine_ColorPicker(&s_RaycastColorFreezeButton, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerSpacing, &Expand, BCLocalize("Freeze color"), &g_Config.m_BcRaycastColorFreeze, ColorRGBA(1.0f, 0.55f, 0.0f, 1.0f), false);
-
-				CUIRect Button;
-				Expand.HSplitTop(LineSize, &Button, &Expand);
-				DoSliderWithScaledValue(&g_Config.m_BcRaycastLength, &g_Config.m_BcRaycastLength, &Button, BCLocalize("Ray length"), 1, 100, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, " tiles");
-
-				Expand.HSplitTop(LineSize, &Button, &Expand);
-				DoSliderWithScaledValue(&g_Config.m_BcRaycastAlpha, &g_Config.m_BcRaycastAlpha, &Button, BCLocalize("Opacity"), 0, 100, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "%");
-
-				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcRaycastBlackout, BCLocalize("World blackout (tee + hook only)"), &g_Config.m_BcRaycastBlackout, &Expand, LineSize);
-			}
-			Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
-		}
-
 		// Media background (left column block)
 		if(!GameClient()->m_BestClient.IsComponentDisabled(CBestClient::COMPONENT_VISUALS_MEDIA_BACKGROUND))
 		{
@@ -896,102 +820,6 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
 		}
 
-		if(!GameClient()->m_BestClient.IsComponentDisabled(CBestClient::COMPONENT_VISUALS_CHAT_BUBBLES))
-		{
-			static float s_BcChatBubblesPhase = 0.0f;
-			static CButtonContainer s_ChatBubblesResetButton;
-			const bool ChatBubblesEnabled = g_Config.m_BcChatBubbles != 0;
-			UpdateRevealPhase(s_BcChatBubblesPhase, ChatBubblesEnabled);
-			const float ColorPickerLineSize = 25.0f;
-			const float ColorPickerLabelSize = 13.0f;
-			const float ColorPickerSpacing = 5.0f;
-			const float CustomColorHeight = g_Config.m_BcChatBubbleCustomColors ? 3.0f * (ColorPickerLineSize + ColorPickerSpacing) : 0.0f;
-			const float ExtraTargetHeight = MarginSmall + 9.0f * LineSize + CustomColorHeight;
-			const float ContentHeight = LineSize + MarginSmall + LineSize + ExtraTargetHeight * s_BcChatBubblesPhase;
-			CUIRect Content, Label, Row, Visible;
-			BeginBlock(Column, ContentHeight, Content);
-
-			Content.HSplitTop(LineSize, &Label, &Content);
-			CUIRect TitleLabel, ResetButton, ResetHitbox;
-			Label.VSplitRight(LineSize + 8.0f, &TitleLabel, &ResetButton);
-			ResetHitbox = ResetButton;
-			const bool ChatBubblesResetClicked = Ui()->DoButton_FontIcon(&s_ChatBubblesResetButton, FontIcon::ARROW_ROTATE_LEFT, 0, &ResetHitbox, BUTTONFLAG_LEFT);
-			GameClient()->m_Tooltips.DoToolTip(&s_ChatBubblesResetButton, &ResetHitbox, BCLocalize("Reset to defaults"));
-			if(ChatBubblesResetClicked)
-			{
-				g_Config.m_BcChatBubblesDemo = DefaultConfig::BcChatBubblesDemo;
-				g_Config.m_BcChatBubblesSelf = DefaultConfig::BcChatBubblesSelf;
-				g_Config.m_BcChatBubbleSize = DefaultConfig::BcChatBubbleSize;
-				g_Config.m_BcChatBubbleShowTime = DefaultConfig::BcChatBubbleShowTime;
-				g_Config.m_BcChatBubbleFadeIn = DefaultConfig::BcChatBubbleFadeIn;
-				g_Config.m_BcChatBubbleFadeOut = DefaultConfig::BcChatBubbleFadeOut;
-				g_Config.m_BcChatBubbleAnimation = DefaultConfig::BcChatBubbleAnimation;
-				g_Config.m_BcChatBubbleCustomColors = DefaultConfig::BcChatBubbleCustomColors;
-				g_Config.m_BcChatBubbleBgColor = DefaultConfig::BcChatBubbleBgColor;
-				g_Config.m_BcChatBubbleTextColor = DefaultConfig::BcChatBubbleTextColor;
-				g_Config.m_BcChatBubbleOutlineColor = DefaultConfig::BcChatBubbleOutlineColor;
-				g_Config.m_BcChatBubbleRounding = DefaultConfig::BcChatBubbleRounding;
-			}
-			Ui()->DoLabel(&TitleLabel, BCLocalize("Chat Bubbles"), HeadlineFontSize, TEXTALIGN_ML);
-			Content.HSplitTop(MarginSmall, nullptr, &Content);
-
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatBubbles, BCLocalize("Enable Chat Bubbles"), &g_Config.m_BcChatBubbles, &Content, LineSize);
-			const float ExtraHeight = ExtraTargetHeight * s_BcChatBubblesPhase;
-			if(!ChatBubblesResetClicked && ExtraHeight > 0.0f)
-			{
-				Content.HSplitTop(ExtraHeight, &Visible, &Content);
-				Ui()->ClipEnable(&Visible);
-				struct SScopedClip
-				{
-					CUi *m_pUi;
-					~SScopedClip() { m_pUi->ClipDisable(); }
-				} ClipGuard{Ui()};
-
-				CUIRect Expand = {Visible.x, Visible.y, Visible.w, ExtraTargetHeight};
-
-				Expand.HSplitTop(MarginSmall, nullptr, &Expand);
-				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatBubblesDemo, BCLocalize("Show Chatbubbles in demo"), &g_Config.m_BcChatBubblesDemo, &Expand, LineSize);
-				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatBubblesSelf, BCLocalize("Show Chatbubbles above you"), &g_Config.m_BcChatBubblesSelf, &Expand, LineSize);
-
-				CUIRect ModeLabel, ModeDropDown;
-				Expand.HSplitTop(LineSize, &Row, &Expand);
-				Row.VSplitLeft(120.0f, &ModeLabel, &ModeDropDown);
-				Ui()->DoLabel(&ModeLabel, BCLocalize("Appear animation"), 14.0f, TEXTALIGN_ML);
-				static CUi::SDropDownState s_ChatBubbleAnimationState;
-				static CScrollRegion s_ChatBubbleAnimationScrollRegion;
-				s_ChatBubbleAnimationState.m_SelectionPopupContext.m_pScrollRegion = &s_ChatBubbleAnimationScrollRegion;
-				const char *apChatBubbleAnimations[4] = {
-					BCLocalize("Fade"),
-					BCLocalize("Rise"),
-					BCLocalize("Slide"),
-					BCLocalize("Pop"),
-				};
-				g_Config.m_BcChatBubbleAnimation = std::clamp(g_Config.m_BcChatBubbleAnimation, 0, 3);
-				g_Config.m_BcChatBubbleAnimation = Ui()->DoDropDown(&ModeDropDown, g_Config.m_BcChatBubbleAnimation, apChatBubbleAnimations, (int)std::size(apChatBubbleAnimations), s_ChatBubbleAnimationState);
-
-				Expand.HSplitTop(LineSize, &Row, &Expand);
-				Ui()->DoScrollbarOption(&g_Config.m_BcChatBubbleSize, &g_Config.m_BcChatBubbleSize, &Row, BCLocalize("Chat Bubble Size"), 20, 30);
-				Expand.HSplitTop(LineSize, &Row, &Expand);
-				Ui()->DoScrollbarOption(&g_Config.m_BcChatBubbleShowTime, &g_Config.m_BcChatBubbleShowTime, &Row, BCLocalize("Show the Bubbles for"), 200, 1000);
-				Expand.HSplitTop(LineSize, &Row, &Expand);
-				Ui()->DoScrollbarOption(&g_Config.m_BcChatBubbleFadeIn, &g_Config.m_BcChatBubbleFadeIn, &Row, BCLocalize("fade in for"), 15, 100);
-				Expand.HSplitTop(LineSize, &Row, &Expand);
-				Ui()->DoScrollbarOption(&g_Config.m_BcChatBubbleFadeOut, &g_Config.m_BcChatBubbleFadeOut, &Row, BCLocalize("fade out for"), 15, 100);
-				Expand.HSplitTop(LineSize, &Row, &Expand);
-				Ui()->DoScrollbarOption(&g_Config.m_BcChatBubbleRounding, &g_Config.m_BcChatBubbleRounding, &Row, BCLocalize("Rounding"), 0, 200, &CUi::ms_LinearScrollbarScale, 0u, "%");
-				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatBubbleCustomColors, BCLocalize("Custom colors"), &g_Config.m_BcChatBubbleCustomColors, &Expand, LineSize);
-				if(g_Config.m_BcChatBubbleCustomColors)
-				{
-					static CButtonContainer s_ChatBubbleBgColorButton;
-					static CButtonContainer s_ChatBubbleTextColorButton;
-					static CButtonContainer s_ChatBubbleOutlineColorButton;
-					DoLine_ColorPicker(&s_ChatBubbleBgColorButton, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerSpacing, &Expand, BCLocalize("Background"), &g_Config.m_BcChatBubbleBgColor, color_cast<ColorRGBA>(ColorHSLA(DefaultConfig::BcChatBubbleBgColor, true)), false, nullptr, true);
-					DoLine_ColorPicker(&s_ChatBubbleTextColorButton, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerSpacing, &Expand, BCLocalize("Text"), &g_Config.m_BcChatBubbleTextColor, color_cast<ColorRGBA>(ColorHSLA(DefaultConfig::BcChatBubbleTextColor, true)), false, nullptr, true);
-					DoLine_ColorPicker(&s_ChatBubbleOutlineColorButton, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerSpacing, &Expand, BCLocalize("Text outline"), &g_Config.m_BcChatBubbleOutlineColor, color_cast<ColorRGBA>(ColorHSLA(DefaultConfig::BcChatBubbleOutlineColor, true)), false, nullptr, true);
-				}
-			}
-			Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
-		}
 
 		if(!GameClient()->m_BestClient.IsComponentDisabled(CBestClient::COMPONENT_VISUALS_FLYING_NAMEPLATES))
 		{
@@ -1031,60 +859,6 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 
 				Content.HSplitTop(LineSize, &Row, &Content);
 				Ui()->DoScrollbarOption(&g_Config.m_BcFlyingNamePlatesFollow, &g_Config.m_BcFlyingNamePlatesFollow, &Row, BCLocalize("Follow speed"), 1, 100);
-			}
-			Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
-		}
-
-		// Afterimage (left column block)
-		if(!GameClient()->m_BestClient.IsComponentDisabled(CBestClient::COMPONENT_VISUALS_AFTERIMAGE))
-		{
-			static float s_AfterimagePhase = 0.0f;
-			static CButtonContainer s_AfterimageResetButton;
-			const bool AfterimageEnabled = g_Config.m_BcAfterimage != 0;
-			UpdateRevealPhase(s_AfterimagePhase, AfterimageEnabled);
-			const float ExtraTargetHeight = 3.0f * LineSize;
-			const float ContentHeight = LineSize + MarginSmall + LineSize + ExtraTargetHeight * s_AfterimagePhase;
-			CUIRect Content, Label, Row, Visible;
-			BeginBlock(Column, ContentHeight, Content);
-
-			Content.HSplitTop(LineSize, &Label, &Content);
-			CUIRect TitleLabel, ResetButton, ResetHitbox;
-			Label.VSplitRight(LineSize + 8.0f, &TitleLabel, &ResetButton);
-			ResetHitbox = ResetButton;
-			const bool AfterimageResetClicked = Ui()->DoButton_FontIcon(&s_AfterimageResetButton, FontIcon::ARROW_ROTATE_LEFT, 0, &ResetHitbox, BUTTONFLAG_LEFT);
-			GameClient()->m_Tooltips.DoToolTip(&s_AfterimageResetButton, &ResetHitbox, BCLocalize("Reset to defaults"));
-			if(AfterimageResetClicked)
-			{
-				g_Config.m_BcAfterimageFrames = DefaultConfig::BcAfterimageFrames;
-				g_Config.m_BcAfterimageAlpha = DefaultConfig::BcAfterimageAlpha;
-				g_Config.m_BcAfterimageSpacing = DefaultConfig::BcAfterimageSpacing;
-			}
-			Ui()->DoLabel(&TitleLabel, BCLocalize("Afterimage"), HeadlineFontSize, TEXTALIGN_ML);
-			Content.HSplitTop(MarginSmall, nullptr, &Content);
-
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcAfterimage, BCLocalize("Enable Afterimage"), &g_Config.m_BcAfterimage, &Content, LineSize);
-
-			const float ExtraHeight = ExtraTargetHeight * s_AfterimagePhase;
-			if(!AfterimageResetClicked && ExtraHeight > 0.0f)
-			{
-				Content.HSplitTop(ExtraHeight, &Visible, &Content);
-				Ui()->ClipEnable(&Visible);
-				struct SScopedClip
-				{
-					CUi *m_pUi;
-					~SScopedClip() { m_pUi->ClipDisable(); }
-				} ClipGuard{Ui()};
-
-				CUIRect Expand = {Visible.x, Visible.y, Visible.w, ExtraTargetHeight};
-
-				Expand.HSplitTop(LineSize, &Row, &Expand);
-				Ui()->DoScrollbarOption(&g_Config.m_BcAfterimageFrames, &g_Config.m_BcAfterimageFrames, &Row, BCLocalize("Afterimage frames"), 2, 20);
-
-				Expand.HSplitTop(LineSize, &Row, &Expand);
-				Ui()->DoScrollbarOption(&g_Config.m_BcAfterimageAlpha, &g_Config.m_BcAfterimageAlpha, &Row, BCLocalize("Afterimage alpha"), 1, 100);
-
-				Expand.HSplitTop(LineSize, &Row, &Expand);
-				Ui()->DoScrollbarOption(&g_Config.m_BcAfterimageSpacing, &g_Config.m_BcAfterimageSpacing, &Row, BCLocalize("Afterimage spacing"), 1, 64);
 			}
 			Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
 		}

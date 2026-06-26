@@ -74,14 +74,7 @@ MACRO_CONFIG_COL(BcShowhudDummyCoordIndicatorColor, bc_showhud_dummy_coord_indic
 MACRO_CONFIG_COL(BcShowhudDummyCoordIndicatorSameHeightColor, bc_showhud_dummy_coord_indicator_same_height_color, 5635967, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Player-below indicator color when aligned vertically")
 MACRO_CONFIG_INT(BcShowRealHitbox, bc_show_real_hitbox, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show a dot at the center of your real hitbox")
 MACRO_CONFIG_COL(BcShowRealHitboxColor, bc_show_real_hitbox_color, 0xFFFFFFFFU, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLALPHA, "Color of the real hitbox center dot")
-MACRO_CONFIG_INT(BcRaycast, bc_raycast, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show raycast lines to reachable hookable and unhookable tiles")
-MACRO_CONFIG_INT(BcRaycastBlackout, bc_raycast_blackout, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Blackout the entire world so only tee, hook and raycast lines are visible")
-MACRO_CONFIG_INT(BcRaycastRays, bc_raycast_rays, 64, 8, 128, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Number of rays for the raycast visualization")
-MACRO_CONFIG_INT(BcRaycastLength, bc_raycast_length, 12, 1, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Raycast line length in tiles")
-MACRO_CONFIG_INT(BcRaycastAlpha, bc_raycast_alpha, 60, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Raycast line opacity in percent")
-MACRO_CONFIG_COL(BcRaycastColorHookable, bc_raycast_color_hookable, 6401973, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Raycast line color for hookable tiles")
-MACRO_CONFIG_COL(BcRaycastColorUnhookable, bc_raycast_color_unhookable, 65407, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Raycast line color for unhookable tiles")
-MACRO_CONFIG_COL(BcRaycastColorFreeze, bc_raycast_color_freeze, 1441664, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Raycast line color for freeze tiles (orange by default)")
+
 MACRO_CONFIG_INT(BcAutoServerListRefresh, bc_auto_server_list_refresh, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically refresh the server browser list while a browser tab is open")
 MACRO_CONFIG_INT(BcAutoServerListRefreshSeconds, bc_auto_server_list_refresh_seconds, 10, 1, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Auto refresh interval for the server browser list in seconds")
 MACRO_CONFIG_INT(BcMastersrv, bc_mastersrv, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use the BestClient master server mirror for the server browser")
@@ -227,11 +220,6 @@ MACRO_CONFIG_INT(BcMenuMediaBackground, bc_menu_media_background, 0, 0, 1, CFGFL
 MACRO_CONFIG_INT(BcGameMediaBackground, bc_game_media_background, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable custom media background in game background rendering")
 MACRO_CONFIG_STR(BcMenuMediaBackgroundPath, bc_menu_media_background_path, IO_MAX_PATH_LENGTH, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Path to the custom menu media background file")
 MACRO_CONFIG_INT(BcGameMediaBackgroundOffset, bc_game_media_background_offset, 0, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "How much the custom media background is fixed to the map when rendering the in-game background")
-// Afterimage
-MACRO_CONFIG_INT(BcAfterimage, bc_afterimage, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Render afterimage layers of your tee")
-MACRO_CONFIG_INT(BcAfterimageFrames, bc_afterimage_frames, 6, 2, 20, CFGFLAG_CLIENT | CFGFLAG_SAVE, "How many previous frames to keep for the afterimage")
-MACRO_CONFIG_INT(BcAfterimageAlpha, bc_afterimage_alpha, 40, 1, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Maximum alpha of afterimage layers (1-100)")
-MACRO_CONFIG_INT(BcAfterimageSpacing, bc_afterimage_spacing, 18, 1, 64, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Distance between afterimage samples")
 MACRO_CONFIG_INT(BcMotionBlur, bc_motion_blur, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable motion blur via previous-frame blending")
 MACRO_CONFIG_INT(BcMotionBlurStrength, bc_motion_blur_strength, 50, 0, 95, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Strength of motion blur frame blending (0-95%)")
 
@@ -246,20 +234,6 @@ MACRO_CONFIG_INT(BcTrail, bc_trail, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Ena
 MACRO_CONFIG_INT(BcTrailOthers, bc_trail_others, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show player trail for other players")
 MACRO_CONFIG_INT(BcTrailMode, bc_trail_mode, 0, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Player trail mode (0=grenade, 1=invisible, 2=ninja)")
 
-// Chat bubbles
-MACRO_CONFIG_INT(BcChatBubbles, bc_chat_bubbles, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Toggle Chatbubbles")
-MACRO_CONFIG_INT(BcChatBubblesSelf, bc_chat_bubbles_self, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show Chatbubbles above you")
-MACRO_CONFIG_INT(BcChatBubblesDemo, bc_chat_bubbles_demo, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show Chatbubbles in demoplayer")
-MACRO_CONFIG_INT(BcChatBubbleSize, bc_chat_bubble_size, 20, 20, 30, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Size of the chat bubble")
-MACRO_CONFIG_INT(BcChatBubbleShowTime, bc_chat_bubble_showtime, 200, 200, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "How long to show the bubble for")
-MACRO_CONFIG_INT(BcChatBubbleFadeOut, bc_chat_bubble_fadeout, 35, 15, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "How long it fades out")
-MACRO_CONFIG_INT(BcChatBubbleFadeIn, bc_chat_bubble_fadein, 15, 15, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "How long it fades in")
-MACRO_CONFIG_INT(BcChatBubbleAnimation, bc_chat_bubble_animation, 1, 0, 3, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Chat bubble appearance animation (0=fade, 1=rise, 2=slide, 3=pop)")
-MACRO_CONFIG_INT(BcChatBubbleCustomColors, bc_chat_bubble_custom_colors, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use custom chat bubble colors")
-MACRO_CONFIG_COL(BcChatBubbleBgColor, bc_chat_bubble_bg_color, 0x40000000, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLALPHA, "Custom chat bubble background color")
-MACRO_CONFIG_COL(BcChatBubbleTextColor, bc_chat_bubble_text_color, 0xFF0000FF, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLALPHA, "Custom chat bubble text color")
-MACRO_CONFIG_COL(BcChatBubbleOutlineColor, bc_chat_bubble_outline_color, 0x99000000, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_COLALPHA, "Custom chat bubble text outline color")
-MACRO_CONFIG_INT(BcChatBubbleRounding, bc_chat_bubble_rounding, 100, 0, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Chat bubble rounding in percent")
 
 // Client Indicator
 MACRO_CONFIG_INT(BcClientIndicator, bc_client_indicator, 1, 1, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Client indicator is always enabled")

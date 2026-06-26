@@ -2788,12 +2788,8 @@ if(CLIENT)
     components/bestclient/3d_particles.h
     components/bestclient/admin_panel.cpp
     components/bestclient/admin_panel.h
-    components/bestclient/afterimage.cpp
-    components/bestclient/afterimage.h
     components/bestclient/bestclient.cpp
     components/bestclient/bestclient.h
-    components/bestclient/chat_bubbles.cpp
-    components/bestclient/chat_bubbles.h
     components/bestclient/clientindicator/browser_cache.cpp
     components/bestclient/clientindicator/browser_cache.h
     components/bestclient/clientindicator/client_indicator.cpp

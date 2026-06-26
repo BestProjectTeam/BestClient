@@ -344,7 +344,6 @@ class CChat : public CComponent
 	friend class CBindChat;
 	friend class CTranslate;
 	friend class CBestClient;
-	friend class CChatBubbles;
 	friend class CTClient;
 
 public:

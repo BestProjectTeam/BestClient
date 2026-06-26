@@ -638,7 +638,6 @@ void CGameClient::OnConsoleInit()
 					      &m_Ghost,
 					      &m_BestClient, // BestClient binds
 					      &m_TClient, // TClient (Must be before chat and players)
-					      &m_Afterimage,
 					      &m_Players,
 					      &m_MovingTilesBackground, // TClient
 					      &m_FastPractice,
@@ -647,7 +646,6 @@ void CGameClient::OnConsoleInit()
 					      &m_Outlines, // TClient
 					      &m_Mumble, // TClient
 					      &m_Pet, // TClient
-							      &m_ChatBubbles,
 					      &m_ClientIndicator,
 					      &m_Particles.m_RenderExplosions,
 					      &m_NamePlates,
