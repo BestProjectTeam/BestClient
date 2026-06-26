@@ -1150,7 +1150,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			else
 				s_AnimationsBlockPhase = AnimationsEnabled ? 1.0f : 0.0f;
 
-			const float ExpandedTargetHeight = 12.0f * LineSize;
+			const float ExpandedTargetHeight = 14.0f * LineSize;
 			const float ContentHeight = LineSize + MarginSmall + LineSize + ExpandedTargetHeight * s_AnimationsBlockPhase;
 			CUIRect Content, Label, Row, Visible;
 			BeginBlock(Column, ContentHeight, Content);
@@ -1177,6 +1177,8 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				g_Config.m_BcKillfeedAnimation = DefaultConfig::BcKillfeedAnimation;
 				g_Config.m_BcKillfeedAnimationMs = DefaultConfig::BcKillfeedAnimationMs;
 				g_Config.m_BcChatAnimationType = DefaultConfig::BcChatAnimationType;
+				g_Config.m_BcMainMenuAnimation = DefaultConfig::BcMainMenuAnimation;
+				g_Config.m_BcMainMenuAnimationSpeed = DefaultConfig::BcMainMenuAnimationSpeed;
 			}
 			Ui()->DoLabel(&TitleLabel, BCLocalize("Animations"), HeadlineFontSize, TEXTALIGN_ML);
 			Content.HSplitTop(MarginSmall, nullptr, &Content);
@@ -1216,6 +1218,22 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 				DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcKillfeedAnimation, BCLocalize("Killfeed animation"), &g_Config.m_BcKillfeedAnimation, &Expand, LineSize);
 				Expand.HSplitTop(LineSize, &Row, &Expand);
 				Ui()->DoScrollbarOption(&g_Config.m_BcKillfeedAnimationMs, &g_Config.m_BcKillfeedAnimationMs, &Row, BCLocalize("Killfeed animation time (ms)"), 1, 500);
+
+				{
+					CUIRect MainMenuRow;
+					Expand.HSplitTop(LineSize, &MainMenuRow, nullptr);
+					DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcMainMenuAnimation, BCLocalize("Main menu animation"), &g_Config.m_BcMainMenuAnimation, &Expand, LineSize);
+					CUIRect BadgeNew = MainMenuRow;
+					BadgeNew.VSplitRight(36.0f, nullptr, &BadgeNew);
+					BadgeNew.HMargin(1.5f, &BadgeNew);
+					Graphics()->DrawRect4(BadgeNew.x, BadgeNew.y, BadgeNew.w, BadgeNew.h,
+						ColorRGBA(1.00f, 0.76f, 0.16f, 1.0f), ColorRGBA(0.92f, 0.56f, 0.02f, 1.0f),
+						ColorRGBA(1.00f, 0.76f, 0.16f, 1.0f), ColorRGBA(0.92f, 0.56f, 0.02f, 1.0f),
+						IGraphics::CORNER_ALL, 5.0f);
+					Ui()->DoLabel(&BadgeNew, "NEW", 11.0f, TEXTALIGN_MC);
+				}
+				Expand.HSplitTop(LineSize, &Row, &Expand);
+				Ui()->DoScrollbarOption(&g_Config.m_BcMainMenuAnimationSpeed, &g_Config.m_BcMainMenuAnimationSpeed, &Row, BCLocalize("Main menu animation speed"), 1, 50);
 			}
 			Column.HSplitTop(MarginBetweenSections, nullptr, &Column);
 		}
