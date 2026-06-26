@@ -110,6 +110,9 @@ MACRO_CONFIG_INT(BcKeystrokesMousePreset, bc_keystrokes_mouse_preset, 0, 0, 4, C
 MACRO_CONFIG_INT(BcAutoTeamLock, bc_auto_team_lock, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically lock your team after joining it")
 MACRO_CONFIG_INT(BcAutoTeamLockDelay, bc_auto_team_lock_delay, 5, 0, 30, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Delay before auto-locking team after joining, in seconds")
 
+// Extend zoom
+MACRO_CONFIG_INT(BcExtendZoom, bc_extend_zoom, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use 0.5 zoom steps instead of 1 for finer scroll zoom (10, 9.5, 9, 8.5 ...)")
+
 // Speedrun timer
 MACRO_CONFIG_INT(BcSpeedrunTimer, bc_speedrun_timer, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Speedrun timer")
 MACRO_CONFIG_INT(BcSpeedrunTimerTime, bc_speedrun_timer_time, 0, 0, 9999, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Speedrun timer time (MMSS format)")

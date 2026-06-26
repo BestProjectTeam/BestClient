@@ -2505,7 +2505,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 #else
 			const float AutoUpdateHeight = 0.0f;
 #endif
-			const float ContentHeight = LineSize + MarginSmall + 18.0f * LineSize + ColorPickerHeight + AutoLockDelayHeight + AutoUpdateHeight;
+			const float ContentHeight = LineSize + MarginSmall + 19.0f * LineSize + ColorPickerHeight + AutoLockDelayHeight + AutoUpdateHeight;
 			CUIRect Content, Label, Row;
 			BeginBlock(Column, ContentHeight, Content);
 
@@ -2602,6 +2602,20 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			{
 				Content.HSplitTop(LineSize, &Row, &Content);
 				Ui()->DoScrollbarOption(&g_Config.m_BcAutoTeamLockDelay, &g_Config.m_BcAutoTeamLockDelay, &Row, BCLocalize("Auto lock delay"), 0, 30, &CUi::ms_LinearScrollbarScale, 0, "s");
+			}
+			{
+				CUIRect CheckBoxRow, BadgeRect;
+				Content.HSplitTop(LineSize, &CheckBoxRow, &Content);
+				if(DoButton_CheckBox_Common(&g_Config.m_BcExtendZoom, BCLocalize("Extend zoom (0.5 steps)"), g_Config.m_BcExtendZoom ? "X" : "", &CheckBoxRow, BUTTONFLAG_LEFT))
+					g_Config.m_BcExtendZoom ^= 1;
+				const float BadgeWidth = 40.0f;
+				CheckBoxRow.VSplitRight(BadgeWidth, nullptr, &BadgeRect);
+				BadgeRect.HMargin(2.0f, &BadgeRect);
+				Graphics()->DrawRect4(BadgeRect.x, BadgeRect.y, BadgeRect.w, BadgeRect.h,
+					ColorRGBA(1.00f, 0.76f, 0.16f, 1.0f), ColorRGBA(0.92f, 0.56f, 0.02f, 1.0f),
+					ColorRGBA(1.00f, 0.76f, 0.16f, 1.0f), ColorRGBA(0.92f, 0.56f, 0.02f, 1.0f),
+					IGraphics::CORNER_ALL, 5.0f);
+				Ui()->DoLabel(&BadgeRect, "NEW", 9.0f, TEXTALIGN_MC);
 			}
 			Content.HSplitTop(LineSize, &Row, &Content);
 			Ui()->DoScrollbarOption(&g_Config.m_UiScale, &g_Config.m_UiScale, &Row, BCLocalize("UI scale"), 50, 200, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_DELAYUPDATE, "%");
