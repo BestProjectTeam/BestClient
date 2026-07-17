@@ -505,6 +505,7 @@ void CGameClient::OnConsoleInit()
 					      &m_GameConsole,
 					      &m_MenuBackground,
 					      &m_VoiceChat, // BestClient
+					      &m_Clans, // BestClient
 					      &m_HudEditor});
 
 	// build the input stack

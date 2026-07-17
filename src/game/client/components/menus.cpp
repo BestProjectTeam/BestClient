@@ -604,6 +604,27 @@ void CMenus::RenderMenubar(CUIRect Box, IClient::EClientState ClientState)
 		GameClient()->m_Tooltips.DoToolTip(&s_DemoButton, &Button, Localize("Demos"));
 		Box.VSplitRight(10.0f, &Box, nullptr);
 
+		if(g_Config.m_BcClansEnabled)
+		{
+			Box.VSplitRight(33.0f, &Box, &Button);
+			ColorRGBA ClansAlert(0, 1, 0, 0.25f);
+			ColorRGBA ClansAlertHover(0, 1, 0, 0.5f);
+			ColorRGBA *pClansColor = nullptr;
+			ColorRGBA *pClansHover = nullptr;
+			if(g_Config.m_BcClansUnreadBadge && GameClient()->m_Clans.GetUnreadCount() > 0)
+			{
+				pClansColor = &ClansAlert;
+				pClansHover = &ClansAlertHover;
+			}
+			static CButtonContainer s_ClansButton;
+			if(DoButton_MenuTab(&s_ClansButton, FontIcon::ICON_USERS, ActivePage == PAGE_CLANS, &Button, IGraphics::CORNER_T, nullptr, pClansColor, pClansColor, pClansHover, 10.0f))
+			{
+				NewPage = PAGE_CLANS;
+			}
+			GameClient()->m_Tooltips.DoToolTip(&s_ClansButton, &Button, Localize("Clans"));
+			Box.VSplitRight(10.0f, &Box, nullptr);
+		}
+
 		Box.VSplitLeft(33.0f, &Button, &Box);
 
 		bool GotNewsOrUpdate = false;
@@ -768,6 +789,27 @@ void CMenus::RenderMenubar(CUIRect Box, IClient::EClientState ClientState)
 			}
 			GameClient()->m_Tooltips.DoToolTip(&s_DemoButton, &Button, Localize("Demos"));
 			Box.VSplitRight(10.0f, &Box, nullptr);
+
+			if(g_Config.m_BcClansEnabled)
+			{
+				Box.VSplitRight(33.0f, &Box, &Button);
+				ColorRGBA ClansAlert(0, 1, 0, 0.25f);
+				ColorRGBA ClansAlertHover(0, 1, 0, 0.5f);
+				ColorRGBA *pClansColor = nullptr;
+				ColorRGBA *pClansHover = nullptr;
+				if(g_Config.m_BcClansUnreadBadge && GameClient()->m_Clans.GetUnreadCount() > 0)
+				{
+					pClansColor = &ClansAlert;
+					pClansHover = &ClansAlertHover;
+				}
+				static CButtonContainer s_ClansButtonIngame;
+				if(DoButton_MenuTab(&s_ClansButtonIngame, FontIcon::ICON_USERS, ActivePage == PAGE_CLANS, &Button, IGraphics::CORNER_T, nullptr, pClansColor, pClansColor, pClansHover, 10.0f))
+				{
+					NewPage = PAGE_CLANS;
+				}
+				GameClient()->m_Tooltips.DoToolTip(&s_ClansButtonIngame, &Button, Localize("Clans"));
+				Box.VSplitRight(10.0f, &Box, nullptr);
+			}
 
 			TextRender()->SetRenderFlags(0);
 			TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
@@ -1270,6 +1312,10 @@ void CMenus::Render()
 			{
 				RenderSettings(MainView);
 			}
+			else if(m_MenuPage == PAGE_CLANS)
+			{
+				RenderClans(MainView);
+			}
 			else
 			{
 				dbg_assert_failed("Invalid m_MenuPage: %d", m_MenuPage);
@@ -1321,6 +1367,10 @@ void CMenus::Render()
 			else if(m_GamePage == PAGE_SETTINGS)
 			{
 				RenderSettings(MainView);
+			}
+			else if(m_GamePage == PAGE_CLANS)
+			{
+				RenderClans(MainView);
 			}
 			else
 			{

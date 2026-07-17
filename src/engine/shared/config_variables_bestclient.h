@@ -353,3 +353,9 @@ MACRO_CONFIG_STR(BcClientIndicatorTokenUrl, bc_client_indicator_token_url, 256, 
 MACRO_CONFIG_STR(BcClientIndicatorSharedToken, bc_client_indicator_shared_token, 256, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Client indicator shared token for signed UDP packets")
 MACRO_CONFIG_STR(BcClientIndicatorSecretKey, bc_client_indicator_secret_key, 256, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Client indicator developer secret key")
 MACRO_CONFIG_INT(BrFilterBestclient, br_filter_bestclient, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Filter out servers with no BestClient users")
+
+// Clans
+MACRO_CONFIG_INT(BcClansEnabled, bc_clans_enabled, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable Clans menu page")
+MACRO_CONFIG_STR(BcClansApiUrl, bc_clans_api_url, 128, "https://clans.bestclient.fun", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Clans API base URL (allowlisted)")
+MACRO_CONFIG_INT(BcClansAllowLocalDev, bc_clans_allow_local_dev, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Allow localhost clans API for development")
+MACRO_CONFIG_INT(BcClansUnreadBadge, bc_clans_unread_badge, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show unread badge on Clans menubar button")

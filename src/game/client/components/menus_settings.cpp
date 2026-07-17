@@ -356,7 +356,17 @@ void CMenus::RenderSettingsPlayer(CUIRect MainView)
 	Button.VSplitLeft(150.0f, &Button, nullptr);
 	str_format(aBuf, sizeof(aBuf), "%s:", Localize("Clan"));
 	Ui()->DoLabel(&Label, aBuf, 14.0f, TEXTALIGN_ML);
-	if(Ui()->DoEditBox(&s_ClanInput, &Button, 14.0f))
+	if(!m_Dummy && GameClient()->m_Clans.IsPlayerClanLocked())
+	{
+		Ui()->DoLabel(&Button, g_Config.m_PlayerClan, 14.0f, TEXTALIGN_ML);
+		CUIRect LockHint;
+		MainView.HSplitTop(3.0f, nullptr, &MainView);
+		MainView.HSplitTop(14.0f, &LockHint, &MainView);
+		TextRender()->TextColor(0.8f, 0.8f, 0.4f, 1.0f);
+		Ui()->DoLabel(&LockHint, Localize("Locked by Clans"), 11.0f, TEXTALIGN_ML);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+	}
+	else if(Ui()->DoEditBox(&s_ClanInput, &Button, 14.0f))
 	{
 		SetNeedSendInfo();
 	}
@@ -620,7 +630,9 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 
 	if(Ui()->DoEditBox(&s_NameInput, &NameInput, 14.0f))
 		SetNeedSendInfo();
-	if(Ui()->DoEditBox(&s_ClanInput, &ClanInput, 14.0f))
+	if(!m_Dummy && GameClient()->m_Clans.IsPlayerClanLocked())
+		Ui()->DoLabel(&ClanInput, g_Config.m_PlayerClan, 14.0f, TEXTALIGN_ML);
+	else if(Ui()->DoEditBox(&s_ClanInput, &ClanInput, 14.0f))
 		SetNeedSendInfo();
 
 	CSkins::CSkinList &SkinList = GameClient()->m_Skins.SkinList();

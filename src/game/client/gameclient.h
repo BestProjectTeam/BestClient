@@ -98,6 +98,7 @@
 #include "components/bestclient/self_time_cp.h"
 #include "components/bestclient/translate.h"
 #include "components/bestclient/voice/voice.h"
+#include "components/bestclient/clans/clans.h"
 #include "components/tclient/warlist.h"
 #include "components/tooltips.h"
 #include "components/touch_controls.h"
@@ -255,6 +256,7 @@ public:
 	CMusicPlayer m_MusicPlayer; // BestClient
 	CAdminPanel m_AdminPanel; // BestClient
 	CVoiceChat m_VoiceChat; // BestClient
+	CClans m_Clans; // BestClient
 	CHudEditor m_HudEditor; // BestClient
 	CPet m_Pet;
 	CPlayerIndicator m_PlayerIndicator;

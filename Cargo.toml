@@ -5,6 +5,11 @@ members = [
   "src/engine/shared",
   "src/rust-bridge/test",
 ]
+exclude = [
+  "bestclient-clans-api",
+  "src/mastersrv",
+  "src/masterping",
+]
 
 resolver = "2"
 

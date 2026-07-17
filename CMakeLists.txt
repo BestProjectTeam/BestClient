@@ -2748,6 +2748,7 @@ if(CLIENT)
     components/menus.h
     components/menus_bestclient.cpp
     components/menus_browser.cpp
+    components/menus_clans.cpp
     components/menus_demo.cpp
     components/menus_games.cpp
     components/menus_gif_wheel.cpp
@@ -2836,6 +2837,8 @@ if(CLIENT)
     components/bestclient/clientindicator/protocol.h
     components/bestclient/cherry_gifs.cpp
     components/bestclient/cherry_gifs.h
+    components/bestclient/clans/clans.cpp
+    components/bestclient/clans/clans.h
     components/bestclient/cherry_gifs_cache.cpp
     components/bestclient/cherry_gifs_cache.h
     components/bestclient/fast_actions.cpp
