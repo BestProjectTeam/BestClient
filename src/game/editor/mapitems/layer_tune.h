@@ -1,0 +1,56 @@
+#ifndef GAME_EDITOR_MAPITEMS_LAYER_TUNE_H
+#define GAME_EDITOR_MAPITEMS_LAYER_TUNE_H
+
+#include "layer_tiles.h"
+
+struct STuneTileStateChange
+{
+	bool m_Changed;
+	struct SData
+	{
+		int m_Number;
+		int m_Type;
+		int m_Index;
+	} m_Previous, m_Current;
+};
+
+class CLayerTune : public CLayerTiles
+{
+public:
+	CLayerTune(CEditorMap *pMap, int w, int h);
+	CLayerTune(const CLayerTune &Other);
+	~CLayerTune() override;
+
+	CTuneTile *m_pTuneTile;
+	unsigned char m_TuningNumber;
+
+	void Resize(int NewW, int NewH) override;
+	void Shift(EShiftDirection Direction) override;
+	[[nodiscard]] bool IsEmpty() const override;
+	void BrushDraw(CLayer *pBrush, vec2 WorldPos) override;
+	void BrushFlipX() override;
+	void BrushFlipY() override;
+	void BrushRotate(float Amount) override;
+	void FillSelection(bool Empty, CLayer *pBrush, CUIRect Rect) override;
+	int FindNextFreeNumber() const;
+	bool ContainsElementWithId(int Id) const;
+	void GetPos(int Number, int Offset, ivec2 &Pos);
+
+	int m_GotoTuneOffset;
+	ivec2 m_GotoTuneLastPos;
+
+	EditorTileStateChangeHistory<STuneTileStateChange> m_History;
+	void ClearHistory() override
+	{
+		CLayerTiles::ClearHistory();
+		m_History.clear();
+	}
+
+	std::shared_ptr<CLayer> Duplicate() const override;
+	const char *TypeName() const override;
+
+private:
+	void RecordStateChange(int x, int y, STuneTileStateChange::SData Previous, STuneTileStateChange::SData Current);
+};
+
+#endif

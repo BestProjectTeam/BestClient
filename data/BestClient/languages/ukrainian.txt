@@ -1,0 +1,1537 @@
+##### authors #####
+
+# noxygalaxy
+
+##### /authors #####
+
+##### translated strings #####
+
+Clan
+== Клан
+
+Custom colors
+== Власні кольори
+
+Name
+== Ім'я
+
+No
+== Ні
+
+Yes
+== Так
+
+Save
+== Зберегти
+
+Website
+== Сайт
+
+Discord
+== Дискорд
+
+Input
+== Ввід
+
+Amount
+== К-сть
+
+Delay
+== Затрим.
+
+Random
+== Випадковий
+
+Name:
+== Назва:
+
+Command:
+== Команда:
+
+Name
+== Гравець
+
+Clan
+== Клан
+
+Apply
+== Застосувати
+
+Info
+== Інформація
+
+BestClient Links
+== Посилання BestClient
+
+BestClient Settings
+== Налаштування BestClient
+
+Config Files
+== Конфіг файли
+
+BestClient Developers
+== Розробники BestClient
+
+Hide Settings Tabs
+== Приховати вкладки в налаштуваннях
+
+Command
+== Команда
+
+Reason
+== Причина
+
+Color
+== Колір
+
+BestClient
+== BestClient
+
+Speed
+== Швидкість
+
+Telegram
+== 
+
+Check update
+== 
+
+BestClient %s is out!
+== 
+
+Preparing update...
+== 
+
+Downloading %d%%
+== 
+
+Update failed
+== 
+
+Update downloaded
+== 
+
+Download
+== 
+
+Restart
+== 
+
+Reset
+== 
+
+Username (auth_add)
+== 
+
+Password
+== 
+
+Search tunings
+== 
+
+Value
+== 
+
+Search commands
+== 
+
+Duration
+== 
+
+Actions for %s
+== 
+
+Player actions
+== 
+
+Say
+== 
+
+Say team
+== 
+
+Broadcast
+== 
+
+Mute
+== 
+
+Ban
+== 
+
+Kick
+== 
+
+Respawn
+== 
+
+Force pause
+== 
+
+Unmute
+== 
+
+Vote mute (10 min)
+== 
+
+Vote unmute
+== 
+
+Teleport to me
+== 
+
+Teleport to player
+== 
+
+Force unpause
+== 
+
+Move to spectators
+== 
+
+Return to game
+== 
+
+Select a player to enable player actions
+== 
+
+Select a player
+== 
+
+Country
+== 
+
+Skin
+== 
+
+Client ID
+== 
+
+Spectators
+== 
+
+Game
+== 
+
+Team
+== 
+
+Score
+== 
+
+Ping
+== 
+
+None
+== 
+
+Admin
+== 
+
+Moderator
+== 
+
+Helper
+== 
+
+Auth
+== 
+
+Super
+== 
+
+Invincible
+== 
+
+Jetpack
+== 
+
+Endless jump
+== 
+
+Endless hook
+== 
+
+Solo
+== 
+
+Deep frozen
+== 
+
+Live freeze
+== 
+
+Frozen
+== 
+
+Normal
+== 
+
+Status
+== 
+
+No other players
+== 
+
+RCON login
+== 
+
+RCON password
+== 
+
+Username
+== 
+
+Login
+== 
+
+Server uses auth_add: enter username and password.
+== 
+
+Server uses password-only rcon.
+== 
+
+RCON log
+== 
+
+No log entries yet
+== 
+
+Fast actions
+== 
+
+No fast actions yet
+== 
+
+No matches
+== 
+
+Muted by admin panel
+== 
+
+Seconds
+== 
+
+Banned by admin panel
+== 
+
+Minutes
+== 
+
+Kicked by admin panel
+== 
+
+Respawned by admin panel
+== 
+
+Message
+== 
+
+Mute player
+== 
+
+Ban player
+== 
+
+Kick player
+== 
+
+Respawn player
+== 
+
+Force pause player
+== 
+
+Say message
+== 
+
+Say team message
+== 
+
+Broadcast message
+== 
+
+Admin panel settings
+== 
+
+Close
+== 
+
+Auto-scroll logs
+== 
+
+Remember last tab
+== 
+
+Disable animations
+== 
+
+Panel scale
+== 
+
+Log lines
+== 
+
+Panel background
+== 
+
+Tab inactive
+== 
+
+Tab active
+== 
+
+Tab hover
+== 
+
+Clear logs
+== 
+
+Duration (sec)
+== 
+
+Duration (min)
+== 
+
+5 min
+== 
+
+30 sec
+== 
+
+10 min
+== 
+
+60 sec
+== 
+
+60 min
+== 
+
+300 sec
+== 
+
+Cancel
+== 
+
+Tunings
+== 
+
+Select a tuning
+== 
+
+Current
+== 
+
+New value
+== 
+
+Reset all
+== 
+
+Changes apply to global tunings (tune).
+== 
+
+Admin Panel
+== 
+
+RCON not authenticated
+== 
+
+Logout
+== 
+
+Players
+== 
+
+Logs
+== 
+
+Rollback is only available while online
+== 
+
+Enable rollback demo recording first
+== 
+
+Rollback recorder is not ready yet
+== 
+
+Wait at least 1 second before rollback
+== 
+
+Enabled
+== 
+
+Scale
+== 
+
+Use Music Player color for HUD
+== 
+
+Music Player / HUD alpha
+== 
+
+Reset position
+== 
+
+Reset settings
+== 
+
+disabled
+== 
+
+preview
+== 
+
+Reset All
+== 
+
+Name A-Z
+== 
+
+Name Z-A
+== 
+
+Effect file
+== 
+
+Live-Shaders controls
+== 
+
+Enable Live-Shaders on startup (restart required)
+== 
+
+Saved Live-Shaders startup state. Restart the game to apply it.
+== 
+
+Auto accept
+== 
+
+Show only enabled on the right
+== 
+
+Toggle effects bind
+== 
+
+Live-Shaders runtime files are missing
+== 
+
+This build does not contain the bundled ReShade64 runtime files. Repack the client with ReShade64.dll and ReShade64.json.
+== 
+
+Added effects
+== 
+
+The Live-Shaders tab will stay unavailable until the portable ReShade runtime files are present next to the game executable.
+== 
+
+Live-Shaders is disabled
+== 
+
+Enable Live-Shaders with the checkbox above and restart the game. Until then this tab stays inactive.
+== 
+
+To manage shaders here, first enable Live-Shaders above and restart the game.
+== 
+
+Vulkan is required
+== 
+
+Switch the graphics backend to Vulkan in the client settings and restart the game to use the Live-Shaders tab.
+== 
+
+Effect controls are available only when the client is running on the Vulkan renderer.
+== 
+
+Failed to load preset
+== 
+
+The right panel will be available again once the preset can be read.
+== 
+
+Confirm keeping "%s" enabled within %d seconds. Otherwise it will be removed automatically.
+== 
+
+Confirm keeping "%s" enabled within %d seconds. Otherwise it will be disabled automatically.
+== 
+
+The effect was removed automatically because it was not confirmed in time.
+== 
+
+The effect was removed because it was not confirmed.
+== 
+
+The effect was disabled automatically because it was not confirmed in time.
+== 
+
+The effect was disabled because it was not confirmed.
+== 
+
+Keep enabled
+== 
+
+Remove
+== 
+
+Disable
+== 
+
+The effect was confirmed and will stay enabled.
+== 
+
+Available shaders
+== 
+
+Sort
+== 
+
+Search
+== 
+
+The effect is live. Confirm it within 5 seconds to keep it enabled.
+== 
+
+The effect was added to the configured list.
+== 
+
+No available shaders match the current search.
+== 
+
+The effect settings were reset to their defaults.
+== 
+
+The effect was removed from the configured list.
+== 
+
+No supported scalar settings were found for this effect.
+== 
+
+No shaders are configured on the right yet.
+== 
+
+Saved to ReShadePreset.ini and settings_reshade.cfg, then applied live.
+== 
+
+assets & components editors/fun/shop \xe2\x86\x92 Info
+== 
+
+Visuals
+== 
+
+Gameplay
+== 
+
+Others
+== 
+
+Live-Shaders
+== 
+
+Fun and Shop moved here
+== 
+
+Open in HUD editor
+== 
+
+Join a game first
+== 
+
+HUD editor
+== 
+
+Reset to defaults
+== 
+
+Hook combo
+== 
+
+Mode
+== 
+
+hook
+== 
+
+hammer
+== 
+
+hook&hammer
+== 
+
+Max time between hooks
+== 
+
+Hook combo sound volume
+== 
+
+Hook combo size
+== 
+
+Jelly Tee
+== 
+
+Enable Jelly Tee
+== 
+
+Jelly Others
+== 
+
+Jelly strength
+== 
+
+Jelly duration
+== 
+
+3D Particles
+== 
+
+Particles count
+== 
+
+Particle type
+== 
+
+Cube
+== 
+
+Heart
+== 
+
+Mixed
+== 
+
+Size
+== 
+
+Alpha
+== 
+
+Color mode
+== 
+
+Custom
+== 
+
+Glow
+== 
+
+Glow alpha
+== 
+
+Glow offset
+== 
+
+Media Background
+== 
+
+Enable to main menu
+== 
+
+Enable to game background
+== 
+
+No media files in backgrounds folder
+== 
+
+Map offset
+== 
+
+0 keeps the image fixed to the screen. 100 fixes it to the map for a full parallax effect.
+== 
+
+Eye Comfort
+== 
+
+Enable warm screen filter
+== 
+
+Comfort level
+== 
+
+Sweat Weapon
+== 
+
+Enable
+== 
+
+Crystal Laser
+== 
+
+Sand Shotgun
+== 
+
+Graffiti
+== 
+
+Enable graffiti
+== 
+
+Graffiti size
+== 
+
+Graffiti spray volume
+== 
+
+Hold key for graffiti wheel
+== 
+
+Graffiti wheel key
+== 
+
+Chat Bubbles
+== 
+
+Show Chatbubbles in demo
+== 
+
+Show Chatbubbles above you
+== 
+
+Appear animation
+== 
+
+Fade
+== 
+
+Rise
+== 
+
+Slide
+== 
+
+Pop
+== 
+
+Chat Bubble Size
+== 
+
+Show the Bubbles for
+== 
+
+fade in for
+== 
+
+fade out for
+== 
+
+Rounding
+== 
+
+Background
+== 
+
+Text
+== 
+
+Text outline
+== 
+
+Flying Name Plates
+== 
+
+Enable flying name plates
+== 
+
+Lift above player
+== 
+
+Movement drag
+== 
+
+Follow speed
+== 
+
+Afterimage
+== 
+
+Enable Afterimage
+== 
+
+Afterimage frames
+== 
+
+Afterimage alpha
+== 
+
+Afterimage spacing
+== 
+
+Motion Blur
+== 
+
+Enable motion blur (frame blend)
+== 
+
+Requires the Vulkan backend
+== 
+
+Temporarily disabled on Linux
+== 
+
+Blend strength
+== 
+
+Animations
+== 
+
+Enable animations
+== 
+
+Module settings reveals
+== 
+
+Module reveal time (ms)
+== 
+
+ESC menu animation
+== 
+
+ESC menu animation time (ms)
+== 
+
+Chat message animations
+== 
+
+Chat message animation time (ms)
+== 
+
+Chat open animation
+== 
+
+Chat open animation time (ms)
+== 
+
+Chat typing animation
+== 
+
+Chat typing animation time (ms)
+== 
+
+Killfeed animation
+== 
+
+Killfeed animation time (ms)
+== 
+
+Music Player
+== 
+
+Enable music player
+== 
+
+Static color
+== 
+
+Cover accent color
+== 
+
+Dominant cover color
+== 
+
+Translucent
+== 
+
+Size mode
+== 
+
+Mini
+== 
+
+Bottom
+== 
+
+Center
+== 
+
+Up
+== 
+
+Text scale
+== 
+
+Sensitivity
+== 
+
+Smoothing
+== 
+
+Columns
+== 
+
+Soft
+== 
+
+Pill
+== 
+
+Keystrokes
+== 
+
+Show keyboard HUD
+== 
+
+Minimal
+== 
+
+Full
+== 
+
+Micro
+== 
+
+Show mouse HUD
+== 
+
+Dot
+== 
+
+Arrow
+== 
+
+Dot Dot
+== 
+
+Dot No Box
+== 
+
+No movement
+== 
+
+Aspect Ratio
+== 
+
+Off (default)
+== 
+
+Preset
+== 
+
+Game only
+== 
+
+Game no HUD
+== 
+
+Custom size
+== 
+
+Fast Input
+== 
+
+Fast input
+== 
+
+Best input
+== 
+
+Prediction offset
+== 
+
+Input smoothing
+== 
+
+Latency compensation
+== 
+
+Interpolation
+== 
+
+Fast Input others
+== 
+
+Best input others
+== 
+
+Sub-Tick aiming
+== 
+
+Auto margin
+== 
+
+Snap Tap
+== 
+
+Looks like you're on a server where this feature is forbidden
+== 
+
+Optimizer
+== 
+
+Enable optimizer
+== 
+
+Disable all particles render
+== 
+
+High Detail
+== 
+
+FPS fog (cull outside limit)
+== 
+
+DDNet priority: High
+== 
+
+Discord priority: Below Normal
+== 
+
+Render FPS fog rectangle
+== 
+
+Cull map tiles outside FPS fog
+== 
+
+FPS fog mode
+== 
+
+Manual radius
+== 
+
+By zoom
+== 
+
+Radius (tiles)
+== 
+
+Visible area (%)
+== 
+
+Gores mode
+== 
+
+Enable gores mode
+== 
+
+Disable if you have shotgun, grenade or laser
+== 
+
+Fast Actions
+== 
+
+Selected slot
+== 
+
+Name (optional)
+== 
+
+Clear command
+== 
+
+In game: hold bind key, press 1..6, release key to execute
+== 
+
+Fast Actions key
+== 
+
+Speedrun timer
+== 
+
+Enable speedrun timer
+== 
+
+Hours
+== 
+
+Milliseconds
+== 
+
+Auto disable after time end
+== 
+
+Finish Prediction
+== 
+
+Show finish prediction HUD
+== 
+
+Classic
+== 
+
+Progress bar
+== 
+
+Custom bar color
+== 
+
+Bar color
+== 
+
+Show time
+== 
+
+Time left
+== 
+
+Finish time
+== 
+
+Show milliseconds
+== 
+
+Show percentage
+== 
+
+Show always
+== 
+
+Focus Mode
+== 
+
+Enable Focus Mode
+== 
+
+Hide Player Names
+== 
+
+Hide Visual Effects
+== 
+
+Hide HUD
+== 
+
+Hide Song Player
+== 
+
+Hide Unnecessary UI
+== 
+
+Hide Chat
+== 
+
+Hide Scoreboard
+== 
+
+Focus mode bind
+== 
+
+Misc
+== 
+
+Use new menu layout
+== 
+
+Hide hud in settings
+== 
+
+Show ESC players list
+== 
+
+Show points in tab
+== 
+
+Shadow of Emotions
+== 
+
+Save unsent messages
+== 
+
+Commands in other layout
+== 
+
+Cinematic camera
+== 
+
+Use BestClient MasterServer
+== 
+
+Show player below indicator
+== 
+
+Show real hitbox
+== 
+
+Lock team automatically after joining
+== 
+
+Auto lock delay
+== 
+
+UI scale
+== 
+
+Real hitbox dot color
+== 
+
+Rollback Demo
+== 
+
+Enable rollback demo recording
+== 
+
+Rollback length
+== 
+
+Rollback bind
+== 
+
+Browser Utils
+== 
+
+Auto server list refresh
+== 
+
+Use short KoG server name
+== 
+
+Chat Media
+== 
+
+Render media previews from chat links
+== 
+
+Show photos in chat media
+== 
+
+Show GIFs in chat media
+== 
+
+Content filtering
+== 
+
+Allowed media domains
+== 
+
+Semicolon-separated allowlist, for example: tenor.com; imgur.com; giphy.com; cdn.discordapp.com
+== 
+
+Media preview width
+== 
+
+Enable fullscreen media viewer in chat
+== 
+
+Viewer max zoom
+== 
+
+Hide media bind
+== 
+
+Voice panel
+== 
+
+Push-to-talk
+== 
+
+Mute microphone
+== 
+
+Mute headphones
+== 
+
+Client Indicator
+== 
+
+Show indicator in name plates
+== 
+
+Show above yourself
+== 
+
+Name plate indicator size
+== 
+
+Show indicator in scoreboard
+== 
+
+Scoreboard indicator size
+== 
+
+Cancel all changes?
+== 
+
+All staged component changes will be lost.
+== 
+
+Restart client now so component changes fully apply?
+== 
+
+Components editor
+== 
+
+Disabled components: %d
+== 
+
+Fun
+== 
+
+Shop
+== 
+
+BestClient %s is available
+== 
+
+Downloading
+== 
+
+Editors
+== 
+
+Create mixed assets or jump to the name plate editor.
+== 
+
+Assets editor
+== 
+
+Open a dedicated component toggles page.
+== 
+
+Sudden Death
+== 
+
+No media
+== 
+
+Unknown artist
+== 
+
+System default
+== 
+
+Voice
+== 
+
+Enable voice chat
+== 
+
+In-Game Only
+== 
+
+Use team0
+== 
+
+Enable your group
+== 
+
+Radius filter
+== 
+
+Activation mode
+== 
+
+Automatic
+== 
+
+VAD threshold (%)
+== 
+
+VAD release delay (ms)
+== 
+
+Microphone
+== 
+
+Headphones
+== 
+
+Connected
+== 
+
+Offline
+== 
+
+Reload servers
+== 
+
+Available servers
+== 
+
+Loading server list...
+== 
+
+No servers loaded
+== 
+
+Voice commands
+== 
+
+!voice mute "name" / !voice unmute "name"
+== 
+
+!voice volume "name" 0-100
+== 
+
+!voice radius on/off/<tiles>
+== 
+
+Participant
+== 
+
+Voice servers
+== 
+
+Servers
+== 
+
+Reload
+== 
+
+No servers loaded. Press Reload
+== 
+
+Участники
+== 
+
+Нет подключенных участников.
+== 
+
+Local participant
+== 
+
+spec
+== 
+
+Участник
+== 
+
+Voice settings
+== 
+
+Voice: On
+== 
+
+Voice: Off
+== 
+
+Mode: Push-to-talk
+== 
+
+Mode: Automatic activation
+== 
+
+Connection
+== 
+
+Connecting
+== 
+
+Automatic activation
+== 
+
+Muted
+== 
+
+On
+== 
+
+Voice volume
+== 
+
+Mic check: On
+== 
+
+Mic check: Off
+== 
+
+Microphone level
+== 
+
+Mic volume
+== 
+
+Reconnect
+== 
+
+PTT
+== 
+
+Voice chat
+== 

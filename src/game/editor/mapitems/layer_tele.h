@@ -1,0 +1,59 @@
+#ifndef GAME_EDITOR_MAPITEMS_LAYER_TELE_H
+#define GAME_EDITOR_MAPITEMS_LAYER_TELE_H
+
+#include "layer_tiles.h"
+
+struct STeleTileStateChange
+{
+	bool m_Changed;
+	struct SData
+	{
+		int m_Number;
+		int m_Type;
+		int m_Index;
+	} m_Previous, m_Current;
+};
+
+class CLayerTele : public CLayerTiles
+{
+public:
+	CLayerTele(CEditorMap *pMap, int w, int h);
+	CLayerTele(const CLayerTele &Other);
+	~CLayerTele() override;
+
+	CTeleTile *m_pTeleTile;
+	unsigned char m_TeleNumber;
+	unsigned char m_TeleCheckpointNumber;
+
+	void Resize(int NewW, int NewH) override;
+	void Shift(EShiftDirection Direction) override;
+	[[nodiscard]] bool IsEmpty() const override;
+	void BrushDraw(CLayer *pBrush, vec2 WorldPos) override;
+	void BrushFlipX() override;
+	void BrushFlipY() override;
+	void BrushRotate(float Amount) override;
+	void FillSelection(bool Empty, CLayer *pBrush, CUIRect Rect) override;
+	int FindNextFreeNumber(bool Checkpoint) const;
+	bool ContainsElementWithId(int Id, bool Checkpoint) const;
+	void GetPos(int Number, int Offset, int &TeleX, int &TeleY);
+
+	int m_GotoTeleOffset;
+	ivec2 m_GotoTeleLastPos;
+
+	EditorTileStateChangeHistory<STeleTileStateChange> m_History;
+	void ClearHistory() override
+	{
+		CLayerTiles::ClearHistory();
+		m_History.clear();
+	}
+
+	std::shared_ptr<CLayer> Duplicate() const override;
+	const char *TypeName() const override;
+
+private:
+	void RecordStateChange(int x, int y, STeleTileStateChange::SData Previous, STeleTileStateChange::SData Current);
+
+	friend class CLayerTiles;
+};
+
+#endif

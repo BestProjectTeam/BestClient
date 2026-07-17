@@ -1,0 +1,14 @@
+prefix=/c/ffmpeg-msvc
+exec_prefix=${prefix}
+libdir=/c/ffmpeg-msvc/lib
+includedir=/c/ffmpeg-msvc/include
+
+Name: libswscale
+Description: FFmpeg image rescaling library
+Version: 9.3.100
+Requires: libavutil >= 60.19.101
+Requires.private: 
+Conflicts:
+Libs: -L${libdir}  -lswscale 
+Libs.private: 
+Cflags: -I${includedir}
