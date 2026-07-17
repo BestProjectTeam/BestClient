@@ -1334,6 +1334,7 @@ void CMenus::Render()
 	case IClient::STATE_DEMOPLAYBACK:
 		if(m_Popup != POPUP_NONE)
 		{
+			Ui()->ClosePopupMenu(&m_DemoCameraEffectsPopupId);
 			RenderPopupFullscreen(Screen);
 		}
 		else
@@ -2647,6 +2648,8 @@ void CMenus::OnStateChange(int NewState, int OldState)
 {
 	// reset active item
 	Ui()->SetActiveItem(nullptr);
+	if(NewState != IClient::STATE_DEMOPLAYBACK)
+		Ui()->ClosePopupMenu(&m_DemoCameraEffectsPopupId);
 
 	if(OldState == IClient::STATE_ONLINE || OldState == IClient::STATE_OFFLINE)
 		TextRender()->DeleteTextContainer(m_MotdTextContainerIndex);

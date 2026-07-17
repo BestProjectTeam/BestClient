@@ -285,6 +285,8 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 
 	if(!m_MenuActive)
 	{
+		if(Ui()->IsPopupOpen(&m_DemoCameraEffectsPopupId))
+			Ui()->ClosePopupMenu(&m_DemoCameraEffectsPopupId);
 		HandleDemoSeeking(PositionToSeek, TimeToSeek);
 		return;
 	}
@@ -706,6 +708,7 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 	static CButtonContainer s_ExitButton;
 	if(Ui()->DoButton_FontIcon(&s_ExitButton, FontIcon::XMARK, 0, &Button, BUTTONFLAG_LEFT) || (Input()->KeyPress(KEY_C) && !GameClient()->m_GameConsole.IsActive() && m_DemoPlayerState == DEMOPLAYER_NONE))
 	{
+		Ui()->ClosePopupMenu(&m_DemoCameraEffectsPopupId);
 		Client()->Disconnect();
 		SetMenuPage(PAGE_DEMOS);
 		DemolistOnUpdate(false);
@@ -721,6 +724,29 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 		g_Config.m_ClDemoKeyboardShortcuts ^= 1;
 	}
 	GameClient()->m_Tooltips.DoToolTip(&s_KeyboardShortcutsButton, &Button, Localize("Toggle keyboard shortcuts"));
+
+	// demo camera effects button
+	ButtonBar.VSplitRight(ButtonbarHeight, &ButtonBar, &Button);
+	static CButtonContainer s_DemoCameraEffectsButton;
+	const bool DemoCameraEffectsPopupOpen = Ui()->IsPopupOpen(&m_DemoCameraEffectsPopupId);
+	const bool DemoCameraEffectsEnabled = g_Config.m_BcCameraDrift || g_Config.m_BcDynamicFov;
+	if(Ui()->DoButton_FontIcon(&s_DemoCameraEffectsButton, FontIcon::GEAR, DemoCameraEffectsPopupOpen || DemoCameraEffectsEnabled, &Button, BUTTONFLAG_LEFT))
+	{
+		if(DemoCameraEffectsPopupOpen)
+		{
+			Ui()->ClosePopupMenu(&m_DemoCameraEffectsPopupId);
+		}
+		else
+		{
+			constexpr float PopupWidth = 320.0f;
+			constexpr float PopupHeight = 230.0f;
+			constexpr float PopupMargin = 5.0f;
+			const float PopupX = std::clamp(Button.x + Button.w - PopupWidth, PopupMargin, maximum(PopupMargin, Ui()->Screen()->w - PopupWidth - PopupMargin));
+			const float PopupY = Button.y >= PopupHeight + PopupMargin ? Button.y - PopupHeight - 2.0f : Button.y + Button.h + 2.0f;
+			Ui()->DoPopupMenu(&m_DemoCameraEffectsPopupId, PopupX, PopupY, PopupWidth, PopupHeight, this, PopupDemoCameraEffects);
+		}
+	}
+	GameClient()->m_Tooltips.DoToolTip(&s_DemoCameraEffectsButton, &Button, Localize("Configure demo camera effects"));
 
 	// auto camera button (only available when it is possible to use)
 	if(GameClient()->m_Camera.CanUseAutoSpecCamera())
@@ -769,6 +795,64 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 	{
 		RenderDemoPlayerSliceSavePopup(MainView);
 	}
+}
+
+CUi::EPopupMenuFunctionResult CMenus::PopupDemoCameraEffects(void *pContext, CUIRect View, bool Active)
+{
+	CMenus *pMenus = static_cast<CMenus *>(pContext);
+
+	if(pMenus->Client()->State() != IClient::STATE_DEMOPLAYBACK || !pMenus->m_MenuActive || pMenus->m_Popup != POPUP_NONE)
+		return CUi::POPUP_CLOSE_CURRENT;
+	if(!Active)
+		return CUi::POPUP_CLOSE_CURRENT;
+
+	constexpr float RowHeight = 20.0f;
+	constexpr float CheckBoxHeight = 18.0f;
+	constexpr float Gap = 6.0f;
+
+	View.Margin(6.0f, &View);
+
+	CUIRect Row;
+	View.HSplitTop(RowHeight, &Row, &View);
+	pMenus->Ui()->DoLabel(&Row, Localize("Demo camera effects"), 14.0f, TEXTALIGN_MC);
+	View.HSplitTop(4.0f, nullptr, &View);
+
+	View.HSplitTop(CheckBoxHeight, &Row, &View);
+	if(pMenus->DoButton_CheckBox(&g_Config.m_BcCameraDrift, Localize("Camera drift"), g_Config.m_BcCameraDrift, &Row))
+		g_Config.m_BcCameraDrift ^= 1;
+
+	View.HSplitTop(RowHeight, &Row, &View);
+	pMenus->Ui()->DoScrollbarOption(&g_Config.m_BcCameraDriftAmount, &g_Config.m_BcCameraDriftAmount, &Row, Localize("Drift amount"), 1, 200);
+
+	View.HSplitTop(RowHeight, &Row, &View);
+	pMenus->Ui()->DoScrollbarOption(&g_Config.m_BcCameraDriftSmoothness, &g_Config.m_BcCameraDriftSmoothness, &Row, Localize("Drift smoothness"), 1, 20);
+
+	View.HSplitTop(CheckBoxHeight, &Row, &View);
+	if(pMenus->DoButton_CheckBox(&g_Config.m_BcCameraDriftReverse, Localize("Reverse drift direction"), g_Config.m_BcCameraDriftReverse, &Row))
+		g_Config.m_BcCameraDriftReverse ^= 1;
+
+	View.HSplitTop(Gap, nullptr, &View);
+	View.HSplitTop(1.0f, &Row, &View);
+	Row.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.15f), IGraphics::CORNER_NONE, 0.0f);
+	View.HSplitTop(Gap, nullptr, &View);
+
+	View.HSplitTop(CheckBoxHeight, &Row, &View);
+	if(pMenus->DoButton_CheckBox(&g_Config.m_BcDynamicFov, Localize("Dynamic FOV"), g_Config.m_BcDynamicFov, &Row))
+		g_Config.m_BcDynamicFov ^= 1;
+
+	View.HSplitTop(RowHeight, &Row, &View);
+	pMenus->Ui()->DoScrollbarOption(&g_Config.m_BcDynamicFovAmount, &g_Config.m_BcDynamicFovAmount, &Row, Localize("FOV amount"), 1, 200);
+
+	View.HSplitTop(RowHeight, &Row, &View);
+	pMenus->Ui()->DoScrollbarOption(&g_Config.m_BcDynamicFovSmoothness, &g_Config.m_BcDynamicFovSmoothness, &Row, Localize("FOV smoothness"), 1, 100);
+
+	View.HSplitTop(Gap, nullptr, &View);
+	View.HSplitTop(CheckBoxHeight, &Row, &View);
+	pMenus->TextRender()->TextColor(ColorRGBA(0.75f, 0.75f, 0.75f, 1.0f));
+	pMenus->Ui()->DoLabel(&Row, Localize("Only affects demo playback and video rendering"), 10.0f, TEXTALIGN_MC);
+	pMenus->TextRender()->TextColor(pMenus->TextRender()->DefaultTextColor());
+
+	return CUi::POPUP_KEEP_OPEN;
 }
 
 void CMenus::RenderDemoPlayerSliceSavePopup(CUIRect MainView)
