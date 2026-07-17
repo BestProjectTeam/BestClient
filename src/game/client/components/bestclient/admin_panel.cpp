@@ -882,6 +882,9 @@ void CAdminPanel::RenderActionPopup(const CUIRect &Screen)
 
 	CUIRect Overlay = Screen;
 	Overlay.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.42f), IGraphics::CORNER_ALL, 0.0f);
+	// Steal HotItem so clicks cannot pass through to buttons under the popup.
+	static int s_ActionPopupOverlayId;
+	Ui()->DoButtonLogic(&s_ActionPopupOverlayId, -1, &Overlay, BUTTONFLAG_LEFT);
 
 	CUIRect Popup = Screen;
 	Popup.VMargin(Screen.w * 0.28f, &Popup);
