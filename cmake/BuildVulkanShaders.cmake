@@ -64,7 +64,7 @@ foreach(GLSL_SHADER_FILE ${GLSL_SHADER_FILES})
 endforeach(GLSL_SHADER_FILE)
 
 string(SHA256 GLSL_SHADER_SHA256 "${TMP_SHADER_SHA256_LIST}")
-set(GLSL_SHADER_SHA256 "${GLSL_SHADER_SHA256}@v1")
+set(GLSL_SHADER_SHA256 "${GLSL_SHADER_SHA256}@v2")
 
 set(FOUND_MATCHING_SHA256_FILE FALSE)
 
@@ -107,11 +107,6 @@ if(NOT FOUND_MATCHING_SHA256_FILE)
   
   generate_shader_file("" "" "${PROJECT_SOURCE_DIR}/data/shader/vulkan/prim.vert" "data/shader/vulkan/prim.vert.spv")
   generate_shader_file("-DTW_TEXTURED" "" "${PROJECT_SOURCE_DIR}/data/shader/vulkan/prim.vert" "data/shader/vulkan/prim_textured.vert.spv")
-
-  generate_shader_file("" "" "${PROJECT_SOURCE_DIR}/data/shader/vulkan/blur.frag" "data/shader/vulkan/blur.frag.spv")
-  generate_shader_file("" "" "${PROJECT_SOURCE_DIR}/data/shader/vulkan/blur.vert" "data/shader/vulkan/blur.vert.spv")
-  generate_shader_file("" "" "${PROJECT_SOURCE_DIR}/data/shader/vulkan/glow.frag" "data/shader/vulkan/glow.frag.spv")
-  generate_shader_file("" "" "${PROJECT_SOURCE_DIR}/data/shader/vulkan/glow.vert" "data/shader/vulkan/glow.vert.spv")
   
   generate_shader_file("" "" "${PROJECT_SOURCE_DIR}/data/shader/vulkan/prim3d.frag" "data/shader/vulkan/prim3d.frag.spv")
   generate_shader_file("-DTW_TEXTURED" "" "${PROJECT_SOURCE_DIR}/data/shader/vulkan/prim3d.frag" "data/shader/vulkan/prim3d_textured.frag.spv")
