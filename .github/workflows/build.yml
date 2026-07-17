@@ -363,13 +363,35 @@ jobs:
               src/masterping
               ./
 
-    - name: Build Android app
+    - name: Prepare Android signing key
       env:
-        TW_KEY_NAME: /home/runner/DDNet.jks
-        TW_KEY_ALIAS: DDNet-Key
+        RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+        RELEASE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+        RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
       run: |
-        export TW_KEY_PW="$(openssl rand -base64 32)"
-        keytool -genkey -v -keystore "$TW_KEY_NAME" -keyalg RSA -keysize 2048 -validity 10000 -alias "$TW_KEY_ALIAS" -storepass "$TW_KEY_PW" -dname "CN=DDNet CI, OU=DDNet, O=DDNet"
+        TW_KEY_NAME=/home/runner/DDNet.jks
+        # Only use the persistent release keystore on main, so PR/dev builds never get
+        # signed with the real key. Losing this keystore breaks self-update forever.
+        if [ -n "$RELEASE_KEYSTORE_BASE64" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > "$TW_KEY_NAME"
+          TW_KEY_ALIAS="$RELEASE_KEY_ALIAS"
+          TW_KEY_PW="$RELEASE_KEYSTORE_PASSWORD"
+          echo "Signed with persistent release keystore" >> "$GITHUB_STEP_SUMMARY"
+        else
+          TW_KEY_ALIAS=DDNet-Key
+          TW_KEY_PW="$(openssl rand -base64 32)"
+          keytool -genkey -v -keystore "$TW_KEY_NAME" -keyalg RSA -keysize 2048 -validity 10000 -alias "$TW_KEY_ALIAS" -storepass "$TW_KEY_PW" -dname "CN=DDNet CI, OU=DDNet, O=DDNet"
+          echo "Signed with ephemeral CI keystore" >> "$GITHUB_STEP_SUMMARY"
+        fi
+        {
+          echo "TW_KEY_NAME=$TW_KEY_NAME"
+          echo "TW_KEY_ALIAS=$TW_KEY_ALIAS"
+          echo "TW_KEY_PW=$TW_KEY_PW"
+          echo "TW_VERSION_CODE=$(date -u +%Y%m%d%H)"
+        } >> "$GITHUB_ENV"
+
+    - name: Build Android app
+      run: |
         export ANDROID_HOME="/home/runner/Android/Sdk"
         unset ANDROID_SDK_ROOT
         export PATH=/home/runner/cmake/bin:$PATH
