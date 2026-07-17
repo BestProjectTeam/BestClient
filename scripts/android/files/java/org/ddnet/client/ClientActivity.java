@@ -109,9 +109,7 @@ public class ClientActivity extends SDLActivity {
 			}
 			Intent startIntent = ServerService.createStartIntent(this, arguments);
 			try {
-				if(ContextCompat.startForegroundService(this, startIntent) == null) {
-					return false;
-				}
+				ContextCompat.startForegroundService(this, startIntent);
 				if(!bindService(startIntent, serverServiceConnection, 0)) {
 					stopService(startIntent);
 					return false;
