@@ -155,7 +155,7 @@ git submodule update --init --recursive
 Quick build:
 
 ```bash
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DDEV=ON
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DDEV=ON -DVULKAN=ON
 cmake --build build --target everything
 ```
 
