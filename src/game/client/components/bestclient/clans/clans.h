@@ -133,6 +133,8 @@ public:
 		char m_aInviteCode[32] = "";
 		bool m_HasInviteCode = false;
 		std::vector<SMember> m_vMembers;
+		std::vector<SUnleashedPlayer> m_vUnleashed;
+		int m_UnreadAnnouncements = 0;
 	};
 
 	int Sizeof() const override { return sizeof(*this); }
@@ -148,7 +150,9 @@ public:
 	bool InClan() const { return m_aClanId[0] != '\0'; }
 	ERole Role() const { return m_Role; }
 	EView View() const { return m_View; }
-	void SetView(EView View) { m_View = View; }
+	void SetView(EView View);
+	int UnreadAnnouncements() const { return m_Clan.m_UnreadAnnouncements; }
+	void MarkAnnouncementsRead();
 
 	const char *StatusMessage() const { return m_aStatus; }
 	const char *ErrorMessage() const { return m_aError; }
@@ -175,6 +179,7 @@ public:
 	void ClearClanTagLock();
 
 	void CollectUnleashed(std::vector<SUnleashedPlayer> *pOut) const;
+	const std::vector<SUnleashedPlayer> &Unleashed() const { return m_Clan.m_vUnleashed; }
 	bool TryRefreshSession();
 
 	void Register(const char *pNickname, const char *pPassword);
@@ -265,6 +270,7 @@ private:
 		REQ_RECENT,
 		REQ_PRESENCE,
 		REQ_PREVIEW,
+		REQ_ANN_READ,
 	};
 
 	bool m_LoggedIn = false;

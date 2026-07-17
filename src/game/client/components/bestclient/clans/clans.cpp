@@ -263,58 +263,8 @@ int CClans::GetUnreadCount() const
 
 void CClans::CollectUnleashed(std::vector<SUnleashedPlayer> *pOut) const
 {
-	pOut->clear();
-	const char *pTag = m_Clan.m_aTag[0] ? m_Clan.m_aTag : m_aClanTag;
-	if(!pTag[0])
-		return;
-
-	auto IsMainNick = [&](const char *pName) {
-		for(const auto &M : m_Clan.m_vMembers)
-		{
-			if(!str_comp(M.m_aNickname, pName))
-				return true;
-		}
-		return false;
-	};
-
-	IServerBrowser *pBrowser = ServerBrowser();
-	if(!pBrowser)
-		return;
-
-	for(int s = 0; s < pBrowser->NumServers(); s++)
-	{
-		const CServerInfo *pInfo = pBrowser->Get(s);
-		if(!pInfo)
-			continue;
-		for(int c = 0; c < pInfo->m_NumReceivedClients; c++)
-		{
-			const CServerInfo::CClient &Client = pInfo->m_aClients[c];
-			if(str_comp(Client.m_aClan, pTag))
-				continue;
-			if(IsMainNick(Client.m_aName))
-				continue;
-			bool Dup = false;
-			for(const auto &U : *pOut)
-			{
-				if(!str_comp(U.m_aName, Client.m_aName) && !str_comp(U.m_aServer, pInfo->m_aAddress))
-				{
-					Dup = true;
-					break;
-				}
-			}
-			if(Dup)
-				continue;
-			SUnleashedPlayer U;
-			str_copy(U.m_aName, Client.m_aName, sizeof(U.m_aName));
-			str_copy(U.m_aMap, pInfo->m_aMap, sizeof(U.m_aMap));
-			str_copy(U.m_aServer, pInfo->m_aAddress, sizeof(U.m_aServer));
-			U.m_Players = pInfo->m_NumClients;
-			U.m_MaxPlayers = pInfo->m_MaxClients;
-			pOut->push_back(U);
-			if(pOut->size() >= 64)
-				return;
-		}
-	}
+	// Server provides unleashed via clan snapshot; keep API for callers.
+	*pOut = m_Clan.m_vUnleashed;
 }
 
 bool CClans::TryRefreshSession()
@@ -395,9 +345,38 @@ void CClans::ClearSession()
 	m_aClanTag[0] = '\0';
 	m_Role = ERole::NONE;
 	m_Clan = SClanSnapshot{};
+	m_vRecentClans.clear();
+	m_vNotifications.clear();
+	m_vAnnouncements.clear();
+	m_vApplications.clear();
 	ClearClanTagLock();
 	Storage()->RemoveFile(SESSION_FILE, IStorage::TYPE_SAVE);
 	m_View = EView::AUTH;
+}
+
+void CClans::SetView(EView View)
+{
+	m_View = View;
+	if(View == EView::ANNOUNCEMENTS)
+		MarkAnnouncementsRead();
+}
+
+void CClans::MarkAnnouncementsRead()
+{
+	if(!m_aClanId[0] || m_Clan.m_UnreadAnnouncements <= 0)
+	{
+		m_Clan.m_UnreadAnnouncements = 0;
+		return;
+	}
+	m_Clan.m_UnreadAnnouncements = 0;
+	char aBase[128];
+	ResolveBaseUrl(aBase, sizeof(aBase));
+	char aUrl[192];
+	str_format(aUrl, sizeof(aUrl), "%s/api/clans/%s/announcements/read", aBase, m_aClanId);
+	auto pReq = HttpPostJson(aUrl, "{}");
+	AuthHeader(pReq.get());
+	pReq->FailOnErrorStatus(false);
+	BeginBackground(std::move(pReq), REQ_ANN_READ);
 }
 
 void CClans::Register(const char *pNickname, const char *pPassword)
@@ -805,9 +784,11 @@ void CClans::MaybeAutoRefresh()
 	const int64_t Now = time_get();
 	const int64_t Freq = time_freq();
 
+	// Keep polls light: ~500 clients must not hammer the API / master.
+	// Manual Refresh still updates immediately; auto is intentionally slow.
 	if(InClan() && (m_View == EView::CLAN || m_View == EView::APPLICATIONS || m_View == EView::ANNOUNCEMENTS || m_View == EView::BROWSE))
 	{
-		if(Now - m_LastClanPollTick >= Freq * 3)
+		if(Now - m_LastClanPollTick >= Freq * 60)
 		{
 			m_LastClanPollTick = Now;
 			if(m_View == EView::APPLICATIONS)
@@ -818,14 +799,14 @@ void CClans::MaybeAutoRefresh()
 				RefreshClan();
 			return;
 		}
-		if(Now - m_LastMePollTick >= Freq * 5)
+		if(Now - m_LastMePollTick >= Freq * 90)
 		{
 			m_LastMePollTick = Now;
 			RefreshMe();
 			return;
 		}
 	}
-	else if(m_View == EView::PREVIEW && m_aPreviewClanId[0] && Now - m_LastClanPollTick >= Freq * 5)
+	else if(m_View == EView::PREVIEW && m_aPreviewClanId[0] && Now - m_LastClanPollTick >= Freq * 60)
 	{
 		m_LastClanPollTick = Now;
 		OpenPreview(m_aPreviewClanId);
@@ -834,7 +815,7 @@ void CClans::MaybeAutoRefresh()
 
 	if(m_View == EView::LANDING || m_View == EView::BROWSE)
 	{
-		if(Now - m_LastCatalogPollTick >= Freq * 5)
+		if(Now - m_LastCatalogPollTick >= Freq * 60)
 		{
 			m_LastCatalogPollTick = Now;
 			RefreshCatalog();
@@ -845,7 +826,7 @@ void CClans::MaybeAutoRefresh()
 void CClans::MaybePushPresence()
 {
 	const int64_t Now = time_get();
-	if(Now - m_LastPresenceTick < time_freq() * 8)
+	if(Now - m_LastPresenceTick < time_freq() * 60)
 		return;
 	m_LastPresenceTick = Now;
 
@@ -886,7 +867,7 @@ void CClans::MaybePushPresence()
 void CClans::MaybePollNotifications()
 {
 	const int64_t Now = time_get();
-	if(Now - m_LastNotifTick < time_freq() * 10)
+	if(Now - m_LastNotifTick < time_freq() * 60)
 		return;
 	m_LastNotifTick = Now;
 	if(m_pBgPending && !m_pBgPending->Done())
@@ -913,6 +894,7 @@ void CClans::ParseAuthResponse(const json_value *pRoot)
 		str_copy(m_aNickname, JsonString(pUser, "nickname"), sizeof(m_aNickname));
 		str_copy(m_aClanId, JsonString(pUser, "clan_id"), sizeof(m_aClanId));
 		m_Role = ParseRole(JsonString(pUser, "role", nullptr));
+		ParseRecentClans(pUser);
 	}
 	m_LoggedIn = m_aAccessToken[0] != '\0';
 	SaveSession();
@@ -921,6 +903,7 @@ void CClans::ParseAuthResponse(const json_value *pRoot)
 		RefreshClan();
 	else
 		RefreshCatalog();
+	RefreshRecentClans();
 }
 
 void CClans::ParseCatalog(const json_value *pRoot)
@@ -1018,6 +1001,26 @@ void CClans::ParseClanSnapshot(const json_value *pRoot)
 		LeaveClanLocal();
 		RefreshCatalog();
 		return;
+	}
+
+	m_Clan.m_UnreadAnnouncements = JsonInt(pRoot, "unread_announcements");
+	const json_value *pUnl = json_object_get(pRoot, "unleashed");
+	if(pUnl && pUnl->type == json_array)
+	{
+		for(unsigned i = 0; i < pUnl->u.array.length; i++)
+		{
+			const json_value *pU = pUnl->u.array.values[i];
+			if(!pU || pU->type != json_object)
+				continue;
+			SUnleashedPlayer U;
+			str_copy(U.m_aName, JsonString(pU, "name"), sizeof(U.m_aName));
+			str_copy(U.m_aMap, JsonString(pU, "map"), sizeof(U.m_aMap));
+			str_copy(U.m_aServer, JsonString(pU, "server"), sizeof(U.m_aServer));
+			U.m_Players = JsonInt(pU, "players");
+			U.m_MaxPlayers = JsonInt(pU, "max_players");
+			if(U.m_aName[0])
+				m_Clan.m_vUnleashed.push_back(U);
+		}
 	}
 
 	SaveSession();
@@ -1245,6 +1248,7 @@ void CClans::HandlePending()
 			m_View = EView::LANDING;
 			SaveSession();
 			RefreshCatalog();
+			RefreshRecentClans();
 		}
 		if(pRoot)
 			json_value_free(pRoot);
@@ -1290,6 +1294,7 @@ void CClans::HandlePending()
 		else
 			m_aClanId[0] = '\0';
 		m_Role = ParseRole(JsonString(pRoot, "role", nullptr));
+		ParseRecentClans(pRoot);
 		const json_value *pClan = json_object_get(pRoot, "clan");
 		if(pClan && pClan->type == json_object)
 			str_copy(m_aClanTag, JsonString(pClan, "tag"), sizeof(m_aClanTag));
@@ -1377,7 +1382,7 @@ void CClans::HandleBackground()
 	const int Code = pReq->StatusCode();
 	json_value *pRoot = pReq->ResultJson();
 
-	if(Kind == REQ_PRESENCE || Kind == REQ_NOTIF_READ)
+	if(Kind == REQ_PRESENCE || Kind == REQ_NOTIF_READ || Kind == REQ_ANN_READ)
 	{
 		if(pRoot)
 			json_value_free(pRoot);

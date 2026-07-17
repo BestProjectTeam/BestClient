@@ -1028,6 +1028,16 @@ bool CUi::DoEditBox(CLineInput *pLineInput, const CUIRect *pRect, float FontSize
 	pRect->Draw(ms_LightButtonColorFunction.GetColor(Active, HotItem() == pLineInput), Corners, 3.0f);
 	ClipEnable(pRect);
 	Textbox.x -= ScrollOffset;
+	if(Multiline)
+	{
+		// Keep wrapped text off the top edge of the field.
+		const float TopPad = 3.0f;
+		if(Textbox.h > TopPad + FontSize)
+		{
+			Textbox.y += TopPad;
+			Textbox.h -= TopPad;
+		}
+	}
 	const float EffectiveLineWidth = Multiline ? Textbox.w : LineWidth;
 	const STextBoundingBox BoundingBox = pLineInput->Render(&Textbox, FontSize, Multiline ? TEXTALIGN_TL : TEXTALIGN_ML, Changed || CursorChanged, EffectiveLineWidth, LineSpacing, vColorSplits);
 	ClipDisable();
