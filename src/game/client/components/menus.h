@@ -531,6 +531,7 @@ protected:
 	void RenderClansLanding(CUIRect MainView);
 	void RenderClansSetup(CUIRect MainView);
 	void RenderClansPage(CUIRect MainView);
+	void RenderClansPreview(CUIRect MainView);
 	void RenderClansApplications(CUIRect MainView);
 	void RenderClansAnnouncements(CUIRect MainView);
 	void RenderClansRecent(CUIRect MainView);

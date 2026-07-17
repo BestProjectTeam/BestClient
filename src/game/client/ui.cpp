@@ -936,12 +936,13 @@ CLabelResult CUi::DoLabel_AutoLineSize(const char *pText, float FontSize, int Al
 	return DoLabel(&LabelRect, pText, FontSize, Align);
 }
 
-bool CUi::DoEditBox(CLineInput *pLineInput, const CUIRect *pRect, float FontSize, int Corners, const std::vector<STextColorSplit> &vColorSplits)
+bool CUi::DoEditBox(CLineInput *pLineInput, const CUIRect *pRect, float FontSize, int Corners, const std::vector<STextColorSplit> &vColorSplits, float LineWidth, float LineSpacing)
 {
 	const bool Inside = MouseHovered(pRect);
 	const bool Active = m_pLastActiveItem == pLineInput;
 	const bool Changed = pLineInput->WasChanged();
 	const bool CursorChanged = pLineInput->WasCursorChanged();
+	const bool Multiline = LineWidth >= 0.0f;
 
 	const float VSpacing = 2.0f;
 	CUIRect Textbox;
@@ -984,6 +985,11 @@ bool CUi::DoEditBox(CLineInput *pLineInput, const CUIRect *pRect, float FontSize
 
 	float ScrollOffset = pLineInput->GetScrollOffset();
 	float ScrollOffsetChange = pLineInput->GetScrollOffsetChange();
+	if(Multiline)
+	{
+		ScrollOffset = 0.0f;
+		ScrollOffsetChange = 0.0f;
+	}
 
 	// Update mouse selection information
 	CLineInput::SMouseSelection *pMouseSelection = pLineInput->GetMouseSelection();
@@ -1022,11 +1028,12 @@ bool CUi::DoEditBox(CLineInput *pLineInput, const CUIRect *pRect, float FontSize
 	pRect->Draw(ms_LightButtonColorFunction.GetColor(Active, HotItem() == pLineInput), Corners, 3.0f);
 	ClipEnable(pRect);
 	Textbox.x -= ScrollOffset;
-	const STextBoundingBox BoundingBox = pLineInput->Render(&Textbox, FontSize, TEXTALIGN_ML, Changed || CursorChanged, -1.0f, 0.0f, vColorSplits);
+	const float EffectiveLineWidth = Multiline ? Textbox.w : LineWidth;
+	const STextBoundingBox BoundingBox = pLineInput->Render(&Textbox, FontSize, Multiline ? TEXTALIGN_TL : TEXTALIGN_ML, Changed || CursorChanged, EffectiveLineWidth, LineSpacing, vColorSplits);
 	ClipDisable();
 
 	// Scroll left or right if necessary
-	if(Active && !JustGotActive && (Changed || CursorChanged || Input()->HasComposition()))
+	if(!Multiline && Active && !JustGotActive && (Changed || CursorChanged || Input()->HasComposition()))
 	{
 		const float CaretPositionX = pLineInput->GetCaretPosition().x - Textbox.x - ScrollOffset - ScrollOffsetChange;
 		if(CaretPositionX > Textbox.w)
@@ -1035,7 +1042,8 @@ bool CUi::DoEditBox(CLineInput *pLineInput, const CUIRect *pRect, float FontSize
 			ScrollOffsetChange += CaretPositionX;
 	}
 
-	DoSmoothScrollLogic(&ScrollOffset, &ScrollOffsetChange, Textbox.w, BoundingBox.m_W, true);
+	if(!Multiline)
+		DoSmoothScrollLogic(&ScrollOffset, &ScrollOffsetChange, Textbox.w, BoundingBox.m_W, true);
 
 	pLineInput->SetScrollOffset(ScrollOffset);
 	pLineInput->SetScrollOffsetChange(ScrollOffsetChange);

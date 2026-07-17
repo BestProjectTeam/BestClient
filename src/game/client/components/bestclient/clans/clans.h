@@ -26,6 +26,7 @@ public:
 		ANNOUNCEMENTS,
 		RECENT,
 		BROWSE, // catalog while already in a clan
+		PREVIEW, // catalog clan detail (not a member yet)
 	};
 
 	enum class ERole
@@ -158,6 +159,11 @@ public:
 
 	const std::vector<SCatalogEntry> &Catalog() const { return m_vCatalog; }
 	const SClanSnapshot &Clan() const { return m_Clan; }
+	const SClanSnapshot &Preview() const { return m_Preview; }
+	bool HasPreview() const { return m_aPreviewClanId[0] != '\0'; }
+	const char *PreviewClanId() const { return m_aPreviewClanId; }
+	void OpenPreview(const char *pClanId);
+	void ClearPreview();
 	const std::vector<SApplication> &Applications() const { return m_vApplications; }
 	const std::vector<SAnnouncement> &Announcements() const { return m_vAnnouncements; }
 	const std::vector<SRecentClan> &RecentClans() const { return m_vRecentClans; }
@@ -216,6 +222,7 @@ private:
 	void ParseAuthResponse(const json_value *pRoot);
 	void ParseCatalog(const json_value *pRoot);
 	void ParseClanSnapshot(const json_value *pRoot);
+	void ParsePreviewSnapshot(const json_value *pRoot);
 	void ParseMemberSkin(const json_value *pMember, SSkin *pSkin);
 	void ParseApplications(const json_value *pRoot);
 	void ParseAnnouncements(const json_value *pRoot);
@@ -257,6 +264,7 @@ private:
 		REQ_NOTIF_READ,
 		REQ_RECENT,
 		REQ_PRESENCE,
+		REQ_PREVIEW,
 	};
 
 	bool m_LoggedIn = false;
@@ -276,6 +284,8 @@ private:
 
 	std::vector<SCatalogEntry> m_vCatalog;
 	SClanSnapshot m_Clan;
+	SClanSnapshot m_Preview;
+	char m_aPreviewClanId[64] = "";
 	std::vector<SApplication> m_vApplications;
 	std::vector<SAnnouncement> m_vAnnouncements;
 	std::vector<SRecentClan> m_vRecentClans;

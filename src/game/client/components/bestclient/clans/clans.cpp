@@ -587,6 +587,29 @@ void CClans::RefreshClan()
 	BeginRequest(std::move(pReq), REQ_CLAN);
 }
 
+void CClans::OpenPreview(const char *pClanId)
+{
+	if(!pClanId || !pClanId[0])
+		return;
+	str_copy(m_aPreviewClanId, pClanId, sizeof(m_aPreviewClanId));
+	m_View = EView::PREVIEW;
+	char aBase[128];
+	ResolveBaseUrl(aBase, sizeof(aBase));
+	char aUrl[192];
+	str_format(aUrl, sizeof(aUrl), "%s/api/clans/%s", aBase, pClanId);
+	auto pReq = HttpGet(aUrl);
+	AuthHeader(pReq.get());
+	pReq->FailOnErrorStatus(false);
+	BeginRequest(std::move(pReq), REQ_PREVIEW);
+	SetStatus(Localize("Loading..."));
+}
+
+void CClans::ClearPreview()
+{
+	m_aPreviewClanId[0] = '\0';
+	m_Preview = SClanSnapshot{};
+}
+
 void CClans::RotateInvite()
 {
 	if(!m_aClanId[0])
@@ -749,6 +772,10 @@ void CClans::RefreshCurrentView()
 	case EView::CLAN:
 		RefreshClan();
 		break;
+	case EView::PREVIEW:
+		if(m_aPreviewClanId[0])
+			OpenPreview(m_aPreviewClanId);
+		break;
 	case EView::APPLICATIONS:
 		RefreshApplications();
 		break;
@@ -797,6 +824,12 @@ void CClans::MaybeAutoRefresh()
 			RefreshMe();
 			return;
 		}
+	}
+	else if(m_View == EView::PREVIEW && m_aPreviewClanId[0] && Now - m_LastClanPollTick >= Freq * 5)
+	{
+		m_LastClanPollTick = Now;
+		OpenPreview(m_aPreviewClanId);
+		return;
 	}
 
 	if(m_View == EView::LANDING || m_View == EView::BROWSE)
@@ -988,8 +1021,48 @@ void CClans::ParseClanSnapshot(const json_value *pRoot)
 	}
 
 	SaveSession();
-	if(m_View == EView::LANDING || m_View == EView::SETUP || m_View == EView::AUTH)
+	if(m_View == EView::LANDING || m_View == EView::SETUP || m_View == EView::AUTH || m_View == EView::PREVIEW)
 		m_View = EView::CLAN;
+}
+
+void CClans::ParsePreviewSnapshot(const json_value *pRoot)
+{
+	m_Preview = SClanSnapshot{};
+	str_copy(m_Preview.m_aClanId, JsonString(pRoot, "clan_id"), sizeof(m_Preview.m_aClanId));
+	str_copy(m_aPreviewClanId, m_Preview.m_aClanId, sizeof(m_aPreviewClanId));
+	str_copy(m_Preview.m_aName, JsonString(pRoot, "name"), sizeof(m_Preview.m_aName));
+	str_copy(m_Preview.m_aTag, JsonString(pRoot, "tag"), sizeof(m_Preview.m_aTag));
+	str_copy(m_Preview.m_aDescription, JsonString(pRoot, "description"), sizeof(m_Preview.m_aDescription));
+	m_Preview.m_IconId = JsonInt(pRoot, "icon_id");
+	m_Preview.m_Color = (unsigned)JsonInt(pRoot, "color", 0xFFFFFF);
+	str_copy(m_Preview.m_aJoinPolicy, JsonString(pRoot, "join_policy", "open"), sizeof(m_Preview.m_aJoinPolicy));
+	m_Preview.m_MaxMembers = JsonInt(pRoot, "max_members", 50);
+
+	const json_value *pMembers = json_object_get(pRoot, "members");
+	if(pMembers && pMembers->type == json_array)
+	{
+		for(unsigned i = 0; i < pMembers->u.array.length; i++)
+		{
+			const json_value *pM = pMembers->u.array.values[i];
+			if(!pM || pM->type != json_object)
+				continue;
+			SMember Member;
+			str_copy(Member.m_aUserId, JsonString(pM, "user_id"), sizeof(Member.m_aUserId));
+			str_copy(Member.m_aNickname, JsonString(pM, "nickname"), sizeof(Member.m_aNickname));
+			Member.m_Role = ParseRole(JsonString(pM, "role"));
+			ParseMemberSkin(pM, &Member.m_Skin);
+			const json_value *pPres = json_object_get(pM, "presence");
+			if(pPres && pPres->type == json_object)
+			{
+				Member.m_Online = JsonBool(pPres, "online");
+				str_copy(Member.m_aMap, JsonString(pPres, "map"), sizeof(Member.m_aMap));
+				Member.m_Players = JsonInt(pPres, "players");
+				Member.m_MaxPlayers = JsonInt(pPres, "max_players");
+			}
+			m_Preview.m_vMembers.push_back(Member);
+		}
+	}
+	m_View = EView::PREVIEW;
 }
 
 void CClans::ParseApplications(const json_value *pRoot)
@@ -1251,6 +1324,10 @@ void CClans::HandlePending()
 	case REQ_REJOIN:
 	case REQ_CLAN:
 		ParseClanSnapshot(pRoot);
+		ClearPreview();
+		break;
+	case REQ_PREVIEW:
+		ParsePreviewSnapshot(pRoot);
 		break;
 	case REQ_ROTATE:
 		str_copy(m_Clan.m_aInviteCode, JsonString(pRoot, "invite_code"), sizeof(m_Clan.m_aInviteCode));
@@ -1280,7 +1357,7 @@ void CClans::HandlePending()
 	}
 
 	json_value_free(pRoot);
-	if(Kind == REQ_CLAN || Kind == REQ_CATALOG || Kind == REQ_APPS || Kind == REQ_ANNS || Kind == REQ_ME)
+	if(Kind == REQ_CLAN || Kind == REQ_CATALOG || Kind == REQ_APPS || Kind == REQ_ANNS || Kind == REQ_ME || Kind == REQ_PREVIEW)
 		m_aStatus[0] = '\0';
 }
 
