@@ -295,6 +295,7 @@ private:
 	std::vector<SApplication> m_vApplications;
 	std::vector<SAnnouncement> m_vAnnouncements;
 	std::vector<SRecentClan> m_vRecentClans;
+	char m_aRecentPendingUserId[64] = "";
 	std::vector<SNotification> m_vNotifications;
 	std::deque<SToast> m_Toasts;
 

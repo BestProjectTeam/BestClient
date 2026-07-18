@@ -68,10 +68,9 @@ void CClans::OnInit()
 	if(m_LoggedIn)
 	{
 		m_View = InClan() ? EView::CLAN : EView::LANDING;
+		// Recent is per-account on the server — load via background so ME isn't aborted.
+		RefreshRecentClans();
 		RefreshMe();
-		RefreshCatalog();
-		if(InClan())
-			RefreshClan();
 	}
 }
 
@@ -199,7 +198,13 @@ void CClans::BeginRequest(std::shared_ptr<CHttpRequest> pReq, int Kind)
 void CClans::BeginBackground(std::shared_ptr<CHttpRequest> pReq, int Kind)
 {
 	if(m_pBgPending && !m_pBgPending->Done())
-		return;
+	{
+		// Account-bound recent must not wait behind soft polls.
+		if(Kind != REQ_RECENT && Kind != REQ_ANN_READ)
+			return;
+		m_pBgPending->Abort();
+		m_pBgPending = nullptr;
+	}
 	m_BgKind = Kind;
 	m_pBgPending = std::move(pReq);
 	Http()->Run(m_pBgPending);
@@ -225,6 +230,7 @@ void CClans::LeaveClanLocal()
 	SaveSession();
 	if(m_View == EView::CLAN || m_View == EView::APPLICATIONS || m_View == EView::ANNOUNCEMENTS)
 		m_View = EView::LANDING;
+	RefreshRecentClans();
 }
 
 void CClans::ApplyClanTagLock(const char *pTag)
@@ -336,6 +342,18 @@ void CClans::LoadSession()
 
 void CClans::ClearSession()
 {
+	if(m_pPending)
+	{
+		m_pPending->Abort();
+		m_pPending = nullptr;
+		m_PendingKind = REQ_NONE;
+	}
+	if(m_pBgPending)
+	{
+		m_pBgPending->Abort();
+		m_pBgPending = nullptr;
+		m_BgKind = REQ_NONE;
+	}
 	m_LoggedIn = false;
 	m_aAccessToken[0] = '\0';
 	m_aRefreshToken[0] = '\0';
@@ -343,6 +361,7 @@ void CClans::ClearSession()
 	m_aNickname[0] = '\0';
 	m_aClanId[0] = '\0';
 	m_aClanTag[0] = '\0';
+	m_aRecentPendingUserId[0] = '\0';
 	m_Role = ERole::NONE;
 	m_Clan = SClanSnapshot{};
 	m_vRecentClans.clear();
@@ -733,6 +752,11 @@ void CClans::MarkNotificationRead(const char *pId)
 
 void CClans::RefreshRecentClans()
 {
+	if(!m_LoggedIn || !m_aUserId[0])
+	{
+		m_vRecentClans.clear();
+		return;
+	}
 	char aBase[128];
 	ResolveBaseUrl(aBase, sizeof(aBase));
 	char aUrl[160];
@@ -740,7 +764,8 @@ void CClans::RefreshRecentClans()
 	auto pReq = HttpGet(aUrl);
 	AuthHeader(pReq.get());
 	pReq->FailOnErrorStatus(false);
-	BeginRequest(std::move(pReq), REQ_RECENT);
+	str_copy(m_aRecentPendingUserId, m_aUserId, sizeof(m_aRecentPendingUserId));
+	BeginBackground(std::move(pReq), REQ_RECENT);
 }
 
 void CClans::RefreshCurrentView()
@@ -903,6 +928,7 @@ void CClans::ParseAuthResponse(const json_value *pRoot)
 		RefreshClan();
 	else
 		RefreshCatalog();
+	// recent_clans already parsed from user; optional bg refresh keeps list in sync
 	RefreshRecentClans();
 }
 
@@ -1303,7 +1329,7 @@ void CClans::HandlePending()
 		if(InClan())
 		{
 			ApplyClanTagLock(m_aClanTag);
-			if(!WasInClan || m_View == EView::LANDING || m_View == EView::SETUP || m_View == EView::AUTH)
+			if(!WasInClan || m_View == EView::LANDING || m_View == EView::SETUP || m_View == EView::AUTH || !m_Clan.m_aClanId[0])
 			{
 				m_View = EView::CLAN;
 				RefreshClan();
@@ -1316,6 +1342,8 @@ void CClans::HandlePending()
 			m_Role = ERole::NONE;
 			if(WasInClan || m_View == EView::CLAN || m_View == EView::APPLICATIONS || m_View == EView::ANNOUNCEMENTS)
 				m_View = EView::LANDING;
+			if((m_View == EView::LANDING || m_View == EView::BROWSE) && m_vCatalog.empty())
+				RefreshCatalog();
 		}
 		SaveSession();
 		break;
@@ -1355,7 +1383,8 @@ void CClans::HandlePending()
 		ParseNotifications(pRoot);
 		break;
 	case REQ_RECENT:
-		ParseRecentClans(pRoot);
+		if(!m_aRecentPendingUserId[0] || !str_comp(m_aRecentPendingUserId, m_aUserId))
+			ParseRecentClans(pRoot);
 		break;
 	default:
 		break;
@@ -1393,6 +1422,18 @@ void CClans::HandleBackground()
 	{
 		if(Code >= 200 && Code < 300 && pRoot && pRoot->type == json_object)
 			ParseNotifications(pRoot);
+		if(pRoot)
+			json_value_free(pRoot);
+		return;
+	}
+
+	if(Kind == REQ_RECENT)
+	{
+		if(Code >= 200 && Code < 300 && pRoot && pRoot->type == json_object)
+		{
+			if(!m_aRecentPendingUserId[0] || !str_comp(m_aRecentPendingUserId, m_aUserId))
+				ParseRecentClans(pRoot);
+		}
 		if(pRoot)
 			json_value_free(pRoot);
 		return;
