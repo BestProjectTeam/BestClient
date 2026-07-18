@@ -43,6 +43,7 @@ void CLineInput::SetBuffer(char *pStr, size_t MaxSize, size_t MaxChars)
 		m_MouseSelection.m_Selecting = false;
 		m_Hidden = false;
 		m_HideCursor = false;
+		m_AllowNewline = false;
 		m_pEmptyText = nullptr;
 		m_WasRendered = false;
 	}
@@ -194,6 +195,50 @@ size_t CLineInput::OffsetFromDisplayToActual(size_t DisplayOffset)
 	return DisplayOffset;
 }
 
+// TextEx skips '\n' in GlyphCount (used as CursorCharacter), but UTF-8 char
+// offsets count newlines. Map byte <-> glyph index the same way TextEx does.
+static size_t BytesToGlyphIndex(const char *pStr, size_t ByteOffset)
+{
+	size_t Glyphs = 0;
+	size_t Offset = 0;
+	while(Offset < ByteOffset && pStr[Offset])
+	{
+		const char *pChar = pStr + Offset;
+		const int Character = str_utf8_decode(&pChar);
+		if(Character != '\n')
+			Glyphs++;
+		const size_t Next = pChar - pStr;
+		if(Next <= Offset)
+			break;
+		Offset = Next;
+	}
+	return Glyphs;
+}
+
+static size_t GlyphIndexToBytes(const char *pStr, size_t GlyphIndex)
+{
+	size_t Glyphs = 0;
+	size_t Offset = 0;
+	while(pStr[Offset])
+	{
+		const char *pChar = pStr + Offset;
+		const int Character = str_utf8_decode(&pChar);
+		const size_t Next = pChar - pStr;
+		if(Next <= Offset)
+			break;
+		if(Character == '\n')
+		{
+			Offset = Next;
+			continue;
+		}
+		if(Glyphs == GlyphIndex)
+			return Offset;
+		Glyphs++;
+		Offset = Next;
+	}
+	return Offset;
+}
+
 bool CLineInput::ProcessInput(const IInput::CEvent &Event)
 {
 	// update derived attributes to handle external changes to the buffer
@@ -204,9 +249,18 @@ bool CLineInput::ProcessInput(const IInput::CEvent &Event)
 	const size_t SelectionLength = GetSelectionLength();
 	bool KeyHandled = false;
 
+	// Keep caret and empty selection synchronized. Inserts use selection offsets;
+	// if they lag behind the displayed caret (e.g. after mouse placement), text
+	// appears one character to the left of the caret.
+	if(m_SelectionStart == m_SelectionEnd && (m_SelectionStart != m_CursorPos || m_SelectionEnd != m_CursorPos))
+		m_SelectionStart = m_SelectionEnd = m_CursorPos;
+
 	if(Event.m_Flags & IInput::FLAG_TEXT)
 	{
-		SetRange(Event.m_aText, m_SelectionStart, m_SelectionEnd);
+		if(GetSelectionLength() == 0)
+			SetRange(Event.m_aText, m_CursorPos, m_CursorPos);
+		else
+			SetRange(Event.m_aText, m_SelectionStart, m_SelectionEnd);
 		KeyHandled = true;
 	}
 
@@ -335,6 +389,11 @@ bool CLineInput::ProcessInput(const IInput::CEvent &Event)
 				m_SelectionStart = m_Len;
 			m_CursorPos = m_Len;
 			m_SelectionEnd = m_Len;
+			KeyHandled = true;
+		}
+		else if((Event.m_Key == KEY_RETURN || Event.m_Key == KEY_KP_ENTER) && m_AllowNewline && Selecting)
+		{
+			SetRange("\n", m_SelectionStart, m_SelectionEnd);
 			KeyHandled = true;
 		}
 		else if(ModPressed && !AltPressed && Event.m_Key == KEY_V)
@@ -477,11 +536,11 @@ STextBoundingBox CLineInput::Render(const CUIRect *pRect, float FontSize, int Al
 			m_LastCompositionCursorPos = CaretOffset;
 			const size_t DisplayCompositionEnd = DisplayCursorOffset + Input()->GetCompositionLength();
 			Cursor.m_CursorMode = TEXT_CURSOR_CURSOR_MODE_SET;
-			Cursor.m_CursorCharacter = str_utf8_offset_bytes_to_chars(pDisplayStr, CaretOffset);
+			Cursor.m_CursorCharacter = BytesToGlyphIndex(pDisplayStr, CaretOffset);
 			Cursor.m_CalculateSelectionMode = TEXT_CURSOR_SELECTION_MODE_SET;
 			Cursor.m_SelectionHeightFactor = 0.1f;
-			Cursor.m_SelectionStart = str_utf8_offset_bytes_to_chars(pDisplayStr, DisplayCursorOffset);
-			Cursor.m_SelectionEnd = str_utf8_offset_bytes_to_chars(pDisplayStr, DisplayCompositionEnd);
+			Cursor.m_SelectionStart = BytesToGlyphIndex(pDisplayStr, DisplayCursorOffset);
+			Cursor.m_SelectionEnd = BytesToGlyphIndex(pDisplayStr, DisplayCompositionEnd);
 			TextRender()->TextSelectionColor(1.0f, 1.0f, 1.0f, 0.8f);
 			TextRender()->TextEx(&Cursor, pDisplayStr);
 			TextRender()->TextSelectionColor(TextRender()->DefaultTextSelectionColor());
@@ -491,29 +550,29 @@ STextBoundingBox CLineInput::Render(const CUIRect *pRect, float FontSize, int Al
 			const size_t Start = OffsetFromActualToDisplay(GetSelectionStart());
 			const size_t End = OffsetFromActualToDisplay(GetSelectionEnd());
 			Cursor.m_CursorMode = m_MouseSelection.m_Selecting ? TEXT_CURSOR_CURSOR_MODE_CALCULATE : TEXT_CURSOR_CURSOR_MODE_SET;
-			Cursor.m_CursorCharacter = str_utf8_offset_bytes_to_chars(pDisplayStr, CaretOffset);
+			Cursor.m_CursorCharacter = BytesToGlyphIndex(pDisplayStr, CaretOffset);
 			Cursor.m_CalculateSelectionMode = m_MouseSelection.m_Selecting ? TEXT_CURSOR_SELECTION_MODE_CALCULATE : TEXT_CURSOR_SELECTION_MODE_SET;
-			Cursor.m_SelectionStart = str_utf8_offset_bytes_to_chars(pDisplayStr, Start);
-			Cursor.m_SelectionEnd = str_utf8_offset_bytes_to_chars(pDisplayStr, End);
+			Cursor.m_SelectionStart = BytesToGlyphIndex(pDisplayStr, Start);
+			Cursor.m_SelectionEnd = BytesToGlyphIndex(pDisplayStr, End);
 			TextRender()->TextEx(&Cursor, pDisplayStr);
 		}
 		else
 		{
 			Cursor.m_CursorMode = m_MouseSelection.m_Selecting ? TEXT_CURSOR_CURSOR_MODE_CALCULATE : TEXT_CURSOR_CURSOR_MODE_SET;
-			Cursor.m_CursorCharacter = str_utf8_offset_bytes_to_chars(pDisplayStr, CaretOffset);
+			Cursor.m_CursorCharacter = BytesToGlyphIndex(pDisplayStr, CaretOffset);
 			Cursor.m_CalculateSelectionMode = m_MouseSelection.m_Selecting ? TEXT_CURSOR_SELECTION_MODE_CALCULATE : TEXT_CURSOR_SELECTION_MODE_NONE;
 			TextRender()->TextEx(&Cursor, pDisplayStr);
 		}
 
 		if(Cursor.m_CursorMode == TEXT_CURSOR_CURSOR_MODE_CALCULATE && Cursor.m_CursorCharacter >= 0)
 		{
-			const size_t NewCursorOffset = str_utf8_offset_chars_to_bytes(pDisplayStr, Cursor.m_CursorCharacter);
+			const size_t NewCursorOffset = GlyphIndexToBytes(pDisplayStr, Cursor.m_CursorCharacter);
 			SetCursorOffset(OffsetFromDisplayToActual(NewCursorOffset));
 		}
 		if(Cursor.m_CalculateSelectionMode == TEXT_CURSOR_SELECTION_MODE_CALCULATE && Cursor.m_SelectionStart >= 0 && Cursor.m_SelectionEnd >= 0)
 		{
-			const size_t NewSelectionStart = str_utf8_offset_chars_to_bytes(pDisplayStr, Cursor.m_SelectionStart);
-			const size_t NewSelectionEnd = str_utf8_offset_chars_to_bytes(pDisplayStr, Cursor.m_SelectionEnd);
+			const size_t NewSelectionStart = GlyphIndexToBytes(pDisplayStr, Cursor.m_SelectionStart);
+			const size_t NewSelectionEnd = GlyphIndexToBytes(pDisplayStr, Cursor.m_SelectionEnd);
 			SetSelection(OffsetFromDisplayToActual(NewSelectionStart), OffsetFromDisplayToActual(NewSelectionEnd));
 		}
 
@@ -526,7 +585,7 @@ STextBoundingBox CLineInput::Render(const CUIRect *pRect, float FontSize, int Al
 		CaretCursor.m_LineWidth = LineWidth;
 		CaretCursor.m_LineSpacing = LineSpacing;
 		CaretCursor.m_CursorMode = TEXT_CURSOR_CURSOR_MODE_SET;
-		CaretCursor.m_CursorCharacter = str_utf8_offset_bytes_to_chars(pDisplayStr, DisplayCursorOffset);
+		CaretCursor.m_CursorCharacter = BytesToGlyphIndex(pDisplayStr, DisplayCursorOffset);
 		TextRender()->TextEx(&CaretCursor, pDisplayStr);
 		SetCompositionWindowPosition(CaretCursor.m_CursorRenderedPosition + vec2(0.0f, CaretCursor.m_AlignedFontSize / 2.0f), CaretCursor.m_AlignedFontSize);
 	}

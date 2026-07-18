@@ -9,6 +9,7 @@
 #include <engine/textrender.h>
 
 #include <game/client/animstate.h>
+#include <game/client/bc_ui_animations.h>
 #include <game/client/gameclient.h>
 #include <game/client/render.h>
 #include <game/client/ui.h>
@@ -23,6 +24,136 @@
 #include <cstdlib>
 #include <cstring>
 #include <vector>
+
+class CClansEditBoxColorFunction final : public IButtonColorFunction
+{
+public:
+	ColorRGBA GetColor(bool Active, bool Hovered) const override
+	{
+		if(Active)
+			return ColorRGBA(0.0f, 0.0f, 0.0f, 0.42f);
+		if(Hovered)
+			return ColorRGBA(0.0f, 0.0f, 0.0f, 0.32f);
+		return ColorRGBA(0.0f, 0.0f, 0.0f, 0.22f);
+	}
+};
+
+static bool DoClansEditBox(CUi *pUi, CLineInput *pLineInput, const CUIRect *pRect, float FontSize, int Corners = IGraphics::CORNER_ALL, float LineWidth = -1.0f, float LineSpacing = 0.0f)
+{
+	static const CClansEditBoxColorFunction s_ColorFunction;
+	return pUi->DoEditBox(pLineInput, pRect, FontSize, Corners, {}, LineWidth, LineSpacing, &s_ColorFunction);
+}
+
+static void TruncateClanDescription(ITextRender *pTextRender, char *pDesc, float FontSize, float LineWidth, int MaxLines)
+{
+	if(!pDesc || MaxLines < 1)
+		return;
+	for(;;)
+	{
+		STextSizeProperties Props;
+		int LineCount = 0;
+		Props.m_pLineCount = &LineCount;
+		pTextRender->TextWidth(FontSize, pDesc, -1, LineWidth, 0, Props);
+		if(LineCount <= MaxLines || !pDesc[0])
+			break;
+		const int Len = str_length(pDesc);
+		pDesc[Len - 1] = '\0';
+		str_utf8_fix_truncation(pDesc);
+	}
+}
+
+// Center each visual line independently (TEXTALIGN_MC + MaxWidth left-aligns wrapped lines).
+static void DoClanDescriptionCentered(CUi *pUi, ITextRender *pTextRender, CUIRect Rect, const char *pDesc, float FontSize, float LineSpacing)
+{
+	if(!pDesc)
+		pDesc = "";
+	const float LineAdvance = FontSize + LineSpacing;
+	const char *p = pDesc;
+	for(;;)
+	{
+		const char *pNl = strchr(p, '\n');
+		char aSeg[256];
+		if(pNl)
+		{
+			const size_t SegLen = minimum(sizeof(aSeg) - 1, (size_t)(pNl - p));
+			mem_copy(aSeg, p, SegLen);
+			aSeg[SegLen] = '\0';
+			p = pNl + 1;
+		}
+		else
+		{
+			str_copy(aSeg, p, sizeof(aSeg));
+			p = nullptr;
+		}
+
+		const char *pSeg = aSeg;
+		if(!pSeg[0])
+		{
+			Rect.HSplitTop(LineAdvance, nullptr, &Rect);
+		}
+		else
+		{
+			while(pSeg[0])
+			{
+				CTextCursor Cut;
+				Cut.m_FontSize = FontSize;
+				Cut.m_LineWidth = Rect.w;
+				Cut.m_Flags = TEXTFLAG_STOP_AT_END | TEXTFLAG_DISALLOW_NEWLINE;
+				pTextRender->TextEx(&Cut, pSeg);
+				int Take = Cut.m_CharCount;
+				if(Cut.m_Truncated && Take > 0)
+					Take = str_utf8_rewind(pSeg, Take);
+				if(Take <= 0)
+					Take = (int)str_utf8_forward(pSeg, 0);
+				if(Take <= 0)
+					break;
+
+				// Prefer wrapping at the last space within the fitted range.
+				if(pSeg[Take] != '\0')
+				{
+					int SpaceBreak = -1;
+					for(int i = Take - 1; i > 0; i--)
+					{
+						if(pSeg[i] == ' ' && (pSeg[i] & 0xC0) != 0x80)
+						{
+							SpaceBreak = i;
+							break;
+						}
+					}
+					if(SpaceBreak > 0)
+						Take = SpaceBreak;
+				}
+
+				char aLine[256];
+				const size_t LineLen = minimum(sizeof(aLine) - 1, (size_t)Take);
+				mem_copy(aLine, pSeg, LineLen);
+				aLine[LineLen] = '\0';
+				str_utf8_fix_truncation(aLine);
+
+				CUIRect LineRect;
+				Rect.HSplitTop(LineAdvance, &LineRect, &Rect);
+				pUi->DoLabel(&LineRect, aLine, FontSize, TEXTALIGN_MC);
+
+				pSeg += Take;
+				if(pSeg[0] == ' ')
+					pSeg++;
+			}
+		}
+
+		if(!p)
+			break;
+	}
+}
+
+static CUIRect ClansAnimGrowRect(const CUIRect &OuterRect, bool GrowFromRight, float Phase)
+{
+	CUIRect AnimRect;
+	AnimRect.w = OuterRect.w * Phase;
+	AnimRect.h = OuterRect.h * Phase;
+	AnimRect.y = OuterRect.y;
+	AnimRect.x = GrowFromRight ? (OuterRect.x + OuterRect.w - AnimRect.w) : OuterRect.x;
+	return AnimRect;
+}
 
 static const char *RoleLabel(CClans::ERole Role)
 {
@@ -92,10 +223,11 @@ static void RenderOwnTee(CGameClient *pGameClient, CRenderTools *pRenderTools, C
 	RenderClanMemberTee(pGameClient, pRenderTools, TeeBox, Skin);
 }
 
-static bool DoClansIconBtn(CUi *pUi, ITextRender *pTextRender, CButtonContainer *pId, const char *pIcon, const CUIRect *pRect, bool Danger = false)
+static bool DoClansIconBtn(CUi *pUi, ITextRender *pTextRender, CButtonContainer *pId, const char *pIcon, const CUIRect *pRect, bool Danger = false, bool DrawBg = true)
 {
-	if(pUi->HotItem() == pId || pUi->CheckActiveItem(pId))
-		pRect->Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.06f), IGraphics::CORNER_ALL, 4.0f);
+	const bool Hot = pUi->HotItem() == pId || pUi->CheckActiveItem(pId);
+	if(DrawBg)
+		pRect->Draw(ColorRGBA(0.0f, 0.0f, 0.0f, Hot ? 0.28f : 0.20f), IGraphics::CORNER_ALL, 5.0f);
 
 	const ColorRGBA Col = Danger ? ColorRGBA(0.92f, 0.32f, 0.32f, 1.0f) : pTextRender->DefaultTextColor();
 	pTextRender->SetFontPreset(EFontPreset::ICON_FONT);
@@ -110,14 +242,13 @@ static bool DoClansIconBtn(CUi *pUi, ITextRender *pTextRender, CButtonContainer 
 
 static bool DoClansTextBtn(CUi *pUi, ITextRender *pTextRender, CButtonContainer *pId, const char *pText, const CUIRect *pRect, int Checked = 0, bool Danger = false)
 {
-	if(pUi->HotItem() == pId || pUi->CheckActiveItem(pId) || Checked)
-		pRect->Draw(ColorRGBA(1.0f, 1.0f, 1.0f, Checked ? 0.10f : 0.06f), IGraphics::CORNER_ALL, 4.0f);
+	const bool Hot = pUi->HotItem() == pId || pUi->CheckActiveItem(pId);
+	float Alpha = Checked ? 0.32f : (Hot ? 0.28f : 0.20f);
+	pRect->Draw(ColorRGBA(0.0f, 0.0f, 0.0f, Alpha), IGraphics::CORNER_ALL, 5.0f);
 
 	ColorRGBA Col = Danger ? ColorRGBA(0.92f, 0.32f, 0.32f, 1.0f) : pTextRender->DefaultTextColor();
-	if(Checked)
-		Col.a = 1.0f;
-	else if(pUi->HotItem() != pId)
-		Col.a = 0.85f;
+	if(!Checked && !Hot)
+		Col.a = 0.90f;
 	pTextRender->TextColor(Col);
 	pUi->DoLabel(pRect, pText, minimum(14.0f, pRect->h * 0.55f), TEXTALIGN_MC);
 	pTextRender->TextColor(pTextRender->DefaultTextColor());
@@ -127,8 +258,7 @@ static bool DoClansTextBtn(CUi *pUi, ITextRender *pTextRender, CButtonContainer 
 static bool DoClansSidebarItem(CUi *pUi, ITextRender *pTextRender, CButtonContainer *pId, const char *pIcon, const char *pText, const CUIRect *pRect, int Badge = 0, bool Danger = false)
 {
 	const bool Hot = pUi->HotItem() == pId || pUi->CheckActiveItem(pId);
-	// Same visual weight as main-menu buttons (40px tall, dark translucent plate).
-	pRect->Draw(ColorRGBA(0.0f, 0.0f, 0.0f, Hot ? 0.40f : 0.25f), IGraphics::CORNER_ALL, 5.0f);
+	pRect->Draw(ColorRGBA(0.0f, 0.0f, 0.0f, Hot ? 0.28f : 0.20f), IGraphics::CORNER_ALL, 5.0f);
 
 	const float FontSize = 14.0f;
 	const float IconSize = 16.0f;
@@ -216,18 +346,8 @@ static void DrawClansAccountBarRect(CGameClient *pGameClient, CRenderTools *pRen
 	}
 
 	static CButtonContainer s_Logout;
-	if(DoClansIconBtn(pUi, pGameClient->TextRender(), &s_Logout, FontIcon::RIGHT_FROM_BRACKET, &LogoutBtn))
+	if(DoClansIconBtn(pUi, pGameClient->TextRender(), &s_Logout, FontIcon::RIGHT_FROM_BRACKET, &LogoutBtn, false, false))
 		Clans.Logout();
-}
-
-static void DrawClansAccountBar(CGameClient *pGameClient, CRenderTools *pRenderTools, CUi *pUi, CClans &Clans, CUIRect *pMainView)
-{
-	CUIRect Acc;
-	pMainView->HSplitBottom(34.0f, pMainView, &Acc);
-	const float AccW = 210.0f;
-	if(Acc.w > AccW)
-		Acc.VSplitLeft(Acc.w - AccW, nullptr, &Acc);
-	DrawClansAccountBarRect(pGameClient, pRenderTools, pUi, Clans, Acc);
 }
 
 void CMenus::RenderClans(CUIRect MainView)
@@ -255,18 +375,18 @@ void CMenus::RenderClans(CUIRect MainView)
 	if(!Clans.IsLoggedIn())
 	{
 		RenderClansAuth(MainView);
+		if(Clans.ErrorMessage()[0])
+		{
+			CUIRect Msg;
+			MainView.HSplitBottom(28.0f, nullptr, &Msg);
+			Msg.VSplitLeft(minimum(280.0f, Msg.w), &Msg, nullptr);
+			Msg.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.35f), IGraphics::CORNER_ALL, 5.0f);
+			Msg.Margin(7.0f, &Msg);
+			TextRender()->TextColor(1.0f, 0.4f, 0.4f, 1.0f);
+			Ui()->DoLabel(&Msg, Clans.ErrorMessage(), 12.0f, TEXTALIGN_ML);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+		}
 		return;
-	}
-
-	// Errors overlay without changing layout (no Loading — it caused a jump every poll).
-	if(Clans.ErrorMessage()[0])
-	{
-		CUIRect Msg = MainView;
-		Msg.HSplitTop(18.0f, &Msg, nullptr);
-		Msg.VSplitRight(120.0f, &Msg, nullptr);
-		TextRender()->TextColor(1.0f, 0.4f, 0.4f, 1.0f);
-		Ui()->DoLabel(&Msg, Clans.ErrorMessage(), 12.0f, TEXTALIGN_ML);
-		TextRender()->TextColor(TextRender()->DefaultTextColor());
 	}
 
 	switch(Clans.View())
@@ -297,6 +417,18 @@ void CMenus::RenderClans(CUIRect MainView)
 	default:
 		RenderClansLanding(MainView);
 		break;
+	}
+
+	if(Clans.ErrorMessage()[0])
+	{
+		CUIRect Msg;
+		MainView.HSplitBottom(28.0f, nullptr, &Msg);
+		Msg.VSplitLeft(minimum(280.0f, Msg.w), &Msg, nullptr);
+		Msg.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.35f), IGraphics::CORNER_ALL, 5.0f);
+		Msg.Margin(7.0f, &Msg);
+		TextRender()->TextColor(1.0f, 0.4f, 0.4f, 1.0f);
+		Ui()->DoLabel(&Msg, Clans.ErrorMessage(), 12.0f, TEXTALIGN_ML);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
 	}
 }
 
@@ -332,14 +464,14 @@ void CMenus::RenderClansAuth(CUIRect MainView)
 	Ui()->DoLabel(&Label, Localize("Nickname"), 14.0f, TEXTALIGN_ML);
 	Box.HSplitTop(4.0f, nullptr, &Box);
 	Box.HSplitTop(24.0f, &Button, &Box);
-	Ui()->DoEditBox(&s_Nick, &Button, 14.0f);
+	DoClansEditBox(Ui(), &s_Nick, &Button, 14.0f);
 
 	Box.HSplitTop(10.0f, nullptr, &Box);
 	Box.HSplitTop(20.0f, &Label, &Box);
 	Ui()->DoLabel(&Label, Localize("Password"), 14.0f, TEXTALIGN_ML);
 	Box.HSplitTop(4.0f, nullptr, &Box);
 	Box.HSplitTop(24.0f, &Button, &Box);
-	Ui()->DoEditBox(&s_Pass, &Button, 14.0f);
+	DoClansEditBox(Ui(), &s_Pass, &Button, 14.0f);
 
 	Box.HSplitTop(16.0f, nullptr, &Box);
 	CUIRect Left, Right;
@@ -351,14 +483,6 @@ void CMenus::RenderClansAuth(CUIRect MainView)
 	if(DoClansTextBtn(Ui(), TextRender(), &s_Register, Localize("Register"), &Right) && !Clans.IsBusy())
 		Clans.Register(s_aNick, s_aPass);
 
-	if(Clans.ErrorMessage()[0])
-	{
-		Box.HSplitTop(12.0f, nullptr, &Box);
-		Box.HSplitTop(20.0f, &Label, &Box);
-		TextRender()->TextColor(1.0f, 0.4f, 0.4f, 1.0f);
-		Ui()->DoLabel(&Label, Clans.ErrorMessage(), 13.0f, TEXTALIGN_MC);
-		TextRender()->TextColor(TextRender()->DefaultTextColor());
-	}
 }
 
 void CMenus::RenderClansLanding(CUIRect MainView)
@@ -390,7 +514,7 @@ void CMenus::RenderClansLanding(CUIRect MainView)
 	// Search
 	CUIRect SearchBox;
 	Left.HSplitTop(26.0f, &SearchBox, &Left);
-	Ui()->DoEditBox(&s_Search, &SearchBox, 13.0f);
+	DoClansEditBox(Ui(), &s_Search, &SearchBox, 13.0f);
 	Left.HSplitTop(8.0f, nullptr, &Left);
 
 	// Join with code + Join (one row)
@@ -398,7 +522,7 @@ void CMenus::RenderClansLanding(CUIRect MainView)
 	Left.HSplitTop(26.0f, &Row, &Left);
 	Row.VSplitRight(64.0f, &CodeInput, &JoinBtn);
 	CodeInput.VSplitRight(6.0f, &CodeInput, nullptr);
-	Ui()->DoEditBox(&s_Code, &CodeInput, 13.0f);
+	DoClansEditBox(Ui(), &s_Code, &CodeInput, 13.0f);
 	static CButtonContainer s_JoinCode;
 	if(DoClansTextBtn(Ui(), TextRender(), &s_JoinCode, Localize("Join"), &JoinBtn) && s_aCode[0] && !Clans.IsBusy())
 		Clans.JoinCode(s_aCode);
@@ -422,9 +546,9 @@ void CMenus::RenderClansLanding(CUIRect MainView)
 
 	Left.HSplitTop(12.0f, nullptr, &Left);
 
-	// Recent clans (fills remaining, Refresh at bottom)
-	CUIRect RefreshRow;
-	Left.HSplitBottom(28.0f, &Left, &RefreshRow);
+	// Recent clans (fills remaining, Clear + Refresh at bottom)
+	CUIRect BottomRow;
+	Left.HSplitBottom(28.0f, &Left, &BottomRow);
 	Left.HSplitBottom(8.0f, &Left, nullptr);
 
 	Left.HSplitTop(16.0f, &Label, &Left);
@@ -532,7 +656,11 @@ void CMenus::RenderClansLanding(CUIRect MainView)
 		}
 	}
 
-	static CButtonContainer s_RefreshList;
+	CUIRect ClearRow, RefreshRow;
+	BottomRow.VSplitMid(&ClearRow, &RefreshRow, 6.0f);
+	static CButtonContainer s_ClearRecent, s_RefreshList;
+	if(DoClansTextBtn(Ui(), TextRender(), &s_ClearRecent, Localize("Clear"), &ClearRow) && !Clans.IsBusy() && !Clans.RecentClans().empty())
+		Clans.ClearRecentClans();
 	if(DoClansTextBtn(Ui(), TextRender(), &s_RefreshList, Localize("Refresh list"), &RefreshRow) && !Clans.IsBusy())
 		Clans.RefreshCurrentView();
 
@@ -554,7 +682,7 @@ void CMenus::RenderClansLanding(CUIRect MainView)
 		Ui()->DoLabel(&Label, Localize("Application text"), 16.0f, TEXTALIGN_MC);
 		Popup.HSplitTop(8.0f, nullptr, &Popup);
 		Popup.HSplitTop(80.0f, &Button, &Popup);
-		Ui()->DoEditBox(&s_ApplyInput, &Button, 14.0f);
+		DoClansEditBox(Ui(), &s_ApplyInput, &Button, 14.0f);
 		Popup.HSplitTop(12.0f, nullptr, &Popup);
 		Popup.HSplitTop(28.0f, &Row, &Popup);
 		CUIRect Send, Cancel;
@@ -662,6 +790,7 @@ void CMenus::RenderClansSetup(CUIRect MainView)
 	s_Name.SetEmptyText(Localize("Clan name"));
 	s_Tag.SetEmptyText(Localize("Tag"));
 	s_Desc.SetEmptyText(Localize("Description"));
+	s_Desc.SetAllowNewline(true);
 
 	const unsigned ClanRgb = ClanRgbFromHsla(s_ColorHsla);
 	static const char *apPolicy[] = {"open", "request", "closed"};
@@ -675,12 +804,16 @@ void CMenus::RenderClansSetup(CUIRect MainView)
 	MainView.VSplitLeft(MainView.w * 0.58f, &Left, &Right);
 	Left.VSplitRight(10.0f, &Left, nullptr);
 
+	const float DescFont = 11.0f;
+	const float DescSpacing = 1.0f;
+	const float PreviewDescW = maximum(1.0f, Right.w - 32.0f);
+
 	Left.Draw(ColorRGBA(0, 0, 0, 0.28f), IGraphics::CORNER_ALL, 6.0f);
 	Left.Margin(12.0f, &Left);
 
 	// Bottom actions first so form uses remaining space
 	CUIRect Actions;
-	Left.HSplitBottom(30.0f, &Left, &Actions);
+	Left.HSplitBottom(40.0f, &Left, &Actions);
 	Left.HSplitBottom(10.0f, &Left, nullptr);
 	CUIRect CreateBtn, BackBtn;
 	Actions.VSplitMid(&CreateBtn, &BackBtn, 8.0f);
@@ -699,33 +832,21 @@ void CMenus::RenderClansSetup(CUIRect MainView)
 	Left.HSplitTop(4.0f, nullptr, &Left);
 	Left.HSplitTop(26.0f, &Row, &Left);
 	Row.VSplitMid(&NameCol, &TagCol, 8.0f);
-	Ui()->DoEditBox(&s_Name, &NameCol, 13.0f);
-	Ui()->DoEditBox(&s_Tag, &TagCol, 13.0f);
+	DoClansEditBox(Ui(), &s_Name, &NameCol, 13.0f);
+	DoClansEditBox(Ui(), &s_Tag, &TagCol, 13.0f);
 
 	Left.HSplitTop(14.0f, nullptr, &Left);
 	Left.HSplitTop(14.0f, &Label, &Left);
 	Ui()->DoLabel(&Label, Localize("Description"), 12.0f, TEXTALIGN_ML);
 	Left.HSplitTop(4.0f, nullptr, &Left);
-	Left.HSplitTop(32.0f, &Button, &Left);
+	Left.HSplitTop(40.0f, &Button, &Left);
 	{
-		const float DescFont = 11.0f;
-		const float DescSpacing = 1.0f;
-		const float DescLineWidth = maximum(1.0f, Button.w - 4.0f);
-		if(Ui()->DoEditBox(&s_Desc, &Button, DescFont, IGraphics::CORNER_ALL, {}, DescLineWidth, DescSpacing))
-		{
-			for(;;)
-			{
-				STextSizeProperties Props;
-				int LineCount = 0;
-				Props.m_pLineCount = &LineCount;
-				TextRender()->TextWidth(DescFont, s_aDesc, -1, DescLineWidth, 0, Props);
-				if(LineCount <= 2 || !s_aDesc[0])
-					break;
-				const int Len = str_length(s_aDesc);
-				s_aDesc[Len - 1] = '\0';
-				str_utf8_fix_truncation(s_aDesc);
-			}
-		}
+		CUIRect DescEdit = Button;
+		if(DescEdit.w > PreviewDescW)
+			DescEdit.w = PreviewDescW;
+		const float DescLineWidth = maximum(1.0f, DescEdit.w - 4.0f);
+		if(DoClansEditBox(Ui(), &s_Desc, &DescEdit, DescFont, IGraphics::CORNER_ALL, DescLineWidth, DescSpacing))
+			TruncateClanDescription(TextRender(), s_aDesc, DescFont, DescLineWidth, 2);
 	}
 
 	Left.HSplitTop(8.0f, nullptr, &Left);
@@ -751,7 +872,7 @@ void CMenus::RenderClansSetup(CUIRect MainView)
 		CUIRect IconBtn;
 		IconsRow.VSplitLeft(IconsRow.h + 4.0f, &IconBtn, &IconsRow);
 		IconBtn.VSplitRight(4.0f, &IconBtn, nullptr);
-		IconBtn.Draw(s_IconId == i ? ColorRGBA(0.35f, 0.55f, 1.0f, 0.45f) : ColorRGBA(0, 0, 0, 0.22f), IGraphics::CORNER_ALL, 4.0f);
+		IconBtn.Draw(ColorRGBA(0, 0, 0, s_IconId == i ? 0.34f : 0.22f), IGraphics::CORNER_ALL, 4.0f);
 		RenderClanIcon(Ui(), TextRender(), IconBtn, i, ClanRgb);
 		if(Ui()->DoButtonLogic(&s_aIcons[i], s_IconId == i, &IconBtn, BUTTONFLAG_LEFT))
 			s_IconId = i;
@@ -816,14 +937,13 @@ void CMenus::RenderClansSetup(CUIRect MainView)
 	Right.HSplitTop(8.0f, nullptr, &Right);
 
 	CUIRect Card = Right;
-	Card.Draw(ColorRGBA(0, 0, 0, 0.22f), IGraphics::CORNER_ALL, 5.0f);
-	Card.Margin(10.0f, &Card);
+	Card.Margin(4.0f, &Card);
 
 	CUIRect Header, IconBox, TextCol;
 	Card.HSplitTop(40.0f, &Header, &Card);
 	Header.VSplitLeft(36.0f, &IconBox, &TextCol);
 	TextCol.VSplitLeft(8.0f, nullptr, &TextCol);
-	IconBox.Draw(ColorRGBA(0, 0, 0, 0.35f), IGraphics::CORNER_ALL, 4.0f);
+	IconBox.Draw(ColorRGBA(0, 0, 0, 0.20f), IGraphics::CORNER_ALL, 4.0f);
 	RenderClanIcon(Ui(), TextRender(), IconBox, s_IconId, ClanRgb);
 
 	CUIRect TitleR, MetaR;
@@ -842,12 +962,21 @@ void CMenus::RenderClansSetup(CUIRect MainView)
 	Sep.Draw(ColorRGBA(1, 1, 1, 0.10f), IGraphics::CORNER_NONE, 0.0f);
 	Card.HSplitTop(10.0f, nullptr, &Card);
 
-	Card.HSplitTop(28.0f, &Label, &Card);
 	{
 		const char *pDesc = s_aDesc[0] ? s_aDesc : Localize("This is how your clan will appear in the catalog list to other players.");
+		STextSizeProperties SizeProps;
+		int LineCount = 1;
+		SizeProps.m_pLineCount = &LineCount;
+		TextRender()->TextWidth(DescFont, pDesc, -1, PreviewDescW, 0, SizeProps);
+		LineCount = std::clamp(LineCount, 1, 2);
+		const float DescH = LineCount * (DescFont + DescSpacing) + 4.0f;
+		CUIRect DescBox;
+		Card.HSplitTop(DescH, &DescBox, &Card);
+		if(DescBox.w > PreviewDescW)
+			DescBox.w = PreviewDescW;
 		SLabelProperties DescProps;
-		DescProps.m_MaxWidth = Label.w;
-		Ui()->DoLabel(&Label, pDesc, 10.0f, TEXTALIGN_TL, DescProps);
+		DescProps.m_MaxWidth = DescBox.w;
+		Ui()->DoLabel(&DescBox, pDesc, DescFont, TEXTALIGN_TL, DescProps);
 	}
 
 	Card.HSplitTop(6.0f, nullptr, &Card);
@@ -900,9 +1029,13 @@ void CMenus::RenderClansPage(CUIRect MainView)
 	static int s_aDisbandOrder[4] = {0, 1, 2, 3};
 	static int s_MemberMenu = -1;
 	static vec2 s_MemberMenuPos;
+	static float s_MemberMenuPhase = 0.0f;
+	static bool s_MemberMenuClosing = false;
+	static bool s_MemberMenuJustOpened = false;
 	static int s_KickUser = -1;
 	static int s_BanHours = 24;
 	static char s_aKickUserId[64] = "";
+	static std::vector<CButtonContainer> s_vMemberSettings;
 
 	CUIRect Left, Right, Label, Button, Row;
 	MainView.VSplitLeft(MainView.w * 0.36f, &Left, &Right);
@@ -927,37 +1060,47 @@ void CMenus::RenderClansPage(CUIRect MainView)
 	const int ManageCount = 3 + (CanApps ? 1 : 0) + (CanSettings ? 1 : 0);
 	const int DangerCount = 1 + (IsPresident ? 1 : 0);
 
-	// Header (no card chrome)
-	CUIRect TitleRow, IconBox;
-	Left.HSplitTop(30.0f, &TitleRow, &Left);
-	TitleRow.VSplitLeft(30.0f, &IconBox, &TitleRow);
-	TitleRow.VSplitLeft(8.0f, nullptr, &TitleRow);
-	RenderClanIcon(Ui(), TextRender(), IconBox, Clan.m_IconId, Clan.m_Color);
-	Ui()->DoLabel(&TitleRow, Clan.m_aName[0] ? Clan.m_aName : Localize("Loading..."), 18.0f, TEXTALIGN_ML);
+	CUIRect InfoBlock, IconBox;
+	const float DescFont = 11.0f;
+	const float DescSpacing = 1.0f;
+	STextSizeProperties DescSizeProps;
+	int DescLines = 1;
+	DescSizeProps.m_pLineCount = &DescLines;
+	const float InfoInnerW = maximum(1.0f, Left.w - 16.0f);
+	TextRender()->TextWidth(DescFont, Clan.m_aDescription[0] ? Clan.m_aDescription : " ", -1, InfoInnerW, 0, DescSizeProps);
+	DescLines = std::clamp(DescLines, 1, 3);
+	const float DescBlockH = DescLines * (DescFont + DescSpacing) + 4.0f;
+	const float InfoBlockH = 34.0f + 25.0f + 18.0f + 4.0f + DescBlockH + 20.0f + 16.0f;
+	Left.HSplitTop(InfoBlockH, &InfoBlock, &Left);
+	InfoBlock.Draw(ColorRGBA(0, 0, 0, 0.20f), IGraphics::CORNER_ALL, 6.0f);
+	InfoBlock.Margin(8.0f, &InfoBlock);
 
-	Left.HSplitTop(18.0f, &Label, &Left);
+	CUIRect CenterIcon, TitleRow;
+	InfoBlock.HSplitTop(34.0f, &CenterIcon, &InfoBlock);
+	CenterIcon.VMargin(maximum(0.0f, (CenterIcon.w - 34.0f) * 0.5f), &IconBox);
+	RenderClanIcon(Ui(), TextRender(), IconBox, Clan.m_IconId, Clan.m_Color);
+	InfoBlock.HSplitTop(25.0f, &TitleRow, &InfoBlock);
+	Ui()->DoLabel(&TitleRow, Clan.m_aName[0] ? Clan.m_aName : Localize("Loading..."), 18.0f, TEXTALIGN_MC);
+
+	InfoBlock.HSplitTop(18.0f, &Label, &InfoBlock);
 	char aMeta[96];
 	str_format(aMeta, sizeof(aMeta), "[%s] · %s", Clan.m_aTag, Clan.m_aJoinPolicy);
 	TextRender()->TextColor(ColorRGBA(0.65f, 0.65f, 0.65f, 1.0f));
-	Ui()->DoLabel(&Label, aMeta, 13.0f, TEXTALIGN_ML);
+	Ui()->DoLabel(&Label, aMeta, 13.0f, TEXTALIGN_MC);
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
 
-	Left.HSplitTop(6.0f, nullptr, &Left);
-	Left.HSplitTop(34.0f, &Label, &Left);
-	{
-		SLabelProperties DescProps;
-		DescProps.m_MaxWidth = Label.w;
-		Ui()->DoLabel(&Label, Clan.m_aDescription, 12.0f, TEXTALIGN_TL, DescProps);
-	}
+	InfoBlock.HSplitTop(4.0f, nullptr, &InfoBlock);
+	InfoBlock.HSplitTop(DescBlockH, &Label, &InfoBlock);
+	DoClanDescriptionCentered(Ui(), TextRender(), Label, Clan.m_aDescription, DescFont, DescSpacing);
 
-	Left.HSplitTop(10.0f, nullptr, &Left);
-	Left.HSplitTop(18.0f, &Label, &Left);
+	CUIRect MembersInfo, OnlineInfo;
+	InfoBlock.HSplitTop(20.0f, &Label, &InfoBlock);
+	Label.VSplitMid(&MembersInfo, &OnlineInfo, 8.0f);
 	str_format(aMeta, sizeof(aMeta), Localize("Members %d/%d"), MemberCount, MaxMembers);
-	Ui()->DoLabel(&Label, aMeta, 13.0f, TEXTALIGN_ML);
-	Left.HSplitTop(4.0f, nullptr, &Left);
-	Left.HSplitTop(18.0f, &Label, &Left);
-	str_format(aMeta, sizeof(aMeta), Localize("Online %d"), OnlineTotal);
-	Ui()->DoLabel(&Label, aMeta, 13.0f, TEXTALIGN_ML);
+	Ui()->DoLabel(&MembersInfo, aMeta, 12.0f, TEXTALIGN_MC);
+	str_format(aMeta, sizeof(aMeta), Localize("Online %d/%d"), OnlineTotal, MemberCount);
+	Ui()->DoLabel(&OnlineInfo, aMeta, 12.0f, TEXTALIGN_MC);
+	Left.HSplitTop(10.0f, nullptr, &Left);
 
 	if(CanInvite)
 	{
@@ -1055,30 +1198,49 @@ void CMenus::RenderClansPage(CUIRect MainView)
 		}
 	}
 
-	Right.HSplitTop(22.0f, &Label, &Right);
-	Ui()->DoLabel(&Label, Localize("Main"), 15.0f, TEXTALIGN_ML);
-	Right.HSplitTop(4.0f, nullptr, &Right);
+	CUIRect MainSection, UnleashedSection;
+	Right.HSplitMid(&MainSection, &UnleashedSection, 8.0f);
 
-	static CScrollRegion s_Scroll;
-	vec2 ScrollOffset(0.0f, 0.0f);
-	CScrollRegionParams Params;
-	s_Scroll.Begin(&Right, &ScrollOffset, &Params);
-	Right.y += ScrollOffset.y;
+	MainSection.Draw(ColorRGBA(0, 0, 0, 0.20f), IGraphics::CORNER_ALL, 6.0f);
+	MainSection.Margin(6.0f, &MainSection);
+
+	MainSection.HSplitTop(22.0f, &Label, &MainSection);
+	char aMainHead[64];
+	str_format(aMainHead, sizeof(aMainHead), "%s (%d)", Localize("Main"), MemberCount);
+	Ui()->DoLabel(&Label, aMainHead, 15.0f, TEXTALIGN_ML);
+	MainSection.HSplitTop(4.0f, nullptr, &MainSection);
+
+	static CScrollRegion s_MainScroll;
+	vec2 MainScrollOffset(0.0f, 0.0f);
+	CScrollRegionParams MainParams;
+	MainParams.m_ClipBgColor = ColorRGBA(0, 0, 0, 0.0f);
+	s_MainScroll.Begin(&MainSection, &MainScrollOffset, &MainParams);
+	MainSection.y += MainScrollOffset.y;
 
 	size_t MemberIndex = 0;
 	static int s_aMemberIds[128];
+	if(s_vMemberSettings.size() < Clan.m_vMembers.size())
+		s_vMemberSettings.resize(Clan.m_vMembers.size());
 	for(const auto &M : Clan.m_vMembers)
 	{
 		CUIRect Item;
-		Right.HSplitTop(42.0f, &Item, &Right);
-		if(s_Scroll.AddRect(Item))
+		MainSection.HSplitTop(42.0f, &Item, &MainSection);
+		if(s_MainScroll.AddRect(Item))
 		{
 			Item.Draw(ColorRGBA(1, 1, 1, 0.04f), IGraphics::CORNER_ALL, 3.0f);
 			Item.Margin(4.0f, &Item);
-			CUIRect Tee, Name, Status;
+			CUIRect Tee, Name, Status, SettingsBtn;
 			Item.VSplitLeft(36.0f, &Tee, &Item);
 			Item.VSplitLeft(4.0f, nullptr, &Item);
-			Item.VSplitRight(150.0f, &Name, &Status);
+
+			const bool IsSelf = !str_comp(M.m_aUserId, Clans.UserId());
+			const bool CanModerate = !IsSelf && (Clans.Role() == CClans::ERole::PRESIDENT || Clans.Role() == CClans::ERole::VICE_PRESIDENT || Clans.Role() == CClans::ERole::VETERAN);
+			if(CanModerate)
+			{
+				Item.VSplitRight(28.0f, &Item, &SettingsBtn);
+				Item.VSplitRight(4.0f, &Item, nullptr);
+			}
+			Item.VSplitRight(140.0f, &Name, &Status);
 			RenderClanMemberTee(GameClient(), RenderTools(), Tee, M.m_Skin);
 			char aName[64];
 			str_format(aName, sizeof(aName), "%s (%s)", M.m_aNickname, RoleLabel(M.m_Role));
@@ -1095,28 +1257,51 @@ void CMenus::RenderClansPage(CUIRect MainView)
 			else
 				Ui()->DoLabel(&Status, Localize("offline"), 11.0f, TEXTALIGN_MR);
 
-			const bool IsSelf = !str_comp(M.m_aUserId, Clans.UserId());
-			const bool CanModerate = !IsSelf && (Clans.Role() == CClans::ERole::PRESIDENT || Clans.Role() == CClans::ERole::VICE_PRESIDENT || Clans.Role() == CClans::ERole::VETERAN);
+			if(CanModerate && MemberIndex < s_vMemberSettings.size())
+			{
+				if(DoClansIconBtn(Ui(), TextRender(), &s_vMemberSettings[MemberIndex], FontIcon::GEAR, &SettingsBtn))
+				{
+					s_MemberMenu = (int)MemberIndex;
+					s_MemberMenuPos = vec2(SettingsBtn.x + SettingsBtn.w, SettingsBtn.y);
+					s_MemberMenuPhase = 0.0f;
+					s_MemberMenuClosing = false;
+					s_MemberMenuJustOpened = true;
+				}
+			}
 			if(CanModerate && MemberIndex < std::size(s_aMemberIds) && Ui()->DoButtonLogic(&s_aMemberIds[MemberIndex], 0, &Item, BUTTONFLAG_RIGHT))
 			{
 				s_MemberMenu = (int)MemberIndex;
 				s_MemberMenuPos = Ui()->MousePos();
+				s_MemberMenuPhase = 0.0f;
+				s_MemberMenuClosing = false;
+				s_MemberMenuJustOpened = true;
 			}
 		}
-		Right.HSplitTop(3.0f, nullptr, &Right);
+		MainSection.HSplitTop(3.0f, nullptr, &MainSection);
 		MemberIndex++;
 	}
+	s_MainScroll.End();
 
-	Right.HSplitTop(10.0f, nullptr, &Right);
-	Right.HSplitTop(20.0f, &Label, &Right);
+	UnleashedSection.Draw(ColorRGBA(0, 0, 0, 0.20f), IGraphics::CORNER_ALL, 6.0f);
+	UnleashedSection.Margin(6.0f, &UnleashedSection);
+
+	UnleashedSection.HSplitTop(22.0f, &Label, &UnleashedSection);
 	char aUnlHead[64];
 	str_format(aUnlHead, sizeof(aUnlHead), "%s (%d)", Localize("Unleashed"), (int)vUnleashed.size());
-	Ui()->DoLabel(&Label, aUnlHead, 13.0f, TEXTALIGN_ML);
+	Ui()->DoLabel(&Label, aUnlHead, 15.0f, TEXTALIGN_ML);
+	UnleashedSection.HSplitTop(4.0f, nullptr, &UnleashedSection);
+
+	static CScrollRegion s_UnleashedScroll;
+	vec2 UnleashedScrollOffset(0.0f, 0.0f);
+	CScrollRegionParams UnleashedParams;
+	UnleashedParams.m_ClipBgColor = ColorRGBA(0, 0, 0, 0.0f);
+	s_UnleashedScroll.Begin(&UnleashedSection, &UnleashedScrollOffset, &UnleashedParams);
+	UnleashedSection.y += UnleashedScrollOffset.y;
 	for(const auto &U : vUnleashed)
 	{
 		CUIRect Item;
-		Right.HSplitTop(26.0f, &Item, &Right);
-		if(s_Scroll.AddRect(Item))
+		UnleashedSection.HSplitTop(26.0f, &Item, &UnleashedSection);
+		if(s_UnleashedScroll.AddRect(Item))
 		{
 			Item.Draw(ColorRGBA(1, 1, 1, 0.03f), IGraphics::CORNER_ALL, 3.0f);
 			Item.Margin(4.0f, &Item);
@@ -1127,69 +1312,122 @@ void CMenus::RenderClansPage(CUIRect MainView)
 			str_format(aUMeta, sizeof(aUMeta), Localize("playing %s %d/%d"), U.m_aMap, U.m_Players, U.m_MaxPlayers);
 			Ui()->DoLabel(&Meta, aUMeta, 11.0f, TEXTALIGN_MR);
 		}
-		Right.HSplitTop(2.0f, nullptr, &Right);
+		UnleashedSection.HSplitTop(2.0f, nullptr, &UnleashedSection);
 	}
-	s_Scroll.End();
+	s_UnleashedScroll.End();
 
-	// Member RMB menu
+	// Member settings popup (gear / RMB) — HUD-editor style grow animation
 	if(s_MemberMenu >= 0 && s_MemberMenu < (int)Clan.m_vMembers.size())
 	{
 		const auto &M = Clan.m_vMembers[s_MemberMenu];
-		CUIRect Menu;
-		Menu.x = s_MemberMenuPos.x;
-		Menu.y = s_MemberMenuPos.y;
-		Menu.w = 140.0f;
-		Menu.h = 100.0f;
-		if(Menu.x + Menu.w > Ui()->Screen()->w)
-			Menu.x = Ui()->Screen()->w - Menu.w - 4.0f;
-		const CUIRect MenuFull = Menu;
-		Menu.Draw(ColorRGBA(0.1f, 0.1f, 0.1f, 0.96f), IGraphics::CORNER_ALL, 4.0f);
-		Menu.Margin(6.0f, &Menu);
-		CUIRect Btn;
-		static CButtonContainer s_Promote, s_Demote, s_Kick;
 		const bool CanPromote = Clans.Role() == CClans::ERole::PRESIDENT || Clans.Role() == CClans::ERole::VICE_PRESIDENT;
 		const bool CanDemote = Clans.Role() == CClans::ERole::PRESIDENT;
-		if(CanPromote)
+		const int ActionCount = 1 + (CanPromote ? 1 : 0) + (CanDemote ? 1 : 0);
+
+		CUIRect Outer;
+		Outer.w = 148.0f;
+		Outer.h = 12.0f + ActionCount * 30.0f + (ActionCount - 1) * 4.0f;
+		Outer.x = s_MemberMenuPos.x - Outer.w;
+		Outer.y = s_MemberMenuPos.y;
+		if(Outer.x < 4.0f)
+			Outer.x = 4.0f;
+		if(Outer.x + Outer.w > Ui()->Screen()->w - 4.0f)
+			Outer.x = Ui()->Screen()->w - Outer.w - 4.0f;
+		if(Outer.y + Outer.h > Ui()->Screen()->h - 4.0f)
+			Outer.y = Ui()->Screen()->h - Outer.h - 4.0f;
+
+		const float AnimTarget = s_MemberMenuClosing ? 0.0f : 1.0f;
+		if(BCUiAnimations::Enabled() && g_Config.m_BcModuleUiRevealAnimation != 0)
+			BCUiAnimations::UpdatePhase(s_MemberMenuPhase, AnimTarget, Client()->RenderFrameTime(), BCUiAnimations::MsToSeconds(g_Config.m_BcModuleUiRevealAnimationMs));
+		else
+			s_MemberMenuPhase = AnimTarget;
+		const float Phase = BCUiAnimations::EaseOutCubic(s_MemberMenuPhase);
+
+		if(s_MemberMenuClosing && s_MemberMenuPhase <= 0.001f)
 		{
-			Menu.HSplitTop(26.0f, &Btn, &Menu);
-			if(DoClansTextBtn(Ui(), TextRender(), &s_Promote, Localize("Promote"), &Btn) && !Clans.IsBusy())
-			{
-				Clans.Promote(M.m_aUserId);
-				s_MemberMenu = -1;
-			}
-			Menu.HSplitTop(4.0f, nullptr, &Menu);
-		}
-		if(CanDemote)
-		{
-			Menu.HSplitTop(26.0f, &Btn, &Menu);
-			if(DoClansTextBtn(Ui(), TextRender(), &s_Demote, Localize("Demote"), &Btn) && !Clans.IsBusy())
-			{
-				Clans.Demote(M.m_aUserId);
-				s_MemberMenu = -1;
-			}
-			Menu.HSplitTop(4.0f, nullptr, &Menu);
-		}
-		Menu.HSplitTop(26.0f, &Btn, &Menu);
-		if(DoClansTextBtn(Ui(), TextRender(), &s_Kick, Localize("Kick"), &Btn, 0, true))
-		{
-			str_copy(s_aKickUserId, M.m_aUserId, sizeof(s_aKickUserId));
-			s_KickUser = s_MemberMenu;
-			s_BanHours = 24;
 			s_MemberMenu = -1;
+			s_MemberMenuClosing = false;
 		}
-		if(Ui()->MouseButtonClicked(0) && !Ui()->MouseHovered(&MenuFull))
-			s_MemberMenu = -1;
+		else
+		{
+			const CUIRect AnimRect = ClansAnimGrowRect(Outer, true, maximum(0.001f, Phase));
+			AnimRect.Draw(ColorRGBA(0.5f, 0.5f, 0.5f, 0.55f * Phase), IGraphics::CORNER_ALL, 5.0f);
+			CUIRect Inner = AnimRect;
+			Inner.Margin(1.0f, &Inner);
+			Inner.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.72f * Phase), IGraphics::CORNER_ALL, 5.0f);
+
+			Ui()->ClipEnable(&AnimRect);
+			CUIRect Menu = Outer;
+			Menu.Margin(6.0f, &Menu);
+			CUIRect Btn;
+			static CButtonContainer s_Promote, s_Demote, s_Kick;
+			bool CloseAfterAction = false;
+			if(CanPromote)
+			{
+				Menu.HSplitTop(26.0f, &Btn, &Menu);
+				if(DoClansTextBtn(Ui(), TextRender(), &s_Promote, Localize("Promote"), &Btn) && !Clans.IsBusy())
+				{
+					Clans.Promote(M.m_aUserId);
+					CloseAfterAction = true;
+				}
+				Menu.HSplitTop(4.0f, nullptr, &Menu);
+			}
+			if(CanDemote)
+			{
+				Menu.HSplitTop(26.0f, &Btn, &Menu);
+				if(DoClansTextBtn(Ui(), TextRender(), &s_Demote, Localize("Demote"), &Btn) && !Clans.IsBusy())
+				{
+					Clans.Demote(M.m_aUserId);
+					CloseAfterAction = true;
+				}
+				Menu.HSplitTop(4.0f, nullptr, &Menu);
+			}
+			Menu.HSplitTop(26.0f, &Btn, &Menu);
+			if(DoClansTextBtn(Ui(), TextRender(), &s_Kick, Localize("Kick"), &Btn, 0, true))
+			{
+				str_copy(s_aKickUserId, M.m_aUserId, sizeof(s_aKickUserId));
+				s_KickUser = s_MemberMenu;
+				s_BanHours = 24;
+				CloseAfterAction = true;
+			}
+			Ui()->ClipDisable();
+
+			if(CloseAfterAction)
+			{
+				s_MemberMenuClosing = true;
+				if(!BCUiAnimations::Enabled() || g_Config.m_BcModuleUiRevealAnimation == 0)
+				{
+					s_MemberMenu = -1;
+					s_MemberMenuClosing = false;
+					s_MemberMenuPhase = 0.0f;
+				}
+			}
+			else if(s_MemberMenuJustOpened)
+			{
+				s_MemberMenuJustOpened = false;
+			}
+			else if(Ui()->MouseButtonClicked(0) && !Ui()->MouseHovered(&Outer))
+			{
+				s_MemberMenuClosing = true;
+				if(!BCUiAnimations::Enabled() || g_Config.m_BcModuleUiRevealAnimation == 0)
+				{
+					s_MemberMenu = -1;
+					s_MemberMenuClosing = false;
+					s_MemberMenuPhase = 0.0f;
+				}
+			}
+		}
 	}
 
 	// Kick confirm popup
 	if(s_KickUser >= 0 && s_aKickUserId[0])
 	{
 		CUIRect Overlay = *Ui()->Screen();
-		Overlay.Draw(ColorRGBA(0, 0, 0, 0.55f), IGraphics::CORNER_ALL, 0.0f);
+		Overlay.Draw(ColorRGBA(0, 0, 0, 0.45f), IGraphics::CORNER_ALL, 0.0f);
 		CUIRect Popup;
 		MainView.VMargin(MainView.w * 0.22f, &Popup);
 		Popup.HMargin(Popup.h * 0.28f, &Popup);
-		Popup.Draw(ColorRGBA(0.12f, 0.12f, 0.12f, 0.98f), IGraphics::CORNER_ALL, 8.0f);
+		Popup.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.55f), IGraphics::CORNER_ALL, 8.0f);
 		Popup.Margin(14.0f, &Popup);
 		Popup.HSplitTop(24.0f, &Label, &Popup);
 		Ui()->DoLabel(&Label, Localize("Kick member"), 16.0f, TEXTALIGN_MC);
@@ -1198,17 +1436,23 @@ void CMenus::RenderClansPage(CUIRect MainView)
 		if(Clans.Role() == CClans::ERole::PRESIDENT)
 		{
 			Popup.HSplitTop(18.0f, &Label, &Popup);
-			Ui()->DoLabel(&Label, Localize("Ban duration"), 13.0f, TEXTALIGN_ML);
+			Ui()->DoLabel(&Label, Localize("Ban duration"), 13.0f, TEXTALIGN_MC);
 			Popup.HSplitTop(6.0f, nullptr, &Popup);
 			Popup.HSplitTop(28.0f, &Row, &Popup);
 			static const int s_aBanOpts[] = {0, 24, 48, 72, -1};
 			static const char *s_apBanLabels[] = {"0h", "24h", "48h", "72h", "perm"};
 			static CButtonContainer s_aBanBtns[5];
+			const float BanBtnW = 52.0f;
+			const float BanGap = 4.0f;
+			const float BanRowW = 5.0f * BanBtnW + 4.0f * BanGap;
+			if(Row.w > BanRowW)
+				Row.VMargin((Row.w - BanRowW) * 0.5f, &Row);
 			for(int i = 0; i < 5; i++)
 			{
 				CUIRect B;
-				Row.VSplitLeft(52.0f, &B, &Row);
-				Row.VSplitLeft(4.0f, nullptr, &Row);
+				Row.VSplitLeft(BanBtnW, &B, &Row);
+				if(i < 4)
+					Row.VSplitLeft(BanGap, nullptr, &Row);
 				if(DoClansTextBtn(Ui(), TextRender(), &s_aBanBtns[i], s_apBanLabels[i], &B, s_BanHours == s_aBanOpts[i]))
 					s_BanHours = s_aBanOpts[i];
 			}
@@ -1290,8 +1534,6 @@ void CMenus::RenderClansPreview(CUIRect MainView)
 	static CLineInput s_ApplyInput;
 	s_ApplyInput.SetBuffer(s_aApplyText, sizeof(s_aApplyText));
 
-	DrawClansAccountBar(GameClient(), RenderTools(), Ui(), Clans, &MainView);
-
 	CUIRect TopBar, BackBtn, RefreshBtn;
 	MainView.HSplitTop(28.0f, &TopBar, &MainView);
 	TopBar.VSplitRight(28.0f, &TopBar, &RefreshBtn);
@@ -1319,7 +1561,7 @@ void CMenus::RenderClansPreview(CUIRect MainView)
 		Ui()->DoLabel(&Label, Localize("Application text"), 16.0f, TEXTALIGN_MC);
 		Popup.HSplitTop(8.0f, nullptr, &Popup);
 		Popup.HSplitTop(80.0f, &Button, &Popup);
-		Ui()->DoEditBox(&s_ApplyInput, &Button, 14.0f);
+		DoClansEditBox(Ui(), &s_ApplyInput, &Button, 14.0f);
 		Popup.HSplitTop(12.0f, nullptr, &Popup);
 		Popup.HSplitTop(28.0f, &Row, &Popup);
 		CUIRect Send, Cancel;
@@ -1345,33 +1587,34 @@ void CMenus::RenderClansPreview(CUIRect MainView)
 	Left.Draw(ColorRGBA(0, 0, 0, 0.3f), IGraphics::CORNER_ALL, 6.0f);
 	Left.Margin(10.0f, &Left);
 
-	CUIRect TitleRow, IconBox;
-	Left.HSplitTop(28.0f, &TitleRow, &Left);
-	TitleRow.VSplitLeft(28.0f, &IconBox, &TitleRow);
-	TitleRow.VSplitLeft(6.0f, nullptr, &TitleRow);
-	RenderClanIcon(Ui(), TextRender(), IconBox, Clan.m_IconId, Clan.m_Color);
-	Ui()->DoLabel(&TitleRow, Clan.m_aName[0] ? Clan.m_aName : Localize("Loading..."), 17.0f, TEXTALIGN_ML);
+	CUIRect InfoBlock, IconBox;
+	Left.HSplitTop(150.0f, &InfoBlock, &Left);
+	InfoBlock.Draw(ColorRGBA(0, 0, 0, 0.20f), IGraphics::CORNER_ALL, 6.0f);
+	InfoBlock.Margin(8.0f, &InfoBlock);
 
-	Left.HSplitTop(18.0f, &Label, &Left);
+	CUIRect CenterIcon, TitleRow;
+	InfoBlock.HSplitTop(32.0f, &CenterIcon, &InfoBlock);
+	CenterIcon.VMargin(maximum(0.0f, (CenterIcon.w - 32.0f) * 0.5f), &IconBox);
+	RenderClanIcon(Ui(), TextRender(), IconBox, Clan.m_IconId, Clan.m_Color);
+	InfoBlock.HSplitTop(24.0f, &TitleRow, &InfoBlock);
+	Ui()->DoLabel(&TitleRow, Clan.m_aName[0] ? Clan.m_aName : Localize("Loading..."), 17.0f, TEXTALIGN_MC);
+
+	InfoBlock.HSplitTop(18.0f, &Label, &InfoBlock);
 	char aMeta[80];
 	str_format(aMeta, sizeof(aMeta), "[%s] · %s", Clan.m_aTag, Clan.m_aJoinPolicy);
-	Ui()->DoLabel(&Label, aMeta, 13.0f, TEXTALIGN_ML);
-	Left.HSplitTop(12.0f, nullptr, &Left);
-	Left.HSplitTop(28.0f, &Label, &Left);
-	{
-		SLabelProperties DescProps;
-		DescProps.m_MaxWidth = Label.w;
-		Ui()->DoLabel(&Label, Clan.m_aDescription, 10.0f, TEXTALIGN_TL, DescProps);
-	}
+	Ui()->DoLabel(&Label, aMeta, 13.0f, TEXTALIGN_MC);
+	InfoBlock.HSplitTop(6.0f, nullptr, &InfoBlock);
+	InfoBlock.HSplitTop(32.0f, &Label, &InfoBlock);
+	DoClanDescriptionCentered(Ui(), TextRender(), Label, Clan.m_aDescription, 10.0f, 1.0f);
 
 	int Online = 0;
 	for(const auto &M : Clan.m_vMembers)
 		if(M.m_Online)
 			Online++;
-	Left.HSplitTop(10.0f, nullptr, &Left);
-	Left.HSplitTop(18.0f, &Label, &Left);
+	InfoBlock.HSplitTop(20.0f, &Label, &InfoBlock);
 	str_format(aMeta, sizeof(aMeta), "Main online %d/%d", Online, (int)Clan.m_vMembers.size());
-	Ui()->DoLabel(&Label, aMeta, 12.0f, TEXTALIGN_ML);
+	Ui()->DoLabel(&Label, aMeta, 12.0f, TEXTALIGN_MC);
+	Left.HSplitTop(10.0f, nullptr, &Left);
 
 	if(!Clans.InClan() && Clan.m_aClanId[0])
 	{
@@ -1483,34 +1726,75 @@ void CMenus::RenderClansApplications(CUIRect MainView)
 void CMenus::RenderClansAnnouncements(CUIRect MainView)
 {
 	CClans &Clans = GameClient()->m_Clans;
-	CUIRect Top, Label, Button, InputRow, BackBtn, RefreshBtn;
+	CUIRect Top, Label, Composer, BackBtn, RefreshBtn;
 	MainView.HSplitTop(28.0f, &Top, &MainView);
 	Top.VSplitRight(28.0f, &Top, &RefreshBtn);
 	Top.VSplitRight(4.0f, &Top, nullptr);
 	Top.VSplitRight(28.0f, &Label, &BackBtn);
-	Ui()->DoLabel(&Label, Localize("Announcements"), 16.0f, TEXTALIGN_ML);
+	{
+		char aTitle[64];
+		str_format(aTitle, sizeof(aTitle), "%s (%d)", Localize("Announcements"), (int)Clans.Announcements().size());
+		Ui()->DoLabel(&Label, aTitle, 16.0f, TEXTALIGN_ML);
+	}
 	static CButtonContainer s_Back, s_Refresh;
 	if(DoClansIconBtn(Ui(), TextRender(), &s_Back, FontIcon::CHEVRON_LEFT, &BackBtn))
 		Clans.SetView(CClans::EView::CLAN);
 	if(DoClansIconBtn(Ui(), TextRender(), &s_Refresh, FontIcon::ARROW_ROTATE_RIGHT, &RefreshBtn) && !Clans.IsBusy())
 		Clans.RefreshCurrentView();
 
+	MainView.HSplitTop(8.0f, nullptr, &MainView);
+
 	const bool CanPost = Clans.Role() == CClans::ERole::PRESIDENT || Clans.Role() == CClans::ERole::VICE_PRESIDENT;
+	static CLineInput s_Text;
+	static char s_aText[500];
+	s_Text.SetBuffer(s_aText, sizeof(s_aText));
+	s_Text.SetEmptyText(Localize("Write an announcement for the clan..."));
+
 	if(CanPost)
 	{
-		MainView.HSplitBottom(40.0f, &MainView, &InputRow);
-		static CLineInput s_Text;
-		static char s_aText[500];
-		s_Text.SetBuffer(s_aText, sizeof(s_aText));
-		CUIRect Edit, Send;
-		InputRow.VSplitRight(90.0f, &Edit, &Send);
-		Ui()->DoEditBox(&s_Text, &Edit, 14.0f);
+		MainView.HSplitBottom(78.0f, &MainView, &Composer);
+		MainView.HSplitBottom(8.0f, &MainView, nullptr);
+		Composer.Margin(2.0f, &Composer);
+
+		CUIRect Edit, Footer, Send, Counter;
+		Composer.HSplitBottom(28.0f, &Edit, &Footer);
+		Composer.HSplitBottom(6.0f, &Edit, nullptr);
+		DoClansEditBox(Ui(), &s_Text, &Edit, 13.0f);
+
+		Footer.VSplitRight(100.0f, &Counter, &Send);
+		Counter.VSplitRight(8.0f, &Counter, nullptr);
+		char aCount[24];
+		str_format(aCount, sizeof(aCount), "%d/500", str_length(s_aText));
+		TextRender()->TextColor(ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
+		Ui()->DoLabel(&Counter, aCount, 11.0f, TEXTALIGN_MR);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+
 		static CButtonContainer s_Send;
-		if(DoClansTextBtn(Ui(), TextRender(), &s_Send, Localize("Send"), &Send) && s_aText[0] && !Clans.IsBusy())
+		if(DoClansTextBtn(Ui(), TextRender(), &s_Send, Localize("Post"), &Send) && s_aText[0] && !Clans.IsBusy())
 		{
 			Clans.PostAnnouncement(s_aText);
 			s_aText[0] = '\0';
 		}
+	}
+
+	if(Clans.Announcements().empty())
+	{
+		CUIRect Empty = MainView;
+		Empty.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.22f), IGraphics::CORNER_ALL, 6.0f);
+		CUIRect IconBox, Hint;
+		Empty.HSplitMid(&IconBox, &Hint);
+		IconBox.HSplitBottom(8.0f, &IconBox, nullptr);
+		Hint.HSplitTop(4.0f, nullptr, &Hint);
+		Hint.HSplitTop(20.0f, &Hint, nullptr);
+		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+		TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
+		TextRender()->TextColor(ColorRGBA(0.45f, 0.45f, 0.45f, 1.0f));
+		Ui()->DoLabel(&IconBox, FontIcon::NEWSPAPER, 28.0f, TEXTALIGN_BC);
+		TextRender()->SetRenderFlags(0);
+		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+		Ui()->DoLabel(&Hint, Localize("No announcements yet"), 13.0f, TEXTALIGN_MC);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+		return;
 	}
 
 	static CScrollRegion s_Scroll;
@@ -1518,21 +1802,71 @@ void CMenus::RenderClansAnnouncements(CUIRect MainView)
 	CScrollRegionParams Params;
 	s_Scroll.Begin(&MainView, &ScrollOffset, &Params);
 	MainView.y += ScrollOffset.y;
+
+	size_t Index = 0;
 	for(const auto &Ann : Clans.Announcements())
 	{
+		const float BodyFont = 12.0f;
+		const float BodyWidth = maximum(1.0f, MainView.w - 28.0f);
+		STextSizeProperties SizeProps;
+		int LineCount = 1;
+		SizeProps.m_pLineCount = &LineCount;
+		TextRender()->TextWidth(BodyFont, Ann.m_aText, -1, BodyWidth, 0, SizeProps);
+		LineCount = std::clamp(LineCount, 1, 8);
+		const float CardH = 14.0f + 18.0f + 6.0f + LineCount * (BodyFont + 3.0f) + 10.0f;
+
 		CUIRect Item;
-		MainView.HSplitTop(55.0f, &Item, &MainView);
+		MainView.HSplitTop(CardH, &Item, &MainView);
 		if(s_Scroll.AddRect(Item))
 		{
-			Item.Draw(ColorRGBA(1, 1, 1, 0.04f), IGraphics::CORNER_ALL, 4.0f);
-			Item.Margin(6.0f, &Item);
-			char aHead[96];
-			str_format(aHead, sizeof(aHead), "%s · %s", Ann.m_aAuthorNick, Ann.m_aCreatedAt);
-			Item.HSplitTop(16.0f, &Label, &Item);
-			Ui()->DoLabel(&Label, aHead, 11.0f, TEXTALIGN_ML);
-			Ui()->DoLabel(&Item, Ann.m_aText, 12.0f, TEXTALIGN_TL);
+			Item.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, Index == 0 ? 0.38f : 0.28f), IGraphics::CORNER_ALL, 6.0f);
+
+			CUIRect Accent = Item;
+			Accent.w = 3.0f;
+			ColorRGBA AccentColor = ClanColorRgb(Clans.Clan().m_Color);
+			AccentColor.a = Index == 0 ? 0.95f : 0.45f;
+			Accent.Draw(AccentColor, IGraphics::CORNER_L, 6.0f);
+
+			Item.Margin(10.0f, &Item);
+			CUIRect Head, Body;
+			Item.HSplitTop(18.0f, &Head, &Body);
+			Body.HSplitTop(6.0f, nullptr, &Body);
+
+			CUIRect Author, Date;
+			Head.VSplitRight(140.0f, &Author, &Date);
+
+			char aAuthor[64];
+			if(Index == 0)
+				str_format(aAuthor, sizeof(aAuthor), "%s · %s", Ann.m_aAuthorNick, Localize("Latest"));
+			else
+				str_copy(aAuthor, Ann.m_aAuthorNick, sizeof(aAuthor));
+			Ui()->DoLabel(&Author, aAuthor, 12.0f, TEXTALIGN_ML);
+
+			char aDate[40];
+			str_copy(aDate, Ann.m_aCreatedAt, sizeof(aDate));
+			// ISO: 2026-07-18T12:34:56.789Z → 2026-07-18 12:34
+			for(int i = 0; aDate[i]; i++)
+			{
+				if(aDate[i] == 'T')
+					aDate[i] = ' ';
+				if(aDate[i] == '.' || aDate[i] == 'Z')
+				{
+					aDate[i] = '\0';
+					break;
+				}
+			}
+			if(str_length(aDate) > 16)
+				aDate[16] = '\0';
+			TextRender()->TextColor(ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
+			Ui()->DoLabel(&Date, aDate, 11.0f, TEXTALIGN_MR);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+			SLabelProperties BodyProps;
+			BodyProps.m_MaxWidth = Body.w;
+			Ui()->DoLabel(&Body, Ann.m_aText, BodyFont, TEXTALIGN_TL, BodyProps);
 		}
-		MainView.HSplitTop(6.0f, nullptr, &MainView);
+		MainView.HSplitTop(8.0f, nullptr, &MainView);
+		Index++;
 	}
 	s_Scroll.End();
 }
@@ -1564,6 +1898,7 @@ void CMenus::RenderClansSettings(CUIRect MainView)
 	s_Desc.SetBuffer(s_aDesc, sizeof(s_aDesc));
 	s_Name.SetEmptyText(Localize("Clan name"));
 	s_Desc.SetEmptyText(Localize("Description"));
+	s_Desc.SetAllowNewline(true);
 
 	CUIRect Top, Label, BackBtn, RefreshBtn, Button, Row;
 	MainView.HSplitTop(28.0f, &Top, &MainView);
@@ -1573,7 +1908,10 @@ void CMenus::RenderClansSettings(CUIRect MainView)
 	Ui()->DoLabel(&Label, Localize("Clan settings"), 16.0f, TEXTALIGN_ML);
 	static CButtonContainer s_Back, s_Refresh;
 	if(DoClansIconBtn(Ui(), TextRender(), &s_Back, FontIcon::CHEVRON_LEFT, &BackBtn))
+	{
+		s_aLoadedClanId[0] = '\0';
 		Clans.SetView(CClans::EView::CLAN);
+	}
 	if(DoClansIconBtn(Ui(), TextRender(), &s_Refresh, FontIcon::ARROW_ROTATE_RIGHT, &RefreshBtn) && !Clans.IsBusy())
 	{
 		s_aLoadedClanId[0] = '\0';
@@ -1587,7 +1925,7 @@ void CMenus::RenderClansSettings(CUIRect MainView)
 	Ui()->DoLabel(&Label, Localize("Name"), 12.0f, TEXTALIGN_ML);
 	MainView.HSplitTop(4.0f, nullptr, &MainView);
 	MainView.HSplitTop(28.0f, &Button, &MainView);
-	Ui()->DoEditBox(&s_Name, &Button, 13.0f);
+	DoClansEditBox(Ui(), &s_Name, &Button, 13.0f);
 
 	MainView.HSplitTop(10.0f, nullptr, &MainView);
 	MainView.HSplitTop(16.0f, &Label, &MainView);
@@ -1606,21 +1944,8 @@ void CMenus::RenderClansSettings(CUIRect MainView)
 		const float DescFont = 11.0f;
 		const float DescSpacing = 1.0f;
 		const float DescLineWidth = maximum(1.0f, Button.w - 4.0f);
-		if(Ui()->DoEditBox(&s_Desc, &Button, DescFont, IGraphics::CORNER_ALL, {}, DescLineWidth, DescSpacing))
-		{
-			for(;;)
-			{
-				STextSizeProperties Props;
-				int LineCount = 0;
-				Props.m_pLineCount = &LineCount;
-				TextRender()->TextWidth(DescFont, s_aDesc, -1, DescLineWidth, 0, Props);
-				if(LineCount <= 3 || !s_aDesc[0])
-					break;
-				const int Len = str_length(s_aDesc);
-				s_aDesc[Len - 1] = '\0';
-				str_utf8_fix_truncation(s_aDesc);
-			}
-		}
+		if(DoClansEditBox(Ui(), &s_Desc, &Button, DescFont, IGraphics::CORNER_ALL, DescLineWidth, DescSpacing))
+			TruncateClanDescription(TextRender(), s_aDesc, DescFont, DescLineWidth, 3);
 	}
 
 	const unsigned ClanRgb = ClanRgbFromHsla(s_ColorHsla);
@@ -1638,7 +1963,7 @@ void CMenus::RenderClansSettings(CUIRect MainView)
 		CUIRect IconBtn;
 		IconsRow.VSplitLeft(IconsRow.h + 4.0f, &IconBtn, &IconsRow);
 		IconBtn.VSplitRight(4.0f, &IconBtn, nullptr);
-		IconBtn.Draw(s_IconId == i ? ColorRGBA(0.35f, 0.55f, 1.0f, 0.45f) : ColorRGBA(0, 0, 0, 0.22f), IGraphics::CORNER_ALL, 4.0f);
+		IconBtn.Draw(ColorRGBA(0, 0, 0, s_IconId == i ? 0.34f : 0.22f), IGraphics::CORNER_ALL, 4.0f);
 		RenderClanIcon(Ui(), TextRender(), IconBtn, i, ClanRgb);
 		if(Ui()->DoButtonLogic(&s_aIcons[i], s_IconId == i, &IconBtn, BUTTONFLAG_LEFT))
 			s_IconId = i;
@@ -1663,12 +1988,12 @@ void CMenus::RenderClansSettings(CUIRect MainView)
 	Row.VSplitMid(&SaveBtn, &CancelBtn, 10.0f);
 	static CButtonContainer s_Save, s_Cancel;
 	if(DoClansTextBtn(Ui(), TextRender(), &s_Save, Localize("Save"), &SaveBtn) && s_aName[0] && !Clans.IsBusy())
-	{
 		Clans.UpdateClanSettings(s_aName, s_aDesc, s_IconId, ClanRgb);
-		s_aLoadedClanId[0] = '\0';
-	}
 	if(DoClansTextBtn(Ui(), TextRender(), &s_Cancel, Localize("Back"), &CancelBtn))
+	{
+		s_aLoadedClanId[0] = '\0';
 		Clans.SetView(CClans::EView::CLAN);
+	}
 
 	if(Clans.StatusMessage()[0])
 	{
@@ -1681,15 +2006,19 @@ void CMenus::RenderClansSettings(CUIRect MainView)
 void CMenus::RenderClansRecent(CUIRect MainView)
 {
 	CClans &Clans = GameClient()->m_Clans;
-	CUIRect Top, Label, BackBtn, RefreshBtn;
+	CUIRect Top, Label, BackBtn, RefreshBtn, ClearBtn;
 	MainView.HSplitTop(28.0f, &Top, &MainView);
 	Top.VSplitRight(28.0f, &Top, &RefreshBtn);
 	Top.VSplitRight(4.0f, &Top, nullptr);
+	Top.VSplitRight(70.0f, &Top, &ClearBtn);
+	Top.VSplitRight(4.0f, &Top, nullptr);
 	Top.VSplitRight(28.0f, &Label, &BackBtn);
 	Ui()->DoLabel(&Label, Localize("Recent clans"), 16.0f, TEXTALIGN_ML);
-	static CButtonContainer s_Back, s_Refresh;
+	static CButtonContainer s_Back, s_Refresh, s_Clear;
 	if(DoClansIconBtn(Ui(), TextRender(), &s_Back, FontIcon::CHEVRON_LEFT, &BackBtn))
 		Clans.SetView(Clans.InClan() ? CClans::EView::CLAN : CClans::EView::LANDING);
+	if(DoClansTextBtn(Ui(), TextRender(), &s_Clear, Localize("Clear"), &ClearBtn) && !Clans.IsBusy() && !Clans.RecentClans().empty())
+		Clans.ClearRecentClans();
 	if(DoClansIconBtn(Ui(), TextRender(), &s_Refresh, FontIcon::ARROW_ROTATE_RIGHT, &RefreshBtn) && !Clans.IsBusy())
 		Clans.RefreshCurrentView();
 

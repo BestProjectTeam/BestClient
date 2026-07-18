@@ -209,6 +209,7 @@ public:
 	void RefreshNotifications();
 	void MarkNotificationRead(const char *pId);
 	void RefreshRecentClans();
+	void ClearRecentClans();
 	void RefreshCurrentView();
 
 	static ERole ParseRole(const char *pRole);
@@ -271,6 +272,7 @@ private:
 		REQ_NOTIFS,
 		REQ_NOTIF_READ,
 		REQ_RECENT,
+		REQ_RECENT_CLEAR,
 		REQ_PRESENCE,
 		REQ_PREVIEW,
 		REQ_ANN_READ,

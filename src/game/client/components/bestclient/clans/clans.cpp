@@ -47,6 +47,42 @@ static bool JsonBool(const json_value *pObj, const char *pKey, bool Default = fa
 	return Default;
 }
 
+static void JsonEscapeString(char *pOut, int OutSize, const char *pIn)
+{
+	if(!pOut || OutSize <= 0)
+		return;
+	int Out = 0;
+	for(int i = 0; pIn && pIn[i] && Out + 1 < OutSize; i++)
+	{
+		const char C = pIn[i];
+		if((C == '\\' || C == '"' || C == '\n' || C == '\r' || C == '\t') && Out + 2 >= OutSize)
+			break;
+		if(C == '\\' || C == '"')
+		{
+			pOut[Out++] = '\\';
+			pOut[Out++] = C;
+		}
+		else if(C == '\n')
+		{
+			pOut[Out++] = '\\';
+			pOut[Out++] = 'n';
+		}
+		else if(C == '\r')
+		{
+			pOut[Out++] = '\\';
+			pOut[Out++] = 'r';
+		}
+		else if(C == '\t')
+		{
+			pOut[Out++] = '\\';
+			pOut[Out++] = 't';
+		}
+		else
+			pOut[Out++] = C;
+	}
+	pOut[Out] = '\0';
+}
+
 CClans::ERole CClans::ParseRole(const char *pRole)
 {
 	if(!pRole)
@@ -480,10 +516,14 @@ void CClans::CreateClan(const char *pName, const char *pTag, const char *pDescri
 	ResolveBaseUrl(aBase, sizeof(aBase));
 	char aUrl[160];
 	str_format(aUrl, sizeof(aUrl), "%s/api/clans", aBase);
-	char aJson[768];
+	char aEscName[128], aEscTag[48], aEscDesc[512];
+	JsonEscapeString(aEscName, sizeof(aEscName), pName ? pName : "");
+	JsonEscapeString(aEscTag, sizeof(aEscTag), pTag ? pTag : "");
+	JsonEscapeString(aEscDesc, sizeof(aEscDesc), pDescription ? pDescription : "");
+	char aJson[900];
 	str_format(aJson, sizeof(aJson),
 		"{\"name\":\"%s\",\"tag\":\"%s\",\"description\":\"%s\",\"icon_id\":%d,\"color\":%u,\"join_policy\":\"%s\",\"max_members\":%d}",
-		pName, pTag, pDescription, IconId, Color, pJoinPolicy, MaxMembers);
+		aEscName, aEscTag, aEscDesc, IconId, Color, pJoinPolicy, MaxMembers);
 	auto pReq = HttpPostJson(aUrl, aJson);
 	AuthHeader(pReq.get());
 	pReq->FailOnErrorStatus(false);
@@ -499,14 +539,24 @@ void CClans::UpdateClanSettings(const char *pName, const char *pDescription, int
 	ResolveBaseUrl(aBase, sizeof(aBase));
 	char aUrl[192];
 	str_format(aUrl, sizeof(aUrl), "%s/api/clans/%s/settings", aBase, m_aClanId);
-	char aJson[768];
+	char aEscName[128], aEscDesc[512];
+	JsonEscapeString(aEscName, sizeof(aEscName), pName ? pName : "");
+	JsonEscapeString(aEscDesc, sizeof(aEscDesc), pDescription ? pDescription : "");
+	char aJson[900];
 	str_format(aJson, sizeof(aJson),
 		"{\"name\":\"%s\",\"description\":\"%s\",\"icon_id\":%d,\"color\":%u}",
-		pName, pDescription, IconId, Color);
+		aEscName, aEscDesc, IconId, Color);
 	auto pReq = HttpPostJson(aUrl, aJson);
 	AuthHeader(pReq.get());
 	pReq->FailOnErrorStatus(false);
 	BeginRequest(std::move(pReq), REQ_UPDATE);
+
+	// Keep the settings form and clan page in sync while the request is in flight.
+	// Clearing the form cache and reloading from the old snapshot caused a one-step lag on save.
+	str_copy(m_Clan.m_aName, pName ? pName : "", sizeof(m_Clan.m_aName));
+	str_copy(m_Clan.m_aDescription, pDescription ? pDescription : "", sizeof(m_Clan.m_aDescription));
+	m_Clan.m_IconId = IconId;
+	m_Clan.m_Color = Color;
 	SetStatus(Localize("Saving..."));
 }
 
@@ -785,6 +835,26 @@ void CClans::RefreshRecentClans()
 	pReq->FailOnErrorStatus(false);
 	str_copy(m_aRecentPendingUserId, m_aUserId, sizeof(m_aRecentPendingUserId));
 	BeginBackground(std::move(pReq), REQ_RECENT);
+}
+
+void CClans::ClearRecentClans()
+{
+	if(!m_LoggedIn || !m_aUserId[0])
+	{
+		m_vRecentClans.clear();
+		return;
+	}
+	m_vRecentClans.clear();
+	char aBase[128];
+	ResolveBaseUrl(aBase, sizeof(aBase));
+	char aUrl[192];
+	str_format(aUrl, sizeof(aUrl), "%s/api/me/recent-clans/clear", aBase);
+	auto pReq = HttpPostJson(aUrl, "{}");
+	AuthHeader(pReq.get());
+	pReq->FailOnErrorStatus(false);
+	str_copy(m_aRecentPendingUserId, m_aUserId, sizeof(m_aRecentPendingUserId));
+	BeginRequest(std::move(pReq), REQ_RECENT_CLEAR);
+	SetStatus(Localize("Clearing..."));
 }
 
 void CClans::RefreshCurrentView()
@@ -1239,8 +1309,9 @@ void CClans::HandlePending()
 
 	if(Code >= 400)
 	{
-		// Background polls must not spam the UI error banner.
-		const bool Silent = Kind == REQ_PRESENCE || Kind == REQ_NOTIFS || Kind == REQ_NOTIF_READ;
+		// Background polls and failed preview refreshes with valid cached data must not spam the UI error banner.
+		const bool HasCachedPreview = Kind == REQ_PREVIEW && m_Preview.m_aClanId[0] && !str_comp(m_Preview.m_aClanId, m_aPreviewClanId);
+		const bool Silent = Kind == REQ_PRESENCE || Kind == REQ_NOTIFS || Kind == REQ_NOTIF_READ || HasCachedPreview;
 		const char *pErr = nullptr;
 		const char *pMsg = nullptr;
 		if(pRoot && pRoot->type == json_object)
@@ -1408,8 +1479,11 @@ void CClans::HandlePending()
 		ParseNotifications(pRoot);
 		break;
 	case REQ_RECENT:
+	case REQ_RECENT_CLEAR:
 		if(!m_aRecentPendingUserId[0] || !str_comp(m_aRecentPendingUserId, m_aUserId))
 			ParseRecentClans(pRoot);
+		if(Kind == REQ_RECENT_CLEAR)
+			SetStatus(Localize("Recent clans cleared"));
 		break;
 	default:
 		break;

@@ -73,6 +73,7 @@ private:
 
 	bool m_Hidden;
 	bool m_HideCursor;
+	bool m_AllowNewline;
 	const char *m_pEmptyText;
 	FClipboardLineCallback m_pfnClipboardLineCallback;
 	FDisplayTextCallback m_pfnDisplayTextCallback;
@@ -166,6 +167,8 @@ public:
 
 	bool IsHidden() const { return m_Hidden; }
 	void SetHidden(bool Hidden) { m_Hidden = Hidden; }
+	bool AllowNewline() const { return m_AllowNewline; }
+	void SetAllowNewline(bool Allow) { m_AllowNewline = Allow; }
 
 	// when set, the blinking cursor quad is not drawn (m_CaretPosition is still updated),
 	// letting the caller render its own animated cursor instead
