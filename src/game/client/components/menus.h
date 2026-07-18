@@ -946,6 +946,8 @@ private:
 public:
 	bool IsIngameGamePage() const { return m_MenuActive && Client()->State() == IClient::STATE_ONLINE && m_GamePage == PAGE_GAME; }
 	bool IsIngameSettingsPage() const { return m_MenuActive && Client()->State() == IClient::STATE_ONLINE && m_GamePage == PAGE_SETTINGS; }
+	int MenuPage() const { return m_MenuPage; }
+	int GamePage() const { return m_GamePage; }
 
 	// found in bestclient/menus_assets_editor.cpp
 	enum

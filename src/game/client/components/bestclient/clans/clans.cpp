@@ -104,9 +104,8 @@ void CClans::OnInit()
 	if(m_LoggedIn)
 	{
 		m_View = InClan() ? EView::CLAN : EView::LANDING;
-		// Recent is per-account on the server — load via background so ME isn't aborted.
-		RefreshRecentClans();
-		RefreshMe();
+		// Defer API sync until the Clans tab is opened.
+		m_NeedInitialSync = true;
 	}
 }
 
@@ -129,6 +128,16 @@ void CClans::OnShutdown()
 	SaveSession();
 }
 
+bool CClans::IsClansUiOpen() const
+{
+	const CMenus &Menus = GameClient()->m_Menus;
+	if(!Menus.IsActive())
+		return false;
+	if(Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK)
+		return Menus.GamePage() == CMenus::PAGE_CLANS;
+	return Menus.MenuPage() == CMenus::PAGE_CLANS;
+}
+
 void CClans::OnUpdate()
 {
 	HandlePending();
@@ -143,13 +152,26 @@ void CClans::OnUpdate()
 			++It;
 	}
 
-	if(m_LoggedIn)
+	if(!m_LoggedIn)
+		return;
+
+	const bool UiOpen = IsClansUiOpen();
+	if(UiOpen)
 	{
+		if(m_NeedInitialSync)
+		{
+			m_NeedInitialSync = false;
+			RefreshRecentClans();
+			RefreshMe();
+		}
 		MaybeAutoRefresh();
 		MaybePollNotifications();
-		if(InClan())
-			MaybePushPresence();
 	}
+
+	// Presence heartbeats only while Clans tab is open.
+	// Exception: report joining a server even with the tab closed (must be in a clan).
+	if(InClan())
+		MaybePushPresence(UiOpen);
 }
 
 bool CClans::ResolveBaseUrl(char *pOut, int OutSize) const
@@ -225,6 +247,7 @@ void CClans::BeginRequest(std::shared_ptr<CHttpRequest> pReq, int Kind)
 		m_pPending->Abort();
 		m_pPending = nullptr;
 	}
+	pReq->LogProgress(HTTPLOG::NONE);
 	m_PendingKind = Kind;
 	m_pPending = std::move(pReq);
 	m_aError[0] = '\0';
@@ -235,12 +258,18 @@ void CClans::BeginBackground(std::shared_ptr<CHttpRequest> pReq, int Kind)
 {
 	if(m_pBgPending && !m_pBgPending->Done())
 	{
-		// Account-bound recent must not wait behind soft polls.
-		if(Kind != REQ_RECENT && Kind != REQ_ANN_READ)
+		// High-priority: recent/ann-read always preempt. Presence preempts soft polls
+		// so Main-list online status stays fresh (client-reported, not master).
+		const bool SoftCurrent = m_BgKind == REQ_NOTIFS || m_BgKind == REQ_NOTIF_READ || m_BgKind == REQ_PRESENCE;
+		if(Kind == REQ_RECENT || Kind == REQ_ANN_READ || (Kind == REQ_PRESENCE && SoftCurrent))
+		{
+			m_pBgPending->Abort();
+			m_pBgPending = nullptr;
+		}
+		else
 			return;
-		m_pBgPending->Abort();
-		m_pBgPending = nullptr;
 	}
+	pReq->LogProgress(HTTPLOG::NONE);
 	m_BgKind = Kind;
 	m_pBgPending = std::move(pReq);
 	Http()->Run(m_pBgPending);
@@ -940,18 +969,40 @@ void CClans::MaybeAutoRefresh()
 	}
 }
 
-void CClans::MaybePushPresence()
+void CClans::MaybePushPresence(bool UiOpen)
 {
-	const int64_t Now = time_get();
-	if(Now - m_LastPresenceTick < time_freq() * 60)
+	// Main-list online/playing status is reported by each BestClient to the clans API.
+	// Unleashed players are filled server-side from the DDNet master only.
+	if(!m_LoggedIn || !InClan())
 		return;
-	m_LastPresenceTick = Now;
+
+	const int ClientState = Client()->State();
+	const bool StateChanged = ClientState != m_LastPresenceClientState;
+	const bool JoinedServer = StateChanged && ClientState == IClient::STATE_ONLINE;
+	m_LastPresenceClientState = ClientState;
+
+	// With Clans tab closed: only notify API when joining a server.
+	if(!UiOpen && !JoinedServer)
+		return;
+
+	const int64_t Now = time_get();
+	if(UiOpen && !StateChanged && Now - m_LastPresenceTick < time_freq() * 30)
+		return;
+
+	// Don't burn the tick if the bg slot is busy with a non-soft request.
+	if(m_pBgPending && !m_pBgPending->Done())
+	{
+		const bool SoftCurrent = m_BgKind == REQ_NOTIFS || m_BgKind == REQ_NOTIF_READ || m_BgKind == REQ_PRESENCE;
+		if(!SoftCurrent)
+			return;
+	}
 
 	char aAddr[NETADDR_MAXSTRSIZE] = "";
 	char aMap[64] = "";
 	int Players = 0;
 	int MaxPlayers = 0;
-	if(Client()->State() == IClient::STATE_ONLINE)
+	const bool InGame = ClientState == IClient::STATE_ONLINE;
+	if(InGame)
 	{
 		net_addr_str(&Client()->ServerAddress(), aAddr, sizeof(aAddr), true);
 		if(GameClient()->Map())
@@ -970,15 +1021,22 @@ void CClans::MaybePushPresence()
 	str_format(aUrl, sizeof(aUrl), "%s/api/presence", aBase);
 	char aSkin[192];
 	BuildSkinJson(aSkin, sizeof(aSkin));
-	char aJson[512];
+	char aEscServer[NETADDR_MAXSTRSIZE * 2];
+	char aEscMap[128];
+	JsonEscapeString(aEscServer, sizeof(aEscServer), aAddr);
+	JsonEscapeString(aEscMap, sizeof(aEscMap), aMap);
+	char aJson[640];
 	str_format(aJson, sizeof(aJson),
-		"{\"server\":\"%s\",\"map\":\"%s\",\"players\":%d,\"max_players\":%d,\"skin\":%s}",
-		aAddr, aMap, Players, MaxPlayers, aSkin);
+		"{\"online\":true,\"in_game\":%s,\"server\":\"%s\",\"map\":\"%s\",\"players\":%d,\"max_players\":%d,\"skin\":%s}",
+		InGame ? "true" : "false", aEscServer, aEscMap, Players, MaxPlayers, aSkin);
+
 	auto pReq = std::make_shared<CHttpRequest>(aUrl);
 	pReq->PostJson(aJson);
 	AuthHeader(pReq.get());
 	pReq->FailOnErrorStatus(false);
 	BeginBackground(std::move(pReq), REQ_PRESENCE);
+	if(m_BgKind == REQ_PRESENCE && m_pBgPending)
+		m_LastPresenceTick = Now;
 }
 
 void CClans::MaybePollNotifications()
@@ -1016,6 +1074,9 @@ void CClans::ParseAuthResponse(const json_value *pRoot)
 	m_LoggedIn = m_aAccessToken[0] != '\0';
 	SaveSession();
 	m_View = InClan() ? EView::CLAN : EView::LANDING;
+	m_LastPresenceTick = 0;
+	m_LastPresenceClientState = -1;
+	m_NeedInitialSync = false;
 	if(InClan())
 		RefreshClan();
 	else
@@ -1101,6 +1162,7 @@ void CClans::ParseClanSnapshot(const json_value *pRoot)
 			if(pPres && pPres->type == json_object)
 			{
 				Member.m_Online = JsonBool(pPres, "online");
+				str_copy(Member.m_aServer, JsonString(pPres, "server"), sizeof(Member.m_aServer));
 				str_copy(Member.m_aMap, JsonString(pPres, "map"), sizeof(Member.m_aMap));
 				Member.m_Players = JsonInt(pPres, "players");
 				Member.m_MaxPlayers = JsonInt(pPres, "max_players");
@@ -1176,6 +1238,7 @@ void CClans::ParsePreviewSnapshot(const json_value *pRoot)
 			if(pPres && pPres->type == json_object)
 			{
 				Member.m_Online = JsonBool(pPres, "online");
+				str_copy(Member.m_aServer, JsonString(pPres, "server"), sizeof(Member.m_aServer));
 				str_copy(Member.m_aMap, JsonString(pPres, "map"), sizeof(Member.m_aMap));
 				Member.m_Players = JsonInt(pPres, "players");
 				Member.m_MaxPlayers = JsonInt(pPres, "max_players");

@@ -68,6 +68,7 @@ public:
 		ERole m_Role = ERole::MEMBER;
 		SSkin m_Skin;
 		bool m_Online = false;
+		char m_aServer[64] = "";
 		char m_aMap[64] = "";
 		int m_Players = 0;
 		int m_MaxPlayers = 0;
@@ -237,7 +238,8 @@ private:
 	void ParseNotifications(const json_value *pRoot);
 	void ParseRecentClans(const json_value *pRoot);
 	void PushToastFromNotifications();
-	void MaybePushPresence();
+	bool IsClansUiOpen() const;
+	void MaybePushPresence(bool UiOpen);
 	void MaybePollNotifications();
 	void MaybeAutoRefresh();
 	void LeaveClanLocal();
@@ -309,6 +311,8 @@ private:
 	std::shared_ptr<CHttpRequest> m_pBgPending;
 	int m_BgKind = REQ_NONE;
 	int64_t m_LastPresenceTick = 0;
+	int m_LastPresenceClientState = -1;
+	bool m_NeedInitialSync = false;
 	int64_t m_LastNotifTick = 0;
 	int64_t m_LastClanPollTick = 0;
 	int64_t m_LastMePollTick = 0;

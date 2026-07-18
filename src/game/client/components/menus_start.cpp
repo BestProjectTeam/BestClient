@@ -77,6 +77,8 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	constexpr float LogoGap = 30.0f;
 	constexpr float ButtonH = 40.0f;
 	constexpr float ButtonGap = 5.0f;
+	constexpr float ClansBtnH = 22.0f;
+	constexpr float ClansBtnW = 100.0f;
 	constexpr int MenuButtonCount = 5;
 	const float ButtonsH = MenuButtonCount * ButtonH + (MenuButtonCount - 1) * ButtonGap;
 	const float TotalBlockH = LogoH + LogoGap + ButtonsH;
@@ -98,6 +100,15 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 		Graphics()->QuadsEnd();
 	}
 
+	const auto ScaleButtonRect = [](const CUIRect &Base, float Scale) -> CUIRect {
+		CUIRect Out = Base;
+		Out.w *= Scale;
+		Out.h *= Scale;
+		Out.x = Base.x + (Base.w - Out.w) * 0.5f;
+		Out.y = Base.y + (Base.h - Out.h) * 0.5f;
+		return Out;
+	};
+
 	// Build button rects top-down
 	CUIRect aMenuButtons[MenuButtonCount];
 	{
@@ -109,6 +120,14 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 		}
 	}
 
+	// Small Clans button — right-aligned under Settings
+	CUIRect ClansButtonRect = {
+		aMenuButtons[4].x + aMenuButtons[4].w - ClansBtnW,
+		aMenuButtons[4].y + aMenuButtons[4].h + ButtonGap,
+		ClansBtnW,
+		ClansBtnH};
+	static float s_ClansButtonScale = 1.0f;
+
 	// Hover scale animation
 	static float s_aMenuButtonScale[MenuButtonCount] = {};
 	static bool s_MenuButtonScaleInit = false;
@@ -119,35 +138,37 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 		s_MenuButtonScaleInit = true;
 	}
 
-	const auto ScaleButtonRect = [](const CUIRect &Base, float Scale) -> CUIRect {
-		CUIRect Out = Base;
-		Out.w *= Scale;
-		Out.h *= Scale;
-		Out.x = Base.x + (Base.w - Out.w) * 0.5f;
-		Out.y = Base.y + (Base.h - Out.h) * 0.5f;
-		return Out;
-	};
-
 	{
 		const bool AnimEnabled = g_Config.m_BcMainMenuAnimation != 0;
 		int HoveredIndex = -1;
+		bool ClansHovered = false;
 		if(AnimEnabled)
 		{
-			for(int i = 0; i < MenuButtonCount; ++i)
+			const CUIRect ScaledClans = ScaleButtonRect(ClansButtonRect, s_ClansButtonScale);
+			if(Ui()->MouseHovered(&ScaledClans))
+				ClansHovered = true;
+			else
 			{
-				const CUIRect Scaled = ScaleButtonRect(aMenuButtons[i], s_aMenuButtonScale[i]);
-				if(Ui()->MouseHovered(&Scaled))
+				for(int i = 0; i < MenuButtonCount; ++i)
 				{
-					HoveredIndex = i;
-					break;
+					const CUIRect Scaled = ScaleButtonRect(aMenuButtons[i], s_aMenuButtonScale[i]);
+					if(Ui()->MouseHovered(&Scaled))
+					{
+						HoveredIndex = i;
+						break;
+					}
 				}
 			}
 		}
-		const bool AnyHovered = HoveredIndex != -1;
+		const bool AnyHovered = ClansHovered || HoveredIndex != -1;
 		const float HoverScale = 1.08f;
 		const float OtherScale = 0.94f;
 		const float Speed = (float)g_Config.m_BcMainMenuAnimationSpeed;
 		const float Blend = AnimEnabled ? std::clamp(Client()->RenderFrameTime() * Speed, 0.0f, 1.0f) : 1.0f;
+		{
+			const float Target = (AnimEnabled && AnyHovered) ? (ClansHovered ? HoverScale : OtherScale) : 1.0f;
+			s_ClansButtonScale += (Target - s_ClansButtonScale) * Blend;
+		}
 		for(int i = 0; i < MenuButtonCount; ++i)
 		{
 			const float Target = (AnimEnabled && AnyHovered) ? (i == HoveredIndex ? HoverScale : OtherScale) : 1.0f;
@@ -218,6 +239,14 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 			NewPage = CMenus::PAGE_SETTINGS;
 	}
 
+	// Clans — small button under Settings, right-aligned
+	{
+		CUIRect ScaledButton = ScaleButtonRect(ClansButtonRect, s_ClansButtonScale);
+		static CButtonContainer s_ClansButton;
+		if(GameClient()->m_Menus.DoButton_Menu(&s_ClansButton, Localize("Clans"), 0, &ScaledButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)) || CheckHotKey(KEY_C))
+			NewPage = CMenus::PAGE_CLANS;
+	}
+
 #if defined(CONF_AUTOUPDATE)
 	{
 		char aUpdateBuf[128] = "";
@@ -231,7 +260,7 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 		if(ShowDownloadButton || ShowRetryButton || ShowRestartButton || ShowUpdateProgress)
 		{
 			CUIRect UpdateRow = SettingsButton;
-			UpdateRow.y += SettingsButton.h + 5.0f;
+			UpdateRow.y += SettingsButton.h + ButtonGap + ClansBtnH + ButtonGap;
 			UpdateRow.h = 22.0f;
 
 			CUIRect UpdateLabel, UpdateButton;

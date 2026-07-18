@@ -1219,6 +1219,7 @@ void CMenus::RenderClansPage(CUIRect MainView)
 
 	size_t MemberIndex = 0;
 	static int s_aMemberIds[128];
+	static int s_aMemberJoinIds[128];
 	if(s_vMemberSettings.size() < Clan.m_vMembers.size())
 		s_vMemberSettings.resize(Clan.m_vMembers.size());
 	for(const auto &M : Clan.m_vMembers)
@@ -1227,13 +1228,15 @@ void CMenus::RenderClansPage(CUIRect MainView)
 		MainSection.HSplitTop(42.0f, &Item, &MainSection);
 		if(s_MainScroll.AddRect(Item))
 		{
-			Item.Draw(ColorRGBA(1, 1, 1, 0.04f), IGraphics::CORNER_ALL, 3.0f);
+			const bool IsSelf = !str_comp(M.m_aUserId, Clans.UserId());
+			const bool CanJoin = !IsSelf && M.m_aServer[0] != '\0';
+			const bool JoinHot = CanJoin && MemberIndex < std::size(s_aMemberJoinIds) && Ui()->HotItem() == &s_aMemberJoinIds[MemberIndex];
+			Item.Draw(ColorRGBA(1, 1, 1, JoinHot ? 0.10f : 0.04f), IGraphics::CORNER_ALL, 3.0f);
 			Item.Margin(4.0f, &Item);
 			CUIRect Tee, Name, Status, SettingsBtn;
 			Item.VSplitLeft(36.0f, &Tee, &Item);
 			Item.VSplitLeft(4.0f, nullptr, &Item);
 
-			const bool IsSelf = !str_comp(M.m_aUserId, Clans.UserId());
 			const bool CanModerate = !IsSelf && (Clans.Role() == CClans::ERole::PRESIDENT || Clans.Role() == CClans::ERole::VICE_PRESIDENT || Clans.Role() == CClans::ERole::VETERAN);
 			if(CanModerate)
 			{
@@ -1242,9 +1245,12 @@ void CMenus::RenderClansPage(CUIRect MainView)
 			}
 			Item.VSplitRight(140.0f, &Name, &Status);
 			RenderClanMemberTee(GameClient(), RenderTools(), Tee, M.m_Skin);
-			char aName[64];
-			str_format(aName, sizeof(aName), "%s (%s)", M.m_aNickname, RoleLabel(M.m_Role));
-			Ui()->DoLabel(&Name, aName, 12.0f, TEXTALIGN_ML);
+			CUIRect NickRow, RoleRow;
+			Name.HSplitMid(&NickRow, &RoleRow);
+			Ui()->DoLabel(&NickRow, M.m_aNickname, 12.0f, TEXTALIGN_ML);
+			TextRender()->TextColor(ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
+			Ui()->DoLabel(&RoleRow, RoleLabel(M.m_Role), 9.0f, TEXTALIGN_ML);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
 			if(M.m_Online)
 			{
 				char aSt[96];
@@ -1276,6 +1282,10 @@ void CMenus::RenderClansPage(CUIRect MainView)
 				s_MemberMenuClosing = false;
 				s_MemberMenuJustOpened = true;
 			}
+			if(CanJoin && MemberIndex < std::size(s_aMemberJoinIds) && Ui()->DoButtonLogic(&s_aMemberJoinIds[MemberIndex], 0, &Item, BUTTONFLAG_LEFT))
+				Connect(M.m_aServer);
+			if(CanJoin && MemberIndex < std::size(s_aMemberJoinIds))
+				GameClient()->m_Tooltips.DoToolTip(&s_aMemberJoinIds[MemberIndex], &Item, Localize("Click to join this player"));
 		}
 		MainSection.HSplitTop(3.0f, nullptr, &MainSection);
 		MemberIndex++;
@@ -1297,13 +1307,17 @@ void CMenus::RenderClansPage(CUIRect MainView)
 	UnleashedParams.m_ClipBgColor = ColorRGBA(0, 0, 0, 0.0f);
 	s_UnleashedScroll.Begin(&UnleashedSection, &UnleashedScrollOffset, &UnleashedParams);
 	UnleashedSection.y += UnleashedScrollOffset.y;
+	static int s_aUnleashedJoinIds[128];
+	size_t UnleashedIndex = 0;
 	for(const auto &U : vUnleashed)
 	{
 		CUIRect Item;
 		UnleashedSection.HSplitTop(26.0f, &Item, &UnleashedSection);
 		if(s_UnleashedScroll.AddRect(Item))
 		{
-			Item.Draw(ColorRGBA(1, 1, 1, 0.03f), IGraphics::CORNER_ALL, 3.0f);
+			const bool CanJoin = U.m_aServer[0] != '\0';
+			const bool JoinHot = CanJoin && UnleashedIndex < std::size(s_aUnleashedJoinIds) && Ui()->HotItem() == &s_aUnleashedJoinIds[UnleashedIndex];
+			Item.Draw(ColorRGBA(1, 1, 1, JoinHot ? 0.10f : 0.03f), IGraphics::CORNER_ALL, 3.0f);
 			Item.Margin(4.0f, &Item);
 			CUIRect Name, Meta;
 			Item.VSplitRight(180.0f, &Name, &Meta);
@@ -1311,8 +1325,13 @@ void CMenus::RenderClansPage(CUIRect MainView)
 			char aUMeta[128];
 			str_format(aUMeta, sizeof(aUMeta), Localize("playing %s %d/%d"), U.m_aMap, U.m_Players, U.m_MaxPlayers);
 			Ui()->DoLabel(&Meta, aUMeta, 11.0f, TEXTALIGN_MR);
+			if(CanJoin && UnleashedIndex < std::size(s_aUnleashedJoinIds) && Ui()->DoButtonLogic(&s_aUnleashedJoinIds[UnleashedIndex], 0, &Item, BUTTONFLAG_LEFT))
+				Connect(U.m_aServer);
+			if(CanJoin && UnleashedIndex < std::size(s_aUnleashedJoinIds))
+				GameClient()->m_Tooltips.DoToolTip(&s_aUnleashedJoinIds[UnleashedIndex], &Item, Localize("Click to join this player"));
 		}
 		UnleashedSection.HSplitTop(2.0f, nullptr, &UnleashedSection);
+		UnleashedIndex++;
 	}
 	s_UnleashedScroll.End();
 
@@ -1659,9 +1678,12 @@ void CMenus::RenderClansPreview(CUIRect MainView)
 			Item.VSplitLeft(4.0f, nullptr, &Item);
 			Item.VSplitRight(150.0f, &Name, &Status);
 			RenderClanMemberTee(GameClient(), RenderTools(), Tee, M.m_Skin);
-			char aName[64];
-			str_format(aName, sizeof(aName), "%s (%s)", M.m_aNickname, RoleLabel(M.m_Role));
-			Ui()->DoLabel(&Name, aName, 12.0f, TEXTALIGN_ML);
+			CUIRect NickRow, RoleRow;
+			Name.HSplitMid(&NickRow, &RoleRow);
+			Ui()->DoLabel(&NickRow, M.m_aNickname, 12.0f, TEXTALIGN_ML);
+			TextRender()->TextColor(ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
+			Ui()->DoLabel(&RoleRow, RoleLabel(M.m_Role), 9.0f, TEXTALIGN_ML);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
 			Ui()->DoLabel(&Status, M.m_Online ? Localize("online") : Localize("offline"), 11.0f, TEXTALIGN_MR);
 		}
 		Right.HSplitTop(3.0f, nullptr, &Right);
