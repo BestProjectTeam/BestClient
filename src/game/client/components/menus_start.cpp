@@ -243,7 +243,15 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 	{
 		CUIRect ScaledButton = ScaleButtonRect(ClansButtonRect, s_ClansButtonScale);
 		static CButtonContainer s_ClansButton;
-		if(GameClient()->m_Menus.DoButton_Menu(&s_ClansButton, Localize("Clans"), 0, &ScaledButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)) || CheckHotKey(KEY_C))
+		ColorRGBA BgColor(0.0f, 0.0f, 0.0f, 0.25f);
+		BgColor.a *= Ui()->ButtonColorMul(&s_ClansButton);
+		ScaledButton.Draw(BgColor, IGraphics::CORNER_ALL, 5.0f);
+
+		CUIRect Label = ScaledButton;
+		Label.HMargin(2.0f, &Label);
+		Ui()->DoLabel(&Label, Localize("Clans"), Label.h * CUi::ms_FontmodHeight, TEXTALIGN_MC);
+
+		if(Ui()->DoButtonLogic(&s_ClansButton, 0, &ScaledButton, BUTTONFLAG_LEFT) || CheckHotKey(KEY_C))
 			NewPage = CMenus::PAGE_CLANS;
 	}
 
