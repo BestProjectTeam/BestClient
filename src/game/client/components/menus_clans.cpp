@@ -126,17 +126,18 @@ static bool DoClansTextBtn(CUi *pUi, ITextRender *pTextRender, CButtonContainer 
 
 static bool DoClansSidebarItem(CUi *pUi, ITextRender *pTextRender, CButtonContainer *pId, const char *pIcon, const char *pText, const CUIRect *pRect, int Badge = 0, bool Danger = false)
 {
-	if(pUi->HotItem() == pId || pUi->CheckActiveItem(pId))
-		pRect->Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.06f), IGraphics::CORNER_ALL, 4.0f);
+	const bool Hot = pUi->HotItem() == pId || pUi->CheckActiveItem(pId);
+	// Same visual weight as main-menu buttons (40px tall, dark translucent plate).
+	pRect->Draw(ColorRGBA(0.0f, 0.0f, 0.0f, Hot ? 0.40f : 0.25f), IGraphics::CORNER_ALL, 5.0f);
 
-	const float FontSize = minimum(16.0f, pRect->h * 0.42f);
-	const float IconSize = FontSize + 2.0f;
+	const float FontSize = 14.0f;
+	const float IconSize = 16.0f;
 	const float Gap = 10.0f;
 	const float TextW = pTextRender->TextWidth(FontSize, pText);
 	float ContentW = IconSize + Gap + TextW;
 	if(Badge > 0)
 		ContentW += 8.0f + 18.0f;
-	ContentW = minimum(ContentW, pRect->w - 8.0f);
+	ContentW = minimum(ContentW, pRect->w - 16.0f);
 
 	CUIRect Content = *pRect;
 	if(Content.w > ContentW)
@@ -278,6 +279,9 @@ void CMenus::RenderClans(CUIRect MainView)
 		break;
 	case CClans::EView::ANNOUNCEMENTS:
 		RenderClansAnnouncements(MainView);
+		break;
+	case CClans::EView::SETTINGS:
+		RenderClansSettings(MainView);
 		break;
 	case CClans::EView::RECENT:
 		RenderClansRecent(MainView);
@@ -918,8 +922,9 @@ void CMenus::RenderClansPage(CUIRect MainView)
 	const bool CanApps = !str_comp(Clan.m_aJoinPolicy, "request") &&
 			     (Clans.Role() == CClans::ERole::PRESIDENT || Clans.Role() == CClans::ERole::VICE_PRESIDENT || Clans.Role() == CClans::ERole::VETERAN);
 	const bool IsPresident = Clans.Role() == CClans::ERole::PRESIDENT;
+	const bool CanSettings = Clans.Role() == CClans::ERole::PRESIDENT || Clans.Role() == CClans::ERole::VICE_PRESIDENT;
 	const bool CanInvite = Clan.m_HasInviteCode && (Clans.Role() == CClans::ERole::PRESIDENT || Clans.Role() == CClans::ERole::VICE_PRESIDENT);
-	const int ManageCount = 3 + (CanApps ? 1 : 0);
+	const int ManageCount = 3 + (CanApps ? 1 : 0) + (CanSettings ? 1 : 0);
 	const int DangerCount = 1 + (IsPresident ? 1 : 0);
 
 	// Header (no card chrome)
@@ -973,18 +978,25 @@ void CMenus::RenderClansPage(CUIRect MainView)
 
 	Left.HSplitTop(12.0f, nullptr, &Left);
 
-	// MANAGE + DANGER fill the rest of the left column
-	const float HeaderPair = 18.0f + 4.0f;
-	const float GapManageDanger = 10.0f;
-	const float FixedH = HeaderPair * 2.0f + GapManageDanger;
-	const float RowH = maximum(32.0f, (Left.h - FixedH) / (float)(ManageCount + DangerCount));
+	// MANAGE + DANGER — same size as main menu (40px + 5px gap)
+	constexpr float ButtonH = 40.0f;
+	constexpr float ButtonGap = 5.0f;
+	const float HeaderH = 18.0f + 4.0f;
+	const float GapManageDanger = 12.0f;
+	const float ManageBlockH = HeaderH + (float)ManageCount * ButtonH + (float)maximum(0, ManageCount - 1) * ButtonGap;
+	const float DangerBlockH = HeaderH + (float)DangerCount * ButtonH + (float)maximum(0, DangerCount - 1) * ButtonGap;
+	const float BottomH = ManageBlockH + GapManageDanger + DangerBlockH;
 
-	DrawClansSectionHeader(Ui(), TextRender(), &Left, Localize("MANAGE"));
-	static CButtonContainer s_Refresh, s_Catalog, s_Ann, s_Apps;
-	Left.HSplitTop(RowH, &Button, &Left);
+	CUIRect Bottom;
+	Left.HSplitBottom(BottomH, &Left, &Bottom);
+
+	DrawClansSectionHeader(Ui(), TextRender(), &Bottom, Localize("MANAGE"));
+	static CButtonContainer s_Refresh, s_Catalog, s_Ann, s_Apps, s_Settings;
+	Bottom.HSplitTop(ButtonH, &Button, &Bottom);
 	if(DoClansSidebarItem(Ui(), TextRender(), &s_Refresh, FontIcon::ARROW_ROTATE_RIGHT, Localize("Refresh"), &Button) && !Clans.IsBusy())
 		Clans.RefreshCurrentView();
-	Left.HSplitTop(RowH, &Button, &Left);
+	Bottom.HSplitTop(ButtonGap, nullptr, &Bottom);
+	Bottom.HSplitTop(ButtonH, &Button, &Bottom);
 	if(DoClansSidebarItem(Ui(), TextRender(), &s_Catalog, FontIcon::LIST_UL, Localize("Clan list"), &Button))
 	{
 		Clans.RefreshCatalog();
@@ -992,7 +1004,8 @@ void CMenus::RenderClansPage(CUIRect MainView)
 	}
 	if(CanApps)
 	{
-		Left.HSplitTop(RowH, &Button, &Left);
+		Bottom.HSplitTop(ButtonGap, nullptr, &Bottom);
+		Bottom.HSplitTop(ButtonH, &Button, &Bottom);
 		const int AppBadge = (int)Clans.Applications().size();
 		if(DoClansSidebarItem(Ui(), TextRender(), &s_Apps, FontIcon::COMMENT, Localize("Applications"), &Button, AppBadge))
 		{
@@ -1000,7 +1013,8 @@ void CMenus::RenderClansPage(CUIRect MainView)
 			Clans.SetView(CClans::EView::APPLICATIONS);
 		}
 	}
-	Left.HSplitTop(RowH, &Button, &Left);
+	Bottom.HSplitTop(ButtonGap, nullptr, &Bottom);
+	Bottom.HSplitTop(ButtonH, &Button, &Bottom);
 	{
 		const int Unread = Clans.UnreadAnnouncements();
 		if(DoClansSidebarItem(Ui(), TextRender(), &s_Ann, FontIcon::NEWSPAPER, Localize("Announcements"), &Button, Unread))
@@ -1009,16 +1023,24 @@ void CMenus::RenderClansPage(CUIRect MainView)
 			Clans.SetView(CClans::EView::ANNOUNCEMENTS);
 		}
 	}
+	if(CanSettings)
+	{
+		Bottom.HSplitTop(ButtonGap, nullptr, &Bottom);
+		Bottom.HSplitTop(ButtonH, &Button, &Bottom);
+		if(DoClansSidebarItem(Ui(), TextRender(), &s_Settings, FontIcon::GEAR, Localize("Settings"), &Button))
+			Clans.SetView(CClans::EView::SETTINGS);
+	}
 
-	Left.HSplitTop(GapManageDanger, nullptr, &Left);
-	DrawClansSectionHeader(Ui(), TextRender(), &Left, Localize("DANGER ZONE"));
-	Left.HSplitTop(RowH, &Button, &Left);
+	Bottom.HSplitTop(GapManageDanger, nullptr, &Bottom);
+	DrawClansSectionHeader(Ui(), TextRender(), &Bottom, Localize("DANGER ZONE"));
+	Bottom.HSplitTop(ButtonH, &Button, &Bottom);
 	static CButtonContainer s_Leave;
 	if(DoClansSidebarItem(Ui(), TextRender(), &s_Leave, FontIcon::RIGHT_FROM_BRACKET, Localize("Leave"), &Button) && !Clans.IsBusy())
 		Clans.Leave();
 	if(IsPresident)
 	{
-		Left.HSplitTop(RowH, &Button, &Left);
+		Bottom.HSplitTop(ButtonGap, nullptr, &Bottom);
+		Bottom.HSplitTop(ButtonH, &Button, &Bottom);
 		static CButtonContainer s_Disband;
 		if(DoClansSidebarItem(Ui(), TextRender(), &s_Disband, FontIcon::TRASH, Localize("Disband"), &Button, 0, true) && !Clans.IsBusy())
 		{
@@ -1513,6 +1535,147 @@ void CMenus::RenderClansAnnouncements(CUIRect MainView)
 		MainView.HSplitTop(6.0f, nullptr, &MainView);
 	}
 	s_Scroll.End();
+}
+
+void CMenus::RenderClansSettings(CUIRect MainView)
+{
+	CClans &Clans = GameClient()->m_Clans;
+	const auto &Clan = Clans.Clan();
+
+	static CLineInput s_Name, s_Desc;
+	static char s_aName[64], s_aDesc[256];
+	static int s_IconId = 0;
+	static unsigned s_ColorHsla = 0;
+	static char s_aLoadedClanId[64] = "";
+
+	if(str_comp(s_aLoadedClanId, Clan.m_aClanId) != 0 || !s_aLoadedClanId[0])
+	{
+		str_copy(s_aLoadedClanId, Clan.m_aClanId, sizeof(s_aLoadedClanId));
+		str_copy(s_aName, Clan.m_aName, sizeof(s_aName));
+		str_copy(s_aDesc, Clan.m_aDescription, sizeof(s_aDesc));
+		s_IconId = std::clamp(Clan.m_IconId, 0, 7);
+		const unsigned R = (Clan.m_Color >> 16) & 0xFF;
+		const unsigned G = (Clan.m_Color >> 8) & 0xFF;
+		const unsigned B = Clan.m_Color & 0xFF;
+		s_ColorHsla = color_cast<ColorHSLA>(ColorRGBA(R / 255.0f, G / 255.0f, B / 255.0f, 1.0f)).Pack(false);
+	}
+
+	s_Name.SetBuffer(s_aName, sizeof(s_aName));
+	s_Desc.SetBuffer(s_aDesc, sizeof(s_aDesc));
+	s_Name.SetEmptyText(Localize("Clan name"));
+	s_Desc.SetEmptyText(Localize("Description"));
+
+	CUIRect Top, Label, BackBtn, RefreshBtn, Button, Row;
+	MainView.HSplitTop(28.0f, &Top, &MainView);
+	Top.VSplitRight(28.0f, &Top, &RefreshBtn);
+	Top.VSplitRight(4.0f, &Top, nullptr);
+	Top.VSplitRight(28.0f, &Label, &BackBtn);
+	Ui()->DoLabel(&Label, Localize("Clan settings"), 16.0f, TEXTALIGN_ML);
+	static CButtonContainer s_Back, s_Refresh;
+	if(DoClansIconBtn(Ui(), TextRender(), &s_Back, FontIcon::CHEVRON_LEFT, &BackBtn))
+		Clans.SetView(CClans::EView::CLAN);
+	if(DoClansIconBtn(Ui(), TextRender(), &s_Refresh, FontIcon::ARROW_ROTATE_RIGHT, &RefreshBtn) && !Clans.IsBusy())
+	{
+		s_aLoadedClanId[0] = '\0';
+		Clans.RefreshCurrentView();
+	}
+
+	MainView.HSplitTop(8.0f, nullptr, &MainView);
+	MainView.VMargin(MainView.w * 0.12f, &MainView);
+
+	MainView.HSplitTop(16.0f, &Label, &MainView);
+	Ui()->DoLabel(&Label, Localize("Name"), 12.0f, TEXTALIGN_ML);
+	MainView.HSplitTop(4.0f, nullptr, &MainView);
+	MainView.HSplitTop(28.0f, &Button, &MainView);
+	Ui()->DoEditBox(&s_Name, &Button, 13.0f);
+
+	MainView.HSplitTop(10.0f, nullptr, &MainView);
+	MainView.HSplitTop(16.0f, &Label, &MainView);
+	char aTagLocked[48];
+	str_format(aTagLocked, sizeof(aTagLocked), "%s: [%s]", Localize("Tag"), Clan.m_aTag);
+	TextRender()->TextColor(ColorRGBA(0.65f, 0.65f, 0.65f, 1.0f));
+	Ui()->DoLabel(&Label, aTagLocked, 12.0f, TEXTALIGN_ML);
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
+
+	MainView.HSplitTop(10.0f, nullptr, &MainView);
+	MainView.HSplitTop(16.0f, &Label, &MainView);
+	Ui()->DoLabel(&Label, Localize("Description"), 12.0f, TEXTALIGN_ML);
+	MainView.HSplitTop(4.0f, nullptr, &MainView);
+	MainView.HSplitTop(48.0f, &Button, &MainView);
+	{
+		const float DescFont = 11.0f;
+		const float DescSpacing = 1.0f;
+		const float DescLineWidth = maximum(1.0f, Button.w - 4.0f);
+		if(Ui()->DoEditBox(&s_Desc, &Button, DescFont, IGraphics::CORNER_ALL, {}, DescLineWidth, DescSpacing))
+		{
+			for(;;)
+			{
+				STextSizeProperties Props;
+				int LineCount = 0;
+				Props.m_pLineCount = &LineCount;
+				TextRender()->TextWidth(DescFont, s_aDesc, -1, DescLineWidth, 0, Props);
+				if(LineCount <= 3 || !s_aDesc[0])
+					break;
+				const int Len = str_length(s_aDesc);
+				s_aDesc[Len - 1] = '\0';
+				str_utf8_fix_truncation(s_aDesc);
+			}
+		}
+	}
+
+	const unsigned ClanRgb = ClanRgbFromHsla(s_ColorHsla);
+	MainView.HSplitTop(12.0f, nullptr, &MainView);
+	MainView.HSplitTop(16.0f, &Label, &MainView);
+	Ui()->DoLabel(&Label, Localize("Icon and color"), 12.0f, TEXTALIGN_ML);
+	MainView.HSplitTop(4.0f, nullptr, &MainView);
+	MainView.HSplitTop(36.0f, &Row, &MainView);
+	CUIRect IconsRow, ColorRow;
+	Row.VSplitRight(100.0f, &IconsRow, &ColorRow);
+	ColorRow.VSplitLeft(8.0f, nullptr, &ColorRow);
+	static CButtonContainer s_aIcons[8];
+	for(int i = 0; i < 8; i++)
+	{
+		CUIRect IconBtn;
+		IconsRow.VSplitLeft(IconsRow.h + 4.0f, &IconBtn, &IconsRow);
+		IconBtn.VSplitRight(4.0f, &IconBtn, nullptr);
+		IconBtn.Draw(s_IconId == i ? ColorRGBA(0.35f, 0.55f, 1.0f, 0.45f) : ColorRGBA(0, 0, 0, 0.22f), IGraphics::CORNER_ALL, 4.0f);
+		RenderClanIcon(Ui(), TextRender(), IconBtn, i, ClanRgb);
+		if(Ui()->DoButtonLogic(&s_aIcons[i], s_IconId == i, &IconBtn, BUTTONFLAG_LEFT))
+			s_IconId = i;
+	}
+	{
+		CUIRect ColorBtn, ResetBtn;
+		ColorRow.VSplitRight(56.0f, &ColorRow, &ResetBtn);
+		ColorRow.VSplitRight(4.0f, &ColorRow, nullptr);
+		const float Sq = minimum(ColorRow.w, ColorRow.h);
+		ColorRow.VMargin(maximum(0.0f, (ColorRow.w - Sq) * 0.5f), &ColorBtn);
+		ColorBtn.HMargin(maximum(0.0f, (ColorBtn.h - Sq) * 0.5f), &ColorBtn);
+		DoButton_ColorPicker(&ColorBtn, &s_ColorHsla, false);
+		static CButtonContainer s_ColorReset;
+		ResetBtn.HMargin(2.0f, &ResetBtn);
+		if(DoClansTextBtn(Ui(), TextRender(), &s_ColorReset, Localize("Reset"), &ResetBtn))
+			s_ColorHsla = color_cast<ColorHSLA>(ColorRGBA(0.33f, 0.55f, 1.0f, 1.0f)).Pack(false);
+	}
+
+	MainView.HSplitTop(20.0f, nullptr, &MainView);
+	MainView.HSplitTop(40.0f, &Row, &MainView);
+	CUIRect SaveBtn, CancelBtn;
+	Row.VSplitMid(&SaveBtn, &CancelBtn, 10.0f);
+	static CButtonContainer s_Save, s_Cancel;
+	if(DoClansTextBtn(Ui(), TextRender(), &s_Save, Localize("Save"), &SaveBtn) && s_aName[0] && !Clans.IsBusy())
+	{
+		Clans.UpdateClanSettings(s_aName, s_aDesc, s_IconId, ClanRgb);
+		s_aLoadedClanId[0] = '\0';
+	}
+	if(DoClansTextBtn(Ui(), TextRender(), &s_Cancel, Localize("Back"), &CancelBtn))
+		Clans.SetView(CClans::EView::CLAN);
+
+	if(Clans.StatusMessage()[0])
+	{
+		MainView.HSplitTop(12.0f, nullptr, &MainView);
+		MainView.HSplitTop(18.0f, &Label, &MainView);
+		Ui()->DoLabel(&Label, Clans.StatusMessage(), 12.0f, TEXTALIGN_MC);
+	}
 }
 
 void CMenus::RenderClansRecent(CUIRect MainView)

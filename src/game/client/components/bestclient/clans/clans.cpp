@@ -228,7 +228,7 @@ void CClans::LeaveClanLocal()
 	m_Clan = SClanSnapshot{};
 	ClearClanTagLock();
 	SaveSession();
-	if(m_View == EView::CLAN || m_View == EView::APPLICATIONS || m_View == EView::ANNOUNCEMENTS)
+	if(m_View == EView::CLAN || m_View == EView::APPLICATIONS || m_View == EView::ANNOUNCEMENTS || m_View == EView::SETTINGS)
 		m_View = EView::LANDING;
 	RefreshRecentClans();
 }
@@ -489,6 +489,25 @@ void CClans::CreateClan(const char *pName, const char *pTag, const char *pDescri
 	pReq->FailOnErrorStatus(false);
 	BeginRequest(std::move(pReq), REQ_CREATE);
 	SetStatus(Localize("Creating clan..."));
+}
+
+void CClans::UpdateClanSettings(const char *pName, const char *pDescription, int IconId, unsigned Color)
+{
+	if(!m_aClanId[0])
+		return;
+	char aBase[128];
+	ResolveBaseUrl(aBase, sizeof(aBase));
+	char aUrl[192];
+	str_format(aUrl, sizeof(aUrl), "%s/api/clans/%s/settings", aBase, m_aClanId);
+	char aJson[768];
+	str_format(aJson, sizeof(aJson),
+		"{\"name\":\"%s\",\"description\":\"%s\",\"icon_id\":%d,\"color\":%u}",
+		pName, pDescription, IconId, Color);
+	auto pReq = HttpPostJson(aUrl, aJson);
+	AuthHeader(pReq.get());
+	pReq->FailOnErrorStatus(false);
+	BeginRequest(std::move(pReq), REQ_UPDATE);
+	SetStatus(Localize("Saving..."));
 }
 
 void CClans::Join(const char *pClanId)
@@ -786,6 +805,9 @@ void CClans::RefreshCurrentView()
 	case EView::ANNOUNCEMENTS:
 		RefreshAnnouncements();
 		break;
+	case EView::SETTINGS:
+		RefreshClan();
+		break;
 	case EView::RECENT:
 		RefreshRecentClans();
 		break;
@@ -811,7 +833,7 @@ void CClans::MaybeAutoRefresh()
 
 	// Keep polls light: ~500 clients must not hammer the API / master.
 	// Manual Refresh still updates immediately; auto is intentionally slow.
-	if(InClan() && (m_View == EView::CLAN || m_View == EView::APPLICATIONS || m_View == EView::ANNOUNCEMENTS || m_View == EView::BROWSE))
+	if(InClan() && (m_View == EView::CLAN || m_View == EView::APPLICATIONS || m_View == EView::ANNOUNCEMENTS || m_View == EView::SETTINGS || m_View == EView::BROWSE))
 	{
 		if(Now - m_LastClanPollTick >= Freq * 60)
 		{
@@ -1229,7 +1251,7 @@ void CClans::HandlePending()
 
 		// Clan wiped on server / disbanded — drop local stuck membership.
 		const bool ClanGone = Code == 404 || (pErr && !str_comp(pErr, "clan.not_found"));
-		if(ClanGone && (Kind == REQ_CLAN || Kind == REQ_LEAVE || Kind == REQ_DISBAND || Kind == REQ_APPS || Kind == REQ_ANNS || Kind == REQ_ROTATE || Kind == REQ_PROMOTE || Kind == REQ_DEMOTE || Kind == REQ_KICK || Kind == REQ_APPROVE || Kind == REQ_REJECT || Kind == REQ_POST_ANN))
+		if(ClanGone && (Kind == REQ_CLAN || Kind == REQ_LEAVE || Kind == REQ_DISBAND || Kind == REQ_APPS || Kind == REQ_ANNS || Kind == REQ_ROTATE || Kind == REQ_PROMOTE || Kind == REQ_DEMOTE || Kind == REQ_KICK || Kind == REQ_APPROVE || Kind == REQ_REJECT || Kind == REQ_POST_ANN || Kind == REQ_UPDATE))
 		{
 			if(pRoot)
 				json_value_free(pRoot);
@@ -1340,7 +1362,7 @@ void CClans::HandlePending()
 			ClearClanTagLock();
 			m_Clan = SClanSnapshot{};
 			m_Role = ERole::NONE;
-			if(WasInClan || m_View == EView::CLAN || m_View == EView::APPLICATIONS || m_View == EView::ANNOUNCEMENTS)
+			if(WasInClan || m_View == EView::CLAN || m_View == EView::APPLICATIONS || m_View == EView::ANNOUNCEMENTS || m_View == EView::SETTINGS)
 				m_View = EView::LANDING;
 			if((m_View == EView::LANDING || m_View == EView::BROWSE) && m_vCatalog.empty())
 				RefreshCatalog();
@@ -1352,12 +1374,15 @@ void CClans::HandlePending()
 		ParseCatalog(pRoot);
 		break;
 	case REQ_CREATE:
+	case REQ_UPDATE:
 	case REQ_JOIN:
 	case REQ_JOIN_CODE:
 	case REQ_REJOIN:
 	case REQ_CLAN:
 		ParseClanSnapshot(pRoot);
 		ClearPreview();
+		if(Kind == REQ_UPDATE)
+			SetStatus(Localize("Settings saved"));
 		break;
 	case REQ_PREVIEW:
 		ParsePreviewSnapshot(pRoot);

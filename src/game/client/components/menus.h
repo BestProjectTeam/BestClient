@@ -534,6 +534,7 @@ protected:
 	void RenderClansPreview(CUIRect MainView);
 	void RenderClansApplications(CUIRect MainView);
 	void RenderClansAnnouncements(CUIRect MainView);
+	void RenderClansSettings(CUIRect MainView);
 	void RenderClansRecent(CUIRect MainView);
 	static void ConchainBackgroundEntities(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainUpdateMusicState(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);

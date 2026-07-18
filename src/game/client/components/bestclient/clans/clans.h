@@ -24,6 +24,7 @@ public:
 		CLAN,
 		APPLICATIONS,
 		ANNOUNCEMENTS,
+		SETTINGS,
 		RECENT,
 		BROWSE, // catalog while already in a clan
 		PREVIEW, // catalog clan detail (not a member yet)
@@ -188,6 +189,7 @@ public:
 	void RefreshMe();
 	void RefreshCatalog();
 	void CreateClan(const char *pName, const char *pTag, const char *pDescription, int IconId, unsigned Color, const char *pJoinPolicy, int MaxMembers);
+	void UpdateClanSettings(const char *pName, const char *pDescription, int IconId, unsigned Color);
 	void Join(const char *pClanId);
 	void Apply(const char *pClanId, const char *pText);
 	void JoinCode(const char *pCode);
@@ -249,6 +251,7 @@ private:
 		REQ_ME,
 		REQ_CATALOG,
 		REQ_CREATE,
+		REQ_UPDATE,
 		REQ_JOIN,
 		REQ_APPLY,
 		REQ_JOIN_CODE,
