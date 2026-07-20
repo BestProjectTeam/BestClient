@@ -6,6 +6,7 @@
 #include <engine/shared/config.h>
 
 #include <game/client/gameclient.h>
+#include <game/client/ui.h>
 
 #include <algorithm>
 #include <cmath>
@@ -259,6 +260,9 @@ void CBcGradient::OnShutdown()
 
 void CBcGradient::RefreshCachedText()
 {
+	// Streamed UI labels (server browser, etc.) bake gradient colors into text
+	// containers; reset them so mode/color changes and animation stay in sync.
+	Ui()->OnElementsReset();
 	GameClient()->m_Chat.RebuildChat();
 	GameClient()->m_NamePlates.ResetNamePlates();
 	GameClient()->m_Hud.ResetHudContainers();
@@ -273,6 +277,7 @@ void CBcGradient::OnRender()
 	const int Clan = g_Config.m_BcNameplateGradientClan;
 	const int Mode = g_Config.m_BcNameplateGradientMode;
 	const int ColorCount = g_Config.m_BcNameplateGradientColorCount;
+	const int AnimateSpeed = g_Config.m_BcNameplateGradientAnimateSpeed;
 	const unsigned CfgColor1 = g_Config.m_BcNameplateGradientColor1;
 	const unsigned CfgColor2 = g_Config.m_BcNameplateGradientColor2;
 	const unsigned CfgColor3 = g_Config.m_BcNameplateGradientColor3;
@@ -287,7 +292,7 @@ void CBcGradient::OnRender()
 	{
 		NeedRefresh = true;
 	}
-	else if(Everything && (Mode != m_LastMode || ColorCount != m_LastColorCount || CfgColor1 != m_LastColor1 || CfgColor2 != m_LastColor2 || CfgColor3 != m_LastColor3 || CfgColor4 != m_LastColor4))
+	else if(Everything && (Mode != m_LastMode || ColorCount != m_LastColorCount || AnimateSpeed != m_LastAnimateSpeed || CfgColor1 != m_LastColor1 || CfgColor2 != m_LastColor2 || CfgColor3 != m_LastColor3 || CfgColor4 != m_LastColor4))
 	{
 		NeedRefresh = true;
 	}
@@ -297,6 +302,7 @@ void CBcGradient::OnRender()
 	m_LastClan = Clan;
 	m_LastMode = Mode;
 	m_LastColorCount = ColorCount;
+	m_LastAnimateSpeed = AnimateSpeed;
 	m_LastColor1 = CfgColor1;
 	m_LastColor2 = CfgColor2;
 	m_LastColor3 = CfgColor3;

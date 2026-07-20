@@ -14,6 +14,7 @@
 #include <engine/keys.h>
 #include <engine/shared/config.h>
 
+#include <game/client/components/bestclient/gradient.h>
 #include <game/localization.h>
 
 #include <limits>
@@ -52,6 +53,7 @@ void CUIElement::SUIElementRect::Reset()
 	m_TextOutlineColor = ColorRGBA(-1, -1, -1, -1);
 	m_QuadColor = ColorRGBA(-1, -1, -1, -1);
 	m_ReadCursorGlyphCount = -1;
+	m_GradientPhaseBucket = -1;
 }
 
 void CUIElement::SUIElementRect::Draw(const CUIRect *pRect, ColorRGBA Color, int Corners, float Rounding)
@@ -877,11 +879,20 @@ void CUi::DoLabelStreamed(CUIElement::SUIElementRect &RectEl, const CUIRect *pRe
 	const int ReadCursorGlyphCount = pReadCursor == nullptr ? -1 : pReadCursor->m_GlyphCount;
 	bool NeedsRecreate = false;
 	bool ColorChanged = RectEl.m_TextColor != TextRender()->GetTextColor() || RectEl.m_TextOutlineColor != TextRender()->GetTextOutlineColor();
+	int GradientPhaseBucket = -1;
+	if(g_Config.m_BcNameplateGradientEverything)
+	{
+		// Rebuild when the animated gradient phase advances so server browser
+		// (and other streamed labels) keep shimmering instead of freezing.
+		GradientPhaseBucket = (int)(CBcGradient::AnimatePhase(Client()->GlobalTime()) * 64.0f) % 64;
+		if(RectEl.m_GradientPhaseBucket != GradientPhaseBucket)
+			NeedsRecreate = true;
+	}
 	if((!RectEl.m_UITextContainer.Valid() && pText[0] != '\0' && StrLen != 0) || RectEl.m_Width != pRect->w || RectEl.m_Height != pRect->h || ColorChanged || RectEl.m_ReadCursorGlyphCount != ReadCursorGlyphCount)
 	{
 		NeedsRecreate = true;
 	}
-	else
+	else if(!NeedsRecreate)
 	{
 		if(StrLen <= -1)
 		{
@@ -896,6 +907,7 @@ void CUi::DoLabelStreamed(CUIElement::SUIElementRect &RectEl, const CUIRect *pRe
 	}
 	RectEl.m_X = pRect->x;
 	RectEl.m_Y = pRect->y;
+	RectEl.m_GradientPhaseBucket = GradientPhaseBucket;
 	if(NeedsRecreate)
 	{
 		TextRender()->DeleteTextContainer(RectEl.m_UITextContainer);

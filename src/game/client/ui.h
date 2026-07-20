@@ -178,6 +178,9 @@ public:
 		ColorRGBA m_TextColor;
 		ColorRGBA m_TextOutlineColor;
 
+		// BestClient: invalidate streamed text when gradient-everything animation advances
+		int m_GradientPhaseBucket;
+
 		SUIElementRect();
 
 		ColorRGBA m_QuadColor;

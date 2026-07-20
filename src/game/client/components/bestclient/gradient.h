@@ -29,6 +29,7 @@ class CBcGradient : public CComponent
 	int m_LastClan = -1;
 	int m_LastMode = -1;
 	int m_LastColorCount = -1;
+	int m_LastAnimateSpeed = -1;
 	unsigned m_LastColor1 = 0;
 	unsigned m_LastColor2 = 0;
 	unsigned m_LastColor3 = 0;
