@@ -194,9 +194,12 @@ static bool DoClansDescEditBox(CUi *pUi, ITextRender *pTextRender, CLineInput *p
 	}
 
 	// Drive LineInput (WasRendered / IME) with an invisible left-aligned pass; suppress its cursor/selection.
+	// Clear empty text so Render does not draw the placeholder (it forces alpha 0.75 and ignores our transparent color).
 	pUi->ClipEnable(pRect);
 	const bool PrevSelecting = pMouseSelection->m_Selecting;
 	pMouseSelection->m_Selecting = false;
+	const char *pEmptyText = pLineInput->GetEmptyText();
+	pLineInput->SetEmptyText(nullptr);
 	const ColorRGBA PrevText = pTextRender->GetTextColor();
 	const ColorRGBA PrevOutline = pTextRender->GetTextOutlineColor();
 	pTextRender->TextColor(1.0f, 1.0f, 1.0f, 0.0f);
@@ -204,6 +207,7 @@ static bool DoClansDescEditBox(CUi *pUi, ITextRender *pTextRender, CLineInput *p
 	pLineInput->SetHideCursor(true);
 	pLineInput->Render(&Textbox, FontSize, TEXTALIGN_TL, Changed || CursorChanged, -1.0f, LineSpacing);
 	pLineInput->SetHideCursor(false);
+	pLineInput->SetEmptyText(pEmptyText);
 	pMouseSelection->m_Selecting = PrevSelecting;
 	pTextRender->TextColor(PrevText);
 	pTextRender->TextOutlineColor(PrevOutline);
