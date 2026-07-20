@@ -220,6 +220,7 @@ namespace
 		       Module == HudLayout::MODULE_VOTES ||
 		       Module == HudLayout::MODULE_LOCAL_TIME ||
 		       Module == HudLayout::MODULE_FROZEN_HUD ||
+		       Module == HudLayout::MODULE_NOTIFY_LAST ||
 		       Module == HudLayout::MODULE_FINISH_PREDICTION ||
 		       Module == HudLayout::MODULE_VOICE_TALKERS ||
 		       Module == HudLayout::MODULE_VOICE_STATUS ||
@@ -545,6 +546,10 @@ CHudEditor::SModuleVisual CHudEditor::GetModuleVisual(HudLayout::EModule Module)
 		Visual.m_Rect = GameClient()->m_Hud.GetFrozenHudEditorRect();
 		Visual.m_Rounding = 5.0f;
 		break;
+	case HudLayout::MODULE_NOTIFY_LAST:
+		Visual.m_Rect = GameClient()->m_Hud.GetNotifyLastHudEditorRect();
+		Visual.m_Rounding = 2.0f;
+		break;
 	case HudLayout::MODULE_FINISH_PREDICTION:
 		Visual.m_Rect = GameClient()->m_Hud.GetFinishPredictionHudEditorRect();
 		Visual.m_Rounding = 5.0f;
@@ -609,6 +614,7 @@ void CHudEditor::CollectModuleVisuals(SModuleVisual *pOut, int &Count) const
 	AddModule(HudLayout::MODULE_VOTES);
 	AddModule(HudLayout::MODULE_LOCAL_TIME);
 	AddModule(HudLayout::MODULE_FROZEN_HUD);
+	AddModule(HudLayout::MODULE_NOTIFY_LAST);
 	AddModule(HudLayout::MODULE_FINISH_PREDICTION);
 	AddModule(HudLayout::MODULE_MUSIC_PLAYER);
 	AddModule(HudLayout::MODULE_VOICE_TALKERS);
@@ -1234,6 +1240,7 @@ void CHudEditor::RenderOverlay(vec2 MousePos)
 	GameClient()->m_Voting.Render(true);
 	GameClient()->m_Hud.RenderLocalTimePreview();
 	GameClient()->m_Hud.RenderFrozenHudPreview();
+	GameClient()->m_Hud.RenderNotifyLastPreview();
 	GameClient()->m_Hud.RenderFinishPredictionPreview();
 	const bool MusicPlayerHasLiveRect = g_Config.m_BcMusicPlayer != 0 && GameClient()->m_MusicPlayer.HudReservation().m_Visible;
 	GameClient()->m_MusicPlayer.RenderHudEditor(!MusicPlayerHasLiveRect);

@@ -17,6 +17,7 @@
 #include <game/client/components/binds.h>
 #include <game/client/components/chat.h>
 #include <game/client/components/countryflags.h>
+#include <game/client/components/hud_layout.h>
 #include <game/client/components/menu_background.h>
 #include <game/client/components/menus.h>
 #include <game/client/components/skins.h>
@@ -810,10 +811,26 @@ void CMenus::RenderSettingsTClientSettings(CUIRect MainView)
 	}
 
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcNotifyWhenLast, TCLocalize("Show when you are the last alive"), &g_Config.m_TcNotifyWhenLast, &Column, LineSize);
+	if(g_Config.m_TcNotifyWhenLast && !HudLayout::IsEnabled(HudLayout::MODULE_NOTIFY_LAST))
+		HudLayout::SetEnabled(HudLayout::MODULE_NOTIFY_LAST, true);
+
 	CUIRect NotificationConfig;
 	Column.HSplitTop(LineSize + MarginSmall, &NotificationConfig, &Column);
 	if(g_Config.m_TcNotifyWhenLast)
 	{
+		CUIRect NotifyLastHudEditorButton;
+		NotificationConfig.VSplitRight(LineSize + 8.0f, &NotificationConfig, &NotifyLastHudEditorButton);
+		static CButtonContainer s_NotifyLastHudEditorButton;
+		const bool NotifyLastCanOpenHudEditor = Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK;
+		const bool NotifyLastHudEditorClicked = Ui()->DoButton_FontIcon(&s_NotifyLastHudEditorButton, FontIcon::UP_RIGHT_AND_DOWN_LEFT_FROM_CENTER, NotifyLastCanOpenHudEditor ? 0 : -1, &NotifyLastHudEditorButton, BUTTONFLAG_LEFT);
+		GameClient()->m_Tooltips.DoToolTip(&s_NotifyLastHudEditorButton, &NotifyLastHudEditorButton, NotifyLastCanOpenHudEditor ? Localize("Open in HUD editor") : Localize("Join a game first"));
+		GameClient()->m_Tooltips.SetFadeTime(&s_NotifyLastHudEditorButton, 0.0f);
+		if(NotifyLastHudEditorClicked && NotifyLastCanOpenHudEditor)
+		{
+			SetActive(false);
+			GameClient()->m_HudEditor.Activate();
+		}
+
 		NotificationConfig.VSplitMid(&Button, &NotificationConfig);
 		static CLineInput s_LastInput(g_Config.m_TcNotifyWhenLastText, sizeof(g_Config.m_TcNotifyWhenLastText));
 		s_LastInput.SetEmptyText(TCLocalize("Last!"));
@@ -822,9 +839,9 @@ void CMenus::RenderSettingsTClientSettings(CUIRect MainView)
 		static CButtonContainer s_ClientNotifyWhenLastColor;
 		DoLine_ColorPicker(&s_ClientNotifyWhenLastColor, ColorPickerLineSize, ColorPickerLabelSize, ColorPickerLineSpacing, &NotificationConfig, "", &g_Config.m_TcNotifyWhenLastColor, ColorRGBA(1.0f, 1.0f, 1.0f), false);
 		Column.HSplitTop(LineSize, &Button, &Column);
-		Ui()->DoScrollbarOption(&g_Config.m_TcNotifyWhenLastX, &g_Config.m_TcNotifyWhenLastX, &Button, TCLocalize("Horizontal Position"), 1, 100, &CUi::ms_LinearScrollbarScale, 0, "%");
+		Ui()->DoScrollbarOption(&g_Config.m_TcNotifyWhenLastX, &g_Config.m_TcNotifyWhenLastX, &Button, TCLocalize("Horizontal Position"), 0, 100, &CUi::ms_LinearScrollbarScale, 0, "%");
 		Column.HSplitTop(LineSize, &Button, &Column);
-		Ui()->DoScrollbarOption(&g_Config.m_TcNotifyWhenLastY, &g_Config.m_TcNotifyWhenLastY, &Button, TCLocalize("Vertical Position"), 1, 100, &CUi::ms_LinearScrollbarScale, 0, "%");
+		Ui()->DoScrollbarOption(&g_Config.m_TcNotifyWhenLastY, &g_Config.m_TcNotifyWhenLastY, &Button, TCLocalize("Vertical Position"), 0, 100, &CUi::ms_LinearScrollbarScale, 0, "%");
 		Column.HSplitTop(LineSize, &Button, &Column);
 		Ui()->DoScrollbarOption(&g_Config.m_TcNotifyWhenLastSize, &g_Config.m_TcNotifyWhenLastSize, &Button, TCLocalize("Font Size"), 1, 50);
 	}

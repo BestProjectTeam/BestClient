@@ -109,7 +109,8 @@ namespace HudLayout
 			       Module == MODULE_VOICE_TALKERS ||
 			       Module == MODULE_VOICE_STATUS ||
 			       Module == MODULE_CHAT ||
-			       Module == MODULE_VOTES;
+			       Module == MODULE_VOTES ||
+			       Module == MODULE_NOTIFY_LAST;
 		}
 
 		bool HasLegacyConfigOverride(EModule Module)
@@ -136,6 +137,10 @@ namespace HudLayout
 				return g_Config.m_BcHudVotesX != (int)gs_aModuleLayouts[Module].m_X ||
 				       g_Config.m_BcHudVotesY != (int)gs_aModuleLayouts[Module].m_Y ||
 				       g_Config.m_BcHudVotesScale != gs_aModuleLayouts[Module].m_Scale;
+			case MODULE_NOTIFY_LAST:
+				// Percentage + font-size settings are always the source of truth so the
+				// tclient scrollbars and the HUD editor stay in sync both ways.
+				return true;
 			default:
 				return false;
 			}
@@ -171,6 +176,19 @@ namespace HudLayout
 				Layout.m_X = (float)g_Config.m_BcHudVotesX;
 				Layout.m_Y = (float)g_Config.m_BcHudVotesY;
 				Layout.m_Scale = g_Config.m_BcHudVotesScale;
+				break;
+			case MODULE_NOTIFY_LAST:
+				// tc_last_notify_x/y are % of the HUD canvas; map them into the same
+				// canvas-space storage the other legacy modules use (X scaled via
+				// CanvasXToHud in ResolveBaseLayout, Y already in HUD pixels at height 300).
+				// Font size stays on tc_last_notify_size (absolute) so the 1..50 range
+				// is preserved; Layout.m_Scale remains an editor-only multiplier.
+				Layout.m_X = (g_Config.m_TcNotifyWhenLastX / 100.0f) * CANVAS_WIDTH;
+				Layout.m_Y = (g_Config.m_TcNotifyWhenLastY / 100.0f) * CANVAS_HEIGHT;
+				// Keep runtime in sync when the settings scrollbars change so
+				// hud_layout_set saves the same position the player sees.
+				gs_aRuntimeModuleLayouts[Module].m_X = Layout.m_X;
+				gs_aRuntimeModuleLayouts[Module].m_Y = Layout.m_Y;
 				break;
 			default:
 				break;
@@ -210,6 +228,10 @@ namespace HudLayout
 				g_Config.m_BcHudVotesX = round_to_int(Layout.m_X);
 				g_Config.m_BcHudVotesY = round_to_int(Layout.m_Y);
 				g_Config.m_BcHudVotesScale = Layout.m_Scale;
+				break;
+			case MODULE_NOTIFY_LAST:
+				g_Config.m_TcNotifyWhenLastX = std::clamp(round_to_int((Layout.m_X / CANVAS_WIDTH) * 100.0f), 0, 100);
+				g_Config.m_TcNotifyWhenLastY = std::clamp(round_to_int((Layout.m_Y / CANVAS_HEIGHT) * 100.0f), 0, 100);
 				break;
 			default:
 				break;

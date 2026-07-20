@@ -169,6 +169,9 @@ class CHud : public CComponent
 	CUIRect GetFrozenHudRect(bool ForcePreview = false) const;
 	void RenderFrozenHud(bool ForcePreview = false);
 
+	CUIRect GetNotifyLastRect(bool ForcePreview = false) const;
+	void RenderNotifyLast(bool ForcePreview = false);
+
 	CUIRect GetKeystrokesKeyboardRectInternal(bool IgnoreModuleEnabled) const;
 	void RenderKeystrokesKeyboardInternal(bool ForcePreview, bool IgnoreModuleEnabled);
 	CUIRect GetKeystrokesMouseRectInternal(bool IgnoreModuleEnabled) const;
@@ -204,6 +207,8 @@ public:
 	void RenderFinishPredictionPreview() { RenderFinishPrediction(true); }
 	CUIRect GetFrozenHudEditorRect() const { return GetFrozenHudRect(true); }
 	void RenderFrozenHudPreview() { RenderFrozenHud(true); }
+	CUIRect GetNotifyLastHudEditorRect() const { return GetNotifyLastRect(true); }
+	void RenderNotifyLastPreview() { RenderNotifyLast(true); }
 	CUIRect GetKeystrokesKeyboardHudEditorRect() const;
 	void RenderKeystrokesKeyboardPreview() { RenderKeystrokesKeyboardInternal(true, true); }
 	CUIRect GetKeystrokesMouseHudEditorRect() const { return GetKeystrokesMouseRectInternal(true); }

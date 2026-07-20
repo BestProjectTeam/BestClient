@@ -1259,42 +1259,73 @@ void CHud::RenderTextInfo()
 		Graphics()->TextureSet(GameClient()->m_GameSkin.m_aSpriteWeaponCursors[CurWeapon]);
 		Graphics()->RenderQuadContainerAsSprite(m_HudQuadContainerIndex, m_aCursorOffset[CurWeapon], m_Width / 2.0f, m_Height / 2.0f, 0.36f, 0.36f);
 	}
-	// render team in freeze text and last notify
-	if((g_Config.m_TcShowFrozenText > 0 || g_Config.m_TcNotifyWhenLast) && GameClient()->m_GameInfo.m_EntitiesDDRace)
+	// render team freeze text
+	if(g_Config.m_TcShowFrozenText > 0 && GameClient()->m_GameInfo.m_EntitiesDDRace)
 	{
 		int NumInTeam = 0;
 		int NumFrozen = 0;
-		int NumUnfreezing = 0;
 		int LocalTeamID = 0;
-		GetFrozenTeamCounts(NumInTeam, NumFrozen, LocalTeamID, &NumUnfreezing);
+		GetFrozenTeamCounts(NumInTeam, NumFrozen, LocalTeamID);
 
-		// Notify when last
-		if(g_Config.m_TcNotifyWhenLast)
-		{
-			if(NumInTeam > 1 && NumInTeam - NumFrozen == 1 && NumUnfreezing == 0)
-			{
-				TextRender()->TextColor(color_cast<ColorRGBA>(ColorHSLA(g_Config.m_TcNotifyWhenLastColor)));
-				float FontSize = g_Config.m_TcNotifyWhenLastSize;
-				float XPos = std::clamp((g_Config.m_TcNotifyWhenLastX / 100.0f) * m_Width, 1.0f, m_Width - FontSize);
-				float YPos = std::clamp((g_Config.m_TcNotifyWhenLastY / 100.0f) * m_Height, 1.0f, m_Height - FontSize);
-
-				TextRender()->Text(XPos, YPos, FontSize, g_Config.m_TcNotifyWhenLastText, -1.0f);
-				TextRender()->TextColor(TextRender()->DefaultTextColor());
-			}
-		}
-		// Show freeze text
 		char aBuf[64];
 		if(g_Config.m_TcShowFrozenText == 1)
 			str_format(aBuf, sizeof(aBuf), "%d / %d", NumInTeam - NumFrozen, NumInTeam);
 		else if(g_Config.m_TcShowFrozenText == 2)
 			str_format(aBuf, sizeof(aBuf), "%d / %d", NumFrozen, NumInTeam);
-		if(g_Config.m_TcShowFrozenText > 0)
-			TextRender()->Text(m_Width / 2.0f - TextRender()->TextWidth(10.0f, aBuf) / 2.0f, 12.0f, 10.0f, aBuf);
-
-		// str_format(aBuf, sizeof(aBuf), "%d", GameClient()->m_aClients[GameClient()->m_Snap.m_LocalClientId].m_PrevPredicted.m_FreezeEnd);
-		// str_format(aBuf, sizeof(aBuf), "%d", g_Config.m_ClWhatsMyPing);
-		// TextRender()->Text(0, m_Width / 2 - TextRender()->TextWidth(0, 10, aBuf, -1, -1.0f) / 2, 20, 10, aBuf, -1.0f);
+		TextRender()->Text(m_Width / 2.0f - TextRender()->TextWidth(10.0f, aBuf) / 2.0f, 12.0f, 10.0f, aBuf);
 	}
+}
+
+CUIRect CHud::GetNotifyLastRect(bool ForcePreview) const
+{
+	if(!HudLayout::IsEnabled(HudLayout::MODULE_NOTIFY_LAST))
+		return {0.0f, 0.0f, 0.0f, 0.0f};
+	if(!ForcePreview && g_Config.m_TcNotifyWhenLast <= 0)
+		return {0.0f, 0.0f, 0.0f, 0.0f};
+
+	if(!ForcePreview)
+	{
+		if(!GameClient()->m_GameInfo.m_EntitiesDDRace)
+			return {0.0f, 0.0f, 0.0f, 0.0f};
+		int NumInTeam = 0;
+		int NumFrozen = 0;
+		int NumUnfreezing = 0;
+		int LocalTeamId = 0;
+		GetFrozenTeamCounts(NumInTeam, NumFrozen, LocalTeamId, &NumUnfreezing);
+		if(NumInTeam <= 1 || NumInTeam - NumFrozen != 1 || NumUnfreezing != 0)
+			return {0.0f, 0.0f, 0.0f, 0.0f};
+	}
+
+	const auto Layout = HudLayout::Get(HudLayout::MODULE_NOTIFY_LAST, m_Width, m_Height);
+	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	const float FontSize = std::clamp(g_Config.m_TcNotifyWhenLastSize * Scale, 1.0f, 50.0f * Scale);
+	const char *pText = g_Config.m_TcNotifyWhenLastText[0] != '\0' ? g_Config.m_TcNotifyWhenLastText : "Last!";
+	const float TextWidth = TextRender()->TextWidth(FontSize, pText, -1, -1.0f);
+
+	CUIRect Rect;
+	Rect.x = Layout.m_X;
+	Rect.y = Layout.m_Y;
+	Rect.w = maximum(TextWidth, 8.0f);
+	Rect.h = FontSize + 2.0f * Scale;
+	Rect.x = std::clamp(Rect.x, 0.0f, maximum(0.0f, m_Width - Rect.w));
+	Rect.y = std::clamp(Rect.y, 0.0f, maximum(0.0f, m_Height - Rect.h));
+	return Rect;
+}
+
+void CHud::RenderNotifyLast(bool ForcePreview)
+{
+	const CUIRect Rect = GetNotifyLastRect(ForcePreview);
+	if(Rect.w <= 0.0f || Rect.h <= 0.0f)
+		return;
+
+	const auto Layout = HudLayout::Get(HudLayout::MODULE_NOTIFY_LAST, m_Width, m_Height);
+	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	const float FontSize = std::clamp(g_Config.m_TcNotifyWhenLastSize * Scale, 1.0f, 50.0f * Scale);
+	const char *pText = g_Config.m_TcNotifyWhenLastText[0] != '\0' ? g_Config.m_TcNotifyWhenLastText : "Last!";
+
+	TextRender()->TextColor(color_cast<ColorRGBA>(ColorHSLA(g_Config.m_TcNotifyWhenLastColor)));
+	TextRender()->Text(Rect.x, Rect.y, FontSize, pText, -1.0f);
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
 }
 
 void CHud::GetFrozenTeamCounts(int &NumInTeam, int &NumFrozen, int &LocalTeamId, int *pNumUnfreezing) const
@@ -4113,6 +4144,7 @@ void CHud::OnRender()
 		RenderWarmupTimer();
 		RenderTextInfo();
 		RenderFrozenHud();
+		RenderNotifyLast();
 		GameClient()->m_TClient.RenderCenterLines();
 		if(!(FocusModeActive && HideUIInFocusMode))
 			RenderLocalTime();
