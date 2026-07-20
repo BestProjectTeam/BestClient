@@ -51,6 +51,8 @@ decltype(CBindChat::BIND_DEFAULTS) CBindChat::BIND_DEFAULTS = {
 					 {TCLocalizable("Translate ID:"), {"!translateid", "translate_id"}},
 					 {TCLocalizable("Mute:"), {"!mute", "add_foe"}},
 					 {TCLocalizable("Unmute:"), {"!unmute", "remove_foe"}},
+					 {TCLocalizable("Add censor word:"), {".addcensor", "add_censor_list"}},
+					 {TCLocalizable("Add filter whitelist:"), {".addwhitelist", "add_white_list"}},
 				 }},
 };
 

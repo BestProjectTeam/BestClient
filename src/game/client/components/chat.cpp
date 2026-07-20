@@ -37,6 +37,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstring>
 #include <string>
 #include <utility>
 #include <vector>
@@ -909,6 +910,8 @@ void CChat::OnConsoleInit()
 	Console()->Register("echo", "r[message]", CFGFLAG_CLIENT | CFGFLAG_STORE, ConEcho, this, "Echo the text in chat window");
 	Console()->Register("clear_chat", "", CFGFLAG_CLIENT | CFGFLAG_STORE, ConClearChat, this, "Clear chat messages");
 	Console()->Register("toggle_chat_media_hidden", "", CFGFLAG_CLIENT, ConToggleHideChatMedia, this, "Toggle hidden media mode in chat");
+	Console()->Register("add_censor_list", "r[word]", CFGFLAG_CLIENT, ConAddCensorList, this, "Add a word to the chat filter regex");
+	Console()->Register("add_white_list", "s[nickname]", CFGFLAG_CLIENT, ConAddWhiteList, this, "Add a player to the chat filter whitelist");
 }
 
 void CChat::OnInit()
@@ -917,6 +920,20 @@ void CChat::OnInit()
 	Console()->Chain("cl_chat_old", ConchainChatOld, this);
 	Console()->Chain("cl_chat_size", ConchainChatFontSize, this);
 	Console()->Chain("cl_chat_width", ConchainChatWidth, this);
+	Console()->Chain("bc_regex_player_whitelist", ConchainRegexPlayerWhitelist, this);
+
+	if(g_Config.m_BcRegexPlayerWhitelist[0])
+	{
+		auto Re = Regex(g_Config.m_BcRegexPlayerWhitelist);
+		if(Re.error().empty())
+			m_RegexPlayerWhitelist = std::move(Re);
+	}
+	if(g_Config.m_TcRegexChatIgnore[0])
+	{
+		auto Re = Regex(g_Config.m_TcRegexChatIgnore);
+		if(Re.error().empty())
+			GameClient()->m_TClient.m_RegexChatIgnore = std::move(Re);
+	}
 }
 
 bool CChat::OnInput(const IInput::CEvent &Event)
@@ -1452,9 +1469,22 @@ void CChat::OnMessage(int MsgType, void *pRawMsg)
 	{
 		CNetMsg_Sv_Chat *pMsg = (CNetMsg_Sv_Chat *)pRawMsg;
 
-		auto &Re = GameClient()->m_TClient.m_RegexChatIgnore;
-		if(Re.error().empty() && Re.test(pMsg->m_pMessage))
-			return;
+		if(g_Config.m_TcRegexChatIgnore[0] && g_Config.m_BcEnableCensorList)
+		{
+			auto &Re = GameClient()->m_TClient.m_RegexChatIgnore;
+			if(Re.error().empty() && Re.test(pMsg->m_pMessage))
+			{
+				const char *pFilteredMSG = FilterText(pMsg->m_pMessage, pMsg->m_ClientId, true);
+				AddLine(pMsg->m_ClientId, pMsg->m_Team, pFilteredMSG);
+				return;
+			}
+		}
+		else
+		{
+			auto &Re = GameClient()->m_TClient.m_RegexChatIgnore;
+			if(Re.error().empty() && Re.test(pMsg->m_pMessage))
+				return;
+		}
 
 		/*
 		if(g_Config.m_ClCensorChat)
@@ -3985,6 +4015,7 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 	else
 	{
 		const auto &LineAuthor = GameClient()->m_aClients[CurrentLine.m_ClientId];
+		const char *pFilteredLineAuthor = FilterText(LineAuthor.m_aName);
 
 		if(LineAuthor.m_Active)
 		{
@@ -4006,7 +4037,7 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 			if(LineAuthor.m_Active)
 			{
 				str_append(CurrentLine.m_aName, " ");
-				str_append(CurrentLine.m_aName, LineAuthor.m_aName);
+				str_append(CurrentLine.m_aName, pFilteredLineAuthor);
 			}
 			CurrentLine.m_NameColor = TEAM_BLUE;
 			CurrentLine.m_Highlighted = false;
@@ -4018,7 +4049,7 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 			if(LineAuthor.m_Active)
 			{
 				str_append(CurrentLine.m_aName, " ");
-				str_append(CurrentLine.m_aName, LineAuthor.m_aName);
+				str_append(CurrentLine.m_aName, pFilteredLineAuthor);
 			}
 			CurrentLine.m_NameColor = TEAM_RED;
 			CurrentLine.m_Highlighted = true;
@@ -4026,7 +4057,7 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 		}
 		else
 		{
-			str_copy(CurrentLine.m_aName, LineAuthor.m_aName);
+			str_copy(CurrentLine.m_aName, pFilteredLineAuthor);
 		}
 
 		if(LineAuthor.m_Active)
@@ -5499,4 +5530,282 @@ void CChat::SendTranslatedChatQueued(int Team, const char *pLine)
 		pEntry->m_Team = Team;
 		str_copy(pEntry->m_aText, pLine, Length + 1);
 	}
+}
+
+std::vector<std::string> CChat::SplitWords(const char *pMessage)
+{
+	std::vector<std::string> Parts;
+	if(!pMessage)
+		return Parts;
+
+	std::string Str(pMessage);
+	size_t Start = 0;
+	size_t End = 0;
+	while((End = Str.find(' ', Start)) != std::string::npos)
+	{
+		Parts.push_back(Str.substr(Start, End - Start));
+		Start = End + 1;
+	}
+	Parts.push_back(Str.substr(Start));
+	return Parts;
+}
+
+void CChat::ConchainRegexPlayerWhitelist(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData)
+{
+	if(pResult->NumArguments() == 1)
+	{
+		auto Re = Regex(pResult->GetString(0));
+		if(!Re.error().empty())
+		{
+			log_error("chat", "Invalid whitelist regex: %s", Re.error().c_str());
+			return;
+		}
+		static_cast<CChat *>(pUserData)->m_RegexPlayerWhitelist = std::move(Re);
+	}
+	pfnCallback(pResult, pCallbackUserData);
+}
+
+void CChat::ConAddWhiteList(IConsole::IResult *pResult, void *pUserData)
+{
+	CChat *pSelf = static_cast<CChat *>(pUserData);
+	const char *pInput = pResult->GetString(0);
+	char aInput[256];
+	str_copy(aInput, pInput, sizeof(aInput));
+	str_utf8_trim_right(aInput);
+	char aBuf[256];
+	if(!aInput[0])
+	{
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "Regex", "No nickname given");
+		return;
+	}
+
+	const bool HadExistingRegex = g_Config.m_BcRegexPlayerWhitelist[0] != '\0';
+	char aOldRegex[sizeof(g_Config.m_BcRegexPlayerWhitelist)];
+	str_copy(aOldRegex, g_Config.m_BcRegexPlayerWhitelist, sizeof(aOldRegex));
+	const char *pNewRegex = aInput;
+	char aNewRegex[sizeof(g_Config.m_BcRegexPlayerWhitelist)];
+	if(HadExistingRegex)
+	{
+		str_format(aNewRegex, sizeof(aNewRegex), "%s|%s", g_Config.m_BcRegexPlayerWhitelist, aInput);
+		pNewRegex = aNewRegex;
+	}
+
+	str_copy(g_Config.m_BcRegexPlayerWhitelist, pNewRegex, sizeof(g_Config.m_BcRegexPlayerWhitelist));
+
+	auto Re = Regex(g_Config.m_BcRegexPlayerWhitelist);
+	if(!Re.error().empty())
+	{
+		str_copy(g_Config.m_BcRegexPlayerWhitelist, aOldRegex, sizeof(g_Config.m_BcRegexPlayerWhitelist));
+		str_format(aBuf, sizeof(aBuf), "Invalid regex, list not updated: %s", Re.error().c_str());
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "Regex", aBuf);
+		return;
+	}
+
+	pSelf->m_RegexPlayerWhitelist = std::move(Re);
+	if(!HadExistingRegex)
+		str_format(aBuf, sizeof(aBuf), "New regex added: %s", aInput);
+	else
+		str_format(aBuf, sizeof(aBuf), "Added to existing regex: %s", aInput);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "Regex", aBuf);
+}
+
+void CChat::ConAddCensorList(IConsole::IResult *pResult, void *pUserData)
+{
+	CChat *pSelf = static_cast<CChat *>(pUserData);
+	const char *pInput = pResult->GetString(0);
+	char aInput[256];
+	str_copy(aInput, pInput, sizeof(aInput));
+	str_utf8_trim_right(aInput);
+	char aBuf[256];
+	if(!aInput[0])
+	{
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "Regex", "No word given");
+		return;
+	}
+
+	const bool HadExistingRegex = g_Config.m_TcRegexChatIgnore[0] != '\0';
+	char aOldRegex[sizeof(g_Config.m_TcRegexChatIgnore)];
+	str_copy(aOldRegex, g_Config.m_TcRegexChatIgnore, sizeof(aOldRegex));
+	const char *pNewRegex = aInput;
+	char aNewRegex[sizeof(g_Config.m_TcRegexChatIgnore)];
+	if(HadExistingRegex)
+	{
+		str_format(aNewRegex, sizeof(aNewRegex), "%s|%s", g_Config.m_TcRegexChatIgnore, aInput);
+		pNewRegex = aNewRegex;
+	}
+
+	str_copy(g_Config.m_TcRegexChatIgnore, pNewRegex, sizeof(g_Config.m_TcRegexChatIgnore));
+
+	auto Re = Regex(g_Config.m_TcRegexChatIgnore);
+	if(!Re.error().empty())
+	{
+		str_copy(g_Config.m_TcRegexChatIgnore, aOldRegex, sizeof(g_Config.m_TcRegexChatIgnore));
+		str_format(aBuf, sizeof(aBuf), "Invalid regex, list not updated: %s", Re.error().c_str());
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "Regex", aBuf);
+		return;
+	}
+
+	pSelf->GameClient()->m_TClient.m_RegexChatIgnore = std::move(Re);
+	if(!HadExistingRegex)
+		str_format(aBuf, sizeof(aBuf), "New regex added: %s", aInput);
+	else
+		str_format(aBuf, sizeof(aBuf), "Added to existing regex: %s", aInput);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "Regex", aBuf);
+}
+
+const char *CChat::FilterText(const char *pMessage, int ClientId, bool IsChat)
+{
+	if(!pMessage || !g_Config.m_TcRegexChatIgnore[0] || !g_Config.m_BcEnableCensorList)
+		return pMessage;
+
+	static char s_aFilteredMessage[1024];
+	s_aFilteredMessage[0] = '\0';
+	if(g_Config.m_BcRegexPlayerWhitelist[0] && ClientId >= 0)
+	{
+		auto &RePlr = m_RegexPlayerWhitelist;
+		if(RePlr.error().empty() && RePlr.test(GameClient()->m_aClients[ClientId].m_aName))
+			return pMessage;
+	}
+	auto &Re = GameClient()->m_TClient.m_RegexChatIgnore;
+	if(!Re.error().empty())
+		return pMessage;
+	if(!Re.test(pMessage))
+		return pMessage;
+
+	std::vector<std::string> BlockedWords;
+	std::vector<std::string> SplitMsg = SplitWords(pMessage);
+
+	if(g_Config.m_BcShowBlockedWordInConsole && IsChat)
+	{
+		Re.match(pMessage, true, [&BlockedWords](const std::string &Match, int /*MatchIndex*/, int Group) {
+			if(Group == 0)
+			{
+				bool AlreadyBlocked = false;
+				for(const auto &BlockedWord : BlockedWords)
+				{
+					if(BlockedWord == Match)
+					{
+						AlreadyBlocked = true;
+						break;
+					}
+				}
+				if(!AlreadyBlocked)
+					BlockedWords.push_back(Match);
+			}
+		});
+	}
+
+	std::string FilteredMessage;
+	if(g_Config.m_BcFilterChangeWholeWord == 0)
+	{
+		FilteredMessage = Re.replace(pMessage, true, [](const std::string &Match, int /*MatchIndex*/, int Group) -> std::string {
+			if(Group != 0)
+				return "";
+
+			if(g_Config.m_BcMultipleReplacementChar)
+			{
+				size_t Size = 0, Count = 0;
+				str_utf8_stats(Match.c_str(), Match.length() * 4, Match.length(), &Size, &Count);
+				std::string Replacement;
+				for(size_t i = 0; i < Count; i++)
+					Replacement += g_Config.m_BcBlockedContentReplacementChar;
+				return Replacement;
+			}
+			return g_Config.m_BcBlockedContentReplacementChar;
+		});
+		str_copy(s_aFilteredMessage, FilteredMessage.c_str(), sizeof(s_aFilteredMessage));
+	}
+	else if(g_Config.m_BcFilterChangeWholeWord == 1)
+	{
+		for(size_t w = 0; w < SplitMsg.size(); w++)
+		{
+			if(Re.error().empty() && Re.test(SplitMsg[w]))
+			{
+				if(g_Config.m_BcMultipleReplacementChar)
+				{
+					if(w > 0)
+						str_append(s_aFilteredMessage, " ", sizeof(s_aFilteredMessage));
+					size_t Size = 0, Count = 0;
+					str_utf8_stats(SplitMsg[w].c_str(), SplitMsg[w].length() * 4, SplitMsg[w].length(), &Size, &Count);
+					for(size_t i = 0; i < Count; i++)
+						str_append(s_aFilteredMessage, g_Config.m_BcBlockedContentReplacementChar, sizeof(s_aFilteredMessage));
+					if(w < SplitMsg.size())
+						str_append(s_aFilteredMessage, " ", sizeof(s_aFilteredMessage));
+				}
+				else
+				{
+					str_append(s_aFilteredMessage, g_Config.m_BcBlockedContentReplacementChar, sizeof(s_aFilteredMessage));
+				}
+			}
+			else
+			{
+				str_append(s_aFilteredMessage, SplitMsg[w].c_str(), sizeof(s_aFilteredMessage));
+			}
+		}
+	}
+	else if(g_Config.m_BcFilterChangeWholeWord == 2)
+	{
+		for(size_t w = 0; w < SplitMsg.size(); w++)
+		{
+			if(w > 0)
+				str_append(s_aFilteredMessage, " ", sizeof(s_aFilteredMessage));
+
+			bool IsExactMatch = false;
+			if(Re.error().empty())
+			{
+				std::string LowerWord;
+				LowerWord.resize(SplitMsg[w].size() * 4 + 1);
+				str_utf8_tolower(SplitMsg[w].c_str(), LowerWord.data(), LowerWord.size());
+				LowerWord.resize(std::strlen(LowerWord.c_str()));
+
+				std::string MatchedWord;
+				Re.match(LowerWord, false, [&MatchedWord, &LowerWord](const std::string &Match, int /*MatchIndex*/, int Group) {
+					if(Group == 0 && Match == LowerWord)
+						MatchedWord = Match;
+				});
+				IsExactMatch = !MatchedWord.empty();
+			}
+
+			if(IsExactMatch)
+				str_append(s_aFilteredMessage, g_Config.m_BcBlockedContentReplacementChar, sizeof(s_aFilteredMessage));
+			else
+				str_append(s_aFilteredMessage, SplitMsg[w].c_str(), sizeof(s_aFilteredMessage));
+		}
+
+		FilteredMessage = Re.replace(s_aFilteredMessage, true, [](const std::string &Match, int /*MatchIndex*/, int Group) -> std::string {
+			if(Group != 0)
+				return "";
+
+			if(g_Config.m_BcMultipleReplacementChar)
+			{
+				size_t Size = 0, Count = 0;
+				str_utf8_stats(Match.c_str(), Match.length() * 4, Match.length(), &Size, &Count);
+				std::string Replacement;
+				for(size_t i = 0; i < Count; i++)
+					Replacement += g_Config.m_BcBlockedContentPartialReplacementChar;
+				return Replacement;
+			}
+			return g_Config.m_BcBlockedContentPartialReplacementChar;
+		});
+		str_copy(s_aFilteredMessage, FilteredMessage.c_str(), sizeof(s_aFilteredMessage));
+	}
+
+	if(g_Config.m_BcShowBlockedWordInConsole && IsChat && !BlockedWords.empty())
+	{
+		char aBlockedWordsStr[512];
+		aBlockedWordsStr[0] = '\0';
+		if(ClientId >= 0)
+			str_format(aBlockedWordsStr, sizeof(aBlockedWordsStr), "%s said: ", GameClient()->m_aClients[ClientId].m_aName);
+		else if(ClientId == SERVER_MSG)
+			str_copy(aBlockedWordsStr, "Server said: ", sizeof(aBlockedWordsStr));
+		for(size_t i = 0; i < BlockedWords.size(); i++)
+		{
+			if(i > 0)
+				str_append(aBlockedWordsStr, ", ", sizeof(aBlockedWordsStr));
+			str_append(aBlockedWordsStr, BlockedWords[i].c_str(), sizeof(aBlockedWordsStr));
+		}
+		Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "Regex filter", aBlockedWordsStr, color_cast<ColorRGBA>(ColorHSLA(g_Config.m_BcBlockedWordConsoleColor)));
+	}
+
+	return s_aFilteredMessage;
 }

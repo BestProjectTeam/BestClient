@@ -1926,6 +1926,60 @@ BETA
 
 ##### BestClient related screens and feedback #####
 
+##### Chat Filter #####
+
+Chat Filter
+== Фильтр чата
+
+Enable chat filter
+== Включить фильтр чата
+
+Show blocked word in console
+== Показывать скрытые слова в консоль
+
+Blocked words console color
+== Цвет скрытых слов
+
+Multiple replacement char on blocked word len
+== Умножить заменённый текст на длину заблокированного слова
+
+Replacement char
+== Текст для замены
+
+Partial Replacement char
+== Частичная замена
+
+[ChatFilter]
+Replace word with:
+== Заменять слово с:
+
+[ChatFilter]
+Regex
+== Регекс
+
+[ChatFilter]
+Full
+== Полностью
+
+[ChatFilter]
+Both
+== Оба
+
+Replacing blocked word with replacement char(badbad->******)
+== Замена заблокированного слова заменяющим символом(badbad->******)
+
+In console will be like 'tee said badbad'
+== В консоли будет что-то вроде 'tee said badbad'
+
+if no will be 'badbad->*' if yes 'badbad->******'
+== если нет, то будет "badbad->*", если да, то "badbad->******"
+
+Add censor word:
+== Добавить слово в фильтр:
+
+Add filter whitelist:
+== Добавить игрока в белый список фильтра:
+
 UPD
 == ОБН.
 

@@ -11,6 +11,16 @@
 // SettingsTabs
 MACRO_CONFIG_INT(BcBestClientSettingsTabs, bc_bestclient_settings_tabs, 0, 0, 65536, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Bit flags to disable BestClient settings tabs")
 
+// Chat Filter
+MACRO_CONFIG_INT(BcShowBlockedWordInConsole, bc_show_blocked_word_in_console, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show blocked word with regex in console")
+MACRO_CONFIG_COL(BcBlockedWordConsoleColor, bc_blocked_word_console_color, 0x99ffff, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Color of blocked word messages in console")
+MACRO_CONFIG_INT(BcEnableCensorList, bc_enable_censor_list, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable chat filter")
+MACRO_CONFIG_INT(BcMultipleReplacementChar, bc_multiple_replacement_char, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Multiple replacement char on blocked word len")
+MACRO_CONFIG_STR(BcBlockedContentReplacementChar, bc_blocked_content_replacement_char, 64, "*", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Character used to replace blocked content")
+MACRO_CONFIG_STR(BcRegexPlayerWhitelist, bc_regex_player_whitelist, 512, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Chat filter player whitelist")
+MACRO_CONFIG_INT(BcFilterChangeWholeWord, bc_filter_change_whole_word, 1, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Change whole word to replacement character")
+MACRO_CONFIG_STR(BcBlockedContentPartialReplacementChar, bc_blocked_content_partial_replacement_char, 64, "*", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Character used to replace partial blocked content")
+
 // Auto update
 MACRO_CONFIG_INT(BcAutoUpdate, bc_auto_update, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically download and apply updates on startup")
 

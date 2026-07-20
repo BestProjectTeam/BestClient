@@ -2809,6 +2809,85 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	BrowserUtilsBlock.HSplitTop(LineSize, &Content, &BrowserUtilsBlock);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcUseShortKogServerName, Localize("Use short KoG server name"), &g_Config.m_BcUseShortKogServerName, &Content, LineSize);
 
+	// Chat Filter
+	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
+
+	const bool ChatFilterEnabled = g_Config.m_BcEnableCensorList != 0;
+	static float s_ChatFilterRevealPhase = 0.0f;
+	UpdateModuleRevealPhase(s_ChatFilterRevealPhase, ChatFilterEnabled, Client()->RenderFrameTime());
+
+	const float ChatFilterColorHeight = g_Config.m_BcShowBlockedWordInConsole ? LineSize + MarginSmall : 0.0f;
+	const float ChatFilterPartialHeight = g_Config.m_BcFilterChangeWholeWord == 2 ? MarginSmall + LineSize : 0.0f;
+	const float ChatFilterRadioHeight = 2.0f + LineSize;
+	const float ChatFilterExpandedTargetHeight = MarginSmall + 3.0f * (LineSize + MarginSmall) + ChatFilterColorHeight + LineSize + MarginSmall + ChatFilterRadioHeight + ChatFilterPartialHeight;
+	const float ChatFilterExpandedHeight = ChatFilterExpandedTargetHeight * BCUiAnimations::EaseOutCubic(s_ChatFilterRevealPhase);
+	const float ChatFilterHeaderHeight = LineSize + MarginSmall + LineSize;
+	const float ChatFilterBlockHeight = ChatFilterHeaderHeight + ChatFilterExpandedHeight;
+
+	CUIRect ChatFilterBlock;
+	Column.HSplitTop(ChatFilterBlockHeight, &ChatFilterBlock, &Column);
+
+	CUIRect ChatFilterBlockBg = ChatFilterBlock;
+	ChatFilterBlockBg.w += BlockPadding;
+	ChatFilterBlockBg.h += BlockPadding;
+	ChatFilterBlockBg.x -= BlockPadding * 0.5f;
+	ChatFilterBlockBg.y -= BlockPadding * 0.5f;
+	ChatFilterBlockBg.Draw(BlockColor, IGraphics::CORNER_ALL, 10.0f);
+
+	ChatFilterBlock.HSplitTop(LineSize, &Label, &ChatFilterBlock);
+	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &Label, Localize("NEW"), 12.0f,
+		ColorRGBA(0.25f, 0.85f, 0.40f, 1.0f), ColorRGBA(0.10f, 0.60f, 0.25f, 1.0f), MarginSmall);
+	Ui()->DoLabel(&Label, Localize("Chat Filter"), HeadlineFontSize, TEXTALIGN_ML);
+	ChatFilterBlock.HSplitTop(MarginSmall, nullptr, &ChatFilterBlock);
+
+	ChatFilterBlock.HSplitTop(LineSize, &Content, &ChatFilterBlock);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcEnableCensorList, Localize("Enable chat filter"), &g_Config.m_BcEnableCensorList, &Content, LineSize);
+	GameClient()->m_Tooltips.DoToolTip(&g_Config.m_BcEnableCensorList, &Content, Localize("Replacing blocked word with replacement char(badbad->******)"));
+
+	if(ChatFilterExpandedHeight > 0.5f)
+	{
+		CUIRect Visible = ChatFilterBlock;
+		Visible.h = ChatFilterExpandedHeight;
+		Ui()->ClipEnable(&Visible);
+
+		ChatFilterBlock.HSplitTop(MarginSmall, nullptr, &ChatFilterBlock);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowBlockedWordInConsole, Localize("Show blocked word in console"), &g_Config.m_BcShowBlockedWordInConsole, &ChatFilterBlock, LineSize);
+		GameClient()->m_Tooltips.DoToolTip(&g_Config.m_BcShowBlockedWordInConsole, &ChatFilterBlock, Localize("In console will be like 'tee said badbad'"));
+		ChatFilterBlock.HSplitTop(MarginSmall, nullptr, &ChatFilterBlock);
+		if(g_Config.m_BcShowBlockedWordInConsole)
+		{
+			static CButtonContainer s_BlockedWordConsoleColorButton;
+			DoLine_ColorPicker(&s_BlockedWordConsoleColorButton, LineSize, 13.0f, MarginSmall, &ChatFilterBlock, Localize("Blocked words console color"), &g_Config.m_BcBlockedWordConsoleColor, color_cast<ColorRGBA>(ColorHSLA(0x99ffff)), false, nullptr, false);
+		}
+
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcMultipleReplacementChar, Localize("Multiple replacement char on blocked word len"), &g_Config.m_BcMultipleReplacementChar, &ChatFilterBlock, LineSize);
+		GameClient()->m_Tooltips.DoToolTip(&g_Config.m_BcMultipleReplacementChar, &ChatFilterBlock, Localize("if no will be 'badbad->*' if yes 'badbad->******'"));
+		ChatFilterBlock.HSplitTop(MarginSmall, nullptr, &ChatFilterBlock);
+
+		static CLineInput s_ReplacementChar;
+		s_ReplacementChar.SetBuffer(g_Config.m_BcBlockedContentReplacementChar, sizeof(g_Config.m_BcBlockedContentReplacementChar));
+		ChatFilterBlock.HSplitTop(LineSize, &Label, &ChatFilterBlock);
+		DoEditBoxWithLabel(&s_ReplacementChar, &Label, Localize("Replacement char"), "*", g_Config.m_BcBlockedContentReplacementChar, sizeof(g_Config.m_BcBlockedContentReplacementChar));
+		ChatFilterBlock.HSplitTop(MarginSmall, nullptr, &ChatFilterBlock);
+
+		static std::vector<CButtonContainer> s_vChatFilterModeButtons = {{}, {}, {}};
+		DoLine_RadioMenu(ChatFilterBlock, Localize("Replace word with:", "ChatFilter"),
+			s_vChatFilterModeButtons,
+			{Localize("Regex", "ChatFilter"), Localize("Full", "ChatFilter"), Localize("Both", "ChatFilter")},
+			{0, 1, 2},
+			g_Config.m_BcFilterChangeWholeWord);
+		if(g_Config.m_BcFilterChangeWholeWord == 2)
+		{
+			ChatFilterBlock.HSplitTop(MarginSmall, nullptr, &ChatFilterBlock);
+			static CLineInput s_PartialReplacementChar;
+			s_PartialReplacementChar.SetBuffer(g_Config.m_BcBlockedContentPartialReplacementChar, sizeof(g_Config.m_BcBlockedContentPartialReplacementChar));
+			ChatFilterBlock.HSplitTop(LineSize, &Label, &ChatFilterBlock);
+			DoEditBoxWithLabel(&s_PartialReplacementChar, &Label, Localize("Partial Replacement char"), "*", g_Config.m_BcBlockedContentPartialReplacementChar, sizeof(g_Config.m_BcBlockedContentPartialReplacementChar));
+		}
+
+		Ui()->ClipDisable();
+	}
+
 	const bool VoiceExpanded = g_Config.m_BcVoiceChatEnable != 0;
 	static float s_VoiceRevealPhase = 0.0f;
 	UpdateModuleRevealPhase(s_VoiceRevealPhase, VoiceExpanded, Client()->RenderFrameTime());

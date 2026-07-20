@@ -6,6 +6,7 @@
 #include <base/str.h>
 
 #include <engine/console.h>
+#include <engine/external/regex.h>
 #include <engine/shared/config.h>
 #include <engine/shared/jobs.h>
 #include <engine/shared/protocol.h>
@@ -333,10 +334,16 @@ class CChat : public CComponent
 	static void ConEcho(IConsole::IResult *pResult, void *pUserData);
 	static void ConClearChat(IConsole::IResult *pResult, void *pUserData);
 	static void ConToggleHideChatMedia(IConsole::IResult *pResult, void *pUserData);
+	static void ConAddCensorList(IConsole::IResult *pResult, void *pUserData);
+	static void ConAddWhiteList(IConsole::IResult *pResult, void *pUserData);
 
 	static void ConchainChatOld(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainChatFontSize(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainChatWidth(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
+	static void ConchainRegexPlayerWhitelist(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
+
+	static std::vector<std::string> SplitWords(const char *pMessage);
+	Regex m_RegexPlayerWhitelist;
 
 	bool LineShouldHighlight(const char *pLine, const char *pName);
 	void StoreSave(const char *pText);
@@ -359,6 +366,7 @@ public:
 
 	bool IsActive() const { return m_Mode != MODE_NONE; }
 	void AddLine(int ClientId, int Team, const char *pLine);
+	const char *FilterText(const char *pMessage, int ClientId = -2, bool IsChat = false);
 	void EnableMode(int Team);
 	void DisableMode();
 	void RegisterCommand(const char *pName, const char *pParams, const char *pHelpText);
