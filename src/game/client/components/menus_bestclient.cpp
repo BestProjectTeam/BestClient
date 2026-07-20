@@ -204,6 +204,118 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 
 	CUIRect Content, Label, Button;
 
+	// Chat Bubbles (left column block)
+	const bool ChatBubblesExpanded = g_Config.m_BcChatBubbles != 0;
+	const bool ChatBubblesShowCustomColors = ChatBubblesExpanded && g_Config.m_BcChatBubbleCustomColors != 0;
+	const float ChatBubbleColorPickerLineSize = 25.0f;
+	const float ChatBubbleColorPickerSpacing = 5.0f;
+	static float s_ChatBubblesRevealPhase = 0.0f;
+	UpdateModuleRevealPhase(s_ChatBubblesRevealPhase, ChatBubblesExpanded, Client()->RenderFrameTime());
+	const float ChatBubblesExpandedTargetHeight =
+		9.0f * (MarginSmall + LineSize) +
+		(ChatBubblesShowCustomColors ? 3.0f * (ChatBubbleColorPickerSpacing + ChatBubbleColorPickerLineSize) : 0.0f);
+	const float ChatBubblesExpandedHeight = ChatBubblesExpandedTargetHeight * BCUiAnimations::EaseOutCubic(s_ChatBubblesRevealPhase);
+	const float ChatBubblesBlockHeight = LineSize + MarginSmall + LineSize + ChatBubblesExpandedHeight;
+
+	CUIRect ChatBubblesBlock;
+	Column.HSplitTop(ChatBubblesBlockHeight, &ChatBubblesBlock, &Column);
+
+	CUIRect ChatBubblesBlockBg = ChatBubblesBlock;
+	ChatBubblesBlockBg.w += BlockPadding;
+	ChatBubblesBlockBg.h += BlockPadding;
+	ChatBubblesBlockBg.x -= BlockPadding * 0.5f;
+	ChatBubblesBlockBg.y -= BlockPadding * 0.5f;
+	ChatBubblesBlockBg.Draw(BlockColor, IGraphics::CORNER_ALL, 10.0f);
+
+	MainView = ChatBubblesBlock;
+
+	MainView.HSplitTop(LineSize, &Label, &MainView);
+	CUIRect ChatBubblesTitleLabel, ChatBubblesResetButton;
+	Label.VSplitRight(LineSize + 8.0f, &ChatBubblesTitleLabel, &ChatBubblesResetButton);
+	static CButtonContainer s_ChatBubblesResetButton;
+	const bool ChatBubblesResetClicked = Ui()->DoButton_FontIcon(&s_ChatBubblesResetButton, FontIcon::ARROW_ROTATE_LEFT, 0, &ChatBubblesResetButton, BUTTONFLAG_LEFT);
+	GameClient()->m_Tooltips.DoToolTip(&s_ChatBubblesResetButton, &ChatBubblesResetButton, Localize("Reset to defaults"));
+	if(ChatBubblesResetClicked)
+	{
+		g_Config.m_BcChatBubbles = DefaultConfig::BcChatBubbles;
+		g_Config.m_BcChatBubblesSelf = DefaultConfig::BcChatBubblesSelf;
+		g_Config.m_BcChatBubblesDemo = DefaultConfig::BcChatBubblesDemo;
+		g_Config.m_BcChatBubbleSize = DefaultConfig::BcChatBubbleSize;
+		g_Config.m_BcChatBubbleShowTime = DefaultConfig::BcChatBubbleShowTime;
+		g_Config.m_BcChatBubbleFadeOut = DefaultConfig::BcChatBubbleFadeOut;
+		g_Config.m_BcChatBubbleFadeIn = DefaultConfig::BcChatBubbleFadeIn;
+		g_Config.m_BcChatBubbleAnimation = DefaultConfig::BcChatBubbleAnimation;
+		g_Config.m_BcChatBubbleCustomColors = DefaultConfig::BcChatBubbleCustomColors;
+		g_Config.m_BcChatBubbleBgColor = DefaultConfig::BcChatBubbleBgColor;
+		g_Config.m_BcChatBubbleTextColor = DefaultConfig::BcChatBubbleTextColor;
+		g_Config.m_BcChatBubbleOutlineColor = DefaultConfig::BcChatBubbleOutlineColor;
+		g_Config.m_BcChatBubbleRounding = DefaultConfig::BcChatBubbleRounding;
+	}
+	Ui()->DoLabel(&ChatBubblesTitleLabel, Localize("Chat Bubbles"), HeadlineFontSize, TEXTALIGN_ML);
+	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+
+	MainView.HSplitTop(LineSize, &Content, &MainView);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatBubbles, Localize("Show chat bubbles above players"), &g_Config.m_BcChatBubbles, &Content, LineSize);
+
+	if(ChatBubblesExpandedHeight > 0.5f)
+	{
+		CUIRect Visible = MainView;
+		Visible.h = ChatBubblesExpandedHeight;
+		Ui()->ClipEnable(&Visible);
+
+		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+		MainView.HSplitTop(LineSize, &Content, &MainView);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatBubblesSelf, Localize("Show chat bubbles above you"), &g_Config.m_BcChatBubblesSelf, &Content, LineSize);
+
+		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+		MainView.HSplitTop(LineSize, &Content, &MainView);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatBubblesDemo, Localize("Show chat bubbles in demo"), &g_Config.m_BcChatBubblesDemo, &Content, LineSize);
+
+		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+		MainView.HSplitTop(LineSize, &Button, &MainView);
+		Ui()->DoScrollbarOption(&g_Config.m_BcChatBubbleSize, &g_Config.m_BcChatBubbleSize, &Button, Localize("Chat bubble size"), 20, 30);
+
+		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+		MainView.HSplitTop(LineSize, &Button, &MainView);
+		DoSliderWithScaledValue(&g_Config.m_BcChatBubbleShowTime, &g_Config.m_BcChatBubbleShowTime, &Button, Localize("Show for"), 200, 1000, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "s");
+
+		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+		MainView.HSplitTop(LineSize, &Button, &MainView);
+		DoSliderWithScaledValue(&g_Config.m_BcChatBubbleFadeIn, &g_Config.m_BcChatBubbleFadeIn, &Button, Localize("Fade in"), 15, 100, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "s");
+
+		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+		MainView.HSplitTop(LineSize, &Button, &MainView);
+		DoSliderWithScaledValue(&g_Config.m_BcChatBubbleFadeOut, &g_Config.m_BcChatBubbleFadeOut, &Button, Localize("Fade out"), 15, 100, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "s");
+
+		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+		MainView.HSplitTop(LineSize, &Content, &MainView);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatBubbleAnimation, Localize("Stack animation"), &g_Config.m_BcChatBubbleAnimation, &Content, LineSize);
+
+		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+		MainView.HSplitTop(LineSize, &Button, &MainView);
+		Ui()->DoScrollbarOption(&g_Config.m_BcChatBubbleRounding, &g_Config.m_BcChatBubbleRounding, &Button, Localize("Corner rounding"), 0, 30);
+
+		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+		MainView.HSplitTop(LineSize, &Content, &MainView);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatBubbleCustomColors, Localize("Custom colors"), &g_Config.m_BcChatBubbleCustomColors, &Content, LineSize);
+
+		if(ChatBubblesShowCustomColors)
+		{
+			static CButtonContainer s_ChatBubbleBgColorButton;
+			DoLine_ColorPicker(&s_ChatBubbleBgColorButton, ChatBubbleColorPickerLineSize, 13.0f, ChatBubbleColorPickerSpacing, &MainView, Localize("Background"), &g_Config.m_BcChatBubbleBgColor, color_cast<ColorRGBA>(ColorHSLA(DefaultConfig::BcChatBubbleBgColor, true)), false, nullptr, true);
+
+			static CButtonContainer s_ChatBubbleTextColorButton;
+			DoLine_ColorPicker(&s_ChatBubbleTextColorButton, ChatBubbleColorPickerLineSize, 13.0f, ChatBubbleColorPickerSpacing, &MainView, Localize("Text"), &g_Config.m_BcChatBubbleTextColor, color_cast<ColorRGBA>(ColorHSLA(DefaultConfig::BcChatBubbleTextColor, true)), false, nullptr, true);
+
+			static CButtonContainer s_ChatBubbleOutlineColorButton;
+			DoLine_ColorPicker(&s_ChatBubbleOutlineColorButton, ChatBubbleColorPickerLineSize, 13.0f, ChatBubbleColorPickerSpacing, &MainView, Localize("Outline"), &g_Config.m_BcChatBubbleOutlineColor, color_cast<ColorRGBA>(ColorHSLA(DefaultConfig::BcChatBubbleOutlineColor, true)), false, nullptr, true);
+		}
+
+		Ui()->ClipDisable();
+	}
+
+	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
+
 	// Gradient (left column block)
 	const bool GradientNicknames = g_Config.m_BcNameplateGradient != 0;
 	const bool GradientClans = g_Config.m_BcNameplateGradientClan != 0;

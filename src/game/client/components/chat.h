@@ -357,6 +357,7 @@ class CChat : public CComponent
 	friend class CTranslate;
 	friend class CTClient;
 	friend class CGifBubbles;
+	friend class CChatBubbles;
 
 public:
 	CChat();

@@ -1045,6 +1045,8 @@ private:
 	}
 
 public:
+	bool IsInited() const { return m_Inited; }
+
 	CNamePlate() = default;
 	CNamePlate(CGameClient &This, const CNamePlateData &Data)
 	{
@@ -1563,6 +1565,18 @@ void CNamePlates::ResetNamePlates()
 		NamePlate.Reset(*GameClient());
 	for(auto &FlyingState : m_pData->m_aFlyingNamePlateStates)
 		FlyingState = CNamePlatesData::CFlyingNamePlateState();
+}
+
+float CNamePlates::GetNamePlateOffset(int ClientId) const
+{
+	if(!m_pData || ClientId < 0 || ClientId >= MAX_CLIENTS)
+		return 0.0f;
+
+	const CNamePlate &NamePlate = m_pData->m_aNamePlates[ClientId];
+	if(!NamePlate.IsInited())
+		return 0.0f;
+
+	return NamePlate.Size().y;
 }
 
 void CNamePlates::OnRender()

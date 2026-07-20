@@ -471,6 +471,7 @@ void CGameClient::OnConsoleInit()
 					      &m_Particles.m_RenderExplosions,
 					      &m_NamePlates,
 					      &m_GifBubbles, // BestClient
+					      &m_ChatBubbles, // BestClient
 					      &m_Particles.m_RenderExtra,
 					      &m_Particles.m_RenderGeneral,
 					      &m_FreezeBars,
