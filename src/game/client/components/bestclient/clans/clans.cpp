@@ -194,12 +194,16 @@ bool CClans::ResolveBaseUrl(char *pOut, int OutSize) const
 
 void CClans::SetError(const char *pErrorCode, const char *pFallback)
 {
+	m_ErrorOfferDiscord = false;
 	if(pErrorCode)
 	{
 		if(!str_comp(pErrorCode, "clan.tag_taken"))
 			str_copy(m_aError, Localize("This clan tag is already taken"), sizeof(m_aError));
-		else if(!str_comp(pErrorCode, "clan.tag_reserved"))
-			str_copy(m_aError, Localize("Please open a ticket"), sizeof(m_aError));
+		else if(!str_comp(pErrorCode, "clan.tag_reserved") || !str_comp(pErrorCode, "clan.tag_reserved_denied"))
+		{
+			str_copy(m_aError, Localize("This clan tag is reserved. Contact us on Discord to request it."), sizeof(m_aError));
+			m_ErrorOfferDiscord = true;
+		}
 		else if(!str_comp(pErrorCode, "auth.bad_credentials"))
 			str_copy(m_aError, Localize("Invalid nickname or password"), sizeof(m_aError));
 		else if(!str_comp(pErrorCode, "auth.taken"))
@@ -471,10 +475,14 @@ void CClans::Register(const char *pNickname, const char *pPassword)
 	str_format(aUrl, sizeof(aUrl), "%s/api/auth/register", aBase);
 	char aSkin[192];
 	BuildSkinJson(aSkin, sizeof(aSkin));
-	char aJson[512];
+	char aEscNick[64];
+	char aEscPass[128];
+	JsonEscapeString(aEscNick, sizeof(aEscNick), pNickname ? pNickname : "");
+	JsonEscapeString(aEscPass, sizeof(aEscPass), pPassword ? pPassword : "");
+	char aJson[640];
 	str_format(aJson, sizeof(aJson),
 		"{\"nickname\":\"%s\",\"password\":\"%s\",\"skin\":%s}",
-		pNickname, pPassword, aSkin);
+		aEscNick, aEscPass, aSkin);
 	auto pReq = HttpPostJson(aUrl, aJson);
 	pReq->FailOnErrorStatus(false);
 	pReq->Timeout(CTimeout{4000, 15000, 500, 5});
@@ -490,10 +498,14 @@ void CClans::Login(const char *pNickname, const char *pPassword)
 	str_format(aUrl, sizeof(aUrl), "%s/api/auth/login", aBase);
 	char aSkin[192];
 	BuildSkinJson(aSkin, sizeof(aSkin));
-	char aJson[512];
+	char aEscNick[64];
+	char aEscPass[128];
+	JsonEscapeString(aEscNick, sizeof(aEscNick), pNickname ? pNickname : "");
+	JsonEscapeString(aEscPass, sizeof(aEscPass), pPassword ? pPassword : "");
+	char aJson[640];
 	str_format(aJson, sizeof(aJson),
 		"{\"nickname\":\"%s\",\"password\":\"%s\",\"skin\":%s}",
-		pNickname, pPassword, aSkin);
+		aEscNick, aEscPass, aSkin);
 	auto pReq = HttpPostJson(aUrl, aJson);
 	pReq->FailOnErrorStatus(false);
 	BeginRequest(std::move(pReq), REQ_LOGIN);
@@ -539,7 +551,7 @@ void CClans::RefreshCatalog()
 	BeginRequest(std::move(pReq), REQ_CATALOG);
 }
 
-void CClans::CreateClan(const char *pName, const char *pTag, const char *pDescription, int IconId, unsigned Color, const char *pJoinPolicy, int MaxMembers)
+void CClans::CreateClan(const char *pName, const char *pTag, const char *pDescription, int IconId, unsigned Color, int Country, const char *pJoinPolicy, int MaxMembers)
 {
 	char aBase[128];
 	ResolveBaseUrl(aBase, sizeof(aBase));
@@ -549,10 +561,10 @@ void CClans::CreateClan(const char *pName, const char *pTag, const char *pDescri
 	JsonEscapeString(aEscName, sizeof(aEscName), pName ? pName : "");
 	JsonEscapeString(aEscTag, sizeof(aEscTag), pTag ? pTag : "");
 	JsonEscapeString(aEscDesc, sizeof(aEscDesc), pDescription ? pDescription : "");
-	char aJson[900];
+	char aJson[960];
 	str_format(aJson, sizeof(aJson),
-		"{\"name\":\"%s\",\"tag\":\"%s\",\"description\":\"%s\",\"icon_id\":%d,\"color\":%u,\"join_policy\":\"%s\",\"max_members\":%d}",
-		aEscName, aEscTag, aEscDesc, IconId, Color, pJoinPolicy, MaxMembers);
+		"{\"name\":\"%s\",\"tag\":\"%s\",\"description\":\"%s\",\"icon_id\":%d,\"color\":%u,\"country\":%d,\"join_policy\":\"%s\",\"max_members\":%d}",
+		aEscName, aEscTag, aEscDesc, IconId, Color, Country, pJoinPolicy, MaxMembers);
 	auto pReq = HttpPostJson(aUrl, aJson);
 	AuthHeader(pReq.get());
 	pReq->FailOnErrorStatus(false);
@@ -560,7 +572,7 @@ void CClans::CreateClan(const char *pName, const char *pTag, const char *pDescri
 	SetStatus(Localize("Creating clan..."));
 }
 
-void CClans::UpdateClanSettings(const char *pName, const char *pDescription, int IconId, unsigned Color)
+void CClans::UpdateClanSettings(const char *pName, const char *pDescription, int IconId, unsigned Color, int Country)
 {
 	if(!m_aClanId[0])
 		return;
@@ -571,10 +583,10 @@ void CClans::UpdateClanSettings(const char *pName, const char *pDescription, int
 	char aEscName[128], aEscDesc[512];
 	JsonEscapeString(aEscName, sizeof(aEscName), pName ? pName : "");
 	JsonEscapeString(aEscDesc, sizeof(aEscDesc), pDescription ? pDescription : "");
-	char aJson[900];
+	char aJson[960];
 	str_format(aJson, sizeof(aJson),
-		"{\"name\":\"%s\",\"description\":\"%s\",\"icon_id\":%d,\"color\":%u}",
-		aEscName, aEscDesc, IconId, Color);
+		"{\"name\":\"%s\",\"description\":\"%s\",\"icon_id\":%d,\"color\":%u,\"country\":%d}",
+		aEscName, aEscDesc, IconId, Color, Country);
 	auto pReq = HttpPostJson(aUrl, aJson);
 	AuthHeader(pReq.get());
 	pReq->FailOnErrorStatus(false);
@@ -586,6 +598,7 @@ void CClans::UpdateClanSettings(const char *pName, const char *pDescription, int
 	str_copy(m_Clan.m_aDescription, pDescription ? pDescription : "", sizeof(m_Clan.m_aDescription));
 	m_Clan.m_IconId = IconId;
 	m_Clan.m_Color = Color;
+	m_Clan.m_Country = Country;
 	SetStatus(Localize("Saving..."));
 }
 
@@ -1103,6 +1116,7 @@ void CClans::ParseCatalog(const json_value *pRoot)
 		str_copy(Entry.m_aDescription, JsonString(pE, "description"), sizeof(Entry.m_aDescription));
 		Entry.m_IconId = JsonInt(pE, "icon_id");
 		Entry.m_Color = (unsigned)JsonInt(pE, "color", 0xFFFFFF);
+		Entry.m_Country = JsonInt(pE, "country", -1);
 		str_copy(Entry.m_aJoinPolicy, JsonString(pE, "join_policy", "open"), sizeof(Entry.m_aJoinPolicy));
 		Entry.m_MaxMembers = JsonInt(pE, "max_members", 50);
 		Entry.m_MemberCount = JsonInt(pE, "member_count");
@@ -1131,6 +1145,7 @@ void CClans::ParseClanSnapshot(const json_value *pRoot)
 	str_copy(m_Clan.m_aDescription, JsonString(pRoot, "description"), sizeof(m_Clan.m_aDescription));
 	m_Clan.m_IconId = JsonInt(pRoot, "icon_id");
 	m_Clan.m_Color = (unsigned)JsonInt(pRoot, "color", 0xFFFFFF);
+	m_Clan.m_Country = JsonInt(pRoot, "country", -1);
 	str_copy(m_Clan.m_aJoinPolicy, JsonString(pRoot, "join_policy", "open"), sizeof(m_Clan.m_aJoinPolicy));
 	m_Clan.m_MaxMembers = JsonInt(pRoot, "max_members", 50);
 	const json_value *pInvite = json_object_get(pRoot, "invite_code");
@@ -1218,6 +1233,7 @@ void CClans::ParsePreviewSnapshot(const json_value *pRoot)
 	str_copy(m_Preview.m_aDescription, JsonString(pRoot, "description"), sizeof(m_Preview.m_aDescription));
 	m_Preview.m_IconId = JsonInt(pRoot, "icon_id");
 	m_Preview.m_Color = (unsigned)JsonInt(pRoot, "color", 0xFFFFFF);
+	m_Preview.m_Country = JsonInt(pRoot, "country", -1);
 	str_copy(m_Preview.m_aJoinPolicy, JsonString(pRoot, "join_policy", "open"), sizeof(m_Preview.m_aJoinPolicy));
 	m_Preview.m_MaxMembers = JsonInt(pRoot, "max_members", 50);
 

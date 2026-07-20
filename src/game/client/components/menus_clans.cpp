@@ -16,6 +16,7 @@
 #include <game/client/ui_scrollregion.h>
 #include <game/localization.h>
 
+#include "countryflags.h"
 #include "menus.h"
 
 #include <engine/font_icons.h>
@@ -167,9 +168,11 @@ static const char *RoleLabel(CClans::ERole Role)
 	}
 }
 
+static constexpr int NUM_CLAN_ICONS = 24;
+
 static const char *ClanIconGlyph(int IconId)
 {
-	static const char *s_apGlyphs[8] = {
+	static const char *s_apGlyphs[NUM_CLAN_ICONS] = {
 		FontIcon::STAR,
 		FontIcon::HEART,
 		FontIcon::BOMB,
@@ -178,14 +181,65 @@ static const char *ClanIconGlyph(int IconId)
 		FontIcon::KEY,
 		FontIcon::SNAKE,
 		FontIcon::CHESS_KING,
+		FontIcon::CHESS_QUEEN,
+		FontIcon::CHESS_ROOK,
+		FontIcon::CHESS_KNIGHT,
+		FontIcon::CHESS_BISHOP,
+		FontIcon::CHESS_PAWN,
+		FontIcon::USER,
+		FontIcon::ICON_USERS,
+		FontIcon::LOCK,
+		FontIcon::BOOKMARK,
+		FontIcon::EYE,
+		FontIcon::EARTH_AMERICAS,
+		FontIcon::MUSIC,
+		FontIcon::MICROPHONE,
+		FontIcon::CAMERA,
+		FontIcon::NETWORK_WIRED,
+		FontIcon::TABLE_TENNIS_PADDLE_BALL,
 	};
-	return s_apGlyphs[std::clamp(IconId, 0, 7)];
+	return s_apGlyphs[std::clamp(IconId, 0, NUM_CLAN_ICONS - 1)];
 }
 
 static ColorRGBA ClanColorRgb(unsigned Color)
 {
 	Color &= 0xFFFFFF;
 	return ColorRGBA(((Color >> 16) & 0xFF) / 255.0f, ((Color >> 8) & 0xFF) / 255.0f, (Color & 0xFF) / 255.0f, 1.0f);
+}
+
+static void RenderClansErrorBanner(CGameClient *pGameClient, CUi *pUi, ITextRender *pTextRender, CUIRect MainView, CClans &Clans)
+{
+	if(!Clans.ErrorMessage()[0])
+		return;
+
+	const bool OfferDiscord = Clans.ErrorOfferDiscord();
+	CUIRect Msg;
+	MainView.HSplitBottom(OfferDiscord ? 46.0f : 28.0f, nullptr, &Msg);
+	Msg.VSplitLeft(minimum(OfferDiscord ? 420.0f : 280.0f, Msg.w), &Msg, nullptr);
+	Msg.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.35f), IGraphics::CORNER_ALL, 5.0f);
+	Msg.Margin(7.0f, &Msg);
+
+	CUIRect Line, Link;
+	if(OfferDiscord)
+		Msg.HSplitTop(16.0f, &Line, &Link);
+	else
+		Line = Msg;
+
+	pTextRender->TextColor(1.0f, 0.4f, 0.4f, 1.0f);
+	pUi->DoLabel(&Line, Clans.ErrorMessage(), 12.0f, TEXTALIGN_ML);
+	pTextRender->TextColor(pTextRender->DefaultTextColor());
+
+	if(OfferDiscord)
+	{
+		Link.HSplitTop(4.0f, nullptr, &Link);
+		static CButtonContainer s_DiscordLink;
+		const bool Hot = pUi->HotItem() == &s_DiscordLink;
+		pTextRender->TextColor(Hot ? ColorRGBA(0.45f, 0.75f, 1.0f, 1.0f) : ColorRGBA(0.35f, 0.65f, 1.0f, 1.0f));
+		pUi->DoLabel(&Link, "discord.gg/bestclient", 12.0f, TEXTALIGN_ML);
+		pTextRender->TextColor(pTextRender->DefaultTextColor());
+		if(pUi->DoButtonLogic(&s_DiscordLink, 0, &Link, BUTTONFLAG_LEFT))
+			pGameClient->Client()->ViewLink("https://discord.gg/bestclient");
+	}
 }
 
 static void RenderClanIcon(CUi *pUi, ITextRender *pTextRender, CUIRect Box, int IconId, unsigned Color)
@@ -197,6 +251,38 @@ static void RenderClanIcon(CUi *pUi, ITextRender *pTextRender, CUIRect Box, int 
 	pTextRender->TextColor(pTextRender->DefaultTextColor());
 	pTextRender->SetRenderFlags(0);
 	pTextRender->SetFontPreset(EFontPreset::DEFAULT_FONT);
+}
+
+static void RenderClanFlag(CGameClient *pGameClient, CUIRect Box, int Country)
+{
+	const float FlagH = Box.h;
+	const float FlagW = FlagH * 2.0f;
+	CUIRect Flag = Box;
+	Flag.w = FlagW;
+	Flag.x += (Box.w - FlagW) * 0.5f;
+	pGameClient->m_CountryFlags.Render(Country, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), Flag.x, Flag.y, Flag.w, Flag.h);
+}
+
+static void RenderClanIconPickerRow(CUi *pUi, ITextRender *pTextRender, CUIRect Row, int StartId, int Count, int *pIconId, unsigned ClanRgb, float IconCell, CButtonContainer *pIcons)
+{
+	for(int i = 0; i < Count; i++)
+	{
+		const int Id = StartId + i;
+		if(Id >= NUM_CLAN_ICONS)
+			break;
+		CUIRect IconBtn;
+		Row.VSplitLeft(IconCell, &IconBtn, &Row);
+		IconBtn.VSplitRight(4.0f, &IconBtn, nullptr);
+		IconBtn.Draw(ColorRGBA(0, 0, 0, *pIconId == Id ? 0.34f : 0.22f), IGraphics::CORNER_ALL, 4.0f);
+		RenderClanIcon(pUi, pTextRender, IconBtn, Id, ClanRgb);
+		if(pUi->DoButtonLogic(&pIcons[Id], *pIconId == Id, &IconBtn, BUTTONFLAG_LEFT))
+			*pIconId = Id;
+	}
+}
+
+static void FormatClanPlayingStatus(char *pBuf, int BufSize, const char *pMap, int Players, int MaxPlayers)
+{
+	str_format(pBuf, BufSize, Localize("playing: \"%s\" | %d/%d"), pMap, Players, MaxPlayers);
 }
 
 static void RenderClanMemberTee(CGameClient *pGameClient, CRenderTools *pRenderTools, CUIRect TeeBox, const CClans::SSkin &Skin)
@@ -375,17 +461,7 @@ void CMenus::RenderClans(CUIRect MainView)
 	if(!Clans.IsLoggedIn())
 	{
 		RenderClansAuth(MainView);
-		if(Clans.ErrorMessage()[0])
-		{
-			CUIRect Msg;
-			MainView.HSplitBottom(28.0f, nullptr, &Msg);
-			Msg.VSplitLeft(minimum(280.0f, Msg.w), &Msg, nullptr);
-			Msg.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.35f), IGraphics::CORNER_ALL, 5.0f);
-			Msg.Margin(7.0f, &Msg);
-			TextRender()->TextColor(1.0f, 0.4f, 0.4f, 1.0f);
-			Ui()->DoLabel(&Msg, Clans.ErrorMessage(), 12.0f, TEXTALIGN_ML);
-			TextRender()->TextColor(TextRender()->DefaultTextColor());
-		}
+		RenderClansErrorBanner(GameClient(), Ui(), TextRender(), MainView, Clans);
 		return;
 	}
 
@@ -419,17 +495,7 @@ void CMenus::RenderClans(CUIRect MainView)
 		break;
 	}
 
-	if(Clans.ErrorMessage()[0])
-	{
-		CUIRect Msg;
-		MainView.HSplitBottom(28.0f, nullptr, &Msg);
-		Msg.VSplitLeft(minimum(280.0f, Msg.w), &Msg, nullptr);
-		Msg.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.35f), IGraphics::CORNER_ALL, 5.0f);
-		Msg.Margin(7.0f, &Msg);
-		TextRender()->TextColor(1.0f, 0.4f, 0.4f, 1.0f);
-		Ui()->DoLabel(&Msg, Clans.ErrorMessage(), 12.0f, TEXTALIGN_ML);
-		TextRender()->TextColor(TextRender()->DefaultTextColor());
-	}
+	RenderClansErrorBanner(GameClient(), Ui(), TextRender(), MainView, Clans);
 }
 
 void CMenus::RenderClansAuth(CUIRect MainView)
@@ -437,7 +503,7 @@ void CMenus::RenderClansAuth(CUIRect MainView)
 	CClans &Clans = GameClient()->m_Clans;
 	static CLineInput s_Nick;
 	static CLineInput s_Pass;
-	static char s_aNick[32];
+	static char s_aNick[MAX_NAME_LENGTH];
 	static char s_aPass[64];
 	static bool s_Init = false;
 	if(!s_Init)
@@ -733,11 +799,14 @@ void CMenus::RenderClansLanding(CUIRect MainView)
 		{
 			Item.Draw(ColorRGBA(1, 1, 1, 0.04f), IGraphics::CORNER_ALL, 3.0f);
 			Item.Margin(4.0f, &Item);
-			CUIRect IconBox, Name, Meta;
+			CUIRect IconBox, FlagBox, Name, Meta;
 			Item.VSplitLeft(28.0f, &IconBox, &Item);
+			Item.VSplitLeft(4.0f, nullptr, &Item);
+			Item.VSplitLeft(36.0f, &FlagBox, &Item);
 			Item.VSplitLeft(4.0f, nullptr, &Item);
 			Item.VSplitRight(100.0f, &Name, &Meta);
 			RenderClanIcon(Ui(), TextRender(), IconBox, Entry.m_IconId, Entry.m_Color);
+			RenderClanFlag(GameClient(), FlagBox, Entry.m_Country);
 			char aLine[96];
 			str_format(aLine, sizeof(aLine), "[%s] %s", Entry.m_aTag, Entry.m_aName);
 			Ui()->DoLabel(&Name, aLine, 13.0f, TEXTALIGN_ML);
@@ -773,6 +842,7 @@ void CMenus::RenderClansSetup(CUIRect MainView)
 	static int s_Policy = 0;
 	static int s_MaxMembers = 50;
 	static int s_IconId = 7; // crown-ish default
+	static int s_Country = -1;
 	static unsigned s_ColorHsla = 0;
 	static bool s_Init = false;
 	if(!s_Init)
@@ -781,6 +851,7 @@ void CMenus::RenderClansSetup(CUIRect MainView)
 		str_copy(s_aTag, g_Config.m_PlayerClan, sizeof(s_aTag));
 		str_copy(s_aName, g_Config.m_PlayerClan, sizeof(s_aName));
 		s_IconId = 7;
+		s_Country = g_Config.m_PlayerCountry;
 		s_ColorHsla = color_cast<ColorHSLA>(ColorRGBA(0.33f, 0.55f, 1.0f, 1.0f)).Pack(false);
 		s_Init = true;
 	}
@@ -819,7 +890,7 @@ void CMenus::RenderClansSetup(CUIRect MainView)
 	Actions.VSplitMid(&CreateBtn, &BackBtn, 8.0f);
 	static CButtonContainer s_Create, s_Back;
 	if(DoClansTextBtn(Ui(), TextRender(), &s_Create, Localize("Create clan"), &CreateBtn) && s_aName[0] && s_aTag[0] && !Clans.IsBusy())
-		Clans.CreateClan(s_aName, s_aTag, s_aDesc, s_IconId, ClanRgb, apPolicy[s_Policy], s_MaxMembers);
+		Clans.CreateClan(s_aName, s_aTag, s_aDesc, s_IconId, ClanRgb, s_Country, apPolicy[s_Policy], s_MaxMembers);
 	if(DoClansTextBtn(Ui(), TextRender(), &s_Back, Localize("Back"), &BackBtn))
 		Clans.SetView(Clans.InClan() ? CClans::EView::CLAN : CClans::EView::LANDING);
 
@@ -839,14 +910,11 @@ void CMenus::RenderClansSetup(CUIRect MainView)
 	Left.HSplitTop(14.0f, &Label, &Left);
 	Ui()->DoLabel(&Label, Localize("Description"), 12.0f, TEXTALIGN_ML);
 	Left.HSplitTop(4.0f, nullptr, &Left);
-	Left.HSplitTop(40.0f, &Button, &Left);
+	Left.HSplitTop(56.0f, &Button, &Left);
 	{
-		CUIRect DescEdit = Button;
-		if(DescEdit.w > PreviewDescW)
-			DescEdit.w = PreviewDescW;
-		const float DescLineWidth = maximum(1.0f, DescEdit.w - 4.0f);
-		if(DoClansEditBox(Ui(), &s_Desc, &DescEdit, DescFont, IGraphics::CORNER_ALL, DescLineWidth, DescSpacing))
-			TruncateClanDescription(TextRender(), s_aDesc, DescFont, DescLineWidth, 2);
+		const float DescLineWidth = maximum(1.0f, Button.w - 4.0f);
+		if(DoClansEditBox(Ui(), &s_Desc, &Button, DescFont, IGraphics::CORNER_ALL, DescLineWidth, DescSpacing))
+			TruncateClanDescription(TextRender(), s_aDesc, DescFont, DescLineWidth, 3);
 	}
 
 	Left.HSplitTop(8.0f, nullptr, &Left);
@@ -866,17 +934,9 @@ void CMenus::RenderClansSetup(CUIRect MainView)
 	CUIRect IconsRow, ColorRow;
 	Row.VSplitRight(100.0f, &IconsRow, &ColorRow);
 	ColorRow.VSplitLeft(8.0f, nullptr, &ColorRow);
-	static CButtonContainer s_aIcons[8];
-	for(int i = 0; i < 8; i++)
-	{
-		CUIRect IconBtn;
-		IconsRow.VSplitLeft(IconsRow.h + 4.0f, &IconBtn, &IconsRow);
-		IconBtn.VSplitRight(4.0f, &IconBtn, nullptr);
-		IconBtn.Draw(ColorRGBA(0, 0, 0, s_IconId == i ? 0.34f : 0.22f), IGraphics::CORNER_ALL, 4.0f);
-		RenderClanIcon(Ui(), TextRender(), IconBtn, i, ClanRgb);
-		if(Ui()->DoButtonLogic(&s_aIcons[i], s_IconId == i, &IconBtn, BUTTONFLAG_LEFT))
-			s_IconId = i;
-	}
+	static CButtonContainer s_aIcons[NUM_CLAN_ICONS];
+	const float IconCell = IconsRow.h + 4.0f;
+	RenderClanIconPickerRow(Ui(), TextRender(), IconsRow, 0, 8, &s_IconId, ClanRgb, IconCell, s_aIcons);
 	{
 		CUIRect ColorBtn, ResetBtn;
 		ColorRow.VSplitRight(56.0f, &ColorRow, &ResetBtn);
@@ -889,6 +949,39 @@ void CMenus::RenderClansSetup(CUIRect MainView)
 		ResetBtn.HMargin(2.0f, &ResetBtn);
 		if(DoClansTextBtn(Ui(), TextRender(), &s_ColorReset, Localize("Reset"), &ResetBtn))
 			s_ColorHsla = color_cast<ColorHSLA>(ColorRGBA(0.33f, 0.55f, 1.0f, 1.0f)).Pack(false);
+	}
+	Left.HSplitTop(4.0f, nullptr, &Left);
+	Left.HSplitTop(32.0f, &Row, &Left);
+	RenderClanIconPickerRow(Ui(), TextRender(), Row, 8, 8, &s_IconId, ClanRgb, IconCell, s_aIcons);
+	Left.HSplitTop(4.0f, nullptr, &Left);
+	Left.HSplitTop(32.0f, &Row, &Left);
+	RenderClanIconPickerRow(Ui(), TextRender(), Row, 16, 8, &s_IconId, ClanRgb, IconCell, s_aIcons);
+
+	Left.HSplitTop(10.0f, nullptr, &Left);
+	Left.HSplitTop(16.0f, &Label, &Left);
+	Ui()->DoLabel(&Label, Localize("Flag"), 12.0f, TEXTALIGN_ML);
+	Left.HSplitTop(4.0f, nullptr, &Left);
+	Left.HSplitTop(28.0f, &Button, &Left);
+	{
+		CUIRect FlagButton = Button;
+		FlagButton.w = minimum(FlagButton.w, 56.0f);
+		static CButtonContainer s_FlagButton;
+		if(DoButton_Menu(&s_FlagButton, "", 0, &FlagButton))
+		{
+			static SPopupMenuId s_PopupCountryId;
+			static SPopupSettingsCountrySelectionContext s_PopupCountryContext;
+			s_PopupCountryContext.m_pMenus = this;
+			s_PopupCountryContext.m_pCountry = &s_Country;
+			s_PopupCountryContext.m_Selection = s_Country;
+			s_PopupCountryContext.m_New = true;
+			Ui()->DoPopupMenu(&s_PopupCountryId, FlagButton.x, FlagButton.y + FlagButton.h, 490.0f, 210.0f, &s_PopupCountryContext, PopupSettingsCountrySelection);
+		}
+		GameClient()->m_Tooltips.DoToolTip(&s_FlagButton, &FlagButton, Localize("Choose country flag"));
+		CUIRect FlagIcon = FlagButton;
+		const float OldFlagWidth = FlagIcon.w;
+		FlagIcon.w = FlagIcon.h * 2.0f;
+		FlagIcon.x += (OldFlagWidth - FlagIcon.w) / 2.0f;
+		GameClient()->m_CountryFlags.Render(s_Country, ColorRGBA(1.0f, 1.0f, 1.0f, Ui()->HotItem() == &s_FlagButton ? 1.0f : 0.85f), FlagIcon.x, FlagIcon.y, FlagIcon.w, FlagIcon.h);
 	}
 
 	Left.HSplitTop(10.0f, nullptr, &Left);
@@ -939,12 +1032,14 @@ void CMenus::RenderClansSetup(CUIRect MainView)
 	CUIRect Card = Right;
 	Card.Margin(4.0f, &Card);
 
-	CUIRect Header, IconBox, TextCol;
+	CUIRect Header, IconBox, FlagBox, TextCol;
 	Card.HSplitTop(40.0f, &Header, &Card);
 	Header.VSplitLeft(36.0f, &IconBox, &TextCol);
 	TextCol.VSplitLeft(8.0f, nullptr, &TextCol);
+	TextCol.VSplitRight(44.0f, &TextCol, &FlagBox);
 	IconBox.Draw(ColorRGBA(0, 0, 0, 0.20f), IGraphics::CORNER_ALL, 4.0f);
 	RenderClanIcon(Ui(), TextRender(), IconBox, s_IconId, ClanRgb);
+	RenderClanFlag(GameClient(), FlagBox, s_Country);
 
 	CUIRect TitleR, MetaR;
 	TextCol.HSplitMid(&TitleR, &MetaR);
@@ -1070,15 +1165,18 @@ void CMenus::RenderClansPage(CUIRect MainView)
 	TextRender()->TextWidth(DescFont, Clan.m_aDescription[0] ? Clan.m_aDescription : " ", -1, InfoInnerW, 0, DescSizeProps);
 	DescLines = std::clamp(DescLines, 1, 3);
 	const float DescBlockH = DescLines * (DescFont + DescSpacing) + 4.0f;
-	const float InfoBlockH = 34.0f + 25.0f + 18.0f + 4.0f + DescBlockH + 20.0f + 16.0f;
+	const float InfoBlockH = 34.0f + 18.0f + 25.0f + 18.0f + 4.0f + DescBlockH + 20.0f + 16.0f;
 	Left.HSplitTop(InfoBlockH, &InfoBlock, &Left);
 	InfoBlock.Draw(ColorRGBA(0, 0, 0, 0.20f), IGraphics::CORNER_ALL, 6.0f);
 	InfoBlock.Margin(8.0f, &InfoBlock);
 
-	CUIRect CenterIcon, TitleRow;
+	CUIRect CenterIcon, TitleRow, FlagRow;
 	InfoBlock.HSplitTop(34.0f, &CenterIcon, &InfoBlock);
 	CenterIcon.VMargin(maximum(0.0f, (CenterIcon.w - 34.0f) * 0.5f), &IconBox);
 	RenderClanIcon(Ui(), TextRender(), IconBox, Clan.m_IconId, Clan.m_Color);
+	InfoBlock.HSplitTop(18.0f, &FlagRow, &InfoBlock);
+	FlagRow.VMargin(maximum(0.0f, (FlagRow.w - 36.0f) * 0.5f), &FlagRow);
+	RenderClanFlag(GameClient(), FlagRow, Clan.m_Country);
 	InfoBlock.HSplitTop(25.0f, &TitleRow, &InfoBlock);
 	Ui()->DoLabel(&TitleRow, Clan.m_aName[0] ? Clan.m_aName : Localize("Loading..."), 18.0f, TEXTALIGN_MC);
 
@@ -1243,7 +1341,7 @@ void CMenus::RenderClansPage(CUIRect MainView)
 				Item.VSplitRight(28.0f, &Item, &SettingsBtn);
 				Item.VSplitRight(4.0f, &Item, nullptr);
 			}
-			Item.VSplitRight(140.0f, &Name, &Status);
+			Item.VSplitRight(200.0f, &Name, &Status);
 			RenderClanMemberTee(GameClient(), RenderTools(), Tee, M.m_Skin);
 			CUIRect NickRow, RoleRow;
 			Name.HSplitMid(&NickRow, &RoleRow);
@@ -1253,9 +1351,9 @@ void CMenus::RenderClansPage(CUIRect MainView)
 			TextRender()->TextColor(TextRender()->DefaultTextColor());
 			if(M.m_Online)
 			{
-				char aSt[96];
+				char aSt[128];
 				if(M.m_aMap[0])
-					str_format(aSt, sizeof(aSt), Localize("playing %s %d/%d"), M.m_aMap, M.m_Players, M.m_MaxPlayers);
+					FormatClanPlayingStatus(aSt, sizeof(aSt), M.m_aMap, M.m_Players, M.m_MaxPlayers);
 				else
 					str_copy(aSt, Localize("online"), sizeof(aSt));
 				Ui()->DoLabel(&Status, aSt, 11.0f, TEXTALIGN_MR);
@@ -1320,10 +1418,10 @@ void CMenus::RenderClansPage(CUIRect MainView)
 			Item.Draw(ColorRGBA(1, 1, 1, JoinHot ? 0.10f : 0.03f), IGraphics::CORNER_ALL, 3.0f);
 			Item.Margin(4.0f, &Item);
 			CUIRect Name, Meta;
-			Item.VSplitRight(180.0f, &Name, &Meta);
+			Item.VSplitRight(220.0f, &Name, &Meta);
 			Ui()->DoLabel(&Name, U.m_aName, 12.0f, TEXTALIGN_ML);
-			char aUMeta[128];
-			str_format(aUMeta, sizeof(aUMeta), Localize("playing %s %d/%d"), U.m_aMap, U.m_Players, U.m_MaxPlayers);
+			char aUMeta[160];
+			FormatClanPlayingStatus(aUMeta, sizeof(aUMeta), U.m_aMap, U.m_Players, U.m_MaxPlayers);
 			Ui()->DoLabel(&Meta, aUMeta, 11.0f, TEXTALIGN_MR);
 			if(CanJoin && UnleashedIndex < std::size(s_aUnleashedJoinIds) && Ui()->DoButtonLogic(&s_aUnleashedJoinIds[UnleashedIndex], 0, &Item, BUTTONFLAG_LEFT))
 				Connect(U.m_aServer);
@@ -1607,14 +1705,17 @@ void CMenus::RenderClansPreview(CUIRect MainView)
 	Left.Margin(10.0f, &Left);
 
 	CUIRect InfoBlock, IconBox;
-	Left.HSplitTop(150.0f, &InfoBlock, &Left);
+	Left.HSplitTop(168.0f, &InfoBlock, &Left);
 	InfoBlock.Draw(ColorRGBA(0, 0, 0, 0.20f), IGraphics::CORNER_ALL, 6.0f);
 	InfoBlock.Margin(8.0f, &InfoBlock);
 
-	CUIRect CenterIcon, TitleRow;
+	CUIRect CenterIcon, TitleRow, FlagRow;
 	InfoBlock.HSplitTop(32.0f, &CenterIcon, &InfoBlock);
 	CenterIcon.VMargin(maximum(0.0f, (CenterIcon.w - 32.0f) * 0.5f), &IconBox);
 	RenderClanIcon(Ui(), TextRender(), IconBox, Clan.m_IconId, Clan.m_Color);
+	InfoBlock.HSplitTop(16.0f, &FlagRow, &InfoBlock);
+	FlagRow.VMargin(maximum(0.0f, (FlagRow.w - 32.0f) * 0.5f), &FlagRow);
+	RenderClanFlag(GameClient(), FlagRow, Clan.m_Country);
 	InfoBlock.HSplitTop(24.0f, &TitleRow, &InfoBlock);
 	Ui()->DoLabel(&TitleRow, Clan.m_aName[0] ? Clan.m_aName : Localize("Loading..."), 17.0f, TEXTALIGN_MC);
 
@@ -1676,7 +1777,7 @@ void CMenus::RenderClansPreview(CUIRect MainView)
 			CUIRect Tee, Name, Status;
 			Item.VSplitLeft(36.0f, &Tee, &Item);
 			Item.VSplitLeft(4.0f, nullptr, &Item);
-			Item.VSplitRight(150.0f, &Name, &Status);
+			Item.VSplitRight(200.0f, &Name, &Status);
 			RenderClanMemberTee(GameClient(), RenderTools(), Tee, M.m_Skin);
 			CUIRect NickRow, RoleRow;
 			Name.HSplitMid(&NickRow, &RoleRow);
@@ -1684,7 +1785,14 @@ void CMenus::RenderClansPreview(CUIRect MainView)
 			TextRender()->TextColor(ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
 			Ui()->DoLabel(&RoleRow, RoleLabel(M.m_Role), 9.0f, TEXTALIGN_ML);
 			TextRender()->TextColor(TextRender()->DefaultTextColor());
-			Ui()->DoLabel(&Status, M.m_Online ? Localize("online") : Localize("offline"), 11.0f, TEXTALIGN_MR);
+			if(M.m_Online && M.m_aMap[0])
+			{
+				char aSt[128];
+				FormatClanPlayingStatus(aSt, sizeof(aSt), M.m_aMap, M.m_Players, M.m_MaxPlayers);
+				Ui()->DoLabel(&Status, aSt, 11.0f, TEXTALIGN_MR);
+			}
+			else
+				Ui()->DoLabel(&Status, M.m_Online ? Localize("online") : Localize("offline"), 11.0f, TEXTALIGN_MR);
 		}
 		Right.HSplitTop(3.0f, nullptr, &Right);
 	}
@@ -1901,6 +2009,7 @@ void CMenus::RenderClansSettings(CUIRect MainView)
 	static CLineInput s_Name, s_Desc;
 	static char s_aName[64], s_aDesc[256];
 	static int s_IconId = 0;
+	static int s_Country = -1;
 	static unsigned s_ColorHsla = 0;
 	static char s_aLoadedClanId[64] = "";
 
@@ -1909,7 +2018,8 @@ void CMenus::RenderClansSettings(CUIRect MainView)
 		str_copy(s_aLoadedClanId, Clan.m_aClanId, sizeof(s_aLoadedClanId));
 		str_copy(s_aName, Clan.m_aName, sizeof(s_aName));
 		str_copy(s_aDesc, Clan.m_aDescription, sizeof(s_aDesc));
-		s_IconId = std::clamp(Clan.m_IconId, 0, 7);
+		s_IconId = std::clamp(Clan.m_IconId, 0, NUM_CLAN_ICONS - 1);
+		s_Country = Clan.m_Country;
 		const unsigned R = (Clan.m_Color >> 16) & 0xFF;
 		const unsigned G = (Clan.m_Color >> 8) & 0xFF;
 		const unsigned B = Clan.m_Color & 0xFF;
@@ -1979,17 +2089,9 @@ void CMenus::RenderClansSettings(CUIRect MainView)
 	CUIRect IconsRow, ColorRow;
 	Row.VSplitRight(100.0f, &IconsRow, &ColorRow);
 	ColorRow.VSplitLeft(8.0f, nullptr, &ColorRow);
-	static CButtonContainer s_aIcons[8];
-	for(int i = 0; i < 8; i++)
-	{
-		CUIRect IconBtn;
-		IconsRow.VSplitLeft(IconsRow.h + 4.0f, &IconBtn, &IconsRow);
-		IconBtn.VSplitRight(4.0f, &IconBtn, nullptr);
-		IconBtn.Draw(ColorRGBA(0, 0, 0, s_IconId == i ? 0.34f : 0.22f), IGraphics::CORNER_ALL, 4.0f);
-		RenderClanIcon(Ui(), TextRender(), IconBtn, i, ClanRgb);
-		if(Ui()->DoButtonLogic(&s_aIcons[i], s_IconId == i, &IconBtn, BUTTONFLAG_LEFT))
-			s_IconId = i;
-	}
+	static CButtonContainer s_aIcons[NUM_CLAN_ICONS];
+	const float IconCell = IconsRow.h + 4.0f;
+	RenderClanIconPickerRow(Ui(), TextRender(), IconsRow, 0, 8, &s_IconId, ClanRgb, IconCell, s_aIcons);
 	{
 		CUIRect ColorBtn, ResetBtn;
 		ColorRow.VSplitRight(56.0f, &ColorRow, &ResetBtn);
@@ -2003,6 +2105,39 @@ void CMenus::RenderClansSettings(CUIRect MainView)
 		if(DoClansTextBtn(Ui(), TextRender(), &s_ColorReset, Localize("Reset"), &ResetBtn))
 			s_ColorHsla = color_cast<ColorHSLA>(ColorRGBA(0.33f, 0.55f, 1.0f, 1.0f)).Pack(false);
 	}
+	MainView.HSplitTop(4.0f, nullptr, &MainView);
+	MainView.HSplitTop(36.0f, &Row, &MainView);
+	RenderClanIconPickerRow(Ui(), TextRender(), Row, 8, 8, &s_IconId, ClanRgb, IconCell, s_aIcons);
+	MainView.HSplitTop(4.0f, nullptr, &MainView);
+	MainView.HSplitTop(36.0f, &Row, &MainView);
+	RenderClanIconPickerRow(Ui(), TextRender(), Row, 16, 8, &s_IconId, ClanRgb, IconCell, s_aIcons);
+
+	MainView.HSplitTop(10.0f, nullptr, &MainView);
+	MainView.HSplitTop(16.0f, &Label, &MainView);
+	Ui()->DoLabel(&Label, Localize("Flag"), 12.0f, TEXTALIGN_ML);
+	MainView.HSplitTop(4.0f, nullptr, &MainView);
+	MainView.HSplitTop(28.0f, &Button, &MainView);
+	{
+		CUIRect FlagButton = Button;
+		FlagButton.w = minimum(FlagButton.w, 56.0f);
+		static CButtonContainer s_FlagButton;
+		if(DoButton_Menu(&s_FlagButton, "", 0, &FlagButton))
+		{
+			static SPopupMenuId s_PopupCountryId;
+			static SPopupSettingsCountrySelectionContext s_PopupCountryContext;
+			s_PopupCountryContext.m_pMenus = this;
+			s_PopupCountryContext.m_pCountry = &s_Country;
+			s_PopupCountryContext.m_Selection = s_Country;
+			s_PopupCountryContext.m_New = true;
+			Ui()->DoPopupMenu(&s_PopupCountryId, FlagButton.x, FlagButton.y + FlagButton.h, 490.0f, 210.0f, &s_PopupCountryContext, PopupSettingsCountrySelection);
+		}
+		GameClient()->m_Tooltips.DoToolTip(&s_FlagButton, &FlagButton, Localize("Choose country flag"));
+		CUIRect FlagIcon = FlagButton;
+		const float OldFlagWidth = FlagIcon.w;
+		FlagIcon.w = FlagIcon.h * 2.0f;
+		FlagIcon.x += (OldFlagWidth - FlagIcon.w) / 2.0f;
+		GameClient()->m_CountryFlags.Render(s_Country, ColorRGBA(1.0f, 1.0f, 1.0f, Ui()->HotItem() == &s_FlagButton ? 1.0f : 0.85f), FlagIcon.x, FlagIcon.y, FlagIcon.w, FlagIcon.h);
+	}
 
 	MainView.HSplitTop(20.0f, nullptr, &MainView);
 	MainView.HSplitTop(40.0f, &Row, &MainView);
@@ -2010,7 +2145,7 @@ void CMenus::RenderClansSettings(CUIRect MainView)
 	Row.VSplitMid(&SaveBtn, &CancelBtn, 10.0f);
 	static CButtonContainer s_Save, s_Cancel;
 	if(DoClansTextBtn(Ui(), TextRender(), &s_Save, Localize("Save"), &SaveBtn) && s_aName[0] && !Clans.IsBusy())
-		Clans.UpdateClanSettings(s_aName, s_aDesc, s_IconId, ClanRgb);
+		Clans.UpdateClanSettings(s_aName, s_aDesc, s_IconId, ClanRgb, s_Country);
 	if(DoClansTextBtn(Ui(), TextRender(), &s_Cancel, Localize("Back"), &CancelBtn))
 	{
 		s_aLoadedClanId[0] = '\0';

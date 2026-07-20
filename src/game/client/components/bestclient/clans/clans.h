@@ -55,6 +55,7 @@ public:
 		char m_aDescription[256] = "";
 		int m_IconId = 0;
 		unsigned m_Color = 0xFFFFFF;
+		int m_Country = -1;
 		char m_aJoinPolicy[16] = "open";
 		int m_MaxMembers = 50;
 		int m_MemberCount = 0;
@@ -130,6 +131,7 @@ public:
 		char m_aDescription[256] = "";
 		int m_IconId = 0;
 		unsigned m_Color = 0xFFFFFF;
+		int m_Country = -1;
 		char m_aJoinPolicy[16] = "open";
 		int m_MaxMembers = 50;
 		char m_aInviteCode[32] = "";
@@ -158,7 +160,12 @@ public:
 
 	const char *StatusMessage() const { return m_aStatus; }
 	const char *ErrorMessage() const { return m_aError; }
-	void ClearError() { m_aError[0] = '\0'; }
+	bool ErrorOfferDiscord() const { return m_ErrorOfferDiscord; }
+	void ClearError()
+	{
+		m_aError[0] = '\0';
+		m_ErrorOfferDiscord = false;
+	}
 
 	bool IsBusy() const { return m_pPending != nullptr; }
 	int GetUnreadCount() const;
@@ -189,8 +196,8 @@ public:
 	void Logout();
 	void RefreshMe();
 	void RefreshCatalog();
-	void CreateClan(const char *pName, const char *pTag, const char *pDescription, int IconId, unsigned Color, const char *pJoinPolicy, int MaxMembers);
-	void UpdateClanSettings(const char *pName, const char *pDescription, int IconId, unsigned Color);
+	void CreateClan(const char *pName, const char *pTag, const char *pDescription, int IconId, unsigned Color, int Country, const char *pJoinPolicy, int MaxMembers);
+	void UpdateClanSettings(const char *pName, const char *pDescription, int IconId, unsigned Color, int Country);
 	void Join(const char *pClanId);
 	void Apply(const char *pClanId, const char *pText);
 	void JoinCode(const char *pCode);
@@ -291,6 +298,7 @@ private:
 	char m_aClanTag[16] = "";
 	char m_aStatus[128] = "";
 	char m_aError[256] = "";
+	bool m_ErrorOfferDiscord = false;
 	bool m_PlayerClanLocked = false;
 	char m_aLockedTag[16] = "";
 	char m_aPlayerClanBackup[16] = "";
