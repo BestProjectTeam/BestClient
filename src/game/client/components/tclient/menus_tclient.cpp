@@ -877,6 +877,18 @@ void CMenus::RenderSettingsTClientSettings(CUIRect MainView)
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcShowFrozenHud, TCLocalize("Show frozen tee display"), &g_Config.m_TcShowFrozenHud, &Column, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcShowFrozenHudSkins, TCLocalize("Use skins instead of ninja tees"), &g_Config.m_TcShowFrozenHudSkins, &Column, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcFrozenHudTeamOnly, TCLocalize("Only show after joining a team"), &g_Config.m_TcFrozenHudTeamOnly, &Column, LineSize);
+	{
+		static std::vector<CButtonContainer> s_vButtonContainers = {{}, {}, {}};
+		int Value = g_Config.m_TcFrozenHudExpandDir;
+		if(DoLine_RadioMenu(Column, TCLocalize("Expand direction"),
+			   s_vButtonContainers,
+			   {Localize("Left"), Localize("Right"), Localize("Center")},
+			   {1, 0, 2},
+			   Value))
+		{
+			g_Config.m_TcFrozenHudExpandDir = Value;
+		}
+	}
 
 	Column.HSplitTop(LineSize, &Button, &Column);
 	Ui()->DoScrollbarOption(&g_Config.m_TcFrozenMaxRows, &g_Config.m_TcFrozenMaxRows, &Button, TCLocalize("Max Rows"), 1, 6);

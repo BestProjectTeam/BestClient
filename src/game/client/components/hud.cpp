@@ -36,6 +36,7 @@
 #include <cmath>
 #include <functional>
 #include <queue>
+#include <vector>
 
 namespace
 {
@@ -407,6 +408,18 @@ namespace
 	float GetFrozenHudScale(const HudLayout::SModuleLayout &Layout)
 	{
 		return std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+	}
+
+	enum EFrozenHudExpandDir
+	{
+		FROZEN_HUD_EXPAND_RIGHT = 0,
+		FROZEN_HUD_EXPAND_LEFT,
+		FROZEN_HUD_EXPAND_CENTER,
+	};
+
+	int FrozenHudExpandDir()
+	{
+		return std::clamp(g_Config.m_TcFrozenHudExpandDir, (int)FROZEN_HUD_EXPAND_RIGHT, (int)FROZEN_HUD_EXPAND_CENTER);
 	}
 
 	bool IsKeystrokesMinecraftStyle()
@@ -1381,13 +1394,19 @@ CUIRect CHud::GetFrozenHudRect(bool ForcePreview) const
 		MaxTees = (int)(9.5f * (m_Width / m_Height) * 13.0f / TeeSize);
 	MaxTees = maximum(MaxTees, 1);
 	const int MaxRows = maximum(g_Config.m_TcFrozenMaxRows, 1);
-	const int TotalRows = std::min(MaxRows, (NumInTeam + MaxTees - 1) / MaxTees);
+	const int TotalRows = maximum(1, minimum(MaxRows, (NumInTeam + MaxTees - 1) / MaxTees));
+	const int ExpandDir = FrozenHudExpandDir();
 
 	CUIRect Rect;
 	Rect.w = TeeSize * minimum(NumInTeam, MaxTees);
 	Rect.h = TeeSize + 3.0f * Scale + (TotalRows - 1) * TeeSize;
-	Rect.x = Layout.m_X - TeeSize / 2.0f;
 	Rect.y = Layout.m_Y;
+	if(ExpandDir == FROZEN_HUD_EXPAND_LEFT)
+		Rect.x = Layout.m_X - Rect.w + TeeSize / 2.0f;
+	else if(ExpandDir == FROZEN_HUD_EXPAND_CENTER)
+		Rect.x = Layout.m_X - Rect.w / 2.0f;
+	else
+		Rect.x = Layout.m_X - TeeSize / 2.0f;
 	Rect.x = std::clamp(Rect.x, 0.0f, maximum(0.0f, m_Width - Rect.w));
 	Rect.y = std::clamp(Rect.y, 0.0f, maximum(0.0f, m_Height - Rect.h));
 	return Rect;
@@ -1426,12 +1445,14 @@ void CHud::RenderFrozenHud(bool ForcePreview)
 	FreezeInfo.m_CustomColoredSkin = false;
 
 	const float TeeSize = g_Config.m_TcFrozenHudTeeSize * Scale;
+	const float RowStep = TeeSize + 3.0f * Scale;
 	int MaxTees = (int)(8.3f * (m_Width / m_Height) * 13.0f / TeeSize);
 	if(!g_Config.m_ClShowfps && !g_Config.m_ClShowpred)
 		MaxTees = (int)(9.5f * (m_Width / m_Height) * 13.0f / TeeSize);
 	MaxTees = maximum(MaxTees, 1);
 	const int MaxRows = maximum(g_Config.m_TcFrozenMaxRows, 1);
 	const bool Overflow = NumInTeam > MaxTees * MaxRows;
+	const int ExpandDir = FrozenHudExpandDir();
 
 	const int Corners = HudLayout::BackgroundCorners(IGraphics::CORNER_ALL, Rect.x, Rect.y, Rect.w, Rect.h, m_Width, m_Height);
 	Graphics()->TextureClear();
@@ -1440,68 +1461,84 @@ void CHud::RenderFrozenHud(bool ForcePreview)
 	Graphics()->DrawRectExt(Rect.x, Rect.y, Rect.w, Rect.h, 5.0f * Scale, Corners);
 	Graphics()->QuadsEnd();
 
-	float ProgressiveOffset = 0.0f;
-	int NumDisplayed = 0;
-	int NumInRow = 0;
-	int CurrentRow = 0;
+	const CAnimState *pIdleState = CAnimState::GetIdle();
 	const int PreviewClientId = GameClient()->m_Snap.m_LocalClientId >= 0 ? GameClient()->m_Snap.m_LocalClientId : 0;
+	struct SFrozenHudRenderTee
+	{
+		bool m_Frozen = false;
+		CTeeRenderInfo m_TeeInfo;
+		int m_Emote = EMOTE_NORMAL;
+	};
+	std::vector<SFrozenHudRenderTee> vRenderTees;
+	vRenderTees.reserve(MaxTees * MaxRows);
 
 	for(int OverflowIndex = 0; OverflowIndex < 1 + Overflow; OverflowIndex++)
 	{
-		for(int i = 0; i < MAX_CLIENTS && NumDisplayed < MaxTees * MaxRows; i++)
+		for(int i = 0; i < MAX_CLIENTS && (int)vRenderTees.size() < MaxTees * MaxRows; i++)
 		{
 			const bool PreviewTee = ForcePreview && !GameClient()->m_Snap.m_apPlayerInfos[i] && i < NumInTeam;
 			if(!PreviewTee && !GameClient()->m_Snap.m_apPlayerInfos[i])
 				continue;
-			if(PreviewTee || GameClient()->m_Teams.Team(i) == LocalTeamId)
-			{
-				bool Frozen = false;
-				CTeeRenderInfo TeeInfo = GameClient()->m_aClients[PreviewTee ? PreviewClientId : i].m_RenderInfo;
-				if(PreviewTee ? i < NumFrozen : (GameClient()->m_aClients[i].m_FreezeEnd > 0 || GameClient()->m_aClients[i].m_DeepFrozen))
-				{
-					if(!g_Config.m_TcShowFrozenHudSkins)
-						TeeInfo = FreezeInfo;
-					Frozen = true;
-				}
+			if(!PreviewTee && GameClient()->m_Teams.Team(i) != LocalTeamId)
+				continue;
 
-				if(Overflow && Frozen && OverflowIndex == 0)
-					continue;
-				if(Overflow && !Frozen && OverflowIndex == 1)
-					continue;
+			const bool Frozen = PreviewTee ? i < NumFrozen : (GameClient()->m_aClients[i].m_FreezeEnd > 0 || GameClient()->m_aClients[i].m_DeepFrozen);
+			CTeeRenderInfo TeeInfo = GameClient()->m_aClients[PreviewTee ? PreviewClientId : i].m_RenderInfo;
+			if(Frozen && !g_Config.m_TcShowFrozenHudSkins)
+				TeeInfo = FreezeInfo;
 
-				NumDisplayed++;
-				NumInRow++;
-				if(NumInRow > MaxTees)
-				{
-					NumInRow = 1;
-					ProgressiveOffset = 0.0f;
-					CurrentRow++;
-				}
+			if(Overflow && Frozen && OverflowIndex == 0)
+				continue;
+			if(Overflow && !Frozen && OverflowIndex == 1)
+				continue;
 
-				TeeInfo.m_Size = TeeSize;
-				const CAnimState *pIdleState = CAnimState::GetIdle();
-				vec2 OffsetToMid;
-				CRenderTools::GetRenderTeeOffsetToRenderedTee(pIdleState, &TeeInfo, OffsetToMid);
-				vec2 TeeRenderPos(Rect.x + TeeSize / 2.0f + ProgressiveOffset, Rect.y + TeeSize * (0.7f) + CurrentRow * TeeSize);
-				float Alpha = 1.0f;
-				CNetObj_Character CurChar = GameClient()->m_aClients[PreviewTee ? PreviewClientId : i].m_RenderCur;
-				if(g_Config.m_TcShowFrozenHudSkins && Frozen)
-				{
-					Alpha = 0.6f;
-					TeeInfo.m_ColorBody.r *= 0.4f;
-					TeeInfo.m_ColorBody.g *= 0.4f;
-					TeeInfo.m_ColorBody.b *= 0.4f;
-					TeeInfo.m_ColorFeet.r *= 0.4f;
-					TeeInfo.m_ColorFeet.g *= 0.4f;
-					TeeInfo.m_ColorFeet.b *= 0.4f;
-				}
-				if(Frozen)
-					RenderTools()->RenderTee(pIdleState, &TeeInfo, EMOTE_PAIN, vec2(1.0f, 0.0f), TeeRenderPos, Alpha);
-				else
-					RenderTools()->RenderTee(pIdleState, &TeeInfo, PreviewTee ? EMOTE_NORMAL : CurChar.m_Emote, vec2(1.0f, 0.0f), TeeRenderPos);
-				ProgressiveOffset += TeeSize;
-			}
+			SFrozenHudRenderTee RenderTee;
+			RenderTee.m_Frozen = Frozen;
+			RenderTee.m_TeeInfo = TeeInfo;
+			RenderTee.m_Emote = PreviewTee ? EMOTE_NORMAL : GameClient()->m_aClients[i].m_RenderCur.m_Emote;
+			vRenderTees.push_back(RenderTee);
 		}
+	}
+
+	for(int Index = 0; Index < (int)vRenderTees.size(); Index++)
+	{
+		SFrozenHudRenderTee &RenderTee = vRenderTees[Index];
+		CTeeRenderInfo &TeeInfo = RenderTee.m_TeeInfo;
+		TeeInfo.m_Size = TeeSize;
+
+		float Alpha = 1.0f;
+		if(g_Config.m_TcShowFrozenHudSkins && RenderTee.m_Frozen)
+		{
+			Alpha = 0.6f;
+			TeeInfo.m_ColorBody.r *= 0.4f;
+			TeeInfo.m_ColorBody.g *= 0.4f;
+			TeeInfo.m_ColorBody.b *= 0.4f;
+			TeeInfo.m_ColorFeet.r *= 0.4f;
+			TeeInfo.m_ColorFeet.g *= 0.4f;
+			TeeInfo.m_ColorFeet.b *= 0.4f;
+		}
+
+		const int CurrentRow = Index / MaxTees;
+		const int NumInRow = Index % MaxTees;
+		const int RowStartIndex = CurrentRow * MaxTees;
+		const int RowCount = minimum(MaxTees, (int)vRenderTees.size() - RowStartIndex);
+
+		float TeePosX;
+		if(ExpandDir == FROZEN_HUD_EXPAND_LEFT)
+			TeePosX = Rect.x + Rect.w - TeeSize * 0.5f - NumInRow * TeeSize;
+		else if(ExpandDir == FROZEN_HUD_EXPAND_CENTER)
+		{
+			const float RowStartPos = Rect.x + Rect.w * 0.5f - RowCount * TeeSize * 0.5f + TeeSize * 0.5f;
+			TeePosX = RowStartPos + NumInRow * TeeSize;
+		}
+		else
+			TeePosX = Rect.x + TeeSize * 0.5f + NumInRow * TeeSize;
+
+		const vec2 TeeRenderPos(TeePosX, Rect.y + TeeSize * 0.7f + CurrentRow * RowStep);
+		if(RenderTee.m_Frozen)
+			RenderTools()->RenderTee(pIdleState, &TeeInfo, EMOTE_PAIN, vec2(1.0f, 0.0f), TeeRenderPos, Alpha);
+		else
+			RenderTools()->RenderTee(pIdleState, &TeeInfo, RenderTee.m_Emote, vec2(1.0f, 0.0f), TeeRenderPos);
 	}
 }
 

@@ -708,7 +708,11 @@ void CHudEditor::ApplyDraggedPosition(HudLayout::EModule Module, const CUIRect &
 		const auto Layout = HudLayout::Get(Module, HudWidth(), HudHeight());
 		const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
 		const float TeeSize = g_Config.m_TcFrozenHudTeeSize * Scale;
-		const float AnchorX = Rect.x + TeeSize * 0.5f;
+		float AnchorX = Rect.x + TeeSize * 0.5f;
+		if(g_Config.m_TcFrozenHudExpandDir == 1)
+			AnchorX = Rect.x + Rect.w - TeeSize * 0.5f;
+		else if(g_Config.m_TcFrozenHudExpandDir == 2)
+			AnchorX = Rect.x + Rect.w * 0.5f;
 		HudLayout::SetPosition(Module, AnchorX * CanvasScale, Rect.y);
 	}
 	else if(Module == HudLayout::MODULE_MUSIC_PLAYER)
