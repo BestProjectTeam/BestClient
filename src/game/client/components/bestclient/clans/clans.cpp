@@ -227,6 +227,13 @@ void CClans::SetError(const char *pErrorCode, const char *pFallback)
 			const int Secs = maximum(1, MembershipCooldownSecondsLeft());
 			str_format(m_aError, sizeof(m_aError), Localize("Wait %d seconds before joining or leaving again"), Secs);
 		}
+		else if(!str_comp(pErrorCode, "clan.chat_cooldown"))
+		{
+			if(!IsAnnounceCooldownActive())
+				ArmAnnounceCooldown();
+			const int Secs = maximum(1, AnnounceCooldownSecondsLeft());
+			str_format(m_aError, sizeof(m_aError), Localize("Wait %d seconds before sending another message"), Secs);
+		}
 		else if(!str_comp(pErrorCode, "clan.cooldown"))
 			str_copy(m_aError, Localize("Clan create cooldown is active"), sizeof(m_aError));
 		else if(pFallback && pFallback[0])
@@ -334,6 +341,32 @@ bool CClans::GuardMembershipCooldown()
 	if(!IsMembershipCooldownActive())
 		return true;
 	SetError("clan.membership_cooldown", Localize("Wait before joining or leaving again"));
+	return false;
+}
+
+void CClans::ArmAnnounceCooldown()
+{
+	m_AnnounceCooldownUntil = time_get() + time_freq() * 5;
+}
+
+bool CClans::IsAnnounceCooldownActive() const
+{
+	return m_AnnounceCooldownUntil > 0 && time_get() < m_AnnounceCooldownUntil;
+}
+
+int CClans::AnnounceCooldownSecondsLeft() const
+{
+	if(!IsAnnounceCooldownActive())
+		return 0;
+	const int64_t Left = m_AnnounceCooldownUntil - time_get();
+	return (int)((Left + time_freq() - 1) / time_freq());
+}
+
+bool CClans::GuardAnnounceCooldown()
+{
+	if(!IsAnnounceCooldownActive())
+		return true;
+	SetError("clan.chat_cooldown", Localize("Wait before sending another message"));
 	return false;
 }
 
@@ -875,12 +908,16 @@ void CClans::RefreshAnnouncements()
 
 void CClans::PostAnnouncement(const char *pText)
 {
+	if(!GuardAnnounceCooldown())
+		return;
 	char aBase[128];
 	ResolveBaseUrl(aBase, sizeof(aBase));
 	char aUrl[220];
 	str_format(aUrl, sizeof(aUrl), "%s/api/clans/%s/announcements", aBase, m_aClanId);
-	char aJson[600];
-	str_format(aJson, sizeof(aJson), "{\"text\":\"%s\"}", pText);
+	char aEsc[1024];
+	JsonEscapeString(aEsc, sizeof(aEsc), pText ? pText : "");
+	char aJson[1100];
+	str_format(aJson, sizeof(aJson), "{\"text\":\"%s\"}", aEsc);
 	auto pReq = HttpPostJson(aUrl, aJson);
 	AuthHeader(pReq.get());
 	pReq->FailOnErrorStatus(false);
@@ -1378,7 +1415,17 @@ void CClans::ParseAnnouncements(const json_value *pRoot)
 			continue;
 		SAnnouncement Ann;
 		str_copy(Ann.m_aId, JsonString(pA, "id"), sizeof(Ann.m_aId));
+		str_copy(Ann.m_aAuthorId, JsonString(pA, "author_id"), sizeof(Ann.m_aAuthorId));
 		str_copy(Ann.m_aAuthorNick, JsonString(pA, "author_nick"), sizeof(Ann.m_aAuthorNick));
+		Ann.m_AuthorRole = ParseRole(JsonString(pA, "author_role", "member"));
+		const json_value *pSkinObj = json_object_get(pA, "author_skin");
+		if(pSkinObj && pSkinObj->type == json_object)
+		{
+			str_copy(Ann.m_AuthorSkin.m_aName, JsonString(pSkinObj, "name", "default"), sizeof(Ann.m_AuthorSkin.m_aName));
+			Ann.m_AuthorSkin.m_ColorBody = JsonInt(pSkinObj, "color_body");
+			Ann.m_AuthorSkin.m_ColorFeet = JsonInt(pSkinObj, "color_feet");
+			Ann.m_AuthorSkin.m_UseCustomColor = JsonBool(pSkinObj, "use_custom_color");
+		}
 		str_copy(Ann.m_aText, JsonString(pA, "text"), sizeof(Ann.m_aText));
 		str_copy(Ann.m_aCreatedAt, JsonString(pA, "created_at"), sizeof(Ann.m_aCreatedAt));
 		m_vAnnouncements.push_back(Ann);
@@ -1633,7 +1680,10 @@ void CClans::HandlePending()
 	case REQ_ANNS:
 	case REQ_POST_ANN:
 		if(Kind == REQ_POST_ANN)
+		{
+			ArmAnnounceCooldown();
 			RefreshAnnouncements();
+		}
 		else
 			ParseAnnouncements(pRoot);
 		break;

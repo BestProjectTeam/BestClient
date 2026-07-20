@@ -1598,7 +1598,7 @@ void CMenus::RenderClansPage(CUIRect MainView)
 	Bottom.HSplitTop(ButtonH, &Button, &Bottom);
 	{
 		const int Unread = Clans.UnreadAnnouncements();
-		if(DoClansSidebarItem(Ui(), TextRender(), &s_Ann, FontIcon::NEWSPAPER, Localize("Announcements"), &Button, Unread))
+		if(DoClansSidebarItem(Ui(), TextRender(), &s_Ann, FontIcon::COMMENT, Localize("Chat"), &Button, Unread))
 		{
 			Clans.RefreshAnnouncements();
 			Clans.SetView(CClans::EView::ANNOUNCEMENTS);
@@ -2273,7 +2273,7 @@ void CMenus::RenderClansAnnouncements(CUIRect MainView)
 	Top.VSplitRight(28.0f, &Label, &BackBtn);
 	{
 		char aTitle[64];
-		str_format(aTitle, sizeof(aTitle), "%s (%d)", Localize("Announcements"), (int)Clans.Announcements().size());
+		str_format(aTitle, sizeof(aTitle), "%s (%d)", Localize("Chat"), (int)Clans.Announcements().size());
 		Ui()->DoLabel(&Label, aTitle, 16.0f, TEXTALIGN_ML);
 	}
 	static CButtonContainer s_Back, s_Refresh;
@@ -2284,37 +2284,44 @@ void CMenus::RenderClansAnnouncements(CUIRect MainView)
 
 	MainView.HSplitTop(8.0f, nullptr, &MainView);
 
-	const bool CanPost = Clans.Role() == CClans::ERole::PRESIDENT || Clans.Role() == CClans::ERole::VICE_PRESIDENT;
 	static CLineInput s_Text;
 	static char s_aText[500];
 	s_Text.SetBuffer(s_aText, sizeof(s_aText));
-	s_Text.SetEmptyText(Localize("Write an announcement for the clan..."));
+	s_Text.SetEmptyText(Localize("Write a message..."));
 
-	if(CanPost)
+	MainView.HSplitBottom(78.0f, &MainView, &Composer);
+	MainView.HSplitBottom(8.0f, &MainView, nullptr);
+	Composer.Margin(2.0f, &Composer);
+
+	CUIRect Edit, Footer, Send, Counter;
+	Composer.HSplitBottom(28.0f, &Edit, &Footer);
+	Composer.HSplitBottom(6.0f, &Edit, nullptr);
+	DoClansEditBox(Ui(), &s_Text, &Edit, 13.0f);
+
+	Footer.VSplitRight(100.0f, &Counter, &Send);
+	Counter.VSplitRight(8.0f, &Counter, nullptr);
+	if(Clans.IsAnnounceCooldownActive())
 	{
-		MainView.HSplitBottom(78.0f, &MainView, &Composer);
-		MainView.HSplitBottom(8.0f, &MainView, nullptr);
-		Composer.Margin(2.0f, &Composer);
-
-		CUIRect Edit, Footer, Send, Counter;
-		Composer.HSplitBottom(28.0f, &Edit, &Footer);
-		Composer.HSplitBottom(6.0f, &Edit, nullptr);
-		DoClansEditBox(Ui(), &s_Text, &Edit, 13.0f);
-
-		Footer.VSplitRight(100.0f, &Counter, &Send);
-		Counter.VSplitRight(8.0f, &Counter, nullptr);
+		char aCd[32];
+		str_format(aCd, sizeof(aCd), "%ds", Clans.AnnounceCooldownSecondsLeft());
+		TextRender()->TextColor(ColorRGBA(0.85f, 0.55f, 0.25f, 1.0f));
+		Ui()->DoLabel(&Counter, aCd, 11.0f, TEXTALIGN_MR);
+	}
+	else
+	{
 		char aCount[24];
 		str_format(aCount, sizeof(aCount), "%d/500", str_length(s_aText));
 		TextRender()->TextColor(ColorRGBA(0.55f, 0.55f, 0.55f, 1.0f));
 		Ui()->DoLabel(&Counter, aCount, 11.0f, TEXTALIGN_MR);
-		TextRender()->TextColor(TextRender()->DefaultTextColor());
+	}
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
 
-		static CButtonContainer s_Send;
-		if(DoClansTextBtn(Ui(), TextRender(), &s_Send, Localize("Post"), &Send) && s_aText[0] && !Clans.IsBusy())
-		{
-			Clans.PostAnnouncement(s_aText);
-			s_aText[0] = '\0';
-		}
+	static CButtonContainer s_Send;
+	const bool CanSend = s_aText[0] && !Clans.IsBusy() && !Clans.IsAnnounceCooldownActive();
+	if(DoClansTextBtn(Ui(), TextRender(), &s_Send, Localize("Send"), &Send) && CanSend)
+	{
+		Clans.PostAnnouncement(s_aText);
+		s_aText[0] = '\0';
 	}
 
 	if(Clans.Announcements().empty())
@@ -2329,10 +2336,10 @@ void CMenus::RenderClansAnnouncements(CUIRect MainView)
 		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
 		TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
 		TextRender()->TextColor(ColorRGBA(0.45f, 0.45f, 0.45f, 1.0f));
-		Ui()->DoLabel(&IconBox, FontIcon::NEWSPAPER, 28.0f, TEXTALIGN_BC);
+		Ui()->DoLabel(&IconBox, FontIcon::COMMENT, 28.0f, TEXTALIGN_BC);
 		TextRender()->SetRenderFlags(0);
 		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
-		Ui()->DoLabel(&Hint, Localize("No announcements yet"), 13.0f, TEXTALIGN_MC);
+		Ui()->DoLabel(&Hint, Localize("No messages yet"), 13.0f, TEXTALIGN_MC);
 		TextRender()->TextColor(TextRender()->DefaultTextColor());
 		return;
 	}
@@ -2343,55 +2350,62 @@ void CMenus::RenderClansAnnouncements(CUIRect MainView)
 	s_Scroll.Begin(&MainView, &ScrollOffset, &Params);
 	MainView.y += ScrollOffset.y;
 
-	size_t Index = 0;
-	for(const auto &Ann : Clans.Announcements())
+	const auto &vAnns = Clans.Announcements();
+	// API stores newest-first; chat shows oldest → newest (composer at bottom).
+	for(int i = (int)vAnns.size() - 1; i >= 0; i--)
 	{
+		const auto &Ann = vAnns[i];
+		const bool IsPresident = Ann.m_AuthorRole == CClans::ERole::PRESIDENT;
 		const float BodyFont = 12.0f;
-		const float BodyWidth = maximum(1.0f, MainView.w - 28.0f);
+		const float TeeSize = 28.0f;
+		const float BodyWidth = maximum(1.0f, MainView.w - 28.0f - TeeSize - 10.0f - (IsPresident ? 6.0f : 0.0f));
 		STextSizeProperties SizeProps;
 		int LineCount = 1;
 		SizeProps.m_pLineCount = &LineCount;
 		TextRender()->TextWidth(BodyFont, Ann.m_aText, -1, BodyWidth, 0, SizeProps);
 		LineCount = std::clamp(LineCount, 1, 8);
-		const float CardH = 14.0f + 18.0f + 6.0f + LineCount * (BodyFont + 3.0f) + 10.0f;
+		const float CardH = maximum(TeeSize + 12.0f, 10.0f + 16.0f + 4.0f + LineCount * (BodyFont + 3.0f) + 8.0f);
 
 		CUIRect Item;
 		MainView.HSplitTop(CardH, &Item, &MainView);
 		if(s_Scroll.AddRect(Item))
 		{
-			Item.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, Index == 0 ? 0.38f : 0.28f), IGraphics::CORNER_ALL, 6.0f);
+			Item.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.28f), IGraphics::CORNER_ALL, 6.0f);
 
-			CUIRect Accent = Item;
-			Accent.w = 3.0f;
-			ColorRGBA AccentColor = ClanColorRgb(Clans.Clan().m_Color);
-			AccentColor.a = Index == 0 ? 0.95f : 0.45f;
-			Accent.Draw(AccentColor, IGraphics::CORNER_L, 6.0f);
+			if(IsPresident)
+			{
+				CUIRect Accent = Item;
+				Accent.w = 3.0f;
+				ColorRGBA AccentColor = ClanColorRgb(Clans.Clan().m_Color);
+				AccentColor.a = 0.95f;
+				Accent.Draw(AccentColor, IGraphics::CORNER_L, 6.0f);
+				Item.x += 5.0f;
+				Item.w -= 5.0f;
+			}
 
-			Item.Margin(10.0f, &Item);
+			Item.Margin(6.0f, &Item);
+			CUIRect Tee, Content;
+			Item.VSplitLeft(TeeSize, &Tee, &Content);
+			Content.VSplitLeft(8.0f, nullptr, &Content);
+			RenderClanMemberTee(GameClient(), RenderTools(), Tee, Ann.m_AuthorSkin);
+
 			CUIRect Head, Body;
-			Item.HSplitTop(18.0f, &Head, &Body);
-			Body.HSplitTop(6.0f, nullptr, &Body);
+			Content.HSplitTop(16.0f, &Head, &Body);
+			Body.HSplitTop(3.0f, nullptr, &Body);
 
 			CUIRect Author, Date;
-			Head.VSplitRight(140.0f, &Author, &Date);
-
-			char aAuthor[64];
-			if(Index == 0)
-				str_format(aAuthor, sizeof(aAuthor), "%s · %s", Ann.m_aAuthorNick, Localize("Latest"));
-			else
-				str_copy(aAuthor, Ann.m_aAuthorNick, sizeof(aAuthor));
-			Ui()->DoLabel(&Author, aAuthor, 12.0f, TEXTALIGN_ML);
+			Head.VSplitRight(120.0f, &Author, &Date);
+			Ui()->DoLabel(&Author, Ann.m_aAuthorNick, 12.0f, TEXTALIGN_ML);
 
 			char aDate[40];
 			str_copy(aDate, Ann.m_aCreatedAt, sizeof(aDate));
-			// ISO: 2026-07-18T12:34:56.789Z → 2026-07-18 12:34
-			for(int i = 0; aDate[i]; i++)
+			for(int c = 0; aDate[c]; c++)
 			{
-				if(aDate[i] == 'T')
-					aDate[i] = ' ';
-				if(aDate[i] == '.' || aDate[i] == 'Z')
+				if(aDate[c] == 'T')
+					aDate[c] = ' ';
+				if(aDate[c] == '.' || aDate[c] == 'Z')
 				{
-					aDate[i] = '\0';
+					aDate[c] = '\0';
 					break;
 				}
 			}
@@ -2405,8 +2419,7 @@ void CMenus::RenderClansAnnouncements(CUIRect MainView)
 			BodyProps.m_MaxWidth = Body.w;
 			Ui()->DoLabel(&Body, Ann.m_aText, BodyFont, TEXTALIGN_TL, BodyProps);
 		}
-		MainView.HSplitTop(8.0f, nullptr, &MainView);
-		Index++;
+		MainView.HSplitTop(6.0f, nullptr, &MainView);
 	}
 	s_Scroll.End();
 }

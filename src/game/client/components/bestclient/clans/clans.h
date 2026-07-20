@@ -86,7 +86,10 @@ public:
 	struct SAnnouncement
 	{
 		char m_aId[64] = "";
+		char m_aAuthorId[64] = "";
 		char m_aAuthorNick[32] = "";
+		ERole m_AuthorRole = ERole::MEMBER;
+		SSkin m_AuthorSkin;
 		char m_aText[512] = "";
 		char m_aCreatedAt[40] = "";
 	};
@@ -192,6 +195,8 @@ public:
 	bool TryRefreshSession();
 	bool IsMembershipCooldownActive() const;
 	int MembershipCooldownSecondsLeft() const;
+	bool IsAnnounceCooldownActive() const;
+	int AnnounceCooldownSecondsLeft() const;
 
 	void Register(const char *pNickname, const char *pPassword);
 	void Login(const char *pNickname, const char *pPassword);
@@ -254,6 +259,8 @@ private:
 	void LeaveClanLocal();
 	void ArmMembershipCooldown();
 	bool GuardMembershipCooldown();
+	void ArmAnnounceCooldown();
+	bool GuardAnnounceCooldown();
 
 	enum
 	{
@@ -330,6 +337,7 @@ private:
 	int64_t m_LastMePollTick = 0;
 	int64_t m_LastCatalogPollTick = 0;
 	int64_t m_MembershipCooldownUntil = 0;
+	int64_t m_AnnounceCooldownUntil = 0;
 };
 
 #endif
