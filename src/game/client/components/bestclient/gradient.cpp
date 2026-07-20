@@ -43,12 +43,17 @@ static ColorRGBA SampleColorStops(const std::vector<ColorRGBA> &vColors, float P
 	if(vColors.size() == 1)
 		return vColors[0];
 
-	const float Clamped = std::clamp(Position, 0.0f, 1.0f);
-	const float Scaled = Clamped * (vColors.size() - 1);
-	const int Index = std::min((int)Scaled, (int)vColors.size() - 2);
-	const float LocalT = Scaled - Index;
+	// Loop seamlessly: last stop blends back into the first (1→2→…→N→1).
+	float Wrapped = std::fmod(Position, 1.0f);
+	if(Wrapped < 0.0f)
+		Wrapped += 1.0f;
+
+	const int Count = (int)vColors.size();
+	const float Scaled = Wrapped * Count;
+	const int Index = (int)Scaled % Count;
+	const float LocalT = Scaled - std::floor(Scaled);
 	const ColorRGBA &A = vColors[Index];
-	const ColorRGBA &B = vColors[Index + 1];
+	const ColorRGBA &B = vColors[(Index + 1) % Count];
 	return ColorRGBA(
 		A.r + LocalT * (B.r - A.r),
 		A.g + LocalT * (B.g - A.g),
