@@ -190,6 +190,8 @@ public:
 	void CollectUnleashed(std::vector<SUnleashedPlayer> *pOut) const;
 	const std::vector<SUnleashedPlayer> &Unleashed() const { return m_Clan.m_vUnleashed; }
 	bool TryRefreshSession();
+	bool IsMembershipCooldownActive() const;
+	int MembershipCooldownSecondsLeft() const;
 
 	void Register(const char *pNickname, const char *pPassword);
 	void Login(const char *pNickname, const char *pPassword);
@@ -250,6 +252,8 @@ private:
 	void MaybePollNotifications();
 	void MaybeAutoRefresh();
 	void LeaveClanLocal();
+	void ArmMembershipCooldown();
+	bool GuardMembershipCooldown();
 
 	enum
 	{
@@ -325,6 +329,7 @@ private:
 	int64_t m_LastClanPollTick = 0;
 	int64_t m_LastMePollTick = 0;
 	int64_t m_LastCatalogPollTick = 0;
+	int64_t m_MembershipCooldownUntil = 0;
 };
 
 #endif

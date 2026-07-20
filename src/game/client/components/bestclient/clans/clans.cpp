@@ -220,6 +220,15 @@ void CClans::SetError(const char *pErrorCode, const char *pFallback)
 			str_copy(m_aError, Localize("You are banned from this clan"), sizeof(m_aError));
 		else if(!str_comp(pErrorCode, "clan.not_found"))
 			str_copy(m_aError, Localize("Clan no longer exists"), sizeof(m_aError));
+		else if(!str_comp(pErrorCode, "clan.membership_cooldown"))
+		{
+			if(!IsMembershipCooldownActive())
+				ArmMembershipCooldown();
+			const int Secs = maximum(1, MembershipCooldownSecondsLeft());
+			str_format(m_aError, sizeof(m_aError), Localize("Wait %d seconds before joining or leaving again"), Secs);
+		}
+		else if(!str_comp(pErrorCode, "clan.cooldown"))
+			str_copy(m_aError, Localize("Clan create cooldown is active"), sizeof(m_aError));
 		else if(pFallback && pFallback[0])
 			str_copy(m_aError, pFallback, sizeof(m_aError));
 		else
@@ -302,9 +311,38 @@ void CClans::LeaveClanLocal()
 	RefreshRecentClans();
 }
 
+bool CClans::IsMembershipCooldownActive() const
+{
+	return m_MembershipCooldownUntil > 0 && time_get() < m_MembershipCooldownUntil;
+}
+
+int CClans::MembershipCooldownSecondsLeft() const
+{
+	if(!IsMembershipCooldownActive())
+		return 0;
+	const int64_t Left = m_MembershipCooldownUntil - time_get();
+	return (int)((Left + time_freq() - 1) / time_freq());
+}
+
+void CClans::ArmMembershipCooldown()
+{
+	m_MembershipCooldownUntil = time_get() + time_freq() * 60;
+}
+
+bool CClans::GuardMembershipCooldown()
+{
+	if(!IsMembershipCooldownActive())
+		return true;
+	SetError("clan.membership_cooldown", Localize("Wait before joining or leaving again"));
+	return false;
+}
+
 void CClans::ApplyClanTagLock(const char *pTag)
 {
 	if(!pTag || !pTag[0])
+		return;
+	// Avoid ChangeInfo spam on every clan poll / snapshot parse.
+	if(m_PlayerClanLocked && !str_comp(m_aLockedTag, pTag) && !str_comp(g_Config.m_PlayerClan, pTag))
 		return;
 	if(!m_PlayerClanLocked)
 		str_copy(m_aPlayerClanBackup, g_Config.m_PlayerClan, sizeof(m_aPlayerClanBackup));
@@ -553,6 +591,8 @@ void CClans::RefreshCatalog()
 
 void CClans::CreateClan(const char *pName, const char *pTag, const char *pDescription, int IconId, unsigned Color, int Country, const char *pJoinPolicy, int MaxMembers)
 {
+	if(!GuardMembershipCooldown())
+		return;
 	char aBase[128];
 	ResolveBaseUrl(aBase, sizeof(aBase));
 	char aUrl[160];
@@ -604,6 +644,8 @@ void CClans::UpdateClanSettings(const char *pName, const char *pDescription, int
 
 void CClans::Join(const char *pClanId)
 {
+	if(!GuardMembershipCooldown())
+		return;
 	char aBase[128];
 	ResolveBaseUrl(aBase, sizeof(aBase));
 	char aUrl[192];
@@ -630,6 +672,8 @@ void CClans::Apply(const char *pClanId, const char *pText)
 
 void CClans::JoinCode(const char *pCode)
 {
+	if(!GuardMembershipCooldown())
+		return;
 	char aBase[128];
 	ResolveBaseUrl(aBase, sizeof(aBase));
 	char aUrl[160];
@@ -646,6 +690,8 @@ void CClans::Leave()
 {
 	if(!m_aClanId[0])
 		return;
+	if(!GuardMembershipCooldown())
+		return;
 	char aBase[128];
 	ResolveBaseUrl(aBase, sizeof(aBase));
 	char aUrl[192];
@@ -660,6 +706,8 @@ void CClans::Disband()
 {
 	if(!m_aClanId[0])
 		return;
+	if(!GuardMembershipCooldown())
+		return;
 	char aBase[128];
 	ResolveBaseUrl(aBase, sizeof(aBase));
 	char aUrl[192];
@@ -672,6 +720,8 @@ void CClans::Disband()
 
 void CClans::RejoinAsPresident(const char *pClanId)
 {
+	if(!GuardMembershipCooldown())
+		return;
 	char aBase[128];
 	ResolveBaseUrl(aBase, sizeof(aBase));
 	char aUrl[220];
@@ -1474,6 +1524,7 @@ void CClans::HandlePending()
 			m_Clan = SClanSnapshot{};
 			ClearClanTagLock();
 			m_View = EView::LANDING;
+			ArmMembershipCooldown();
 			SaveSession();
 			RefreshCatalog();
 			RefreshRecentClans();
@@ -1561,6 +1612,8 @@ void CClans::HandlePending()
 	case REQ_CLAN:
 		ParseClanSnapshot(pRoot);
 		ClearPreview();
+		if(Kind == REQ_CREATE || Kind == REQ_JOIN || Kind == REQ_JOIN_CODE || Kind == REQ_REJOIN)
+			ArmMembershipCooldown();
 		if(Kind == REQ_UPDATE)
 			SetStatus(Localize("Settings saved"));
 		break;
