@@ -558,6 +558,7 @@ public:
 	const void *HotItem() const { return m_pHotItem; }
 	const void *NextHotItem() const { return m_pBecomingHotItem; }
 	const void *ActiveItem() const { return m_pActiveItem; }
+	const void *LastActiveItem() const { return m_pLastActiveItem; }
 	const CScrollRegion *HotScrollRegion() const { return m_pHotScrollRegion; }
 
 	void StartCheck() { m_ActiveItemValid = false; }

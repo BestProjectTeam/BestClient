@@ -39,14 +39,231 @@ public:
 	}
 };
 
+static constexpr int CLAN_DESC_MAX_LINES = 3;
+static constexpr int CLAN_DESC_CHARS_PER_LINE = 36;
+
 static bool DoClansEditBox(CUi *pUi, CLineInput *pLineInput, const CUIRect *pRect, float FontSize, int Corners = IGraphics::CORNER_ALL, float LineWidth = -1.0f, float LineSpacing = 0.0f, int Align = -1)
 {
 	static const CClansEditBoxColorFunction s_ColorFunction;
 	return pUi->DoEditBox(pLineInput, pRect, FontSize, Corners, {}, LineWidth, LineSpacing, &s_ColorFunction, Align);
 }
 
-static constexpr int CLAN_DESC_MAX_LINES = 3;
-static constexpr int CLAN_DESC_CHARS_PER_LINE = 36;
+// Multiline description: each line centered independently (TEXTALIGN_TC only centers the whole block).
+static bool DoClansDescEditBox(CUi *pUi, ITextRender *pTextRender, CLineInput *pLineInput, const CUIRect *pRect, float FontSize, float LineSpacing)
+{
+	static const CClansEditBoxColorFunction s_ColorFunction;
+
+	const bool Inside = pUi->MouseHovered(pRect);
+	const bool Active = pUi->LastActiveItem() == pLineInput;
+	const bool Changed = pLineInput->WasChanged();
+	const bool CursorChanged = pLineInput->WasCursorChanged();
+
+	bool JustGotActive = false;
+	if(pUi->CheckActiveItem(pLineInput))
+	{
+		if(!pUi->MouseButton(0))
+			pUi->SetActiveItem(nullptr);
+	}
+	else if(pUi->HotItem() == pLineInput)
+	{
+		if(pUi->MouseButton(0))
+		{
+			if(!Active)
+				JustGotActive = true;
+			pUi->SetActiveItem(pLineInput);
+		}
+	}
+
+	if(Inside && !pUi->MouseButton(0))
+		pUi->SetHotItem(pLineInput);
+
+	if(pUi->Enabled() && Active && !JustGotActive)
+		pLineInput->Activate(EInputPriority::UI);
+	else
+		pLineInput->Deactivate();
+
+	CLineInput::SMouseSelection *pMouseSelection = pLineInput->GetMouseSelection();
+	if(Inside && !pMouseSelection->m_Selecting && pUi->MouseButtonClicked(0))
+	{
+		pMouseSelection->m_Selecting = true;
+		pMouseSelection->m_PressMouse = pUi->MousePos();
+	}
+	if(pMouseSelection->m_Selecting)
+	{
+		pMouseSelection->m_ReleaseMouse = pUi->MousePos();
+		if(!pUi->MouseButton(0))
+			pMouseSelection->m_Selecting = false;
+	}
+
+	pRect->Draw(s_ColorFunction.GetColor(Active, pUi->HotItem() == pLineInput), IGraphics::CORNER_ALL, 3.0f);
+
+	CUIRect Textbox;
+	pRect->VMargin(2.0f, &Textbox);
+	const float TopPad = 3.0f;
+	if(Textbox.h > TopPad + FontSize)
+	{
+		Textbox.y += TopPad;
+		Textbox.h -= TopPad;
+	}
+
+	const char *pStr = pLineInput->GetString();
+	const bool Empty = pStr[0] == '\0';
+	const char *pDraw = Empty ? (pLineInput->GetEmptyText() ? pLineInput->GetEmptyText() : "") : pStr;
+
+	const float LineAdvance = FontSize + LineSpacing;
+	size_t aLineStart[CLAN_DESC_MAX_LINES + 1] = {};
+	size_t aLineEnd[CLAN_DESC_MAX_LINES + 1] = {};
+	int NumLines = 0;
+	{
+		const char *p = pDraw;
+		size_t Base = 0;
+		for(;;)
+		{
+			if(NumLines >= CLAN_DESC_MAX_LINES)
+				break;
+			const char *pNl = strchr(p, '\n');
+			aLineStart[NumLines] = Base;
+			if(pNl)
+			{
+				aLineEnd[NumLines] = Base + (size_t)(pNl - p);
+				NumLines++;
+				Base = aLineEnd[NumLines - 1] + 1;
+				p = pNl + 1;
+				if(!*p)
+				{
+					if(NumLines < CLAN_DESC_MAX_LINES)
+					{
+						aLineStart[NumLines] = Base;
+						aLineEnd[NumLines] = Base;
+						NumLines++;
+					}
+					break;
+				}
+			}
+			else
+			{
+				aLineEnd[NumLines] = Base + (size_t)str_length(p);
+				NumLines++;
+				break;
+			}
+		}
+		if(NumLines <= 0)
+		{
+			aLineStart[0] = 0;
+			aLineEnd[0] = 0;
+			NumLines = 1;
+		}
+	}
+
+	// Click → cursor on centered line (before Render so LineInput does not override from left-aligned layout).
+	if(!Empty && Active && Inside && pUi->MouseButtonClicked(0))
+	{
+		const float RelY = pUi->MousePos().y - Textbox.y;
+		int LineIdx = std::clamp((int)(RelY / LineAdvance), 0, NumLines - 1);
+		const size_t Start = aLineStart[LineIdx];
+		const size_t End = aLineEnd[LineIdx];
+		char aLine[128];
+		const size_t Len = minimum(sizeof(aLine) - 1, End - Start);
+		mem_copy(aLine, pDraw + Start, Len);
+		aLine[Len] = '\0';
+		const float LineW = pTextRender->TextWidth(FontSize, aLine);
+		const float LineX = Textbox.x + (Textbox.w - LineW) * 0.5f;
+		const float LocalX = pUi->MousePos().x - LineX;
+		size_t Best = End;
+		float BestDist = 1e9f;
+		for(size_t Off = 0;;)
+		{
+			char aPrefix[128];
+			mem_copy(aPrefix, aLine, Off);
+			aPrefix[Off] = '\0';
+			const float Dist = absolute(pTextRender->TextWidth(FontSize, aPrefix) - LocalX);
+			if(Dist < BestDist)
+			{
+				BestDist = Dist;
+				Best = Start + Off;
+			}
+			if(Off >= Len)
+				break;
+			const int Next = str_utf8_forward(aLine, (int)Off);
+			if(Next <= (int)Off)
+				break;
+			Off = (size_t)Next;
+		}
+		pLineInput->SetCursorOffset(Best);
+		pLineInput->SelectNothing();
+	}
+
+	// Drive LineInput (WasRendered / IME) with an invisible left-aligned pass; suppress its cursor/selection.
+	pUi->ClipEnable(pRect);
+	const bool PrevSelecting = pMouseSelection->m_Selecting;
+	pMouseSelection->m_Selecting = false;
+	const ColorRGBA PrevText = pTextRender->GetTextColor();
+	const ColorRGBA PrevOutline = pTextRender->GetTextOutlineColor();
+	pTextRender->TextColor(1.0f, 1.0f, 1.0f, 0.0f);
+	pTextRender->TextOutlineColor(0.0f, 0.0f, 0.0f, 0.0f);
+	pLineInput->SetHideCursor(true);
+	pLineInput->Render(&Textbox, FontSize, TEXTALIGN_TL, Changed || CursorChanged, -1.0f, LineSpacing);
+	pLineInput->SetHideCursor(false);
+	pMouseSelection->m_Selecting = PrevSelecting;
+	pTextRender->TextColor(PrevText);
+	pTextRender->TextOutlineColor(PrevOutline);
+
+	if(Empty)
+		pTextRender->TextColor(1.0f, 1.0f, 1.0f, 0.75f);
+
+	for(int i = 0; i < NumLines; i++)
+	{
+		char aLine[128];
+		const size_t Len = minimum(sizeof(aLine) - 1, aLineEnd[i] - aLineStart[i]);
+		mem_copy(aLine, pDraw + aLineStart[i], Len);
+		aLine[Len] = '\0';
+		CUIRect LineRect;
+		LineRect.x = Textbox.x;
+		LineRect.y = Textbox.y + (float)i * LineAdvance;
+		LineRect.w = Textbox.w;
+		LineRect.h = LineAdvance;
+		pUi->DoLabel(&LineRect, aLine, FontSize, TEXTALIGN_MC);
+	}
+
+	if(!Empty && Active && pLineInput->IsActive())
+	{
+		const size_t Cursor = pLineInput->GetCursorOffset();
+		int CaretLine = 0;
+		for(int i = 0; i < NumLines; i++)
+		{
+			if(Cursor >= aLineStart[i] && Cursor <= aLineEnd[i])
+			{
+				CaretLine = i;
+				break;
+			}
+			CaretLine = i;
+		}
+
+		char aLine[128];
+		const size_t LineLen = minimum(sizeof(aLine) - 1, aLineEnd[CaretLine] - aLineStart[CaretLine]);
+		mem_copy(aLine, pDraw + aLineStart[CaretLine], LineLen);
+		aLine[LineLen] = '\0';
+		const float LineW = pTextRender->TextWidth(FontSize, aLine);
+		const float LineX = Textbox.x + (Textbox.w - LineW) * 0.5f;
+		size_t PrefixLen = 0;
+		if(Cursor > aLineStart[CaretLine])
+			PrefixLen = minimum(LineLen, Cursor - aLineStart[CaretLine]);
+		char aPrefix[128];
+		mem_copy(aPrefix, aLine, PrefixLen);
+		aPrefix[PrefixLen] = '\0';
+
+		CUIRect CaretRect;
+		CaretRect.x = LineX + pTextRender->TextWidth(FontSize, aPrefix);
+		CaretRect.y = Textbox.y + (float)CaretLine * LineAdvance;
+		CaretRect.w = 1.5f;
+		CaretRect.h = FontSize;
+		CaretRect.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.9f), IGraphics::CORNER_NONE, 0.0f);
+	}
+
+	pTextRender->TextColor(pTextRender->DefaultTextColor());
+	pUi->ClipDisable();
+	return Changed;
+}
 
 // Take up to MaxChars UTF-8 codepoints from p, within MaxBytes. Returns byte length.
 static int ClanDescTakeChars(const char *p, int MaxChars, int MaxBytes)
@@ -1048,8 +1265,7 @@ void CMenus::RenderClansSetup(CUIRect MainView)
 	Left.HSplitTop(4.0f, nullptr, &Left);
 	Left.HSplitTop(56.0f, &Button, &Left);
 	{
-		const float DescLineWidth = maximum(1.0f, Button.w - 4.0f);
-		if(DoClansEditBox(Ui(), &s_Desc, &Button, DescFont, IGraphics::CORNER_ALL, DescLineWidth, DescSpacing, TEXTALIGN_TC))
+		if(DoClansDescEditBox(Ui(), TextRender(), &s_Desc, &Button, DescFont, DescSpacing))
 			NormalizeClanDescription(s_aDesc, sizeof(s_aDesc));
 	}
 
@@ -2266,8 +2482,7 @@ void CMenus::RenderClansSettings(CUIRect MainView)
 	{
 		const float DescFont = 11.0f;
 		const float DescSpacing = 1.0f;
-		const float DescLineWidth = maximum(1.0f, Button.w - 4.0f);
-		if(DoClansEditBox(Ui(), &s_Desc, &Button, DescFont, IGraphics::CORNER_ALL, DescLineWidth, DescSpacing, TEXTALIGN_TC))
+		if(DoClansDescEditBox(Ui(), TextRender(), &s_Desc, &Button, DescFont, DescSpacing))
 			NormalizeClanDescription(s_aDesc, sizeof(s_aDesc));
 	}
 
