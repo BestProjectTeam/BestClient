@@ -285,6 +285,16 @@ static void FormatClanPlayingStatus(char *pBuf, int BufSize, const char *pMap, i
 	str_format(pBuf, BufSize, Localize("playing: \"%s\" | %d/%d"), pMap, Players, MaxPlayers);
 }
 
+static bool CatalogClanIsOpen(const CClans &Clans, const char *pClanId)
+{
+	for(const auto &Cat : Clans.Catalog())
+	{
+		if(!str_comp(Cat.m_aClanId, pClanId))
+			return !str_comp(Cat.m_aJoinPolicy, "open");
+	}
+	return false;
+}
+
 static void RenderClanMemberTee(CGameClient *pGameClient, CRenderTools *pRenderTools, CUIRect TeeBox, const CClans::SSkin &Skin)
 {
 	const CSkin *pDefault = pGameClient->m_Skins.Find("default");
@@ -682,12 +692,17 @@ void CMenus::RenderClansLanding(CUIRect MainView)
 						}
 					}
 
-					if(R.m_WasPresident && !Clans.InClan())
+					if(!Clans.InClan() && (R.m_WasPresident || CatalogClanIsOpen(Clans, R.m_aClanId)))
 					{
 						Item.VSplitRight(64.0f, &Item, &Act);
 						Ui()->DoLabel(&Item, aName, 12.0f, TEXTALIGN_ML);
 						if(DoClansTextBtn(Ui(), TextRender(), &s_vLandingRejoin[Ri], Localize("Return"), &Act) && !Clans.IsBusy())
-							Clans.RejoinAsPresident(R.m_aClanId);
+						{
+							if(R.m_WasPresident)
+								Clans.RejoinAsPresident(R.m_aClanId);
+							else
+								Clans.Join(R.m_aClanId);
+						}
 					}
 					else
 					{
@@ -2258,10 +2273,16 @@ void CMenus::RenderClansRecent(CUIRect MainView)
 		char aLine[96];
 		str_format(aLine, sizeof(aLine), "[%s] %s", R.m_aTag, R.m_aName);
 		Ui()->DoLabel(&Label, aLine, 13.0f, TEXTALIGN_ML);
-		if(R.m_WasPresident && !Clans.InClan())
+		if(!Clans.InClan() && (R.m_WasPresident || CatalogClanIsOpen(Clans, R.m_aClanId)))
 		{
-			if(DoClansTextBtn(Ui(), TextRender(), &s_vRejoin[RecentIndex], Localize("Return as President"), &Act) && !Clans.IsBusy())
-				Clans.RejoinAsPresident(R.m_aClanId);
+			const char *pBtn = R.m_WasPresident ? Localize("Return as President") : Localize("Return");
+			if(DoClansTextBtn(Ui(), TextRender(), &s_vRejoin[RecentIndex], pBtn, &Act) && !Clans.IsBusy())
+			{
+				if(R.m_WasPresident)
+					Clans.RejoinAsPresident(R.m_aClanId);
+				else
+					Clans.Join(R.m_aClanId);
+			}
 		}
 		MainView.HSplitTop(4.0f, nullptr, &MainView);
 		RecentIndex++;
