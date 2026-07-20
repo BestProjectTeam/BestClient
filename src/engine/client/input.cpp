@@ -341,17 +341,23 @@ void CInput::StartTextInput()
 {
 	// enable system messages for IME
 	SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
+	// Avoid restarting an already-active text input — on Android that rapidly
+	// opens/closes the soft keyboard (especially with Vulkan).
+	if(SDL_IsTextInputActive())
+		return;
 	SDL_StartTextInput();
 }
 
 void CInput::StopTextInput()
 {
-	SDL_StopTextInput();
+	if(SDL_IsTextInputActive())
+		SDL_StopTextInput();
 	// disable system messages for performance
 	SDL_EventState(SDL_SYSWMEVENT, SDL_DISABLE);
 	m_CompositionString = "";
 	m_CompositionCursor = 0;
 	m_vCandidates.clear();
+	m_TextInputRectValid = false;
 }
 
 void CInput::EnsureScreenKeyboardShown()
@@ -361,7 +367,14 @@ void CInput::EnsureScreenKeyboardShown()
 	{
 		return;
 	}
-	SDL_StopTextInput();
+	// SDL_IsScreenKeyboardShown can lag behind while the keyboard is animating
+	// (common on Android/Vulkan). Throttle restarts so we don't open/close forever.
+	const int64_t Now = time_get();
+	if(m_LastEnsureKeyboardTime != 0 && Now - m_LastEnsureKeyboardTime < time_freq() / 2)
+		return;
+	m_LastEnsureKeyboardTime = Now;
+	if(SDL_IsTextInputActive())
+		SDL_StopTextInput();
 	SDL_StartTextInput();
 }
 
@@ -598,6 +611,17 @@ void CInput::SetCompositionWindowPosition(float X, float Y, float H)
 	Rect.y = Y / m_pGraphics->ScreenHiDPIScale();
 	Rect.h = H / m_pGraphics->ScreenHiDPIScale();
 	Rect.w = 0;
+	// Redundant SetTextInputRect calls restart the Android soft keyboard.
+	if(m_TextInputRectValid &&
+		m_TextInputRect.x == Rect.x &&
+		m_TextInputRect.y == Rect.y &&
+		m_TextInputRect.w == Rect.w &&
+		m_TextInputRect.h == Rect.h)
+	{
+		return;
+	}
+	m_TextInputRect = Rect;
+	m_TextInputRectValid = true;
 	SDL_SetTextInputRect(&Rect);
 }
 

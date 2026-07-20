@@ -166,6 +166,7 @@ class CGameConsole : public CComponent
 	int m_ConsoleState;
 	float m_StateChangeEnd;
 	float m_StateChangeDuration;
+	float m_IgnoreAndroidEscapeUntil = 0.0f;
 
 	bool m_WantsSelectionCopy = false;
 	CUi::CTouchState m_TouchState;

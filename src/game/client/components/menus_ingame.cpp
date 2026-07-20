@@ -320,6 +320,7 @@ void CMenus::RenderGame(CUIRect MainView)
 		static CButtonContainer s_RemoveConsoleButton;
 		if(DoButton_Menu(&s_RemoveConsoleButton, Localize("Remote console"), 0, &Button))
 		{
+			SetActive(false);
 			Console()->ExecuteLine("toggle_remote_console", IConsole::CLIENT_ID_UNSPECIFIED);
 		}
 
@@ -328,6 +329,7 @@ void CMenus::RenderGame(CUIRect MainView)
 		static CButtonContainer s_LocalConsoleButton;
 		if(DoButton_Menu(&s_LocalConsoleButton, Localize("Console"), 0, &Button))
 		{
+			SetActive(false);
 			Console()->ExecuteLine("toggle_local_console", IConsole::CLIENT_ID_UNSPECIFIED);
 		}
 		// Only when these are all false, the preview page is rendered. Once the page is not rendered, update is needed upon next rendering.

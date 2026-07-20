@@ -2773,7 +2773,9 @@ void CMenus::OnRender()
 	const bool IngameMenu = IsActive() && (Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK);
 	const bool UseWindowAspectForUi = IngameMenu && g_Config.m_BcCustomAspectRatioApplyMode != 1;
 	Ui()->SetUseGraphicsScreenAspect(!UseWindowAspectForUi);
-	Ui()->SetEnabled(true);
+	// Console disables UI while open; don't re-enable every frame or Android soft keyboard thrash.
+	if(!GameClient()->m_GameConsole.IsActive())
+		Ui()->SetEnabled(true);
 
 	Ui()->Update();
 

@@ -1741,6 +1741,16 @@ bool CGameConsole::OnInput(const IInput::CEvent &Event)
 	if((Event.m_Key >= KEY_F1 && Event.m_Key <= KEY_F12) || (Event.m_Key >= KEY_F13 && Event.m_Key <= KEY_F24))
 		return false;
 
+#if defined(CONF_PLATFORM_ANDROID)
+	if(Event.m_Key == KEY_ESCAPE && (Event.m_Flags & IInput::FLAG_PRESS) &&
+		(Graphics()->IsScreenKeyboardShown() || Client()->GlobalTime() < m_IgnoreAndroidEscapeUntil))
+	{
+		// Android back → ESC. Ignore while the soft keyboard is visible or has just been
+		// requested — SDL may report it as hidden for a few frames while it is opening.
+		return true;
+	}
+#endif
+
 	if(Event.m_Key == KEY_ESCAPE && (Event.m_Flags & IInput::FLAG_PRESS) && !CurrentConsole()->m_Searching)
 		Toggle(m_ConsoleType);
 	else if(!CurrentConsole()->OnInput(Event))
@@ -1776,6 +1786,9 @@ void CGameConsole::Toggle(int Type)
 		{
 			Ui()->SetEnabled(false);
 			m_ConsoleState = CONSOLE_OPENING;
+#if defined(CONF_PLATFORM_ANDROID)
+			m_IgnoreAndroidEscapeUntil = Client()->GlobalTime() + m_StateChangeDuration + 0.25f;
+#endif
 		}
 		else
 		{
