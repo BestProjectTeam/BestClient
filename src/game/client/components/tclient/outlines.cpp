@@ -147,6 +147,25 @@ void COutlines::OnRender()
 
 	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
 	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
+
+	// Cull tile outlines outside optimizer FPS fog (same area as other non-map draws)
+	if(GameClient()->OptimizerFpsFogEnabled())
+	{
+		float HalfW = 0.0f;
+		float HalfH = 0.0f;
+		GameClient()->OptimizerFpsFogHalfExtents(HalfW, HalfH);
+		if(HalfW > 0.0f && HalfH > 0.0f)
+		{
+			const vec2 Center = GameClient()->m_Camera.m_Center;
+			ScreenX0 = std::max(ScreenX0, Center.x - HalfW);
+			ScreenX1 = std::min(ScreenX1, Center.x + HalfW);
+			ScreenY0 = std::max(ScreenY0, Center.y - HalfH);
+			ScreenY1 = std::min(ScreenY1, Center.y + HalfH);
+			if(ScreenX0 >= ScreenX1 || ScreenY0 >= ScreenY1)
+				return;
+		}
+	}
+
 	int StartY = (int)(ScreenY0 / Scale) - 1;
 	int StartX = (int)(ScreenX0 / Scale) - 1;
 	int EndY = (int)(ScreenY1 / Scale) + 1;
