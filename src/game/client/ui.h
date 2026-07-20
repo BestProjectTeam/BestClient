@@ -625,7 +625,7 @@ public:
 	 *
 	 * @return true if the value of the input field changed since the last call.
 	 */
-	bool DoEditBox(CLineInput *pLineInput, const CUIRect *pRect, float FontSize, int Corners = IGraphics::CORNER_ALL, const std::vector<STextColorSplit> &vColorSplits = {}, float LineWidth = -1.0f, float LineSpacing = 0.0f, const IButtonColorFunction *pColorFunction = nullptr);
+	bool DoEditBox(CLineInput *pLineInput, const CUIRect *pRect, float FontSize, int Corners = IGraphics::CORNER_ALL, const std::vector<STextColorSplit> &vColorSplits = {}, float LineWidth = -1.0f, float LineSpacing = 0.0f, const IButtonColorFunction *pColorFunction = nullptr, int Align = -1);
 
 	/**
 	 * Creates an input field with a clear [x] button attached to it.

@@ -948,13 +948,14 @@ CLabelResult CUi::DoLabel_AutoLineSize(const char *pText, float FontSize, int Al
 	return DoLabel(&LabelRect, pText, FontSize, Align);
 }
 
-bool CUi::DoEditBox(CLineInput *pLineInput, const CUIRect *pRect, float FontSize, int Corners, const std::vector<STextColorSplit> &vColorSplits, float LineWidth, float LineSpacing, const IButtonColorFunction *pColorFunction)
+bool CUi::DoEditBox(CLineInput *pLineInput, const CUIRect *pRect, float FontSize, int Corners, const std::vector<STextColorSplit> &vColorSplits, float LineWidth, float LineSpacing, const IButtonColorFunction *pColorFunction, int Align)
 {
 	const bool Inside = MouseHovered(pRect);
 	const bool Active = m_pLastActiveItem == pLineInput;
 	const bool Changed = pLineInput->WasChanged();
 	const bool CursorChanged = pLineInput->WasCursorChanged();
 	const bool Multiline = LineWidth >= 0.0f;
+	const int EffectiveAlign = Align >= 0 ? Align : (Multiline ? TEXTALIGN_TL : TEXTALIGN_ML);
 
 	const float VSpacing = 2.0f;
 	CUIRect Textbox;
@@ -1052,7 +1053,7 @@ bool CUi::DoEditBox(CLineInput *pLineInput, const CUIRect *pRect, float FontSize
 		}
 	}
 	const float EffectiveLineWidth = Multiline ? Textbox.w : LineWidth;
-	const STextBoundingBox BoundingBox = pLineInput->Render(&Textbox, FontSize, Multiline ? TEXTALIGN_TL : TEXTALIGN_ML, Changed || CursorChanged, EffectiveLineWidth, LineSpacing, vColorSplits);
+	const STextBoundingBox BoundingBox = pLineInput->Render(&Textbox, FontSize, EffectiveAlign, Changed || CursorChanged, EffectiveLineWidth, LineSpacing, vColorSplits);
 	ClipDisable();
 
 	// Scroll left or right if necessary

@@ -39,83 +39,200 @@ public:
 	}
 };
 
-static bool DoClansEditBox(CUi *pUi, CLineInput *pLineInput, const CUIRect *pRect, float FontSize, int Corners = IGraphics::CORNER_ALL, float LineWidth = -1.0f, float LineSpacing = 0.0f)
+static bool DoClansEditBox(CUi *pUi, CLineInput *pLineInput, const CUIRect *pRect, float FontSize, int Corners = IGraphics::CORNER_ALL, float LineWidth = -1.0f, float LineSpacing = 0.0f, int Align = -1)
 {
 	static const CClansEditBoxColorFunction s_ColorFunction;
-	return pUi->DoEditBox(pLineInput, pRect, FontSize, Corners, {}, LineWidth, LineSpacing, &s_ColorFunction);
+	return pUi->DoEditBox(pLineInput, pRect, FontSize, Corners, {}, LineWidth, LineSpacing, &s_ColorFunction, Align);
 }
 
-static void TruncateClanDescription(ITextRender *pTextRender, char *pDesc, float FontSize, float LineWidth, int MaxLines)
+static constexpr int CLAN_DESC_MAX_LINES = 3;
+static constexpr int CLAN_DESC_CHARS_PER_LINE = 36;
+
+// Take up to MaxChars UTF-8 codepoints from p, within MaxBytes. Returns byte length.
+static int ClanDescTakeChars(const char *p, int MaxChars, int MaxBytes)
 {
-	if(!pDesc || MaxLines < 1)
-		return;
-	for(;;)
+	if(!p || MaxChars <= 0 || MaxBytes <= 0)
+		return 0;
+	int Cursor = 0;
+	int Chars = 0;
+	while(p[Cursor] && Chars < MaxChars && Cursor < MaxBytes)
 	{
-		STextSizeProperties Props;
-		int LineCount = 0;
-		Props.m_pLineCount = &LineCount;
-		pTextRender->TextWidth(FontSize, pDesc, -1, LineWidth, 0, Props);
-		if(LineCount <= MaxLines || !pDesc[0])
+		const int Next = str_utf8_forward(p, Cursor);
+		if(Next <= Cursor || Next > MaxBytes)
 			break;
-		const int Len = str_length(pDesc);
-		pDesc[Len - 1] = '\0';
-		str_utf8_fix_truncation(pDesc);
+		Cursor = Next;
+		Chars++;
 	}
+	return Cursor;
 }
 
-// Center each visual line independently (TEXTALIGN_MC + MaxWidth left-aligns wrapped lines).
-static void DoClanDescriptionCentered(CUi *pUi, ITextRender *pTextRender, CUIRect Rect, const char *pDesc, float FontSize, float LineSpacing)
+// Enforce max 3 lines × 36 characters. Soft-wraps long segments; prefers space breaks.
+static void NormalizeClanDescription(char *pDesc, int DescSize)
 {
-	if(!pDesc)
-		pDesc = "";
-	const float LineAdvance = FontSize + LineSpacing;
+	if(!pDesc || DescSize <= 1)
+		return;
+
+	char aOut[256];
+	int OutLen = 0;
+	int Lines = 0;
 	const char *p = pDesc;
+
+	auto AppendLine = [&](const char *pLine, int ByteLen) -> bool {
+		if(Lines >= CLAN_DESC_MAX_LINES)
+			return false;
+		if(Lines > 0)
+		{
+			if(OutLen + 1 >= (int)sizeof(aOut))
+				return false;
+			aOut[OutLen++] = '\n';
+		}
+		ByteLen = minimum(ByteLen, (int)sizeof(aOut) - 1 - OutLen);
+		if(ByteLen > 0)
+		{
+			mem_copy(aOut + OutLen, pLine, ByteLen);
+			OutLen += ByteLen;
+		}
+		aOut[OutLen] = '\0';
+		Lines++;
+		return Lines < CLAN_DESC_MAX_LINES;
+	};
+
 	for(;;)
 	{
-		const char *pNl = strchr(p, '\n');
-		char aSeg[256];
-		if(pNl)
-		{
-			const size_t SegLen = minimum(sizeof(aSeg) - 1, (size_t)(pNl - p));
-			mem_copy(aSeg, p, SegLen);
-			aSeg[SegLen] = '\0';
-			p = pNl + 1;
-		}
-		else
-		{
-			str_copy(aSeg, p, sizeof(aSeg));
-			p = nullptr;
-		}
+		if(Lines >= CLAN_DESC_MAX_LINES)
+			break;
 
-		const char *pSeg = aSeg;
-		if(!pSeg[0])
+		const char *pNl = strchr(p, '\n');
+		const int SegBytes = pNl ? (int)(pNl - p) : str_length(p);
+		int Off = 0;
+		if(SegBytes <= 0)
 		{
-			Rect.HSplitTop(LineAdvance, nullptr, &Rect);
+			if(!AppendLine("", 0))
+				break;
 		}
 		else
 		{
-			while(pSeg[0])
+			while(Off < SegBytes && Lines < CLAN_DESC_MAX_LINES)
 			{
-				CTextCursor Cut;
-				Cut.m_FontSize = FontSize;
-				Cut.m_LineWidth = Rect.w;
-				Cut.m_Flags = TEXTFLAG_STOP_AT_END | TEXTFLAG_DISALLOW_NEWLINE;
-				pTextRender->TextEx(&Cut, pSeg);
-				int Take = Cut.m_CharCount;
-				if(Cut.m_Truncated && Take > 0)
-					Take = str_utf8_rewind(pSeg, Take);
-				if(Take <= 0)
-					Take = (int)str_utf8_forward(pSeg, 0);
+				int Take = ClanDescTakeChars(p + Off, CLAN_DESC_CHARS_PER_LINE, SegBytes - Off);
 				if(Take <= 0)
 					break;
-
-				// Prefer wrapping at the last space within the fitted range.
-				if(pSeg[Take] != '\0')
+				if(Off + Take < SegBytes)
 				{
 					int SpaceBreak = -1;
 					for(int i = Take - 1; i > 0; i--)
 					{
-						if(pSeg[i] == ' ' && (pSeg[i] & 0xC0) != 0x80)
+						if(p[Off + i] == ' ' && (p[Off + i] & 0xC0) != 0x80)
+						{
+							SpaceBreak = i;
+							break;
+						}
+					}
+					if(SpaceBreak > 0)
+						Take = SpaceBreak;
+				}
+				if(!AppendLine(p + Off, Take))
+					break;
+				Off += Take;
+				if(Off < SegBytes && p[Off] == ' ')
+					Off++;
+			}
+		}
+
+		if(!pNl)
+			break;
+		p = pNl + 1;
+		// Keep a trailing empty line after Shift+Enter ("text\n").
+		if(!*p)
+		{
+			AppendLine("", 0);
+			break;
+		}
+	}
+
+	str_copy(pDesc, aOut, DescSize);
+}
+
+static int CountClanDescriptionLines(const char *pDesc)
+{
+	if(!pDesc || !pDesc[0])
+		return 1;
+	int Lines = 0;
+	const char *p = pDesc;
+	for(;;)
+	{
+		const char *pNl = strchr(p, '\n');
+		const int SegBytes = pNl ? (int)(pNl - p) : str_length(p);
+		int Off = 0;
+		if(SegBytes <= 0)
+			Lines++;
+		else
+		{
+			while(Off < SegBytes)
+			{
+				int Take = ClanDescTakeChars(p + Off, CLAN_DESC_CHARS_PER_LINE, SegBytes - Off);
+				if(Take <= 0)
+					break;
+				if(Off + Take < SegBytes)
+				{
+					int SpaceBreak = -1;
+					for(int i = Take - 1; i > 0; i--)
+					{
+						if(p[Off + i] == ' ' && (p[Off + i] & 0xC0) != 0x80)
+						{
+							SpaceBreak = i;
+							break;
+						}
+					}
+					if(SpaceBreak > 0)
+						Take = SpaceBreak;
+				}
+				Lines++;
+				Off += Take;
+				if(Off < SegBytes && p[Off] == ' ')
+					Off++;
+			}
+		}
+		if(!pNl)
+			break;
+		p = pNl + 1;
+	}
+	return std::clamp(maximum(1, Lines), 1, CLAN_DESC_MAX_LINES);
+}
+
+static void DoClanDescriptionCentered(CUi *pUi, ITextRender *pTextRender, CUIRect Rect, const char *pDesc, float FontSize, float LineSpacing)
+{
+	(void)pTextRender;
+	if(!pDesc)
+		pDesc = "";
+	const float LineAdvance = FontSize + LineSpacing;
+	int Drawn = 0;
+	const char *p = pDesc;
+	for(;;)
+	{
+		if(Drawn >= CLAN_DESC_MAX_LINES)
+			break;
+		const char *pNl = strchr(p, '\n');
+		const int SegBytes = pNl ? (int)(pNl - p) : str_length(p);
+		int Off = 0;
+		if(SegBytes <= 0)
+		{
+			Rect.HSplitTop(LineAdvance, nullptr, &Rect);
+			Drawn++;
+		}
+		else
+		{
+			while(Off < SegBytes && Drawn < CLAN_DESC_MAX_LINES)
+			{
+				int Take = ClanDescTakeChars(p + Off, CLAN_DESC_CHARS_PER_LINE, SegBytes - Off);
+				if(Take <= 0)
+					break;
+				if(Off + Take < SegBytes)
+				{
+					int SpaceBreak = -1;
+					for(int i = Take - 1; i > 0; i--)
+					{
+						if(p[Off + i] == ' ' && (p[Off + i] & 0xC0) != 0x80)
 						{
 							SpaceBreak = i;
 							break;
@@ -125,24 +242,25 @@ static void DoClanDescriptionCentered(CUi *pUi, ITextRender *pTextRender, CUIRec
 						Take = SpaceBreak;
 				}
 
-				char aLine[256];
+				char aLine[128];
 				const size_t LineLen = minimum(sizeof(aLine) - 1, (size_t)Take);
-				mem_copy(aLine, pSeg, LineLen);
+				mem_copy(aLine, p + Off, LineLen);
 				aLine[LineLen] = '\0';
 				str_utf8_fix_truncation(aLine);
 
 				CUIRect LineRect;
 				Rect.HSplitTop(LineAdvance, &LineRect, &Rect);
 				pUi->DoLabel(&LineRect, aLine, FontSize, TEXTALIGN_MC);
+				Drawn++;
 
-				pSeg += Take;
-				if(pSeg[0] == ' ')
-					pSeg++;
+				Off += Take;
+				if(Off < SegBytes && p[Off] == ' ')
+					Off++;
 			}
 		}
-
-		if(!p)
+		if(!pNl)
 			break;
+		p = pNl + 1;
 	}
 }
 
@@ -905,7 +1023,10 @@ void CMenus::RenderClansSetup(CUIRect MainView)
 	Actions.VSplitMid(&CreateBtn, &BackBtn, 8.0f);
 	static CButtonContainer s_Create, s_Back;
 	if(DoClansTextBtn(Ui(), TextRender(), &s_Create, Localize("Create clan"), &CreateBtn) && s_aName[0] && s_aTag[0] && !Clans.IsBusy())
+	{
+		NormalizeClanDescription(s_aDesc, sizeof(s_aDesc));
 		Clans.CreateClan(s_aName, s_aTag, s_aDesc, s_IconId, ClanRgb, s_Country, apPolicy[s_Policy], s_MaxMembers);
+	}
 	if(DoClansTextBtn(Ui(), TextRender(), &s_Back, Localize("Back"), &BackBtn))
 		Clans.SetView(Clans.InClan() ? CClans::EView::CLAN : CClans::EView::LANDING);
 
@@ -928,8 +1049,8 @@ void CMenus::RenderClansSetup(CUIRect MainView)
 	Left.HSplitTop(56.0f, &Button, &Left);
 	{
 		const float DescLineWidth = maximum(1.0f, Button.w - 4.0f);
-		if(DoClansEditBox(Ui(), &s_Desc, &Button, DescFont, IGraphics::CORNER_ALL, DescLineWidth, DescSpacing))
-			TruncateClanDescription(TextRender(), s_aDesc, DescFont, DescLineWidth, 3);
+		if(DoClansEditBox(Ui(), &s_Desc, &Button, DescFont, IGraphics::CORNER_ALL, DescLineWidth, DescSpacing, TEXTALIGN_TC))
+			NormalizeClanDescription(s_aDesc, sizeof(s_aDesc));
 	}
 
 	Left.HSplitTop(8.0f, nullptr, &Left);
@@ -946,18 +1067,18 @@ void CMenus::RenderClansSetup(CUIRect MainView)
 	Ui()->DoLabel(&Label, Localize("Icon and color"), 12.0f, TEXTALIGN_ML);
 	Left.HSplitTop(4.0f, nullptr, &Left);
 	Left.HSplitTop(32.0f, &Row, &Left);
-	CUIRect IconsRow, ColorRow;
-	Row.VSplitRight(100.0f, &IconsRow, &ColorRow);
-	ColorRow.VSplitLeft(8.0f, nullptr, &ColorRow);
+	CUIRect IconsRow, ColorCol;
+	Row.VSplitRight(100.0f, &IconsRow, &ColorCol);
+	ColorCol.VSplitLeft(8.0f, nullptr, &ColorCol);
 	static CButtonContainer s_aIcons[NUM_CLAN_ICONS];
 	const float IconCell = IconsRow.h + 4.0f;
 	RenderClanIconPickerRow(Ui(), TextRender(), IconsRow, 0, 8, &s_IconId, ClanRgb, IconCell, s_aIcons);
 	{
 		CUIRect ColorBtn, ResetBtn;
-		ColorRow.VSplitRight(56.0f, &ColorRow, &ResetBtn);
-		ColorRow.VSplitRight(4.0f, &ColorRow, nullptr);
-		const float Sq = minimum(ColorRow.w, ColorRow.h);
-		ColorRow.VMargin(maximum(0.0f, (ColorRow.w - Sq) * 0.5f), &ColorBtn);
+		ColorCol.VSplitRight(56.0f, &ColorCol, &ResetBtn);
+		ColorCol.VSplitRight(4.0f, &ColorCol, nullptr);
+		const float Sq = minimum(ColorCol.w, ColorCol.h);
+		ColorCol.VMargin(maximum(0.0f, (ColorCol.w - Sq) * 0.5f), &ColorBtn);
 		ColorBtn.HMargin(maximum(0.0f, (ColorBtn.h - Sq) * 0.5f), &ColorBtn);
 		DoButton_ColorPicker(&ColorBtn, &s_ColorHsla, false);
 		static CButtonContainer s_ColorReset;
@@ -967,19 +1088,15 @@ void CMenus::RenderClansSetup(CUIRect MainView)
 	}
 	Left.HSplitTop(4.0f, nullptr, &Left);
 	Left.HSplitTop(32.0f, &Row, &Left);
-	RenderClanIconPickerRow(Ui(), TextRender(), Row, 8, 8, &s_IconId, ClanRgb, IconCell, s_aIcons);
-	Left.HSplitTop(4.0f, nullptr, &Left);
-	Left.HSplitTop(32.0f, &Row, &Left);
-	RenderClanIconPickerRow(Ui(), TextRender(), Row, 16, 8, &s_IconId, ClanRgb, IconCell, s_aIcons);
-
-	Left.HSplitTop(10.0f, nullptr, &Left);
-	Left.HSplitTop(16.0f, &Label, &Left);
-	Ui()->DoLabel(&Label, Localize("Flag"), 12.0f, TEXTALIGN_ML);
-	Left.HSplitTop(4.0f, nullptr, &Left);
-	Left.HSplitTop(28.0f, &Button, &Left);
+	Row.VSplitRight(100.0f, &IconsRow, &ColorCol);
+	ColorCol.VSplitLeft(8.0f, nullptr, &ColorCol);
+	RenderClanIconPickerRow(Ui(), TextRender(), IconsRow, 8, 8, &s_IconId, ClanRgb, IconCell, s_aIcons);
 	{
-		CUIRect FlagButton = Button;
-		FlagButton.w = minimum(FlagButton.w, 56.0f);
+		// Flag sits under the color picker in the spare column.
+		CUIRect FlagButton = ColorCol;
+		const float FlagW = minimum(FlagButton.w, FlagButton.h * 2.0f);
+		FlagButton.x += (FlagButton.w - FlagW) * 0.5f;
+		FlagButton.w = FlagW;
 		static CButtonContainer s_FlagButton;
 		if(DoButton_Menu(&s_FlagButton, "", 0, &FlagButton))
 		{
@@ -992,12 +1109,11 @@ void CMenus::RenderClansSetup(CUIRect MainView)
 			Ui()->DoPopupMenu(&s_PopupCountryId, FlagButton.x, FlagButton.y + FlagButton.h, 490.0f, 210.0f, &s_PopupCountryContext, PopupSettingsCountrySelection);
 		}
 		GameClient()->m_Tooltips.DoToolTip(&s_FlagButton, &FlagButton, Localize("Choose country flag"));
-		CUIRect FlagIcon = FlagButton;
-		const float OldFlagWidth = FlagIcon.w;
-		FlagIcon.w = FlagIcon.h * 2.0f;
-		FlagIcon.x += (OldFlagWidth - FlagIcon.w) / 2.0f;
-		GameClient()->m_CountryFlags.Render(s_Country, ColorRGBA(1.0f, 1.0f, 1.0f, Ui()->HotItem() == &s_FlagButton ? 1.0f : 0.85f), FlagIcon.x, FlagIcon.y, FlagIcon.w, FlagIcon.h);
+		GameClient()->m_CountryFlags.Render(s_Country, ColorRGBA(1.0f, 1.0f, 1.0f, Ui()->HotItem() == &s_FlagButton ? 1.0f : 0.85f), FlagButton.x, FlagButton.y, FlagButton.w, FlagButton.h);
 	}
+	Left.HSplitTop(4.0f, nullptr, &Left);
+	Left.HSplitTop(32.0f, &Row, &Left);
+	RenderClanIconPickerRow(Ui(), TextRender(), Row, 16, 8, &s_IconId, ClanRgb, IconCell, s_aIcons);
 
 	Left.HSplitTop(10.0f, nullptr, &Left);
 	Left.HSplitTop(16.0f, &Label, &Left);
@@ -1074,19 +1190,13 @@ void CMenus::RenderClansSetup(CUIRect MainView)
 
 	{
 		const char *pDesc = s_aDesc[0] ? s_aDesc : Localize("This is how your clan will appear in the catalog list to other players.");
-		STextSizeProperties SizeProps;
-		int LineCount = 1;
-		SizeProps.m_pLineCount = &LineCount;
-		TextRender()->TextWidth(DescFont, pDesc, -1, PreviewDescW, 0, SizeProps);
-		LineCount = std::clamp(LineCount, 1, 2);
+		const int LineCount = CountClanDescriptionLines(pDesc);
 		const float DescH = LineCount * (DescFont + DescSpacing) + 4.0f;
 		CUIRect DescBox;
 		Card.HSplitTop(DescH, &DescBox, &Card);
 		if(DescBox.w > PreviewDescW)
 			DescBox.w = PreviewDescW;
-		SLabelProperties DescProps;
-		DescProps.m_MaxWidth = DescBox.w;
-		Ui()->DoLabel(&DescBox, pDesc, DescFont, TEXTALIGN_TL, DescProps);
+		DoClanDescriptionCentered(Ui(), TextRender(), DescBox, pDesc, DescFont, DescSpacing);
 	}
 
 	Card.HSplitTop(6.0f, nullptr, &Card);
@@ -1173,12 +1283,7 @@ void CMenus::RenderClansPage(CUIRect MainView)
 	CUIRect InfoBlock, IconBox;
 	const float DescFont = 11.0f;
 	const float DescSpacing = 1.0f;
-	STextSizeProperties DescSizeProps;
-	int DescLines = 1;
-	DescSizeProps.m_pLineCount = &DescLines;
-	const float InfoInnerW = maximum(1.0f, Left.w - 16.0f);
-	TextRender()->TextWidth(DescFont, Clan.m_aDescription[0] ? Clan.m_aDescription : " ", -1, InfoInnerW, 0, DescSizeProps);
-	DescLines = std::clamp(DescLines, 1, 3);
+	const int DescLines = CountClanDescriptionLines(Clan.m_aDescription);
 	const float DescBlockH = DescLines * (DescFont + DescSpacing) + 4.0f;
 	const float InfoBlockH = 34.0f + 18.0f + 25.0f + 18.0f + 4.0f + DescBlockH + 20.0f + 16.0f;
 	Left.HSplitTop(InfoBlockH, &InfoBlock, &Left);
@@ -1720,7 +1825,12 @@ void CMenus::RenderClansPreview(CUIRect MainView)
 	Left.Margin(10.0f, &Left);
 
 	CUIRect InfoBlock, IconBox;
-	Left.HSplitTop(168.0f, &InfoBlock, &Left);
+	const float DescFont = 10.0f;
+	const float DescSpacing = 1.0f;
+	const int DescLines = CountClanDescriptionLines(Clan.m_aDescription);
+	const float DescBlockH = DescLines * (DescFont + DescSpacing) + 4.0f;
+	const float InfoBlockH = 32.0f + 16.0f + 24.0f + 18.0f + 6.0f + DescBlockH + 20.0f + 8.0f;
+	Left.HSplitTop(InfoBlockH, &InfoBlock, &Left);
 	InfoBlock.Draw(ColorRGBA(0, 0, 0, 0.20f), IGraphics::CORNER_ALL, 6.0f);
 	InfoBlock.Margin(8.0f, &InfoBlock);
 
@@ -1739,8 +1849,8 @@ void CMenus::RenderClansPreview(CUIRect MainView)
 	str_format(aMeta, sizeof(aMeta), "[%s] · %s", Clan.m_aTag, Clan.m_aJoinPolicy);
 	Ui()->DoLabel(&Label, aMeta, 13.0f, TEXTALIGN_MC);
 	InfoBlock.HSplitTop(6.0f, nullptr, &InfoBlock);
-	InfoBlock.HSplitTop(32.0f, &Label, &InfoBlock);
-	DoClanDescriptionCentered(Ui(), TextRender(), Label, Clan.m_aDescription, 10.0f, 1.0f);
+	InfoBlock.HSplitTop(DescBlockH, &Label, &InfoBlock);
+	DoClanDescriptionCentered(Ui(), TextRender(), Label, Clan.m_aDescription, DescFont, DescSpacing);
 
 	int OnlineMain = 0;
 	for(const auto &M : Clan.m_vMembers)
@@ -2098,6 +2208,7 @@ void CMenus::RenderClansSettings(CUIRect MainView)
 		str_copy(s_aLoadedClanId, Clan.m_aClanId, sizeof(s_aLoadedClanId));
 		str_copy(s_aName, Clan.m_aName, sizeof(s_aName));
 		str_copy(s_aDesc, Clan.m_aDescription, sizeof(s_aDesc));
+		NormalizeClanDescription(s_aDesc, sizeof(s_aDesc));
 		s_IconId = std::clamp(Clan.m_IconId, 0, NUM_CLAN_ICONS - 1);
 		s_Country = Clan.m_Country;
 		const unsigned R = (Clan.m_Color >> 16) & 0xFF;
@@ -2151,13 +2262,13 @@ void CMenus::RenderClansSettings(CUIRect MainView)
 	MainView.HSplitTop(16.0f, &Label, &MainView);
 	Ui()->DoLabel(&Label, Localize("Description"), 12.0f, TEXTALIGN_ML);
 	MainView.HSplitTop(4.0f, nullptr, &MainView);
-	MainView.HSplitTop(48.0f, &Button, &MainView);
+	MainView.HSplitTop(56.0f, &Button, &MainView);
 	{
 		const float DescFont = 11.0f;
 		const float DescSpacing = 1.0f;
 		const float DescLineWidth = maximum(1.0f, Button.w - 4.0f);
-		if(DoClansEditBox(Ui(), &s_Desc, &Button, DescFont, IGraphics::CORNER_ALL, DescLineWidth, DescSpacing))
-			TruncateClanDescription(TextRender(), s_aDesc, DescFont, DescLineWidth, 3);
+		if(DoClansEditBox(Ui(), &s_Desc, &Button, DescFont, IGraphics::CORNER_ALL, DescLineWidth, DescSpacing, TEXTALIGN_TC))
+			NormalizeClanDescription(s_aDesc, sizeof(s_aDesc));
 	}
 
 	const unsigned ClanRgb = ClanRgbFromHsla(s_ColorHsla);
@@ -2166,18 +2277,18 @@ void CMenus::RenderClansSettings(CUIRect MainView)
 	Ui()->DoLabel(&Label, Localize("Icon and color"), 12.0f, TEXTALIGN_ML);
 	MainView.HSplitTop(4.0f, nullptr, &MainView);
 	MainView.HSplitTop(36.0f, &Row, &MainView);
-	CUIRect IconsRow, ColorRow;
-	Row.VSplitRight(100.0f, &IconsRow, &ColorRow);
-	ColorRow.VSplitLeft(8.0f, nullptr, &ColorRow);
+	CUIRect IconsRow, ColorCol;
+	Row.VSplitRight(100.0f, &IconsRow, &ColorCol);
+	ColorCol.VSplitLeft(8.0f, nullptr, &ColorCol);
 	static CButtonContainer s_aIcons[NUM_CLAN_ICONS];
 	const float IconCell = IconsRow.h + 4.0f;
 	RenderClanIconPickerRow(Ui(), TextRender(), IconsRow, 0, 8, &s_IconId, ClanRgb, IconCell, s_aIcons);
 	{
 		CUIRect ColorBtn, ResetBtn;
-		ColorRow.VSplitRight(56.0f, &ColorRow, &ResetBtn);
-		ColorRow.VSplitRight(4.0f, &ColorRow, nullptr);
-		const float Sq = minimum(ColorRow.w, ColorRow.h);
-		ColorRow.VMargin(maximum(0.0f, (ColorRow.w - Sq) * 0.5f), &ColorBtn);
+		ColorCol.VSplitRight(56.0f, &ColorCol, &ResetBtn);
+		ColorCol.VSplitRight(4.0f, &ColorCol, nullptr);
+		const float Sq = minimum(ColorCol.w, ColorCol.h);
+		ColorCol.VMargin(maximum(0.0f, (ColorCol.w - Sq) * 0.5f), &ColorBtn);
 		ColorBtn.HMargin(maximum(0.0f, (ColorBtn.h - Sq) * 0.5f), &ColorBtn);
 		DoButton_ColorPicker(&ColorBtn, &s_ColorHsla, false);
 		static CButtonContainer s_ColorReset;
@@ -2187,19 +2298,14 @@ void CMenus::RenderClansSettings(CUIRect MainView)
 	}
 	MainView.HSplitTop(4.0f, nullptr, &MainView);
 	MainView.HSplitTop(36.0f, &Row, &MainView);
-	RenderClanIconPickerRow(Ui(), TextRender(), Row, 8, 8, &s_IconId, ClanRgb, IconCell, s_aIcons);
-	MainView.HSplitTop(4.0f, nullptr, &MainView);
-	MainView.HSplitTop(36.0f, &Row, &MainView);
-	RenderClanIconPickerRow(Ui(), TextRender(), Row, 16, 8, &s_IconId, ClanRgb, IconCell, s_aIcons);
-
-	MainView.HSplitTop(10.0f, nullptr, &MainView);
-	MainView.HSplitTop(16.0f, &Label, &MainView);
-	Ui()->DoLabel(&Label, Localize("Flag"), 12.0f, TEXTALIGN_ML);
-	MainView.HSplitTop(4.0f, nullptr, &MainView);
-	MainView.HSplitTop(28.0f, &Button, &MainView);
+	Row.VSplitRight(100.0f, &IconsRow, &ColorCol);
+	ColorCol.VSplitLeft(8.0f, nullptr, &ColorCol);
+	RenderClanIconPickerRow(Ui(), TextRender(), IconsRow, 8, 8, &s_IconId, ClanRgb, IconCell, s_aIcons);
 	{
-		CUIRect FlagButton = Button;
-		FlagButton.w = minimum(FlagButton.w, 56.0f);
+		CUIRect FlagButton = ColorCol;
+		const float FlagW = minimum(FlagButton.w, FlagButton.h * 2.0f);
+		FlagButton.x += (FlagButton.w - FlagW) * 0.5f;
+		FlagButton.w = FlagW;
 		static CButtonContainer s_FlagButton;
 		if(DoButton_Menu(&s_FlagButton, "", 0, &FlagButton))
 		{
@@ -2212,12 +2318,11 @@ void CMenus::RenderClansSettings(CUIRect MainView)
 			Ui()->DoPopupMenu(&s_PopupCountryId, FlagButton.x, FlagButton.y + FlagButton.h, 490.0f, 210.0f, &s_PopupCountryContext, PopupSettingsCountrySelection);
 		}
 		GameClient()->m_Tooltips.DoToolTip(&s_FlagButton, &FlagButton, Localize("Choose country flag"));
-		CUIRect FlagIcon = FlagButton;
-		const float OldFlagWidth = FlagIcon.w;
-		FlagIcon.w = FlagIcon.h * 2.0f;
-		FlagIcon.x += (OldFlagWidth - FlagIcon.w) / 2.0f;
-		GameClient()->m_CountryFlags.Render(s_Country, ColorRGBA(1.0f, 1.0f, 1.0f, Ui()->HotItem() == &s_FlagButton ? 1.0f : 0.85f), FlagIcon.x, FlagIcon.y, FlagIcon.w, FlagIcon.h);
+		GameClient()->m_CountryFlags.Render(s_Country, ColorRGBA(1.0f, 1.0f, 1.0f, Ui()->HotItem() == &s_FlagButton ? 1.0f : 0.85f), FlagButton.x, FlagButton.y, FlagButton.w, FlagButton.h);
 	}
+	MainView.HSplitTop(4.0f, nullptr, &MainView);
+	MainView.HSplitTop(36.0f, &Row, &MainView);
+	RenderClanIconPickerRow(Ui(), TextRender(), Row, 16, 8, &s_IconId, ClanRgb, IconCell, s_aIcons);
 
 	MainView.HSplitTop(20.0f, nullptr, &MainView);
 	MainView.HSplitTop(40.0f, &Row, &MainView);
@@ -2225,7 +2330,10 @@ void CMenus::RenderClansSettings(CUIRect MainView)
 	Row.VSplitMid(&SaveBtn, &CancelBtn, 10.0f);
 	static CButtonContainer s_Save, s_Cancel;
 	if(DoClansTextBtn(Ui(), TextRender(), &s_Save, Localize("Save"), &SaveBtn) && s_aName[0] && !Clans.IsBusy())
+	{
+		NormalizeClanDescription(s_aDesc, sizeof(s_aDesc));
 		Clans.UpdateClanSettings(s_aName, s_aDesc, s_IconId, ClanRgb, s_Country);
+	}
 	if(DoClansTextBtn(Ui(), TextRender(), &s_Cancel, Localize("Back"), &CancelBtn))
 	{
 		s_aLoadedClanId[0] = '\0';
