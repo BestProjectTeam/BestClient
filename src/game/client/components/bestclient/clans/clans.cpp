@@ -1138,28 +1138,25 @@ void CClans::ParseMemberSkin(const json_value *pMember, SSkin *pSkin)
 
 void CClans::ParseClanSnapshot(const json_value *pRoot)
 {
-	m_Clan = SClanSnapshot{};
-	str_copy(m_Clan.m_aClanId, JsonString(pRoot, "clan_id"), sizeof(m_Clan.m_aClanId));
-	str_copy(m_Clan.m_aName, JsonString(pRoot, "name"), sizeof(m_Clan.m_aName));
-	str_copy(m_Clan.m_aTag, JsonString(pRoot, "tag"), sizeof(m_Clan.m_aTag));
-	str_copy(m_Clan.m_aDescription, JsonString(pRoot, "description"), sizeof(m_Clan.m_aDescription));
-	m_Clan.m_IconId = JsonInt(pRoot, "icon_id");
-	m_Clan.m_Color = (unsigned)JsonInt(pRoot, "color", 0xFFFFFF);
-	m_Clan.m_Country = JsonInt(pRoot, "country", -1);
-	str_copy(m_Clan.m_aJoinPolicy, JsonString(pRoot, "join_policy", "open"), sizeof(m_Clan.m_aJoinPolicy));
-	m_Clan.m_MaxMembers = JsonInt(pRoot, "max_members", 50);
+	SClanSnapshot Parsed{};
+	str_copy(Parsed.m_aClanId, JsonString(pRoot, "clan_id"), sizeof(Parsed.m_aClanId));
+	str_copy(Parsed.m_aName, JsonString(pRoot, "name"), sizeof(Parsed.m_aName));
+	str_copy(Parsed.m_aTag, JsonString(pRoot, "tag"), sizeof(Parsed.m_aTag));
+	str_copy(Parsed.m_aDescription, JsonString(pRoot, "description"), sizeof(Parsed.m_aDescription));
+	Parsed.m_IconId = JsonInt(pRoot, "icon_id");
+	Parsed.m_Color = (unsigned)JsonInt(pRoot, "color", 0xFFFFFF);
+	Parsed.m_Country = JsonInt(pRoot, "country", -1);
+	str_copy(Parsed.m_aJoinPolicy, JsonString(pRoot, "join_policy", "open"), sizeof(Parsed.m_aJoinPolicy));
+	Parsed.m_MaxMembers = JsonInt(pRoot, "max_members", 50);
 	const json_value *pInvite = json_object_get(pRoot, "invite_code");
 	if(pInvite && pInvite->type == json_string)
 	{
-		str_copy(m_Clan.m_aInviteCode, pInvite->u.string.ptr, sizeof(m_Clan.m_aInviteCode));
-		m_Clan.m_HasInviteCode = true;
+		str_copy(Parsed.m_aInviteCode, pInvite->u.string.ptr, sizeof(Parsed.m_aInviteCode));
+		Parsed.m_HasInviteCode = true;
 	}
 
-	str_copy(m_aClanId, m_Clan.m_aClanId, sizeof(m_aClanId));
-	str_copy(m_aClanTag, m_Clan.m_aTag, sizeof(m_aClanTag));
-	ApplyClanTagLock(m_Clan.m_aTag);
-
 	bool FoundSelf = false;
+	ERole SelfRole = ERole::NONE;
 	const json_value *pMembers = json_object_get(pRoot, "members");
 	if(pMembers && pMembers->type == json_array)
 	{
@@ -1182,21 +1179,32 @@ void CClans::ParseClanSnapshot(const json_value *pRoot)
 				Member.m_Players = JsonInt(pPres, "players");
 				Member.m_MaxPlayers = JsonInt(pPres, "max_players");
 			}
-			if(!str_comp(Member.m_aUserId, m_aUserId))
+			if(m_aUserId[0] && !str_comp(Member.m_aUserId, m_aUserId))
 			{
-				m_Role = Member.m_Role;
+				SelfRole = Member.m_Role;
 				FoundSelf = true;
 			}
-			m_Clan.m_vMembers.push_back(Member);
+			Parsed.m_vMembers.push_back(Member);
 		}
 	}
 
+	// Only wipe membership when this snapshot is for OUR clan and we are missing from it.
+	// A foreign clan payload must never kick us out (that used to cause "not found" after preview).
 	if(m_aUserId[0] && !FoundSelf)
 	{
-		LeaveClanLocal();
-		RefreshCatalog();
+		if(m_aClanId[0] && !str_comp(m_aClanId, Parsed.m_aClanId))
+		{
+			LeaveClanLocal();
+			RefreshCatalog();
+		}
 		return;
 	}
+
+	m_Clan = std::move(Parsed);
+	m_Role = SelfRole;
+	str_copy(m_aClanId, m_Clan.m_aClanId, sizeof(m_aClanId));
+	str_copy(m_aClanTag, m_Clan.m_aTag, sizeof(m_aClanTag));
+	ApplyClanTagLock(m_Clan.m_aTag);
 
 	m_Clan.m_UnreadAnnouncements = JsonInt(pRoot, "unread_announcements");
 	const json_value *pUnl = json_object_get(pRoot, "unleashed");
@@ -1219,7 +1227,9 @@ void CClans::ParseClanSnapshot(const json_value *pRoot)
 	}
 
 	SaveSession();
-	if(m_View == EView::LANDING || m_View == EView::SETUP || m_View == EView::AUTH || m_View == EView::PREVIEW)
+	// Only jump into the own-clan view when this snapshot is actually our membership.
+	// Never hijack an open catalog preview of another clan.
+	if(FoundSelf && (m_View == EView::LANDING || m_View == EView::SETUP || m_View == EView::AUTH || m_View == EView::PREVIEW))
 		m_View = EView::CLAN;
 }
 
@@ -1262,6 +1272,26 @@ void CClans::ParsePreviewSnapshot(const json_value *pRoot)
 			m_Preview.m_vMembers.push_back(Member);
 		}
 	}
+
+	const json_value *pUnl = json_object_get(pRoot, "unleashed");
+	if(pUnl && pUnl->type == json_array)
+	{
+		for(unsigned i = 0; i < pUnl->u.array.length; i++)
+		{
+			const json_value *pU = pUnl->u.array.values[i];
+			if(!pU || pU->type != json_object)
+				continue;
+			SUnleashedPlayer U;
+			str_copy(U.m_aName, JsonString(pU, "name"), sizeof(U.m_aName));
+			str_copy(U.m_aMap, JsonString(pU, "map"), sizeof(U.m_aMap));
+			str_copy(U.m_aServer, JsonString(pU, "server"), sizeof(U.m_aServer));
+			U.m_Players = JsonInt(pU, "players");
+			U.m_MaxPlayers = JsonInt(pU, "max_players");
+			if(U.m_aName[0])
+				m_Preview.m_vUnleashed.push_back(U);
+		}
+	}
+
 	m_View = EView::PREVIEW;
 }
 
