@@ -487,6 +487,32 @@ void CCamera::OnRender()
 	else
 		m_ForceFreeviewPos = m_Center;
 
+    if(m_CamType == CAMTYPE_SPEC && g_Config.m_BcFreeviewNumpad)
+{
+    const float SmoothFreeviewSpeed = (float)g_Config.m_BcFreeviewSpeed;
+    const float SmoothFreeviewAcceleration = g_Config.m_BcFreeviewSmoothness / 10.0f;
+    const float FrameTime = Client()->RenderFrameTime();
+    vec2 FreeviewMove = vec2(0.0f, 0.0f);
+    static vec2 SmoothFreeviewVelocity = vec2(0.0f, 0.0f);
+    if(Input()->KeyIsPressed(KEY_KP_4))
+        FreeviewMove.x -= 1.0f;
+    if(Input()->KeyIsPressed(KEY_KP_6))
+        FreeviewMove.x += 1.0f;
+    if(Input()->KeyIsPressed(KEY_KP_8))
+        FreeviewMove.y -= 1.0f;
+    if(Input()->KeyIsPressed(KEY_KP_2))
+        FreeviewMove.y += 1.0f;
+    const vec2 TargetVelocity = FreeviewMove * SmoothFreeviewSpeed;
+    SmoothFreeviewVelocity += (TargetVelocity - SmoothFreeviewVelocity) * minimum(FrameTime * SmoothFreeviewAcceleration, 1.0f);
+    if(absolute(SmoothFreeviewVelocity.x) < 0.1f && absolute(SmoothFreeviewVelocity.y) < 0.1f)
+        SmoothFreeviewVelocity = vec2(0.0f, 0.0f);
+    if(SmoothFreeviewVelocity.x != 0.0f || SmoothFreeviewVelocity.y != 0.0f)
+    {
+        m_ForceFreeviewPos = m_Center + SmoothFreeviewVelocity * FrameTime;
+        m_ForceFreeview = true;
+    }
+}
+
 	const int SpecId = GameClient()->m_Snap.m_SpecInfo.m_SpectatorId;
 
 	// start smoothing from the current position when the target changes
