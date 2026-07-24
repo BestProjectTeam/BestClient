@@ -70,7 +70,7 @@ The client currently ships with **278** `bc_*` config variables, five BestClient
 </td>
 <td width="50%" valign="top" align="left">
 <strong>Multimapping</strong><br><br>
-<p align="center"><img src="docs/screenshots/multimapping.jpg" width="100%" alt="Multimapping" /></p>
+<p align="center"><img src="docs/screenshots/multimapping.png" width="100%" alt="Multimapping" /></p>
 <ul>
 <li>Create a room or join with a code; live cursors for all participants</li>
 <li>Full editor sync: tiles, layers, quads, groups, images, sounds</li>
