@@ -65,14 +65,9 @@ The client currently ships with **278** `bc_*` config variables, five BestClient
 
 Built-in clan system with its own menu page.
 
-- Register and log in with nickname/password
-- Create a clan, browse catalog, preview clans, join via open / apply / invite code
-- Roles: Member, Veteran, Vice-President, President
-- Applications, announcements, notifications, unread badge on the menu button
-- Online member status, unleashed players on servers
-- In-game clan tag sync and cooldowns for membership/announcement changes
-
-Config: `bc_clans_enabled`, `bc_clans_api_url`, `bc_clans_unread_badge`, `bc_clans_allow_local_dev`.
+- Register/login, create or join clans, roles, applications and announcements
+- Online member status and in-game clan tag sync
+- Unread badge on the menu button
 
 ### Multimapping
 
@@ -82,11 +77,9 @@ Config: `bc_clans_enabled`, `bc_clans_api_url`, `bc_clans_unread_badge`, `bc_cla
 
 Collaborative map editing inside the DDNet editor.
 
-- Create a room or join with a code
-- Multiple participants with live cursors and colored slots
-- Sync for tiles, layers, quads, groups, images/sounds, tune/switch/tele/speedup
-- Full sync, map transfer for late join, ping/pong and tile relay latency
-- **MULTIMAPPING** badge on the Editor button in the main menu
+- Create a room or join with a code; live cursors for all participants
+- Full editor sync: tiles, layers, quads, groups, images, sounds
+- Map transfer for late join; **MULTIMAPPING** badge on the Editor button
 
 ### Fast Practice
 
@@ -96,10 +89,9 @@ Collaborative map editing inside the DDNet editor.
 
 Local practice mode with a separate predicted world and dummy ghost.
 
-- Toggle from the ingame menu or console: `fast_practice_toggle`
-- Practice commands in team chat (`/rescue`, `/tp`, `/weapon`, `/invincible`, `/deep`, `/hit others`, and more)
-- Ghost tee, anchor saving, visual fast input prediction
-- Requires a dummy on the server; intercepts kill and practice chat commands
+- Toggle from ingame menu or `fast_practice_toggle`
+- Practice chat commands: `/rescue`, `/tp`, `/weapon`, `/invincible`, and more
+- Ghost tee and anchor saving; requires a dummy on the server
 
 ### HUD Editor
 
@@ -109,10 +101,9 @@ Local practice mode with a separate predicted world and dummy ghost.
 
 Live HUD module placement over gameplay or demo playback.
 
-- Drag and drop plus corner resize handles
-- Modules: Score, Movement Info, Dummy Actions, Local Time, Spectator Count, Frozen HUD, Chat, Votes, Finish Prediction, Music Player, Keystrokes, Voice HUD / mute icons
-- Per-module reset position/scale and animated Reset All
-- Positions saved to `bc_hud_*` config variables
+- Drag, drop, and resize HUD modules in real time
+- Chat, votes, music player, keystrokes, voice HUD, and more
+- Per-module reset and animated Reset All
 
 ## Feature overview
 
