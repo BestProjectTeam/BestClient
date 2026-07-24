@@ -57,53 +57,48 @@ The client currently ships with **278** `bc_*` config variables, five BestClient
 
 ## Highlight features
 
-### Clans
-
-<p align="center">
-  <img src="docs/screenshots/clans.jpg" width="70%" alt="Clans" />
-</p>
-
-Built-in clan system with its own menu page.
-
-- Register/login, create or join clans, roles, applications and announcements
-- Online member status and in-game clan tag sync
-- Unread badge on the menu button
-
-### Multimapping
-
-<p align="center">
-  <img src="docs/screenshots/multimapping.jpg" width="70%" alt="Multimapping" />
-</p>
-
-Collaborative map editing inside the DDNet editor.
-
-- Create a room or join with a code; live cursors for all participants
-- Full editor sync: tiles, layers, quads, groups, images, sounds
-- Map transfer for late join; **MULTIMAPPING** badge on the Editor button
-
-### Fast Practice
-
-<p align="center">
-  <img src="docs/screenshots/fast_practice.jpg" width="70%" alt="Fast Practice" />
-</p>
-
-Local practice mode with a separate predicted world and dummy ghost.
-
-- Toggle from ingame menu or `fast_practice_toggle`
-- Practice chat commands: `/rescue`, `/tp`, `/weapon`, `/invincible`, and more
-- Ghost tee and anchor saving; requires a dummy on the server
-
-### HUD Editor
-
-<p align="center">
-  <img src="docs/screenshots/hud_editor.jpg" width="70%" alt="HUD Editor" />
-</p>
-
-Live HUD module placement over gameplay or demo playback.
-
-- Drag, drop, and resize HUD modules in real time
-- Chat, votes, music player, keystrokes, voice HUD, and more
-- Per-module reset and animated Reset All
+<table>
+<tr>
+<td width="50%" valign="top" align="center">
+<strong>Clans</strong><br><br>
+<img src="docs/screenshots/clans.jpg" width="95%" alt="Clans" /><br><br>
+<ul align="left">
+<li>Register/login, create or join clans, roles, applications and announcements</li>
+<li>Online member status and in-game clan tag sync</li>
+<li>Unread badge on the menu button</li>
+</ul>
+</td>
+<td width="50%" valign="top" align="center">
+<strong>Multimapping</strong><br><br>
+<img src="docs/screenshots/multimapping.jpg" width="95%" alt="Multimapping" /><br><br>
+<ul align="left">
+<li>Create a room or join with a code; live cursors for all participants</li>
+<li>Full editor sync: tiles, layers, quads, groups, images, sounds</li>
+<li>Map transfer for late join; <strong>MULTIMAPPING</strong> badge on the Editor button</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top" align="center">
+<strong>HUD Editor</strong><br><br>
+<img src="docs/screenshots/hud_editor.jpg" width="95%" alt="HUD Editor" /><br><br>
+<ul align="left">
+<li>Drag, drop, and resize HUD modules in real time</li>
+<li>Chat, votes, music player, keystrokes, voice HUD, and more</li>
+<li>Per-module reset and animated Reset All</li>
+</ul>
+</td>
+<td width="50%" valign="top" align="center">
+<strong>Fast Practice</strong><br><br>
+<img src="docs/screenshots/fast_practice.jpg" width="95%" alt="Fast Practice" /><br><br>
+<ul align="left">
+<li>Toggle from ingame menu or <code>fast_practice_toggle</code></li>
+<li>Practice chat commands: <code>/rescue</code>, <code>/tp</code>, <code>/weapon</code>, <code>/invincible</code>, and more</li>
+<li>Ghost tee and anchor saving; requires a dummy on the server</li>
+</ul>
+</td>
+</tr>
+</table>
 
 ## Feature overview
 
