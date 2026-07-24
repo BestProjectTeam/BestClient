@@ -1,6 +1,6 @@
 <div align="center">
   <img src="https://badges4noxy.vercel.app/badges/bestclient/bc_logo.webp" alt="BestClient" width="640" />
-  <p>Кастомный DDNet-клиент на базе TClient/DDNet: комфорт, кастомизация, социальные системы и QoL для соревновательной игры.</p>
+  <p>Custom DDNet client fork focused on comfort, customization, native tooling, and competitive quality-of-life features.</p>
 
   <p>
     <a href="https://bestclient.fun"><img src="https://badges4noxy.vercel.app/badges/bestclient/website.svg" alt="Website"/></a>
@@ -9,208 +9,178 @@
   </p>
 </div>
 
-## О проекте
+## About
 
-BestClient — это форк DDNet с собственным стеком фич, а не просто reskin. Клиент добавляет визуальные эффекты, инструменты ввода, голосовой чат, редакторы, социальные системы и мини-игры, оставаясь совместимым с DDNet-серверами.
+BestClient is a customized DDNet client built around native BestClient systems instead of a thin reskin.
+The project adds its own rendering stack, input tools, social systems, editors, and UI modules while staying compatible with DDNet servers.
 
-Сейчас в клиенте **278** переменных `bc_*`, пять вкладок настроек BestClient, встроенный голосовой чат, HUD-редактор, кланы, совместный маппинг, Fast Practice и вкладка Fun с мини-играми.
+The client currently ships with **278** `bc_*` config variables, five BestClient settings tabs, integrated voice chat, a live HUD editor, clans, collaborative multimapping, Fast Practice, and a Fun tab with mini-games.
 
-## Ссылки
+## Links
 
-- Сайт: [bestclient.fun](https://bestclient.fun)
+- Website: [bestclient.fun](https://bestclient.fun)
 - Telegram: [t.me/bestddnet](https://t.me/bestddnet)
 - Discord: [discord.gg/bestclient](https://discord.gg/bestclient)
 
-## Скриншоты
+## Screenshots
 
-### Главное меню
+### Main menu
 
-![Главное меню](docs/screenshots/mainmenu.jpg)
+<p align="center">
+  <img src="docs/screenshots/mainmenu.jpg" width="70%" alt="Main menu" />
+</p>
 
-Анимация кнопок при наведении, быстрый доступ к Play/Editor/Demo/Settings и бейдж **MULTIMAPPING** на кнопке редактора.
+Hover button animation, quick access to Play/Editor/Demo/Settings, and a **MULTIMAPPING** badge on the editor button.
 
-### Настройки BestClient — все вкладки
+### BestClient settings tabs
 
-#### Visuals
+**Visuals**
 
-![Visuals 1](docs/screenshots/visuals_1.jpg)
-![Visuals 2](docs/screenshots/visuals_2.jpg)
-![Visuals 3](docs/screenshots/visuals_3.jpg)
+<p align="center">
+  <img src="docs/screenshots/visuals_1.jpg" width="32%" alt="Visuals 1" />
+  <img src="docs/screenshots/visuals_2.jpg" width="32%" alt="Visuals 2" />
+  <img src="docs/screenshots/visuals_3.jpg" width="32%" alt="Visuals 3" />
+</p>
 
-Chat Media, Gif Wheel, градиенты ников, Hook Combo, Jelly Tee, 3D Particles, Media Background, Eye Comfort, Sweat Weapon, Flying Name Plates, Motion Blur, Animations, Music Player, Keystrokes, Custom Aspect Ratio, Chat Bubbles и кнопка **HUD editor**.
+Chat Media, Gif Wheel, gradient nameplates, Hook Combo, Jelly Tee, 3D Particles, Media Background, Eye Comfort, Sweat Weapon, Flying Name Plates, Motion Blur, Animations, Music Player, Keystrokes, Custom Aspect Ratio, Chat Bubbles, and the **HUD editor** button.
 
-#### Gameplay
+<p align="center">
+  <img src="docs/screenshots/gameplay.jpg" width="32%" alt="Gameplay" />
+  <img src="docs/screenshots/fun.jpg" width="32%" alt="Fun" />
+  <img src="docs/screenshots/info.jpg" width="32%" alt="Info" />
+</p>
 
-![Gameplay](docs/screenshots/gameplay.jpg)
+**Gameplay** — Inputs (Fast / Best / Saiko / Delta / F), Snap Tap, Optimizer, Gores mode, Self timeCP, Fast Actions, Speedrun timer, Finish Prediction, Focus Mode.
 
-Inputs (Fast / Best / Saiko / Delta / F), Snap Tap, Optimizer, Gores mode, Self timeCP, Fast Actions, Speedrun timer, Finish Prediction, Focus Mode.
+**Fun** — Casino, Snake, Minesweeper, Chess, Memory, Pong, Brick Breaker.
 
-#### Others
+**Info** — links, Assets editor, config files, developers, hide-settings-tabs controls.
 
-![Others 1](docs/screenshots/others_1.jpg)
-![Others 2](docs/screenshots/others_2.jpg)
+**Others**
+
+<p align="center">
+  <img src="docs/screenshots/others_1.jpg" width="49%" alt="Others 1" />
+  <img src="docs/screenshots/others_2.jpg" width="49%" alt="Others 2" />
+</p>
 
 Misc, Rollback Demo, Browser Utils, Chat Filter, Voice Binds, Client Indicator.
 
-#### Fun
+## Highlight features
 
-![Fun](docs/screenshots/fun.jpg)
+### Clans & Multimapping
 
-Casino, Snake, Minesweeper, Chess, Memory, Pong, Brick Breaker.
+<p align="center">
+  <img src="docs/screenshots/clans.jpg" width="49%" alt="Clans" />
+  <img src="docs/screenshots/multimapping.jpg" width="49%" alt="Multimapping" />
+</p>
 
-#### Info
+**Clans** — built-in clan system with its own menu page: register/login, create or join clans (open / apply / invite code), roles, applications, announcements, notifications, online status, unleashed players, in-game clan tag sync. Config: `bc_clans_enabled`, `bc_clans_api_url`, `bc_clans_unread_badge`, `bc_clans_allow_local_dev`.
 
-![Info](docs/screenshots/info.jpg)
+**Multimapping** — collaborative map editing in the DDNet editor: create/join rooms, live cursors, full tile/layer/quad/group sync, map transfer for late join, ping/pong latency. **MULTIMAPPING** badge on the Editor button.
 
-Ссылки, Assets editor, конфиг-файлы, разработчики, скрытие вкладок настроек.
+### Fast Practice & HUD Editor
 
-## Ключевые системы
+<p align="center">
+  <img src="docs/screenshots/fast_practice.jpg" width="49%" alt="Fast Practice" />
+  <img src="docs/screenshots/hud_editor.jpg" width="49%" alt="HUD Editor" />
+</p>
 
-### Clans
+**Fast Practice** — local practice with a separate predicted world and dummy ghost. Toggle via ingame menu or `fast_practice_toggle`. Practice chat commands (`/rescue`, `/tp`, `/weapon`, `/invincible`, `/deep`, `/hit others`, etc.). Requires a dummy on the server.
 
-![Clans](docs/screenshots/clans.jpg)
+**HUD Editor** — live HUD module placement over gameplay or demo. Drag, resize, per-module reset, animated Reset All. Saves to `bc_hud_*` config variables.
 
-Встроенная система кланов с отдельной страницей в меню клиента.
-
-- Регистрация и вход по нику/паролю
-- Создание клана, каталог, превью и вступление (open / apply / invite code)
-- Роли: Member, Veteran, Vice-President, President
-- Заявки, объявления, уведомления и unread-бейдж на кнопке меню
-- Онлайн-статус участников, «unleashed» игроки на серверах
-- Синхронизация клан-тега в игре и cooldown на смену клана/объявлений
-
-Конфиг: `bc_clans_enabled`, `bc_clans_api_url`, `bc_clans_unread_badge`, `bc_clans_allow_local_dev`.
-
-### Multimapping
-
-![Multimapping](docs/screenshots/multimapping.jpg)
-
-Совместное редактирование карт прямо в редакторе DDNet.
-
-- Создание комнаты или вход по коду
-- Несколько участников с live-курсорами и цветными слотами
-- Синхронизация тайлов, слоёв, квадов, групп, images/sounds, tune/switch/tele/speedup
-- Full sync, map transfer для late join, ping/pong и e2e latency
-- Бейдж **MULTIMAPPING** на кнопке Editor в главном меню
-
-### Fast Practice
-
-![Fast Practice](docs/screenshots/fast_practice.jpg)
-
-Локальный practice-режим с отдельным predicted world и dummy ghost.
-
-- Переключение из ingame-меню или консолью: `fast_practice_toggle`
-- Practice-команды в team chat (`/rescue`, `/tp`, `/weapon`, `/invincible`, `/deep`, `/hit others` и др.)
-- Ghost другого tee, anchor-сохранение, visual fast input prediction
-- Требует dummy на сервере; перехватывает kill и practice chat-команды
-
-### HUD Editor
-
-![HUD Editor](docs/screenshots/hud_editor.jpg)
-
-Live-редактор расположения HUD-модулей поверх игры или демо.
-
-- Drag & drop и resize угловых хватов
-- Модули: Score, Movement Info, Dummy Actions, Local Time, Spectator Count, Frozen HUD, Chat, Votes, Finish Prediction, Music Player, Keystrokes, Voice HUD / mute icons
-- Per-module reset position/scale, Reset All с анимацией
-- Позиции сохраняются в `bc_hud_*` конфиги
-
-## Обзор функций
+## Feature overview
 
 ### Visuals
 
-- **Chat Media** — превью фото/GIF из ссылок в чате, фильтр доменов, Gif Wheel, CherryGifs, gif bubble над головой
-- **Gradient** — градиентные ники, кланы, скины и весь текст (skin / custom / rainbow)
-- **Hook Combo** — popup и звук комбо (hook / hammer / both)
-- **Jelly Tee** — деформация tee (self / others)
-- **3D Particles** — кубы/сердца/mixed, glow, push от игрока
-- **Media Background** — видео/картинка в меню и ingame background
-- **Eye Comfort** — тёплый оверлей для глаз
-- **Sweat Weapon (Crystal Laser)** — кристаллы на laser/shotgun
-- **Flying Name Plates** — «воздушные» неймплates
-- **Motion Blur** — смешивание с предыдущим кадром (BETA)
-- **Animations** — UI reveal, chat/killfeed/main menu анимации
-- **Music Player** — HUD-плеер с visualizer и цветами обложки
-- **Keystrokes** — Classic / Minecraft HUD клавиатуры и мыши
-- **Custom Aspect Ratio** — пресеты и произвольный num:den
-- **Chat Bubbles** — пузыри над игроками
+- **Chat Media** — inline photo/GIF previews, domain filter, Gif Wheel, CherryGifs, above-head gif bubble
+- **Gradient** — gradient nicknames, clans, skins, or all text (skin / custom / rainbow)
+- **Hook Combo** — combo popups and sounds (hook / hammer / both)
+- **Jelly Tee** — tee deformation (self / others)
+- **3D Particles** — cubes/hearts/mixed, glow, player push
+- **Media Background** — video/image in menus and ingame background
+- **Eye Comfort** — warm screen overlay
+- **Sweat Weapon (Crystal Laser)** — crystal laser and shotgun effects
+- **Flying Name Plates** — kite-style trailing name plates
+- **Motion Blur** — previous-frame blending (BETA)
+- **Animations** — UI reveal, chat/killfeed/main menu animations
+- **Music Player** — HUD player with visualizer and cover colors
+- **Keystrokes** — Classic / Minecraft keyboard and mouse HUD
+- **Custom Aspect Ratio** — presets and arbitrary num:den input
+- **Chat Bubbles** — bubbles above players
 
-Demo-only (в Demo Player): **Camera Drift**, **Dynamic FOV**.
+Demo playback only (Demo Player): **Camera Drift**, **Dynamic FOV**.
 
 ### Gameplay
 
 - **Inputs** — Fast, Best (smoothing/latency/interpolation), Saiko, Delta, F + Auto Margin
-- **Snap Tap** — мгновенное переключение A/D (с community blocklist)
-- **Optimizer** — отключение particles, FPS Fog, приоритеты процессов
-- **Gores mode** — entity-like режим с auto-disable при оружии
-- **Self timeCP** — личные чекпоинты (tee / cursor placement)
-- **Fast Actions** — быстрый селектор команд
-- **Speedrun timer** — таймер с H/M/S/ms
-- **Finish Prediction** — прогноз финиша на карте
-- **Focus Mode** — скрытие отвлекающих HUD/UI элементов
-- **45° / Small Sens** quick binds (через binds)
+- **Snap Tap** — instant opposite left/right switching (with community blocklist)
+- **Optimizer** — disable particles, FPS Fog, process priorities
+- **Gores mode** — entity-like mode with auto-disable while holding weapons
+- **Self timeCP** — personal checkpoints (tee / cursor placement)
+- **Fast Actions** — quick command selector
+- **Speedrun timer** — H/M/S/ms timer
+- **Finish Prediction** — finish progress prediction on race maps
+- **Focus Mode** — hide distracting HUD/UI elements
+- **45° / Small Sens** quick binds (via binds)
 
 ### Others
 
-- **Misc** — auto update, layout, silent typing, cinematic camera, spec moved notify, extend zoom, UI/wheel/scoreboard scale и др.
-- **Rollback Demo** — replay rollback с настраиваемой длиной
-- **Browser Utils** — auto refresh списка серверов, short KoG names
-- **Chat Filter** — regex/censor list, whitelist игроков
-- **Voice Binds** — push-to-talk и voice moderation key
-- **Client Indicator** — иконка BestClient в nameplate/scoreboard + browser filter
+- **Misc** — auto update, layout, silent typing, cinematic camera, spec moved notify, extend zoom, UI/wheel/scoreboard scale, and more
+- **Rollback Demo** — replay rollback with configurable length
+- **Browser Utils** — auto server list refresh, short KoG server names
+- **Chat Filter** — regex/censor list, player whitelist
+- **Voice Binds** — push-to-talk and voice moderation key
+- **Client Indicator** — BestClient icon in nameplates/scoreboard + browser filter
 
-### Отдельные системы (вне вкладок BestClient)
+### Standalone systems
 
-- **Voice Chat** — Opus PTT/VAD, radius/team0, per-player volume/mute, voice mod tab в admin panel
-- **Admin Panel** — say/broadcast/mute/ban/kick/respawn/pause + Voice moderation
-- **Translate** — авто-перевод входящего/исходящего чата (кнопка в chat UI)
-- **Clans**, **Multimapping**, **Fast Practice**, **Assets Editor**, **Casino + мини-игры**
+- **Voice Chat** — Opus PTT/VAD, radius/team0, per-player volume/mute, voice mod tab in admin panel
+- **Admin Panel** — say/broadcast/mute/ban/kick/respawn/pause + voice moderation
+- **Translate** — incoming/outgoing chat translation (button in chat UI)
+- **Clans**, **Multimapping**, **Fast Practice**, **Assets Editor**, **Casino + mini-games**
 
-### Удалено (больше не в клиенте)
+## Build
 
-Afterimage, Raycast, Player Trail, Magic Particles, Orbit Aura, Graffiti, ReShade tab, BestClient Shop, Components editor и часть старых мини-игр (2048, Tetris, Tic-Tac-Toe и др.).
-
-## Сборка
-
-Инициализация submodules:
+Initialize submodules first:
 
 ```bash
 git submodule update --init --recursive
 ```
 
-Быстрая сборка:
+Quick build:
 
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DDEV=ON -DVULKAN=ON
 cmake --build build --target everything
 ```
 
-CI-like сборка:
+CI-like build:
 
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DDOWNLOAD_GTEST=ON -DDEV=ON
 cmake --build build --target everything
 ```
 
-Тесты:
+Run tests:
 
 ```bash
 cmake --build build --target run_tests
 ```
 
-Headless:
+Headless test build:
 
 ```bash
 cmake -S . -B headless -G Ninja -DHEADLESS_CLIENT=ON -DCMAKE_BUILD_TYPE=Debug -DDOWNLOAD_GTEST=ON -DDEV=ON
 cmake --build headless --target run_tests
 ```
 
-## Полный список `bc_*` конфигов
+## Full `bc_*` config list
 
-Источник: `src/engine/shared/config_variables_bestclient.h` (278 переменных).
+Source: `src/engine/shared/config_variables_bestclient.h` (278 variables).
 
 <details>
-<summary>Развернуть полный список</summary>
+<summary>Expand full list</summary>
 
 ```cfg
 bc_3d_particles
@@ -495,12 +465,12 @@ bc_wheel_scale
 
 </details>
 
-Также доступен как plain-text: [docs/bc_config_list.txt](docs/bc_config_list.txt).
+Plain-text export: [docs/bc_config_list.txt](docs/bc_config_list.txt).
 
-## Лицензия
+## License
 
-BestClient-authored код распространяется под **[MIT License](LICENSE)**.
+BestClient-authored code is released under the **[MIT License](LICENSE)**.
 
-Upstream DDNet/Teeworlds, сторонние библиотеки и ассеты в `data/` остаются под своими исходными лицензиями — см. [license.txt](license.txt) и локальные `license.txt` в подпапках.
+Upstream DDNet/Teeworlds code, third-party libraries, and assets under `data/` remain under their original licenses — see [license.txt](license.txt) and per-directory `license.txt` files.
 
-Справочник по authored-коду: [docs/BESTCLIENT_AUTHORED_FUNCTIONS.md](docs/BESTCLIENT_AUTHORED_FUNCTIONS.md).
+Authored-code reference: [docs/BESTCLIENT_AUTHORED_FUNCTIONS.md](docs/BESTCLIENT_AUTHORED_FUNCTIONS.md).
