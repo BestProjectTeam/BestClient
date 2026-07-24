@@ -30,8 +30,6 @@ The client currently ships with **278** `bc_*` config variables, five BestClient
   <img src="docs/screenshots/mainmenu.jpg" width="70%" alt="Main menu" />
 </p>
 
-Hover button animation, quick access to Play/Editor/Demo/Settings, and a **MULTIMAPPING** badge on the editor button.
-
 ### BestClient settings tabs
 
 #### Visuals
@@ -42,19 +40,19 @@ Hover button animation, quick access to Play/Editor/Demo/Settings, and a **MULTI
   <img src="docs/screenshots/visuals_3.jpg" width="32%" alt="Visuals 3" />
 </p>
 
-#### Gameplay · Fun · Info
+#### Gameplay · Others
 
 <p align="center">
   <img src="docs/screenshots/gameplay.jpg" width="32%" alt="Gameplay" />
-  <img src="docs/screenshots/fun.jpg" width="32%" alt="Fun" />
-  <img src="docs/screenshots/info.jpg" width="32%" alt="Info" />
+  <img src="docs/screenshots/others_1.jpg" width="32%" alt="Others 1" />
+  <img src="docs/screenshots/others_2.jpg" width="32%" alt="Others 2" />
 </p>
 
-#### Others
+#### Fun · Info
 
 <p align="center">
-  <img src="docs/screenshots/others_1.jpg" width="49%" alt="Others 1" />
-  <img src="docs/screenshots/others_2.jpg" width="49%" alt="Others 2" />
+  <img src="docs/screenshots/fun.jpg" width="49%" alt="Fun" />
+  <img src="docs/screenshots/info.jpg" width="49%" alt="Info" />
 </p>
 
 ## Highlight features
