@@ -59,19 +59,19 @@ The client currently ships with **278** `bc_*` config variables, five BestClient
 
 <table>
 <tr>
-<td width="50%" valign="top" align="center">
+<td width="50%" valign="top" align="left">
 <strong>Clans</strong><br><br>
-<img src="docs/screenshots/clans.jpg" width="95%" alt="Clans" /><br><br>
-<ul align="left">
+<p align="center"><img src="docs/screenshots/clans.jpg" width="100%" alt="Clans" /></p>
+<ul>
 <li>Register/login, create or join clans, roles, applications and announcements</li>
 <li>Online member status and in-game clan tag sync</li>
 <li>Unread badge on the menu button</li>
 </ul>
 </td>
-<td width="50%" valign="top" align="center">
+<td width="50%" valign="top" align="left">
 <strong>Multimapping</strong><br><br>
-<img src="docs/screenshots/multimapping.jpg" width="95%" alt="Multimapping" /><br><br>
-<ul align="left">
+<p align="center"><img src="docs/screenshots/multimapping.jpg" width="100%" alt="Multimapping" /></p>
+<ul>
 <li>Create a room or join with a code; live cursors for all participants</li>
 <li>Full editor sync: tiles, layers, quads, groups, images, sounds</li>
 <li>Map transfer for late join; <strong>MULTIMAPPING</strong> badge on the Editor button</li>
@@ -79,19 +79,19 @@ The client currently ships with **278** `bc_*` config variables, five BestClient
 </td>
 </tr>
 <tr>
-<td width="50%" valign="top" align="center">
+<td width="50%" valign="top" align="left">
 <strong>HUD Editor</strong><br><br>
-<img src="docs/screenshots/hud_editor.jpg" width="95%" alt="HUD Editor" /><br><br>
-<ul align="left">
+<p align="center"><img src="docs/screenshots/hud_editor.jpg" width="100%" alt="HUD Editor" /></p>
+<ul>
 <li>Drag, drop, and resize HUD modules in real time</li>
 <li>Chat, votes, music player, keystrokes, voice HUD, and more</li>
 <li>Per-module reset and animated Reset All</li>
 </ul>
 </td>
-<td width="50%" valign="top" align="center">
+<td width="50%" valign="top" align="left">
 <strong>Fast Practice</strong><br><br>
-<img src="docs/screenshots/fast_practice.jpg" width="95%" alt="Fast Practice" /><br><br>
-<ul align="left">
+<p align="center"><img src="docs/screenshots/fast_practice.jpg" width="100%" alt="Fast Practice" /></p>
+<ul>
 <li>Toggle from ingame menu or <code>fast_practice_toggle</code></li>
 <li>Practice chat commands: <code>/rescue</code>, <code>/tp</code>, <code>/weapon</code>, <code>/invincible</code>, and more</li>
 <li>Ghost tee and anchor saving; requires a dummy on the server</li>
