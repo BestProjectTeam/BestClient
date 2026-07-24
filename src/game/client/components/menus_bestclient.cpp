@@ -2716,6 +2716,7 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 		Ui()->DoScrollbarOption(&g_Config.m_BcAutoTeamLockDelay, &g_Config.m_BcAutoTeamLockDelay, &Button, Localize("Auto lock delay"), 0, 30, &CUi::ms_LinearScrollbarScale, 0, "s");
 	}
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcExtendZoom, Localize("Extend zoom (0.5 steps)"), &g_Config.m_BcExtendZoom, &MiscBlock, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcFastPracticeResetInput, Localize("Fast practice reset input"), &g_Config.m_BcFastPracticeResetInput, &MiscBlock, LineSize);
 	MiscBlock.HSplitTop(LineSize, &Button, &MiscBlock);
 	Ui()->DoScrollbarOption(&g_Config.m_UiScale, &g_Config.m_UiScale, &Button, Localize("UI scale"), 50, 110, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_DELAYUPDATE, "%");
 	MiscBlock.HSplitTop(LineSize, &Button, &MiscBlock);

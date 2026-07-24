@@ -102,6 +102,18 @@ private:
 		bool m_Finished = false;
 	};
 
+	struct SControlState
+	{
+		CNetObj_PlayerInput m_Input{};
+		int m_InputDirectionLeft = 0;
+		int m_InputDirectionRight = 0;
+		int m_SnapTapAppliedDirection = 0;
+		int m_SnapTapLastPressedDirection = 0;
+		int64_t m_SnapTapLastPressedTime = 0;
+		int m_SnapTapPrevLeft = 0;
+		int m_SnapTapPrevRight = 0;
+	};
+
 	bool m_Enabled = false;
 	bool m_RequireDummy = false;
 	int m_EnableLocalClientId = -1;
@@ -116,6 +128,11 @@ private:
 	int m_LastResolvedDummyInputConn = -1;
 	std::array<ivec2, NUM_DUMMIES> m_aServerLockedTargets{};
 	std::array<bool, NUM_DUMMIES> m_aHasServerLockedTargets{};
+	std::array<CNetObj_PlayerInput, NUM_DUMMIES> m_aServerLockedInputs{};
+	std::array<SControlState, NUM_DUMMIES> m_aStoredControlState{};
+	CNetObj_PlayerInput m_StoredDummyInput{};
+	int m_StoredDummyFire = 0;
+	bool m_HasStoredControlState = false;
 
 	SGhostData m_MainGhost;
 	SGhostData m_DummyGhost;
@@ -141,7 +158,7 @@ private:
 	void UpdateGhostForClientId(int ClientId, SGhostData &Ghost);
 	int ApplyVisualFastInputPrediction(int FinalTickRegular, int LocalClientId, int DummyClientId, int LocalInputConn, int DummyInputConn);
 	void CaptureAnchorsFromSnapshot();
-	bool ApplyAnchorToCharacter(CGameWorld &World, const SAnchorData &Anchor) const;
+	bool ApplyAnchorToCharacter(CGameWorld &World, const SAnchorData &Anchor, int InputConn) const;
 	bool InitPracticeWorld();
 	void PrunePracticeWorld(CGameWorld &World) const;
 	void ResetAttackTickHistory();
@@ -150,6 +167,8 @@ private:
 	void MaybePlayHammerHitEffect(CCharacter *pChar);
 	void RenderGhost(const SGhostData &Ghost, float Alpha) const;
 	void ReleaseBufferedInputState();
+	void RebaseBufferedFireState();
+	void RestoreControlState();
 
 	[[gnu::format(printf, 2, 3)]]
 	void EchoPractice(const char *pFormat, ...) const;
