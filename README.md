@@ -34,7 +34,7 @@ Hover button animation, quick access to Play/Editor/Demo/Settings, and a **MULTI
 
 ### BestClient settings tabs
 
-**Visuals**
+#### Visuals
 
 <p align="center">
   <img src="docs/screenshots/visuals_1.jpg" width="32%" alt="Visuals 1" />
@@ -42,7 +42,7 @@ Hover button animation, quick access to Play/Editor/Demo/Settings, and a **MULTI
   <img src="docs/screenshots/visuals_3.jpg" width="32%" alt="Visuals 3" />
 </p>
 
-Chat Media, Gif Wheel, gradient nameplates, Hook Combo, Jelly Tee, 3D Particles, Media Background, Eye Comfort, Sweat Weapon, Flying Name Plates, Motion Blur, Animations, Music Player, Keystrokes, Custom Aspect Ratio, Chat Bubbles, and the **HUD editor** button.
+#### Gameplay · Fun · Info
 
 <p align="center">
   <img src="docs/screenshots/gameplay.jpg" width="32%" alt="Gameplay" />
@@ -50,44 +50,71 @@ Chat Media, Gif Wheel, gradient nameplates, Hook Combo, Jelly Tee, 3D Particles,
   <img src="docs/screenshots/info.jpg" width="32%" alt="Info" />
 </p>
 
-**Gameplay** — Inputs (Fast / Best / Saiko / Delta / F), Snap Tap, Optimizer, Gores mode, Self timeCP, Fast Actions, Speedrun timer, Finish Prediction, Focus Mode.
-
-**Fun** — Casino, Snake, Minesweeper, Chess, Memory, Pong, Brick Breaker.
-
-**Info** — links, Assets editor, config files, developers, hide-settings-tabs controls.
-
-**Others**
+#### Others
 
 <p align="center">
   <img src="docs/screenshots/others_1.jpg" width="49%" alt="Others 1" />
   <img src="docs/screenshots/others_2.jpg" width="49%" alt="Others 2" />
 </p>
 
-Misc, Rollback Demo, Browser Utils, Chat Filter, Voice Binds, Client Indicator.
-
 ## Highlight features
 
-### Clans & Multimapping
+### Clans
 
 <p align="center">
-  <img src="docs/screenshots/clans.jpg" width="49%" alt="Clans" />
-  <img src="docs/screenshots/multimapping.jpg" width="49%" alt="Multimapping" />
+  <img src="docs/screenshots/clans.jpg" width="70%" alt="Clans" />
 </p>
 
-**Clans** — built-in clan system with its own menu page: register/login, create or join clans (open / apply / invite code), roles, applications, announcements, notifications, online status, unleashed players, in-game clan tag sync. Config: `bc_clans_enabled`, `bc_clans_api_url`, `bc_clans_unread_badge`, `bc_clans_allow_local_dev`.
+Built-in clan system with its own menu page.
 
-**Multimapping** — collaborative map editing in the DDNet editor: create/join rooms, live cursors, full tile/layer/quad/group sync, map transfer for late join, ping/pong latency. **MULTIMAPPING** badge on the Editor button.
+- Register and log in with nickname/password
+- Create a clan, browse catalog, preview clans, join via open / apply / invite code
+- Roles: Member, Veteran, Vice-President, President
+- Applications, announcements, notifications, unread badge on the menu button
+- Online member status, unleashed players on servers
+- In-game clan tag sync and cooldowns for membership/announcement changes
 
-### Fast Practice & HUD Editor
+Config: `bc_clans_enabled`, `bc_clans_api_url`, `bc_clans_unread_badge`, `bc_clans_allow_local_dev`.
+
+### Multimapping
 
 <p align="center">
-  <img src="docs/screenshots/fast_practice.jpg" width="49%" alt="Fast Practice" />
-  <img src="docs/screenshots/hud_editor.jpg" width="49%" alt="HUD Editor" />
+  <img src="docs/screenshots/multimapping.jpg" width="70%" alt="Multimapping" />
 </p>
 
-**Fast Practice** — local practice with a separate predicted world and dummy ghost. Toggle via ingame menu or `fast_practice_toggle`. Practice chat commands (`/rescue`, `/tp`, `/weapon`, `/invincible`, `/deep`, `/hit others`, etc.). Requires a dummy on the server.
+Collaborative map editing inside the DDNet editor.
 
-**HUD Editor** — live HUD module placement over gameplay or demo. Drag, resize, per-module reset, animated Reset All. Saves to `bc_hud_*` config variables.
+- Create a room or join with a code
+- Multiple participants with live cursors and colored slots
+- Sync for tiles, layers, quads, groups, images/sounds, tune/switch/tele/speedup
+- Full sync, map transfer for late join, ping/pong and tile relay latency
+- **MULTIMAPPING** badge on the Editor button in the main menu
+
+### Fast Practice
+
+<p align="center">
+  <img src="docs/screenshots/fast_practice.jpg" width="70%" alt="Fast Practice" />
+</p>
+
+Local practice mode with a separate predicted world and dummy ghost.
+
+- Toggle from the ingame menu or console: `fast_practice_toggle`
+- Practice commands in team chat (`/rescue`, `/tp`, `/weapon`, `/invincible`, `/deep`, `/hit others`, and more)
+- Ghost tee, anchor saving, visual fast input prediction
+- Requires a dummy on the server; intercepts kill and practice chat commands
+
+### HUD Editor
+
+<p align="center">
+  <img src="docs/screenshots/hud_editor.jpg" width="70%" alt="HUD Editor" />
+</p>
+
+Live HUD module placement over gameplay or demo playback.
+
+- Drag and drop plus corner resize handles
+- Modules: Score, Movement Info, Dummy Actions, Local Time, Spectator Count, Frozen HUD, Chat, Votes, Finish Prediction, Music Player, Keystrokes, Voice HUD / mute icons
+- Per-module reset position/scale and animated Reset All
+- Positions saved to `bc_hud_*` config variables
 
 ## Feature overview
 
@@ -122,7 +149,6 @@ Demo playback only (Demo Player): **Camera Drift**, **Dynamic FOV**.
 - **Speedrun timer** — H/M/S/ms timer
 - **Finish Prediction** — finish progress prediction on race maps
 - **Focus Mode** — hide distracting HUD/UI elements
-- **45° / Small Sens** quick binds (via binds)
 
 ### Others
 
@@ -131,14 +157,15 @@ Demo playback only (Demo Player): **Camera Drift**, **Dynamic FOV**.
 - **Browser Utils** — auto server list refresh, short KoG server names
 - **Chat Filter** — regex/censor list, player whitelist
 - **Voice Binds** — push-to-talk and voice moderation key
-- **Client Indicator** — BestClient icon in nameplates/scoreboard + browser filter
-
-### Standalone systems
-
 - **Voice Chat** — Opus PTT/VAD, radius/team0, per-player volume/mute, voice mod tab in admin panel
+- **Client Indicator** — BestClient icon in nameplates/scoreboard + browser filter
 - **Admin Panel** — say/broadcast/mute/ban/kick/respawn/pause + voice moderation
 - **Translate** — incoming/outgoing chat translation (button in chat UI)
-- **Clans**, **Multimapping**, **Fast Practice**, **Assets Editor**, **Casino + mini-games**
+- **Clans** — register/login, create or join clans, roles, applications, announcements, online status, in-game clan tag sync
+- **Multimapping** — collaborative map editing with room codes, live cursors, full editor sync, map transfer for late join
+- **Fast Practice** — local practice world with dummy ghost, practice chat commands, `fast_practice_toggle`
+- **Assets Editor** — mix assets, prepare exports, jump into the name plate workflow from a fullscreen editor
+- **Fun tab mini-games** — Snake, Minesweeper, Chess, Memory, Pong, Brick Breaker
 
 ## Build
 
@@ -472,5 +499,3 @@ Plain-text export: [docs/bc_config_list.txt](docs/bc_config_list.txt).
 BestClient-authored code is released under the **[MIT License](LICENSE)**.
 
 Upstream DDNet/Teeworlds code, third-party libraries, and assets under `data/` remain under their original licenses — see [license.txt](license.txt) and per-directory `license.txt` files.
-
-Authored-code reference: [docs/BESTCLIENT_AUTHORED_FUNCTIONS.md](docs/BESTCLIENT_AUTHORED_FUNCTIONS.md).
