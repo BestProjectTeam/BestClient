@@ -1,32 +1,31 @@
-BestClient Mixed License Notice
+MIT License
+
 Copyright (c) 2026 BestProject Team
 
-This repository contains code and content under multiple licenses.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-1) Upstream and third-party materials
-- DDNet/Teeworlds upstream code remains under its original license terms.
-- Third-party libraries, tools, and assets remain under their own licenses.
-- Nothing in this file replaces, narrows, or revokes any upstream or third-party rights.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-2) Data/content licenses
-- Content under `data/` remains under the license specified in each file/directory.
-- In particular, DDNet content under CC-BY-SA 3.0 remains under CC-BY-SA 3.0.
-- Where a `license.txt` exists in a subdirectory, that license controls for that material.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
-3) BestProject-authored functions (permission-required scope)
-- Prior written permission from BestProject Team is required only for reuse or redistribution of BestProject-authored function implementations listed in `docs/BESTCLIENT_AUTHORED_FUNCTIONS.md`.
-- `docs/BESTCLIENT_AUTHORED_FUNCTIONS.md` is the authoritative scope definition for current BestClient-authored implementations and the live `bc_*` settings registry, including the component-mask settings used by the Components editor.
-- Chat Bubbles implementation/config handling is excluded from that permission-required scope.
-- This permission requirement applies only to those listed function implementations and does not apply to upstream/DDNet code or third-party code.
-- If those listed functions are removed or replaced, the remaining code may be used and redistributed under the applicable upstream/per-file licenses.
+---
 
-4) Attribution and modified versions
-- Do not misrepresent the origin of upstream software.
-- Mark altered versions as modified.
-- Preserve existing copyright and license notices.
+Third-party and upstream notice
 
-5) Warranty disclaimer
-This software is provided "as is", without warranty of any kind, express or implied, including but not limited to merchantability, fitness for a particular purpose, and noninfringement. In no event shall BestProject Team or contributors be liable for any claim, damages, or other liability, whether in an action of contract, tort, or otherwise, arising from, out of, or in connection with the software or the use or other dealings in the software.
-
-Permission requests:
-discord.gg/bestclient
+This repository is a DDNet/Teeworlds fork. Portions of the codebase, bundled
+libraries, fonts, maps, skins, and other assets remain under their original
+licenses. See `license.txt` and per-directory `license.txt` files under `data/`
+for the applicable terms. Nothing in this MIT license replaces or narrows those
+upstream or third-party rights.
