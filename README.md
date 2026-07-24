@@ -134,6 +134,16 @@ Demo playback only (Demo Player): **Camera Drift**, **Dynamic FOV**.
 - **Finish Prediction** — finish progress prediction on race maps
 - **Focus Mode** — hide distracting HUD/UI elements
 
+### Fun
+
+- Casino
+- Snake
+- Minesweeper
+- Chess
+- Memory
+- Pong
+- Brick Breaker
+
 ### Others
 
 - **Misc** — auto update, layout, silent typing, cinematic camera, spec moved notify, extend zoom, UI/wheel/scoreboard scale, and more
@@ -143,13 +153,15 @@ Demo playback only (Demo Player): **Camera Drift**, **Dynamic FOV**.
 - **Voice Binds** — push-to-talk and voice moderation key
 - **Voice Chat** — Opus PTT/VAD, radius/team0, per-player volume/mute, voice mod tab in admin panel
 - **Client Indicator** — BestClient icon in nameplates/scoreboard + browser filter
+
+### Outside settings menu
+
 - **Admin Panel** — say/broadcast/mute/ban/kick/respawn/pause + voice moderation
 - **Translate** — incoming/outgoing chat translation (button in chat UI)
 - **Clans** — register/login, create or join clans, roles, applications, announcements, online status, in-game clan tag sync
 - **Multimapping** — collaborative map editing with room codes, live cursors, full editor sync, map transfer for late join
 - **Fast Practice** — local practice world with dummy ghost, practice chat commands, `fast_practice_toggle`
 - **Assets Editor** — mix assets, prepare exports, jump into the name plate workflow from a fullscreen editor
-- **Fun tab mini-games** — Snake, Minesweeper, Chess, Memory, Pong, Brick Breaker
 
 ## Build
 
