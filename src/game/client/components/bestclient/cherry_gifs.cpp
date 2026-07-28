@@ -1,13 +1,11 @@
 /* Copyright © 2026 BestProject Team */
 #include "cherry_gifs.h"
-#include "cherry_gifs_cache.h"
 
 #include <base/log.h>
 #include <base/mem.h>
 
 #include <engine/shared/http.h>
 #include <engine/shared/json.h>
-#include <engine/storage.h>
 
 #include <game/client/components/media_decoder.h>
 #include <game/client/gameclient.h>
@@ -370,26 +368,6 @@ void CCherryGifs::RequestThumbnail(int Index)
 		return;
 	}
 
-	// Disk cache hit: decode straight from the cached bytes, no network round trip at all. This
-	// is what makes reopening the browser (or restarting the client) not re-fetch everything.
-	std::vector<unsigned char> vCached;
-	if(CherryGifsCache::Load(Storage(), Gif.m_aId, vCached) && IsRecognizedImageSignature(vCached.data(), vCached.size()))
-	{
-		Gif.m_ThumbnailRequested = true;
-		SMediaDecodedFrames DecodedFrames;
-		if(MediaDecoder::DecodeStaticImageCpu(Graphics(), vCached.data(), vCached.size(), Gif.m_aId, DecodedFrames, 256))
-		{
-			std::vector<SMediaFrame> vFrames;
-			if(MediaDecoder::UploadFrames(Graphics(), DecodedFrames, vFrames, Gif.m_aId) && !vFrames.empty())
-			{
-				Gif.m_Thumbnail = vFrames.front().m_Texture;
-				return;
-			}
-		}
-		Gif.m_ThumbnailFailed = true;
-		return;
-	}
-
 	Gif.m_ThumbnailRequested = true;
 
 	SThumbnailJob Job;
@@ -441,7 +419,6 @@ void CCherryGifs::PollThumbnails()
 					if(MediaDecoder::UploadFrames(Graphics(), DecodedFrames, vFrames, pGif->m_aId) && !vFrames.empty())
 					{
 						pGif->m_Thumbnail = vFrames.front().m_Texture;
-						CherryGifsCache::Save(Storage(), pGif->m_aId, pData, DataSize);
 					}
 					else
 					{

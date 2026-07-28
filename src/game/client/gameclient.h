@@ -1057,17 +1057,11 @@ private:
 	void RenderEyeComfortOverlay(); // BestClient
 
 	// BestClient: optimizer
-	void OptimizerSetDdnetPriorityHigh();
-	void OptimizerSetDiscordPriorityBelowNormal();
 	void OptimizerUpdateProcessPriorities();
 	void RenderOptimizerFpsFogRect();
 	unsigned long m_OptimizerDdnetPrevPriorityClass = 0;
 	unsigned long m_OptimizerDdnetLastSetPriorityClass = 0;
 	bool m_OptimizerDdnetPriorityHighActive = false;
-	bool m_OptimizerDiscordPriorityBelowNormalActive = false;
-	std::vector<unsigned long> m_vOptimizerDiscordPids;
-	float m_OptimizerDiscordLastRescanTime = -1.0f;
-	float m_OptimizerDiscordLastReapplyTime = -1.0f;
 
 	int m_aLastUpdateTick[MAX_CLIENTS] = {0};
 	void DetectStrongHook();

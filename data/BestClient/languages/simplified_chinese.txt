@@ -1225,9 +1225,6 @@ High Detail
 DDNet priority: High
 == 
 
-Discord priority: Below Normal
-== 
-
 Render FPS fog rectangle
 == 
 

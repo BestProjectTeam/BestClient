@@ -1,6 +1,5 @@
 /* Copyright © 2026 BestProject Team */
 #include "gif_wheel.h"
-#include "cherry_gifs_cache.h"
 
 #include <base/math.h>
 #include <base/mem.h>
@@ -8,7 +7,6 @@
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
 #include <engine/shared/http.h>
-#include <engine/storage.h>
 
 #include <generated/protocol.h>
 
@@ -247,26 +245,6 @@ void CGifWheel::EnsureThumbnail(CSlot &Slot)
 		return;
 	}
 
-	// Disk cache hit: the browser (or a previous session) may have already downloaded this exact
-	// gif - decode straight from disk, no network round trip.
-	std::vector<unsigned char> vCached;
-	if(CherryGifsCache::Load(Storage(), Slot.m_aGifId, vCached) && IsRecognizedImageSignature(vCached.data(), vCached.size()))
-	{
-		Slot.m_ThumbnailRequested = true;
-		SMediaDecodedFrames DecodedFrames;
-		if(MediaDecoder::DecodeStaticImageCpu(Graphics(), vCached.data(), vCached.size(), Slot.m_aGifId, DecodedFrames, 256))
-		{
-			std::vector<SMediaFrame> vFrames;
-			if(MediaDecoder::UploadFrames(Graphics(), DecodedFrames, vFrames, Slot.m_aGifId) && !vFrames.empty())
-			{
-				Slot.m_Thumbnail = vFrames.front().m_Texture;
-				return;
-			}
-		}
-		Slot.m_ThumbnailFailed = true;
-		return;
-	}
-
 	Slot.m_ThumbnailRequested = true;
 
 	std::shared_ptr<CHttpRequest> pGet = HttpGet(Slot.m_aUrl);
@@ -299,7 +277,6 @@ void CGifWheel::PollThumbnails()
 					if(MediaDecoder::UploadFrames(Graphics(), DecodedFrames, vFrames, Slot.m_aGifId) && !vFrames.empty())
 					{
 						Slot.m_Thumbnail = vFrames.front().m_Texture;
-						CherryGifsCache::Save(Storage(), Slot.m_aGifId, pData, DataSize);
 					}
 					else
 					{

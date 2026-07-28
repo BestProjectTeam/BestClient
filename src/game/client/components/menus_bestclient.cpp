@@ -2123,7 +2123,7 @@ void CMenus::RenderSettingsBestClientGameplay(CUIRect MainView)
 	else
 		s_OptimizerFpsFogRevealPhase = OptimizerFpsFogExpanded ? 1.0f : 0.0f;
 	const float OptimizerFpsFogExpandedHeight = (4.0f * (MarginSmall + LineSize)) * BCUiAnimations::EaseOutCubic(s_OptimizerFpsFogRevealPhase);
-	const float OptimizerExpandedHeight = (4.0f * (MarginSmall + LineSize)) * BCUiAnimations::EaseOutCubic(s_OptimizerRevealPhase) + OptimizerFpsFogExpandedHeight;
+	const float OptimizerExpandedHeight = (3.0f * (MarginSmall + LineSize)) * BCUiAnimations::EaseOutCubic(s_OptimizerRevealPhase) + OptimizerFpsFogExpandedHeight;
 	const float OptimizerHeaderHeight = LineSize + MarginSmall + LineSize;
 	const float OptimizerBlockHeight = OptimizerHeaderHeight + OptimizerExpandedHeight;
 
@@ -2163,10 +2163,6 @@ void CMenus::RenderSettingsBestClientGameplay(CUIRect MainView)
 		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
 		MainView.HSplitTop(LineSize, &Content, &MainView);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcOptimizerDdnetPriorityHigh, Localize("DDNet priority: High"), &g_Config.m_BcOptimizerDdnetPriorityHigh, &Content, LineSize);
-
-		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
-		MainView.HSplitTop(LineSize, &Content, &MainView);
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcOptimizerDiscordPriorityBelowNormal, Localize("Discord priority: Below Normal"), &g_Config.m_BcOptimizerDiscordPriorityBelowNormal, &Content, LineSize);
 
 		if(OptimizerFpsFogExpandedHeight > 0.5f)
 		{

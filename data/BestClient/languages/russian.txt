@@ -881,9 +881,6 @@ FPS fog (cull outside limit)
 DDNet priority: High
 == Приоритет DDNet: высокий
 
-Discord priority: Below Normal
-== Приоритет Discord: ниже обычного
-
 Render FPS fog rectangle
 == Показывать прямоугольник FPS-тумана
 

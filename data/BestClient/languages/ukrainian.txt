@@ -1071,9 +1071,6 @@ FPS fog (cull outside limit)
 DDNet priority: High
 == 
 
-Discord priority: Below Normal
-== 
-
 Render FPS fog rectangle
 == 
 
