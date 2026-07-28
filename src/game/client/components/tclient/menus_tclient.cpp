@@ -5,6 +5,7 @@
 
 #include <engine/font_icons.h>
 #include <engine/graphics.h>
+#include <game/client/lineinput.h>
 #include <engine/shared/config.h>
 #include <engine/shared/linereader.h>
 #include <engine/shared/localization.h>
@@ -34,6 +35,7 @@
 #include <game/localization.h>
 
 #include <algorithm>
+#include <list>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -2607,6 +2609,157 @@ void CMenus::RenderSettingsTClientProfiles(CUIRect MainView)
 	s_SelectedProfile = s_ListBox.DoEnd();
 }
 
+struct SWatchEditPopupContext : public SPopupMenuId
+{
+	CGameClient *m_pGameClient;
+	CUi *m_pUI;
+	const SConfigVariable *m_pVar;
+	CLineInputBuffered<64> m_LabelInput;
+	unsigned m_ColorValue;
+	ColorHSLA m_DisplayHsla;
+	CUi::SColorPickerPopupContext m_ColorPickerContext;
+	bool m_NeedsReopen{false};
+
+	struct SCondition
+	{
+		CLineInputNumber m_ValueInput;
+		unsigned m_ColorValue{0xFFFFFFFF};
+		ColorHSLA m_DisplayHsla{0.0f, 0.0f, 1.0f, 1.0f};
+		CUi::SColorPickerPopupContext m_ColorPickerContext;
+		CButtonContainer m_RemoveBtnId;
+	};
+	std::list<SCondition> m_vConditions;
+};
+
+static CUi::EPopupMenuFunctionResult WatchEditPopupFunc(void *pContext, CUIRect View, bool Active)
+{
+	SWatchEditPopupContext *pCtx = static_cast<SWatchEditPopupContext *>(pContext);
+	CGameClient *pGameClient = pCtx->m_pGameClient;
+	CUi *pUI = pCtx->m_pUI;
+
+	const float RowHeight = 16.0f;
+	const float Margin = 3.0f;
+	const float Padding = 5.0f;
+
+	// Label row
+	CUIRect LabelRow;
+	View.HSplitTop(Padding, nullptr, &View);
+	View.HSplitTop(RowHeight, &LabelRow, &View);
+	LabelRow.VSplitLeft(35.0f, nullptr, &LabelRow);
+	pUI->DoLabel(&LabelRow, "Имя:", RowHeight * 0.8f, TEXTALIGN_ML);
+
+	CUIRect LabelInput;
+	LabelRow.VSplitRight(0.0f, &LabelRow, &LabelInput);
+	LabelRow.VSplitLeft(45.0f, nullptr, &LabelInput);
+	pUI->DoEditBox(&pCtx->m_LabelInput, &LabelInput, 12.0f);
+
+	// Value→Color conditions header
+	CUIRect CondHeader;
+	View.HSplitTop(Margin + 1.0f, nullptr, &View);
+	View.HSplitTop(RowHeight, &CondHeader, &View);
+	pUI->DoLabel(&CondHeader, "Цвета значений:", RowHeight * 0.8f, TEXTALIGN_ML);
+
+	// Condition rows
+	for(auto it = pCtx->m_vConditions.begin(); it != pCtx->m_vConditions.end(); )
+	{
+		auto &Cond = *it;
+
+		CUIRect CondRow, ValInput, ColSquare, RemoveBtn;
+		View.HSplitTop(Margin, nullptr, &View);
+		View.HSplitTop(RowHeight, &CondRow, &View);
+
+		CondRow.VSplitLeft(40.0f, &ValInput, &CondRow);
+		pUI->DoEditBox(&Cond.m_ValueInput, &ValInput, 10.0f);
+
+		CondRow.VSplitLeft(Margin, nullptr, &CondRow);
+		CondRow.VSplitLeft(22.0f, &ColSquare, &CondRow);
+		ColSquare.h = RowHeight - 2.0f;
+		ColSquare.y += 1.0f;
+		{
+			ColorRGBA Outline(1.0f, 1.0f, 1.0f, 0.25f);
+			ColSquare.Draw(Outline, IGraphics::CORNER_ALL, 3.0f);
+			CUIRect Inner;
+			ColSquare.Margin(1.5f, &Inner);
+			ColorRGBA ColPrev = color_cast<ColorRGBA>(Cond.m_DisplayHsla);
+			Inner.Draw(ColPrev, IGraphics::CORNER_ALL, 2.0f);
+		}
+
+		if(Active && pUI->DoButtonLogic(&Cond.m_ColorValue, 0, &ColSquare, BUTTONFLAG_LEFT))
+		{
+			Cond.m_ColorPickerContext.m_pHslaColor = &Cond.m_ColorValue;
+			Cond.m_ColorPickerContext.m_HslaColor = Cond.m_DisplayHsla;
+			Cond.m_ColorPickerContext.m_HsvaColor = color_cast<ColorHSVA>(Cond.m_DisplayHsla);
+			Cond.m_ColorPickerContext.m_RgbaColor = color_cast<ColorRGBA>(Cond.m_DisplayHsla);
+			Cond.m_ColorPickerContext.m_Alpha = true;
+			pUI->ShowPopupColorPicker(pUI->MouseX(), pUI->MouseY(), &Cond.m_ColorPickerContext);
+		}
+
+		if(pUI->IsPopupOpen(&Cond.m_ColorPickerContext) && Cond.m_ColorPickerContext.m_pHslaColor == &Cond.m_ColorValue)
+		{
+			Cond.m_DisplayHsla = color_cast<ColorHSLA>(Cond.m_ColorPickerContext.m_HsvaColor);
+		}
+
+		CondRow.VSplitRight(18.0f, &CondRow, &RemoveBtn);
+		if(pUI->DoButton_FontIcon(&Cond.m_RemoveBtnId, FontIcon::XMARK, 0, &RemoveBtn, BUTTONFLAG_LEFT, IGraphics::CORNER_ALL, true, std::nullopt))
+		{
+			if(Active)
+			{
+				it = pCtx->m_vConditions.erase(it);
+				pCtx->m_NeedsReopen = true;
+				return CUi::POPUP_CLOSE_CURRENT;
+			}
+		}
+		++it;
+	}
+
+	// Add condition button
+	CUIRect AddCondRow;
+	View.HSplitTop(Margin, nullptr, &View);
+	View.HSplitTop(RowHeight, &AddCondRow, &View);
+	static CButtonContainer s_AddCondBtn;
+	if(pGameClient->m_Menus.DoButton_Menu(&s_AddCondBtn, "+ Добавить условие", 0, &AddCondRow))
+	{
+		pCtx->m_vConditions.emplace_back();
+		pCtx->m_NeedsReopen = true;
+		return CUi::POPUP_CLOSE_CURRENT;
+	}
+
+	// Button row
+	CUIRect ButtonRow;
+	View.HSplitTop(Margin + 5.0f, nullptr, &View);
+	float ButtonRowHeight = 18.0f;
+	View.HSplitTop(ButtonRowHeight, &ButtonRow, &View);
+
+	CUIRect SaveBtn, RemoveBtnB;
+	CUIRect TmpRow = ButtonRow;
+	TmpRow.VSplitLeft((TmpRow.w - Margin) / 2.0f, &SaveBtn, &TmpRow);
+	TmpRow.VSplitLeft(Margin, nullptr, &TmpRow);
+	RemoveBtnB = TmpRow;
+
+	static CButtonContainer s_SaveBtn, s_RemoveBtn;
+	if(pGameClient->m_Menus.DoButton_Menu(&s_SaveBtn, "Сохранить", 0, &SaveBtn))
+	{
+		ColorRGBA FinalColor(1.0f, 1.0f, 1.0f, 1.0f);
+		std::unordered_map<int, ColorRGBA> ValueColors;
+		for(const auto &Cond : pCtx->m_vConditions)
+		{
+			int Val = Cond.m_ValueInput.GetInteger();
+			ValueColors[Val] = color_cast<ColorRGBA>(Cond.m_DisplayHsla);
+		}
+		pGameClient->m_HudWatch.SetWatch(pCtx->m_pVar, pCtx->m_LabelInput.GetString(), FinalColor, ValueColors);
+		return CUi::POPUP_CLOSE_CURRENT;
+	}
+	if(pGameClient->m_Menus.DoButton_Menu(&s_RemoveBtn, "Удалить", 0, &RemoveBtnB))
+	{
+		pGameClient->m_HudWatch.RemoveWatch(pCtx->m_pVar);
+		return CUi::POPUP_CLOSE_CURRENT;
+	}
+
+	View.HSplitTop(4.0f, nullptr, &View);
+
+	return CUi::POPUP_KEEP_OPEN;
+}
+
 void CMenus::RenderSettingsTClientConfigs(CUIRect MainView)
 {
 	// hi hello, this is a relatively self contained mess, sorry if you're forking or need to modify this -Tater
@@ -2908,10 +3061,84 @@ void CMenus::RenderSettingsTClientConfigs(CUIRect MainView)
 			RowContent.HSplitTop(LineSize, &TopLine, &Below);
 		}
 		CUIRect NameLine, Right;
-		TopLine.VSplitRight(320.0f, &NameLine, &Right);
+		TopLine.VSplitRight(344.0f, &NameLine, &Right);
 		NameLine.VSplitLeft(10.0f, nullptr, &NameLine);
 
+		CUIRect EyeBtn;
+		NameLine.VSplitRight(24.0f, &NameLine, &EyeBtn);
+		EyeBtn.h = LineSize;
+		EyeBtn.y = TopLine.y + (TopLine.h - LineSize) / 2.0f;
+
 		Ui()->DoLabel(&NameLine, pVar->m_pScriptName, FontSize, TEXTALIGN_ML);
+
+		{
+			const bool Watched = GameClient()->m_HudWatch.IsWatched(pVar);
+			static std::unordered_map<const SConfigVariable *, CButtonContainer> s_EyeBtns;
+			static std::unordered_map<const SConfigVariable *, SWatchEditPopupContext> s_EditPopups;
+			CButtonContainer &EyeBtnId = s_EyeBtns[pVar];
+			bool EyeClicked = DoButton_Menu(&EyeBtnId, "", 0, &EyeBtn);
+			TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+			TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING);
+			TextRender()->TextColor(Watched ? ColorRGBA(1.0f, 1.0f, 0.0f, 1.0f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.35f));
+			Ui()->DoLabel(&EyeBtn, Watched ? FontIcon::EYE : FontIcon::EYE_SLASH, EyeBtn.h * 0.5f, TEXTALIGN_MC);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+			TextRender()->SetRenderFlags(0);
+			TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+			if(EyeClicked)
+			{
+				SWatchEditPopupContext &PopupCtx = s_EditPopups[pVar];
+				PopupCtx.m_pGameClient = GameClient();
+				PopupCtx.m_pUI = Ui();
+				PopupCtx.m_pVar = pVar;
+				PopupCtx.m_LabelInput.Clear();
+				PopupCtx.m_vConditions.clear();
+				PopupCtx.m_NeedsReopen = false;
+				bool Found = false;
+				for(const auto &W : GameClient()->m_HudWatch.GetWatches())
+				{
+					if(W.m_pVar == pVar)
+					{
+						PopupCtx.m_LabelInput.Set(W.m_aLabel);
+						PopupCtx.m_DisplayHsla = color_cast<ColorHSLA>(W.m_Color);
+						ColorRGBA Col = W.m_Color;
+						PopupCtx.m_ColorValue = ((unsigned)(Col.a * 255) << 24) | ((unsigned)(Col.r * 255) << 16) | ((unsigned)(Col.g * 255) << 8) | (unsigned)(Col.b * 255);
+						for(const auto &[Val, CCol] : W.m_vValueColors)
+						{
+							PopupCtx.m_vConditions.emplace_back();
+							auto &Cond = PopupCtx.m_vConditions.back();
+							Cond.m_ValueInput.SetInteger(Val);
+							Cond.m_DisplayHsla = color_cast<ColorHSLA>(CCol);
+							ColorRGBA TmpCol = CCol;
+							Cond.m_ColorValue = ((unsigned)(TmpCol.a * 255) << 24) | ((unsigned)(TmpCol.r * 255) << 16) | ((unsigned)(TmpCol.g * 255) << 8) | (unsigned)(TmpCol.b * 255);
+						}
+						Found = true;
+						break;
+					}
+				}
+				if(!Found)
+				{
+					PopupCtx.m_LabelInput.Set(pVar->m_pScriptName);
+					PopupCtx.m_DisplayHsla = ColorHSLA(0.0f, 0.0f, 1.0f, 1.0f);
+					PopupCtx.m_ColorValue = 0xFFFFFFFF;
+				}
+				PopupCtx.m_ColorPickerContext.m_ColorMode = CUi::SColorPickerPopupContext::MODE_UNSET;
+				PopupCtx.m_ColorPickerContext.m_Alpha = false;
+				PopupCtx.m_ColorPickerContext.m_pHslaColor = nullptr;
+				PopupCtx.m_ColorPickerContext.m_State = EEditState::NONE;
+				float PopupHeight = 90.0f + PopupCtx.m_vConditions.size() * 19.0f;
+				Ui()->DoPopupMenu(&PopupCtx, EyeBtn.x, EyeBtn.y, 240.0f, PopupHeight, &PopupCtx, WatchEditPopupFunc);
+			}
+			else
+			{
+				auto it = s_EditPopups.find(pVar);
+				if(it != s_EditPopups.end() && it->second.m_NeedsReopen)
+				{
+					it->second.m_NeedsReopen = false;
+					float PopupHeight = 90.0f + it->second.m_vConditions.size() * 19.0f;
+					Ui()->DoPopupMenu(&it->second, EyeBtn.x, EyeBtn.y, 240.0f, PopupHeight, &it->second, WatchEditPopupFunc);
+				}
+			}
+		}
 
 		CUIRect Controls, ResetRect;
 		Right.VSplitRight(120.0f, &Controls, &ResetRect);

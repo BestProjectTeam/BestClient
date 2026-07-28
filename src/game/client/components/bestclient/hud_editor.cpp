@@ -224,7 +224,8 @@ namespace
 		       Module == HudLayout::MODULE_FINISH_PREDICTION ||
 		       Module == HudLayout::MODULE_VOICE_TALKERS ||
 		       Module == HudLayout::MODULE_VOICE_STATUS ||
-		       Module == HudLayout::MODULE_MUSIC_PLAYER;
+		       Module == HudLayout::MODULE_MUSIC_PLAYER ||
+		       Module == HudLayout::MODULE_HUD_WATCH;
 	}
 
 	bool PointInRect(vec2 Point, const CUIRect &Rect)
@@ -572,6 +573,10 @@ CHudEditor::SModuleVisual CHudEditor::GetModuleVisual(HudLayout::EModule Module)
 		Visual.m_Rect = GameClient()->m_VoiceChat.GetHudMuteStatusIndicatorRect(Width, Height, true);
 		Visual.m_Rounding = 2.3f;
 		break;
+	case HudLayout::MODULE_HUD_WATCH:
+		Visual.m_Rect = GameClient()->m_HudWatch.GetHudEditorRect();
+		Visual.m_Rounding = 4.0f;
+		break;
 	default:
 		Visual.m_Rect = GetFallbackModuleRect(Module);
 		Visual.m_Rounding = 4.0f;
@@ -619,6 +624,7 @@ void CHudEditor::CollectModuleVisuals(SModuleVisual *pOut, int &Count) const
 	AddModule(HudLayout::MODULE_MUSIC_PLAYER);
 	AddModule(HudLayout::MODULE_VOICE_TALKERS);
 	AddModule(HudLayout::MODULE_VOICE_STATUS);
+	AddModule(HudLayout::MODULE_HUD_WATCH);
 }
 
 HudLayout::EModule CHudEditor::HitTestModule(vec2 MousePos) const

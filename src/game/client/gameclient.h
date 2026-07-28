@@ -81,6 +81,7 @@
 #include "components/tclient/skinprofiles.h"
 #include "components/tclient/statusbar.h"
 #include "components/tclient/tclient.h"
+#include "components/tclient/hud_watch.h"
 #include "components/tclient/trails.h"
 #include "components/bestclient/3d_particles.h"
 #include "components/bestclient/admin_panel.h"
@@ -202,6 +203,7 @@ public:
 	CCountryFlags m_CountryFlags;
 	CFlow m_Flow;
 	CHud m_Hud;
+	CHudWatch m_HudWatch;
 	CImportantAlert m_ImportantAlert;
 	CDebugHud m_DebugHud;
 	CControls m_Controls;

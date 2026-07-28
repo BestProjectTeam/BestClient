@@ -290,4 +290,8 @@ MACRO_CONFIG_INT(TcUiCompactList, tc_ui_compact_list, 0, 0, 1, CFGFLAG_CLIENT | 
 // Dummy Info
 MACRO_CONFIG_INT(TcShowhudDummyPosition, tc_showhud_dummy_position, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show ingame HUD (Dummy Position)")
 MACRO_CONFIG_INT(TcShowhudDummySpeed, tc_showhud_dummy_speed, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show ingame HUD (Dummy Speed)")
+
+// Hud Watch - config variable watcher displayed on screen
+MACRO_CONFIG_INT(TcHudWatchEnable, tc_hud_watch_enable, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable HUD watch overlay")
+MACRO_CONFIG_STR(TcHudWatchData, tc_hud_watch_data, 2048, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Serialized HUD watch data (var|label|hexcolor;...)")
 MACRO_CONFIG_INT(TcShowhudDummyAngle, tc_showhud_dummy_angle, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show ingame HUD (Dummy Aim Angle)")

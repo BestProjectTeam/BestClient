@@ -332,6 +332,7 @@ void CGameClient::OnConsoleInit()
 					      &m_CustomCommunities, // TClient
 					      &m_MusicPlayer, // BestClient
 					      &m_Hud,
+						  &m_HudWatch,
 					      &m_Spectator,
 					      &m_Emoticon,
 					      &m_BindChat, // TClient

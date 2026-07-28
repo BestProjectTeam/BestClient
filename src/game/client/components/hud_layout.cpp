@@ -48,6 +48,7 @@ namespace HudLayout
 			// when the keyboard preset changes.
 			{84.5f, 152.0f, 100, 0, true, false, 0x66000000U}, // KEYSTROKES_MOUSE
 			{484.0f, 172.0f, 100, 0, true, true, 0x66000000U}, // DUMMY_ACTIONS
+			{5.0f, 60.0f, 100, 0, true, false, 0x66000000U}, // HUD_WATCH
 		};
 
 		static const char *gs_apModuleNames[MODULE_COUNT] = {
@@ -73,6 +74,7 @@ namespace HudLayout
 			"Keyboard",
 			"Mouse",
 			"Dummy Actions",
+			"Config Watch",
 		};
 
 		static SModuleLayout gs_aRuntimeModuleLayouts[MODULE_COUNT];

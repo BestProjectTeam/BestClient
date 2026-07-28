@@ -2823,6 +2823,8 @@ if(CLIENT)
     components/tclient/tclient.h
     components/tclient/trails.cpp
     components/tclient/trails.h
+    components/tclient/hud_watch.cpp
+    components/tclient/hud_watch.h
     components/bestclient/3d_particles.cpp
     components/bestclient/3d_particles.h
     components/bestclient/admin_panel.cpp
