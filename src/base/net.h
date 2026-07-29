@@ -371,6 +371,18 @@ int net_tcp_connect_non_blocking(NETSOCKET sock, NETADDR bindaddr);
 int net_tcp_connect_poll(NETSOCKET sock);
 
 /**
+ * Disables Nagle's algorithm (`TCP_NODELAY`) on a TCP socket, so small writes
+ * go out immediately instead of being coalesced.
+ *
+ * @ingroup Network-TCP
+ *
+ * @param sock The socket to configure.
+ *
+ * @returns `0` on success.
+ */
+int net_tcp_set_nodelay(NETSOCKET sock);
+
+/**
  * Connects a socket to a TCP address, blocking for at most `TimeoutMs`
  * milliseconds instead of the OS-default connect timeout.
  *

@@ -122,12 +122,19 @@ public:
 	int m_RecvBufLen = 0;
 
 	// TCP outbound queue вЂ” SendFrame enqueues, DrainSendBuf drains non-blocking
-	// Priority queue for ping/pong/cursor вЂ” always drained first
+	// Priority queue for ping/pong/cursor/heartbeat вЂ” drained first, but only
+	// ever at a frame boundary: both queues share one TCP stream, so switching
+	// mid-frame would splice one queue's bytes into the middle of the other's
+	// length-prefixed frame and desync the server's parser.
+	// m_*FrameEnd is the offset just past the frame currently being written;
+	// m_*Offset == m_*FrameEnd means we're at a boundary and may switch queues.
 	std::vector<uint8_t> m_vSendBufPrio;
 	int m_SendBufPrioOffset = 0;
+	int m_SendBufPrioFrameEnd = 0;
 	// Normal queue for tile edits, sync data, etc.
 	std::vector<uint8_t> m_vSendBuf;
 	int m_SendBufOffset = 0;
+	int m_SendBufFrameEnd = 0;
 
 	// set while applying a remote packet вЂ” prevents re-broadcasting back
 	bool m_ApplyingRemote = false;
@@ -178,13 +185,25 @@ public:
 	};
 	std::vector<SPendingSyncRequest> m_vPendingSyncRequests;
 
-	// deferred SYNC_DATA responses: queued in HandleMessage, sent in OnBackgroundUpdate
+	// deferred SYNC_DATA responses: queued in HandleMessage, sent in
+	// OnBackgroundUpdate a few rows at a time — a full 1000Г—1000 layer dump is
+	// ~4MB, which used to be pushed into the send queue in one go and trip its
+	// own overflow guard (killing the session outright).
 	struct SPendingSyncResponse
 	{
 		int m_GroupIdx = -1;
 		int m_LayerIdx = -1;
+		int m_Row = 0;      // next row to send
+		int m_Phase = 0;    // 0 = CTile rows, 1 = special (tele/speedup/switch/tune) rows
 	};
 	std::vector<SPendingSyncResponse> m_vPendingSyncResponses;
+
+	// outgoing map transfer: the file is held here and fed into the send queue
+	// a bounded number of chunks per tick, so a 20MB map can't overflow the
+	// outbound buffer (nor flood the relay's per-recipient backlog) at once.
+	std::vector<uint8_t> m_vMapSendBuf;
+	int m_MapSendOffset = 0;
+	bool m_MapSendActive = false;
 
 	int64_t m_LastFullSyncTime = 0;
 
@@ -229,6 +248,7 @@ public:
 	void OpenSocket();
 	void CloseSocket();
 	void DrainSendBuf();
+	bool DrainQueue(std::vector<uint8_t> &vBuf, int &Offset, int &FrameEnd);
 	void SendFrame(const std::vector<uint8_t> &vPayload);
 	void SendFramePrio(const std::vector<uint8_t> &vPayload); // ping/pong/cursor вЂ” bypasses normal queue
 	void SendHello();
@@ -239,7 +259,7 @@ public:
 	void FlushTileEdits();
 	void SendSyncCheck(int GroupIdx, int LayerIdx);
 	void SendSyncRequest(int GroupIdx, int LayerIdx);
-	void SendSyncData(int GroupIdx, int LayerIdx);
+	bool SendSyncDataRows(SPendingSyncResponse &Resp);
 	void SendStructAddGroup(int InsertIdx);
 	void SendStructDelGroup(int GroupIdx);
 	void SendStructAddLayer(int GroupIdx, int LayerIdx, int LayerType, const char *pName, int SubType = 0);

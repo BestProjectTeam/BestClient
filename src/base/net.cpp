@@ -25,6 +25,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h> // TCP_NODELAY
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 
@@ -1332,6 +1333,17 @@ int net_tcp_connect_non_blocking(NETSOCKET sock, NETADDR bindaddr)
 {
 	net_set_non_blocking(sock);
 	return net_tcp_connect(sock, &bindaddr);
+}
+
+int net_tcp_set_nodelay(NETSOCKET sock)
+{
+	int flag = 1;
+	int result = -1;
+	if(sock->ipv4sock >= 0)
+		result = setsockopt(sock->ipv4sock, IPPROTO_TCP, TCP_NODELAY, (const char *)&flag, sizeof(flag));
+	if(sock->ipv6sock >= 0)
+		result = setsockopt(sock->ipv6sock, IPPROTO_TCP, TCP_NODELAY, (const char *)&flag, sizeof(flag));
+	return result;
 }
 
 int net_tcp_connect_poll(NETSOCKET sock)

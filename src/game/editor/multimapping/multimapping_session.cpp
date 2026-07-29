@@ -137,8 +137,11 @@ void CMultiMappingSession::OnUpdate()
 		m_ApplyingRemote = false;
 	}
 
-	// Deferred map transfer: wait for save job to finish, then read and send
-	if(m_PendingMapTransfer && Editor()->m_WriterFinishJobs.empty())
+	// Deferred map transfer: wait for the save job to finish AND for any transfer
+	// already being fed into the send queue to drain — starting a second one
+	// would overwrite m_vMapSendBuf mid-flight, so the receiver would get the
+	// tail of a different map than the size its MAP_START announced.
+	if(m_PendingMapTransfer && !m_MapSendActive && Editor()->m_WriterFinishJobs.empty())
 	{
 		m_PendingMapTransfer = false;
 		static const char *s_pTmpPath = "multimapping_transfer_tmp.map";
@@ -162,13 +165,14 @@ void CMultiMappingSession::OnUpdate()
 						pBaseName = p + 1;
 				dbg_msg("multimapping", "MapTransfer: sending '%s' (%d bytes) target=%d", pBaseName, (int)vData.size(), m_PendingMapTransferTarget);
 				SendMapStart(pBaseName, (int)vData.size(), m_PendingMapTransferTarget);
-				const int ChunkSize = 32768;
-				for(int Offset = 0; Offset < (int)vData.size(); Offset += ChunkSize)
-				{
-					int Len = minimum(ChunkSize, (int)vData.size() - Offset);
-					SendMapChunk(Offset, vData.data() + Offset, Len);
-				}
-				SendMapEnd();
+				// Hand the payload to the paced feeder in OnBackgroundUpdate
+				// instead of pushing every chunk into the send queue right here:
+				// a map larger than the 4MB queue limit used to overflow it and
+				// kill the session on the spot, and even a smaller one dumped at
+				// once buried heartbeats and got us dropped by the relay.
+				m_vMapSendBuf = std::move(vData);
+				m_MapSendOffset = 0;
+				m_MapSendActive = true;
 			}
 		}
 	}
@@ -191,7 +195,7 @@ void CMultiMappingSession::OnUpdate()
 
 	// Late-join map push (authority only): send queued new joiners their
 	// initial full map, one at a time, once any in-flight save/transfer is done.
-	if(m_State == STATE_LIVE && !m_ApplyingRemote && m_IsCreator && !m_PendingMapTransfer &&
+	if(m_State == STATE_LIVE && !m_ApplyingRemote && m_IsCreator && !m_PendingMapTransfer && !m_MapSendActive &&
 		!m_vPendingLateJoinTargets.empty() && Editor()->m_WriterFinishJobs.empty())
 	{
 		uint8_t TargetSlot = m_vPendingLateJoinTargets.front();
@@ -377,6 +381,10 @@ void CMultiMappingSession::OpenSocket()
 	m_Socket = net_tcp_create(Bind);
 	if(m_Socket == nullptr)
 		return;
+	// Editing traffic is a stream of small latency-sensitive messages; Nagle
+	// held them back behind the delayed-ACK timer, which on a high-RTT link
+	// showed up as blocks taking hundreds of ms to appear for everyone else.
+	net_tcp_set_nodelay(m_Socket);
 	net_tcp_connect_non_blocking(m_Socket, m_ServerAddr);
 }
 
@@ -389,10 +397,16 @@ void CMultiMappingSession::CloseSocket()
 	}
 	m_vSendBufPrio.clear();
 	m_SendBufPrioOffset = 0;
+	m_SendBufPrioFrameEnd = 0;
 	m_vSendBuf.clear();
 	m_SendBufOffset = 0;
+	m_SendBufFrameEnd = 0;
 	m_vPendingSyncRequests.clear();
 	m_vPendingSyncResponses.clear();
+	m_MapSendActive = false;
+	m_MapSendOffset = 0;
+	m_vMapSendBuf.clear();
+	m_vMapSendBuf.shrink_to_fit();
 }
 
 void CMultiMappingSession::SendFrame(const std::vector<uint8_t> &vPayload)
@@ -418,6 +432,13 @@ void CMultiMappingSession::SendFramePrio(const std::vector<uint8_t> &vPayload)
 {
 	if(m_Socket == nullptr)
 		return;
+	// Cursor updates are produced at 30 Hz regardless of how fast the link
+	// drains, so on a congested connection this queue would grow without bound.
+	// They're superseded by the next one anyway: once a backlog builds, drop
+	// the new sample rather than queueing it (ping/pong/heartbeat frames are
+	// tiny and rare enough that this cap never affects them in practice).
+	if((int)(m_vSendBufPrio.size() - m_SendBufPrioOffset) > 64 * 1024)
+		return;
 	uint32_t Size = (uint32_t)vPayload.size();
 	m_vSendBufPrio.push_back((Size >> 24) & 0xFF);
 	m_vSendBufPrio.push_back((Size >> 16) & 0xFF);
@@ -426,45 +447,74 @@ void CMultiMappingSession::SendFramePrio(const std::vector<uint8_t> &vPayload)
 	m_vSendBufPrio.insert(m_vSendBufPrio.end(), vPayload.begin(), vPayload.end());
 }
 
+// Sends as much of vBuf as the socket accepts right now. Returns true when the
+// queue is left exactly at a frame boundary, i.e. it is safe to start writing
+// the other queue into the shared TCP stream; false when a frame is still half
+// written (or the connection died — check m_Socket).
+bool CMultiMappingSession::DrainQueue(std::vector<uint8_t> &vBuf, int &Offset, int &FrameEnd)
+{
+	while(Offset < (int)vBuf.size())
+	{
+		int Sent = net_tcp_send(m_Socket, vBuf.data() + Offset, (int)vBuf.size() - Offset);
+		if(Sent > 0)
+		{
+			Offset += Sent;
+			// Keep FrameEnd on the end of the frame that Offset now sits inside,
+			// walking over any frames the kernel accepted whole.
+			while(FrameEnd < Offset && FrameEnd + 4 <= (int)vBuf.size())
+			{
+				uint32_t Size = ((uint32_t)vBuf[FrameEnd] << 24) | ((uint32_t)vBuf[FrameEnd + 1] << 16) |
+						((uint32_t)vBuf[FrameEnd + 2] << 8) | (uint32_t)vBuf[FrameEnd + 3];
+				FrameEnd += 4 + (int)Size;
+			}
+			continue;
+		}
+		if(Sent < 0 && net_would_block())
+			break;
+		str_copy(m_aErrorMsg, "Connection lost");
+		m_State = STATE_ERROR;
+		CloseSocket();
+		return false;
+	}
+
+	if(Offset >= (int)vBuf.size())
+	{
+		vBuf.clear();
+		Offset = 0;
+		FrameEnd = 0;
+		return true;
+	}
+	return Offset == FrameEnd;
+}
+
 void CMultiMappingSession::DrainSendBuf()
 {
 	if(m_Socket == nullptr)
 		return;
 
-	// drain priority queue first (ping/pong/cursor)
-	if(!m_vSendBufPrio.empty())
+	// Both queues feed one TCP stream, so a queue may only be switched away
+	// from at a frame boundary. The old code drained the priority queue and
+	// then unconditionally started on the normal queue — as soon as a partial
+	// send happened (which is exactly what a congested/high-latency link does)
+	// tile-edit bytes got spliced into the middle of a half-sent cursor frame.
+	// The relay then read the payload as a length prefix, saw a nonsense frame
+	// size and dropped the connection: the "connection lost every minute with
+	// 500+ ping" reports.
+	if(!m_vSendBuf.empty() && m_SendBufOffset != m_SendBufFrameEnd)
 	{
-		const uint8_t *pData = m_vSendBufPrio.data() + m_SendBufPrioOffset;
-		int Remaining = (int)m_vSendBufPrio.size() - m_SendBufPrioOffset;
-		while(Remaining > 0)
-		{
-			int Sent = net_tcp_send(m_Socket, pData, Remaining);
-			if(Sent > 0) { pData += Sent; m_SendBufPrioOffset += Sent; Remaining -= Sent; }
-			else if(Sent == 0) { str_copy(m_aErrorMsg, "Connection lost"); m_State = STATE_ERROR; CloseSocket(); return; }
-			else if(net_would_block()) break;
-			else { str_copy(m_aErrorMsg, "Connection lost"); m_State = STATE_ERROR; CloseSocket(); return; }
-		}
-		if(m_SendBufPrioOffset >= (int)m_vSendBufPrio.size()) { m_vSendBufPrio.clear(); m_SendBufPrioOffset = 0; }
+		// normal queue was left mid-frame — it has to finish first
+		if(!DrainQueue(m_vSendBuf, m_SendBufOffset, m_SendBufFrameEnd) || m_Socket == nullptr)
+			return;
 	}
 
-	// drain normal queue
-	if(m_vSendBuf.empty())
-		return;
-	const uint8_t *pData = m_vSendBuf.data() + m_SendBufOffset;
-	int Remaining = (int)m_vSendBuf.size() - m_SendBufOffset;
-	while(Remaining > 0)
+	if(!m_vSendBufPrio.empty())
 	{
-		int Sent = net_tcp_send(m_Socket, pData, Remaining);
-		if(Sent > 0) { pData += Sent; m_SendBufOffset += Sent; Remaining -= Sent; }
-		else if(Sent == 0) { str_copy(m_aErrorMsg, "Connection lost"); m_State = STATE_ERROR; CloseSocket(); return; }
-		else if(net_would_block()) break;
-		else { str_copy(m_aErrorMsg, "Connection lost"); m_State = STATE_ERROR; CloseSocket(); return; }
+		if(!DrainQueue(m_vSendBufPrio, m_SendBufPrioOffset, m_SendBufPrioFrameEnd) || m_Socket == nullptr)
+			return;
 	}
-	if(m_SendBufOffset >= (int)m_vSendBuf.size())
-	{
-		m_vSendBuf.clear();
-		m_SendBufOffset = 0;
-	}
+
+	if(!m_vSendBuf.empty())
+		DrainQueue(m_vSendBuf, m_SendBufOffset, m_SendBufFrameEnd);
 }
 
 void CMultiMappingSession::SendHello()
@@ -489,7 +539,9 @@ void CMultiMappingSession::SendHeartbeat()
 		return;
 	std::vector<uint8_t> vPacket;
 	WriteHeader(vPacket, PACKET_HEARTBEAT);
-	SendFrame(vPacket);
+	// Priority queue: the heartbeat is what keeps the relay from treating us as
+	// stale, so it must not queue behind a multi-megabyte map transfer.
+	SendFramePrio(vPacket);
 }
 
 void CMultiMappingSession::SendCursor(float WorldX, float WorldY)
@@ -629,20 +681,37 @@ void CMultiMappingSession::ProcessNetwork()
 	if(m_Socket == nullptr)
 		return;
 
-	// grow buffer to fit incoming data
-	const int ChunkSize = 4096;
-	m_vRecvBuf.resize(m_RecvBufLen + ChunkSize);
-	int Bytes = net_tcp_recv(m_Socket, m_vRecvBuf.data() + m_RecvBufLen, ChunkSize);
-	if(Bytes > 0)
-		m_RecvBufLen += Bytes;
-	else if(Bytes == 0)
+	// Drain the socket until it's empty instead of taking a single small slice
+	// per frame: one 4KB read per tick capped the inbound rate at a few hundred
+	// KB/s, so a multi-megabyte map transfer or layer resync took tens of
+	// seconds to pull in. Meanwhile the relay kept queueing data we weren't
+	// reading, its per-recipient backlog limit tripped, and it dropped us —
+	// the "connection lost every 1-2 minutes" everyone with a slow link saw.
+	const int ChunkSize = 64 * 1024;
+	const int MaxBytesPerTick = 8 * 1024 * 1024;
+	int TotalRead = 0;
+	while(TotalRead < MaxBytesPerTick)
 	{
-		str_copy(m_aErrorMsg, "Connection closed");
-		m_State = STATE_ERROR;
-		CloseSocket();
-		return;
+		if((int)m_vRecvBuf.size() < m_RecvBufLen + ChunkSize)
+			m_vRecvBuf.resize(m_RecvBufLen + ChunkSize);
+		int Bytes = net_tcp_recv(m_Socket, m_vRecvBuf.data() + m_RecvBufLen, ChunkSize);
+		if(Bytes > 0)
+		{
+			m_RecvBufLen += Bytes;
+			TotalRead += Bytes;
+			if(Bytes < ChunkSize)
+				break; // socket drained
+			continue;
+		}
+		if(Bytes == 0)
+		{
+			str_copy(m_aErrorMsg, "Connection closed");
+			m_State = STATE_ERROR;
+			CloseSocket();
+			return;
+		}
+		break; // Bytes < 0: WOULDBLOCK — normal for non-blocking
 	}
-	// Bytes < 0: WOULDBLOCK РІР‚вЂќ normal for non-blocking
 
 	int Offset = 0;
 	while(Offset + 4 <= m_RecvBufLen)
@@ -678,6 +747,14 @@ void CMultiMappingSession::ProcessNetwork()
 	}
 	else if(Offset >= m_RecvBufLen)
 		m_RecvBufLen = 0;
+
+	// A burst (map transfer, layer resync) can grow the buffer to many MB and it
+	// would otherwise stay that big for the whole session.
+	if(m_RecvBufLen == 0 && m_vRecvBuf.size() > 1024 * 1024)
+	{
+		m_vRecvBuf.clear();
+		m_vRecvBuf.shrink_to_fit();
+	}
 }
 
 static void WriteQuad(std::vector<uint8_t> &v, const CQuad &q)
@@ -2057,7 +2134,10 @@ void CMultiMappingSession::HandleMessage(const uint8_t *pData, int Size)
 		// applying the incoming transfer now would silently discard it.
 		// Push ours instead so both sides converge on the local edit rather
 		// than on whichever MAP_END happened to arrive first.
-		if(m_EnvDirty || m_PendingMapTransfer)
+		// m_MapSendActive counts too: our own transfer is still being fed into
+		// the send queue, so loading theirs now would leave us shipping chunks
+		// of a map we no longer have.
+		if(m_EnvDirty || m_PendingMapTransfer || m_MapSendActive)
 		{
 			m_vMapTransferBuf.clear();
 			PushLog("MultiMapping: incoming map skipped, local edit pending");
@@ -2491,48 +2571,30 @@ void CMultiMappingSession::SendSyncRequest(int GroupIdx, int LayerIdx)
 	SendFrame(vPacket);
 }
 
-void CMultiMappingSession::SendSyncData(int GroupIdx, int LayerIdx)
+// Sends up to MaxRows rows of the layer dump described by Resp, advancing its
+// cursor. Returns true when the whole layer (tiles + any special array) is
+// done, so the caller can drop it from the queue.
+bool CMultiMappingSession::SendSyncDataRows(SPendingSyncResponse &Resp)
 {
 	if(m_Socket == nullptr)
-		return;
+		return true;
 	auto &vGroups = Editor()->Map()->m_vpGroups;
-	if(GroupIdx < 0 || GroupIdx >= (int)vGroups.size())
-		return;
-	auto &vLayers = vGroups[GroupIdx]->m_vpLayers;
-	if(LayerIdx < 0 || LayerIdx >= (int)vLayers.size())
-		return;
-	if(vLayers[LayerIdx]->m_Type != LAYERTYPE_TILES)
-		return;
-	auto pTiles = std::static_pointer_cast<CLayerTiles>(vLayers[LayerIdx]);
+	if(Resp.m_GroupIdx < 0 || Resp.m_GroupIdx >= (int)vGroups.size())
+		return true;
+	auto &vLayers = vGroups[Resp.m_GroupIdx]->m_vpLayers;
+	if(Resp.m_LayerIdx < 0 || Resp.m_LayerIdx >= (int)vLayers.size())
+		return true;
+	if(vLayers[Resp.m_LayerIdx]->m_Type != LAYERTYPE_TILES)
+		return true;
+	auto pTiles = std::static_pointer_cast<CLayerTiles>(vLayers[Resp.m_LayerIdx]);
 	int W = pTiles->m_Width;
 	int H = pTiles->m_Height;
-	int RowBytes = W * (int)sizeof(CTile);
 
-	// send one row per frame to keep individual packets small
-	for(int row = 0; row < H; row++)
-	{
-		std::vector<uint8_t> vPacket;
-		WriteHeader(vPacket, PACKET_SYNC_DATA);
-		WriteS32(vPacket, GroupIdx);
-		WriteS32(vPacket, LayerIdx);
-		WriteS32(vPacket, W);
-		WriteS32(vPacket, H);
-		WriteS32(vPacket, row);
-		WriteU8(vPacket, 0); // ExtraType=0: CTile row
-		WriteBytes(vPacket, reinterpret_cast<const uint8_t *>(pTiles->m_pTiles + row * W), RowBytes);
-		SendFrame(vPacket);
-		if(m_Socket == nullptr)
-			return;
-	}
-
-	// send special tile arrays if applicable
 	auto pTele = std::dynamic_pointer_cast<CLayerTele>(pTiles);
 	auto pSpeedup = std::dynamic_pointer_cast<CLayerSpeedup>(pTiles);
 	auto pSwitch = std::dynamic_pointer_cast<CLayerSwitch>(pTiles);
 	auto pTune = std::dynamic_pointer_cast<CLayerTune>(pTiles);
-	uint8_t ExtraType = pTele ? 1 : pSpeedup ? 2 : pSwitch ? 3 : pTune ? 4 : 0;
-	if(ExtraType == 0)
-		return;
+	const uint8_t ExtraType = pTele ? 1 : pSpeedup ? 2 : pSwitch ? 3 : pTune ? 4 : 0;
 
 	const uint8_t *pExData = nullptr;
 	int ExItemSize = 0;
@@ -2541,22 +2603,45 @@ void CMultiMappingSession::SendSyncData(int GroupIdx, int LayerIdx)
 	else if(pSwitch) { pExData = reinterpret_cast<const uint8_t *>(pSwitch->m_pSwitchTile); ExItemSize = (int)sizeof(CSwitchTile); }
 	else if(pTune) { pExData = reinterpret_cast<const uint8_t *>(pTune->m_pTuneTile); ExItemSize = (int)sizeof(CTuneTile); }
 
-	int ExRowBytes = W * ExItemSize;
-	for(int row = 0; row < H; row++)
+	// Bound the bytes queued per call rather than the row count, so a wide layer
+	// doesn't queue proportionally more than a narrow one.
+	const int ByteBudget = 128 * 1024;
+	int Queued = 0;
+	while(Queued < ByteBudget)
 	{
+		if(Resp.m_Phase == 0 && Resp.m_Row >= H)
+		{
+			if(ExtraType == 0)
+				return true;
+			Resp.m_Phase = 1;
+			Resp.m_Row = 0;
+		}
+		if(Resp.m_Phase == 1 && Resp.m_Row >= H)
+			return true;
+
+		const int ItemSize = Resp.m_Phase == 0 ? (int)sizeof(CTile) : ExItemSize;
+		const int RowBytes = W * ItemSize;
+		const uint8_t *pSrc = Resp.m_Phase == 0 ?
+			reinterpret_cast<const uint8_t *>(pTiles->m_pTiles + Resp.m_Row * W) :
+			pExData + Resp.m_Row * RowBytes;
+
 		std::vector<uint8_t> vPacket;
 		WriteHeader(vPacket, PACKET_SYNC_DATA);
-		WriteS32(vPacket, GroupIdx);
-		WriteS32(vPacket, LayerIdx);
+		WriteS32(vPacket, Resp.m_GroupIdx);
+		WriteS32(vPacket, Resp.m_LayerIdx);
 		WriteS32(vPacket, W);
 		WriteS32(vPacket, H);
-		WriteS32(vPacket, row);
-		WriteU8(vPacket, ExtraType);
-		WriteBytes(vPacket, pExData + row * ExRowBytes, ExRowBytes);
+		WriteS32(vPacket, Resp.m_Row);
+		WriteU8(vPacket, Resp.m_Phase == 0 ? 0 : ExtraType);
+		WriteBytes(vPacket, pSrc, RowBytes);
 		SendFrame(vPacket);
 		if(m_Socket == nullptr)
-			return;
+			return true;
+
+		Resp.m_Row++;
+		Queued += RowBytes;
 	}
+	return false;
 }
 
 void CMultiMappingSession::SendStructAddGroup(int InsertIdx)
@@ -3185,12 +3270,39 @@ void CMultiMappingSession::OnBackgroundUpdate()
 		SendActivity(Current);
 	}
 
-	// process deferred SYNC_DATA responses РІР‚вЂќ send one per tick, only if send buffer has room
+	// Feed the in-flight map transfer, bounded per tick and only while the send
+	// queue has drained — this is what keeps a big map from overflowing the
+	// outbound buffer or starving the heartbeat.
+	if(m_MapSendActive)
+	{
+		const int QueueSoftLimit = 512 * 1024;
+		const int ChunkSize = 32768;
+		int Budget = 16; // ~512KB per tick
+		while(m_MapSendActive && Budget-- > 0 &&
+			(int)(m_vSendBuf.size() - m_SendBufOffset) < QueueSoftLimit)
+		{
+			int Len = minimum(ChunkSize, (int)m_vMapSendBuf.size() - m_MapSendOffset);
+			SendMapChunk(m_MapSendOffset, m_vMapSendBuf.data() + m_MapSendOffset, Len);
+			m_MapSendOffset += Len;
+			if(m_MapSendOffset >= (int)m_vMapSendBuf.size())
+			{
+				SendMapEnd();
+				m_MapSendActive = false;
+				m_MapSendOffset = 0;
+				m_vMapSendBuf.clear();
+				m_vMapSendBuf.shrink_to_fit();
+			}
+			if(m_Socket == nullptr)
+				return;
+		}
+	}
+
+	// process deferred SYNC_DATA responses РІР‚вЂќ a few rows per tick, only if send buffer has room
 	if(!m_vPendingSyncResponses.empty() && (int)(m_vSendBuf.size() - m_SendBufOffset) < 512 * 1024)
 	{
-		auto Resp = m_vPendingSyncResponses.front();
-		m_vPendingSyncResponses.erase(m_vPendingSyncResponses.begin());
-		SendSyncData(Resp.m_GroupIdx, Resp.m_LayerIdx);
+		auto &Resp = m_vPendingSyncResponses.front();
+		if(SendSyncDataRows(Resp))
+			m_vPendingSyncResponses.erase(m_vPendingSyncResponses.begin());
 	}
 
 	// process deferred SYNC_REQUESTs РІР‚вЂќ send only if CRC still mismatches after the delay
