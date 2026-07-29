@@ -86,6 +86,7 @@
 #include "components/bestclient/admin_panel.h"
 #include "components/bestclient/cherry_gifs.h"
 #include "components/bestclient/chat_bubbles.h"
+#include "components/bestclient/cloud_input.h"
 #include "components/bestclient/fast_actions.h"
 #include "components/bestclient/fast_practice.h"
 #include "components/bestclient/gif_bubbles.h"
@@ -244,6 +245,7 @@ public:
 	CGifBubbles m_GifBubbles; // BestClient
 	CChatBubbles m_ChatBubbles; // BestClient
 	CFastPractice m_FastPractice; // BestClient
+	CCloudInput m_CloudInput; // BestClient
 	CBgDraw m_BgDraw;
 	CTClient m_TClient;
 	CTrails m_Trails;
@@ -768,6 +770,8 @@ public:
 
 	void ApplyPreInputs(int Tick, bool Direct, CGameWorld &GameWorld);
 	bool GetDummyFastInput(CNetObj_PlayerInput &DummyFastInput, const CNetObj_PlayerInput *pDummyInputData, const class CCharacter *pDummyChar, int LocalTee, int DummyTee) const;
+	bool IsCloudInputMode() const;
+	bool IsFastInputLocalClient(int ClientId) const;
 
 	int m_aNextChangeInfo[NUM_DUMMIES];
 
@@ -1120,7 +1124,9 @@ private:
 public:
 	// TClient
 	int m_SmoothTick = 0;
-	float m_SmoothIntraTick = 0;
+	float m_SmoothIntraTick = 0.0f;
+	int m_aCloudSmoothTick[2] = {};
+	float m_aCloudSmoothIntraTick[2] = {};
 	bool CheckNewInput() override;
 	bool IsSnapTapBlockedByCommunity() const;
 	std::optional<CServerInfo> m_ConnectServerInfo = std::nullopt;

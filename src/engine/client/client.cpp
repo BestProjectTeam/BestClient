@@ -2947,8 +2947,9 @@ void CClient::Update()
 					(g_Config.m_BcInputs == BC_INPUTS_BEST && g_Config.m_BcBestInputAmount > 0) ||
 					(g_Config.m_BcInputs == BC_INPUTS_SAIKO && g_Config.m_BcSaikoInputAmount > 0) ||
 					(g_Config.m_BcInputs == BC_INPUTS_DELTA && g_Config.m_BcDeltaInputAmount > 0) ||
-					(g_Config.m_BcInputs == BC_INPUTS_F && g_Config.m_BcFInputAmount > 0);
-				if(HasFastInput && g_Config.m_BcInputs == BC_INPUTS_SAIKO)
+					(g_Config.m_BcInputs == BC_INPUTS_F && g_Config.m_BcFInputAmount > 0) ||
+					(g_Config.m_BcInputs == BC_INPUTS_CLOUD && g_Config.m_BcCloudInputAmount > 0);
+				if(HasFastInput && (g_Config.m_BcInputs == BC_INPUTS_SAIKO || g_Config.m_BcInputs == BC_INPUTS_CLOUD))
 				{
 					GameClient()->CheckNewInput();
 					Repredict = true;
@@ -5359,6 +5360,8 @@ int CClient::PredictionMargin() const
 		FastInputMargin = (std::max(0, g_Config.m_BcDeltaInputAmount) + 2) / 5;
 	else if(g_Config.m_BcInputs == BC_INPUTS_F)
 		FastInputMargin = (std::max(0, g_Config.m_BcFInputAmount) + 25) / 50;
+	else if(g_Config.m_BcInputs == BC_INPUTS_CLOUD)
+		FastInputMargin = (std::max(0, g_Config.m_BcCloudInputAmount) + 2) / 5;
 
 	const int BaseMargin = std::max(PredictionMargin, FastInputMargin);
 	const int64_t Now = time_get();

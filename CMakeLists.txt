@@ -2841,6 +2841,8 @@ if(CLIENT)
     components/bestclient/clans/clans.h
     components/bestclient/chat_bubbles.cpp
     components/bestclient/chat_bubbles.h
+    components/bestclient/cloud_input.cpp
+    components/bestclient/cloud_input.h
     components/bestclient/fast_actions.cpp
     components/bestclient/fast_actions.h
     components/bestclient/fast_practice.cpp

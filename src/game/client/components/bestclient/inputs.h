@@ -24,6 +24,7 @@ namespace BcInputs
 	bool SaikoOthers();
 	bool DeltaOthers();
 	bool FOthers();
+	bool CloudOthers();
 	bool AnyOthers();
 	bool ImmediateOthers();
 } // namespace BcInputs

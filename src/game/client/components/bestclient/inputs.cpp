@@ -159,9 +159,14 @@ bool BcInputs::FOthers()
 	return g_Config.m_BcInputs == BC_INPUTS_F && g_Config.m_BcFInputOthers != 0;
 }
 
+bool BcInputs::CloudOthers()
+{
+	return g_Config.m_BcInputs == BC_INPUTS_CLOUD && g_Config.m_BcCloudInputOthers != 0;
+}
+
 bool BcInputs::AnyOthers()
 {
-	return FastOthers() || BestOthers() || SaikoOthers() || DeltaOthers() || FOthers();
+	return FastOthers() || BestOthers() || SaikoOthers() || DeltaOthers() || FOthers() || CloudOthers();
 }
 
 bool BcInputs::ImmediateOthers()

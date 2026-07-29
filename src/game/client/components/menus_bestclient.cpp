@@ -1895,12 +1895,12 @@ void CMenus::RenderSettingsBestClientGameplay(CUIRect MainView)
 		InputsBlock.HSplitTop(MarginSmall, nullptr, &InputsBlock);
 		InputsBlock.HSplitTop(LineSize, &Button, &InputsBlock);
 		{
-			static CButtonContainer s_InputsFast, s_InputsBest, s_InputsSaiko, s_InputsDelta, s_InputsF;
+			static CButtonContainer s_InputsFast, s_InputsBest, s_InputsSaiko, s_InputsDelta, s_InputsF, s_InputsCloud;
 			CUIRect ButtonsRect = Button;
 			const float Spacing = 2.0f;
-			const float InputButtonWidth = (ButtonsRect.w - Spacing * 4.0f) / 5.0f;
+			const float InputButtonWidth = (ButtonsRect.w - Spacing * 5.0f) / 6.0f;
 
-			CUIRect FastButton, BestButton, SaikoButton, DeltaButton, FButton;
+			CUIRect FastButton, BestButton, SaikoButton, DeltaButton, FButton, CloudButton;
 			ButtonsRect.VSplitLeft(InputButtonWidth, &FastButton, &ButtonsRect);
 			ButtonsRect.VSplitLeft(Spacing, nullptr, &ButtonsRect);
 			ButtonsRect.VSplitLeft(InputButtonWidth, &BestButton, &ButtonsRect);
@@ -1909,13 +1909,16 @@ void CMenus::RenderSettingsBestClientGameplay(CUIRect MainView)
 			ButtonsRect.VSplitLeft(Spacing, nullptr, &ButtonsRect);
 			ButtonsRect.VSplitLeft(InputButtonWidth, &DeltaButton, &ButtonsRect);
 			ButtonsRect.VSplitLeft(Spacing, nullptr, &ButtonsRect);
-			FButton = ButtonsRect;
+			ButtonsRect.VSplitLeft(InputButtonWidth, &FButton, &ButtonsRect);
+			ButtonsRect.VSplitLeft(Spacing, nullptr, &ButtonsRect);
+			CloudButton = ButtonsRect;
 
 			FastButton.HMargin(2.0f, &FastButton);
 			BestButton.HMargin(2.0f, &BestButton);
 			SaikoButton.HMargin(2.0f, &SaikoButton);
 			DeltaButton.HMargin(2.0f, &DeltaButton);
 			FButton.HMargin(2.0f, &FButton);
+			CloudButton.HMargin(2.0f, &CloudButton);
 
 			if(DoButton_Menu(&s_InputsFast, "Fast", InputsMode == BC_INPUTS_FAST, &FastButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_L))
 				g_Config.m_BcInputs = BC_INPUTS_FAST;
@@ -1925,8 +1928,10 @@ void CMenus::RenderSettingsBestClientGameplay(CUIRect MainView)
 				g_Config.m_BcInputs = BC_INPUTS_SAIKO;
 			if(DoButton_Menu(&s_InputsDelta, "Delta", InputsMode == BC_INPUTS_DELTA, &DeltaButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_NONE))
 				g_Config.m_BcInputs = BC_INPUTS_DELTA;
-			if(DoButton_Menu(&s_InputsF, "F", InputsMode == BC_INPUTS_F, &FButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
+			if(DoButton_Menu(&s_InputsF, "F", InputsMode == BC_INPUTS_F, &FButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_NONE))
 				g_Config.m_BcInputs = BC_INPUTS_F;
+			if(DoButton_Menu(&s_InputsCloud, "Cloud", InputsMode == BC_INPUTS_CLOUD, &CloudButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
+				g_Config.m_BcInputs = BC_INPUTS_CLOUD;
 		}
 
 		if(InputsMode == BC_INPUTS_FAST)
@@ -2023,6 +2028,16 @@ void CMenus::RenderSettingsBestClientGameplay(CUIRect MainView)
 			InputsBlock.HSplitTop(MarginSmall, nullptr, &InputsBlock);
 			InputsBlock.HSplitTop(LineSize, &Content, &InputsBlock);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcFInputOthers, Localize("F input others"), &g_Config.m_BcFInputOthers, &Content, LineSize);
+		}
+		else if(InputsMode == BC_INPUTS_CLOUD)
+		{
+			InputsBlock.HSplitTop(MarginSmall, nullptr, &InputsBlock);
+			InputsBlock.HSplitTop(LineSize, &Button, &InputsBlock);
+			DoTickAmountSlider(&g_Config.m_BcCloudInputAmount, &Button, Localize("Prediction offset"), 0, 500);
+
+			InputsBlock.HSplitTop(MarginSmall, nullptr, &InputsBlock);
+			InputsBlock.HSplitTop(LineSize, &Content, &InputsBlock);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcCloudInputOthers, Localize("Cloud input others"), &g_Config.m_BcCloudInputOthers, &Content, LineSize);
 		}
 
 		Ui()->ClipDisable();
