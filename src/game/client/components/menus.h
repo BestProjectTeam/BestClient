@@ -92,8 +92,10 @@ public:
 		IGraphics::CTextureHandle m_RenderTexture;
 
 		int m_FavoriteButtonId;
+		int m_DeleteButtonId;
 
 		char m_aName[50];
+		bool m_Deletable = false;
 
 		bool operator<(const SCustomItem &Other) const { return str_comp(m_aName, Other.m_aName) < 0; }
 	};
@@ -189,8 +191,15 @@ protected:
 	void AddFavoriteAsset(int Tab, const char *pName);
 	void RemoveFavoriteAsset(int Tab, const char *pName);
 	bool IsFavoriteAsset(int Tab, const char *pName) const;
+	bool CanDeleteCustomAsset(int Tab, const char *pName) const;
+	bool DeleteCustomAsset(int Tab, const char *pName);
+	void RemoveCustomAssetFromList(int Tab, const char *pName);
+	void MarkCustomAssetsDeletable(int Tab);
+	void PopupConfirmDeleteAsset();
 
 	std::array<std::set<std::string>, NUM_ASSET_FAVORITE_TABS> m_aAssetFavorites;
+	char m_aDeleteAssetName[50] = "";
+	int m_DeleteAssetTab = -1;
 
 	int m_MenuPage;
 	int m_GamePage;

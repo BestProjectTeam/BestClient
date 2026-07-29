@@ -91,6 +91,16 @@ int CMenus::EntitiesScan(const char *pName, int IsDir, int DirType, void *pUser)
 {
 	auto *pRealUser = (SMenuAssetScanUser *)pUser;
 	auto *pThis = (CMenus *)pRealUser->m_pUser;
+
+	auto Exists = [&](const char *pItemName) {
+		for(const auto &Item : pThis->m_vEntitiesList)
+		{
+			if(str_comp(Item.m_aName, pItemName) == 0)
+				return true;
+		}
+		return false;
+	};
+
 	if(IsDir)
 	{
 		if(pName[0] == '.')
@@ -98,6 +108,8 @@ int CMenus::EntitiesScan(const char *pName, int IsDir, int DirType, void *pUser)
 
 		// default is reserved
 		if(str_comp(pName, "default") == 0)
+			return 0;
+		if(Exists(pName))
 			return 0;
 
 		SCustomEntities EntitiesItem;
@@ -113,6 +125,8 @@ int CMenus::EntitiesScan(const char *pName, int IsDir, int DirType, void *pUser)
 			str_truncate(aName, sizeof(aName), pName, str_length(pName) - 4);
 			// default is reserved
 			if(str_comp(aName, "default") == 0)
+				return 0;
+			if(Exists(aName))
 				return 0;
 
 			SCustomEntities EntitiesItem;
@@ -152,6 +166,16 @@ template<typename TName>
 static int AssetScan(const char *pName, int IsDir, int DirType, std::vector<TName> &vAssetList, const char *pAssetName, IGraphics *pGraphics, void *pUser)
 {
 	auto *pRealUser = (SMenuAssetScanUser *)pUser;
+
+	auto Exists = [&](const char *pItemName) {
+		for(const auto &Item : vAssetList)
+		{
+			if(str_comp(Item.m_aName, pItemName) == 0)
+				return true;
+		}
+		return false;
+	};
+
 	if(IsDir)
 	{
 		if(pName[0] == '.')
@@ -159,6 +183,8 @@ static int AssetScan(const char *pName, int IsDir, int DirType, std::vector<TNam
 
 		// default is reserved
 		if(str_comp(pName, "default") == 0)
+			return 0;
+		if(Exists(pName))
 			return 0;
 
 		TName AssetItem;
@@ -174,6 +200,8 @@ static int AssetScan(const char *pName, int IsDir, int DirType, std::vector<TNam
 			str_truncate(aName, sizeof(aName), pName, str_length(pName) - 4);
 			// default is reserved
 			if(str_comp(aName, "default") == 0)
+				return 0;
+			if(Exists(aName))
 				return 0;
 
 			TName AssetItem;
@@ -376,11 +404,22 @@ int CMenus::ArrowScan(const char *pName, int IsDir, int DirType, void *pUser)
 	auto *pThis = (CMenus *)pRealUser->m_pUser;
 	IGraphics *pGraphics = pThis->Graphics();
 
+	auto Exists = [&](const char *pItemName) {
+		for(const auto &Item : pThis->m_vArrowList)
+		{
+			if(str_comp(Item.m_aName, pItemName) == 0)
+				return true;
+		}
+		return false;
+	};
+
 	if(IsDir)
 	{
 		if(pName[0] == '.')
 			return 0;
 		if(str_comp(pName, "default") == 0)
+			return 0;
+		if(Exists(pName))
 			return 0;
 
 		SCustomArrow ArrowItem;
@@ -395,6 +434,8 @@ int CMenus::ArrowScan(const char *pName, int IsDir, int DirType, void *pUser)
 			char aName[IO_MAX_PATH_LENGTH];
 			str_truncate(aName, sizeof(aName), pName, str_length(pName) - 4);
 			if(str_comp(aName, "default") == 0)
+				return 0;
+			if(Exists(aName))
 				return 0;
 
 			SCustomArrow ArrowItem;
@@ -554,6 +595,325 @@ bool CMenus::IsFavoriteAsset(int Tab, const char *pName) const
 	return Tab >= 0 && Tab < NUMBER_OF_ASSETS_TABS && m_aAssetFavorites[Tab].contains(pName);
 }
 
+static void AssetsGetRelativePaths(int Tab, const char *pName, char *pFilePath, int FilePathSize, char *pFolderPath, int FolderPathSize, char *pAltFolderPath, int AltFolderPathSize)
+{
+	pFilePath[0] = '\0';
+	pFolderPath[0] = '\0';
+	if(pAltFolderPath != nullptr)
+		pAltFolderPath[0] = '\0';
+
+	const char *pTabFolder = FavoriteAssetTabToString(Tab);
+	if(pTabFolder[0] == '\0' || pName == nullptr || pName[0] == '\0')
+		return;
+
+	if(Tab == ASSETS_TAB_AUDIO)
+	{
+		str_format(pFolderPath, FolderPathSize, "assets/audio/%s", pName);
+		if(pAltFolderPath != nullptr)
+			str_format(pAltFolderPath, AltFolderPathSize, "audio/%s", pName);
+		return;
+	}
+
+	str_format(pFilePath, FilePathSize, "assets/%s/%s.png", pTabFolder, pName);
+	str_format(pFolderPath, FolderPathSize, "assets/%s/%s", pTabFolder, pName);
+}
+
+bool CMenus::CanDeleteCustomAsset(int Tab, const char *pName) const
+{
+	if(Tab < 0 || Tab >= NUMBER_OF_ASSETS_TABS || pName == nullptr || pName[0] == '\0')
+		return false;
+	if(str_comp(pName, "default") == 0)
+		return false;
+
+	char aFilePath[IO_MAX_PATH_LENGTH];
+	char aFolderPath[IO_MAX_PATH_LENGTH];
+	char aAltFolderPath[IO_MAX_PATH_LENGTH];
+	AssetsGetRelativePaths(Tab, pName, aFilePath, sizeof(aFilePath), aFolderPath, sizeof(aFolderPath), aAltFolderPath, sizeof(aAltFolderPath));
+
+	if(aFilePath[0] != '\0' && Storage()->FileExists(aFilePath, IStorage::TYPE_SAVE))
+		return true;
+	if(aFolderPath[0] != '\0' && Storage()->FolderExists(aFolderPath, IStorage::TYPE_SAVE))
+		return true;
+	if(aAltFolderPath[0] != '\0' && Storage()->FolderExists(aAltFolderPath, IStorage::TYPE_SAVE))
+		return true;
+	return false;
+}
+
+struct SAssetsDeleteFolderContext
+{
+	IStorage *m_pStorage;
+	char m_aBasePath[IO_MAX_PATH_LENGTH];
+	bool m_Success = true;
+	int m_Depth = 0;
+};
+
+static int AssetsDeleteFolderContents(const char *pName, int IsDir, int DirType, void *pUser)
+{
+	auto *pContext = static_cast<SAssetsDeleteFolderContext *>(pUser);
+	// Skip only "." / ".." — other dotfiles (e.g. .DS_Store) must be removed or RemoveFolder fails.
+	if(pName[0] == '.' && (pName[1] == '\0' || (pName[1] == '.' && pName[2] == '\0')))
+		return 0;
+
+	char aPath[IO_MAX_PATH_LENGTH];
+	str_format(aPath, sizeof(aPath), "%s/%s", pContext->m_aBasePath, pName);
+	if(IsDir)
+	{
+		if(pContext->m_Depth >= 16)
+		{
+			pContext->m_Success = false;
+			return 0;
+		}
+		SAssetsDeleteFolderContext ChildContext;
+		ChildContext.m_pStorage = pContext->m_pStorage;
+		ChildContext.m_Depth = pContext->m_Depth + 1;
+		str_copy(ChildContext.m_aBasePath, aPath);
+		pContext->m_pStorage->ListDirectory(IStorage::TYPE_SAVE, aPath, AssetsDeleteFolderContents, &ChildContext);
+		if(!ChildContext.m_Success || !pContext->m_pStorage->RemoveFolder(aPath, IStorage::TYPE_SAVE))
+			pContext->m_Success = false;
+	}
+	else if(!pContext->m_pStorage->RemoveFile(aPath, IStorage::TYPE_SAVE))
+	{
+		pContext->m_Success = false;
+	}
+	return 0;
+}
+
+static bool AssetsDeleteSavePath(IStorage *pStorage, const char *pPath, bool IsFolder)
+{
+	if(pPath == nullptr || pPath[0] == '\0')
+		return true;
+
+	if(IsFolder)
+	{
+		if(!pStorage->FolderExists(pPath, IStorage::TYPE_SAVE))
+			return true;
+
+		SAssetsDeleteFolderContext Context;
+		Context.m_pStorage = pStorage;
+		str_copy(Context.m_aBasePath, pPath);
+		pStorage->ListDirectory(IStorage::TYPE_SAVE, pPath, AssetsDeleteFolderContents, &Context);
+		if(!Context.m_Success)
+			return false;
+		return pStorage->RemoveFolder(pPath, IStorage::TYPE_SAVE);
+	}
+
+	if(!pStorage->FileExists(pPath, IStorage::TYPE_SAVE))
+		return true;
+	return pStorage->RemoveFile(pPath, IStorage::TYPE_SAVE);
+}
+
+bool CMenus::DeleteCustomAsset(int Tab, const char *pName)
+{
+	if(!CanDeleteCustomAsset(Tab, pName))
+		return false;
+
+	char aFilePath[IO_MAX_PATH_LENGTH];
+	char aFolderPath[IO_MAX_PATH_LENGTH];
+	char aAltFolderPath[IO_MAX_PATH_LENGTH];
+	AssetsGetRelativePaths(Tab, pName, aFilePath, sizeof(aFilePath), aFolderPath, sizeof(aFolderPath), aAltFolderPath, sizeof(aAltFolderPath));
+
+	// Best-effort: remove every SAVE path. Success = nothing deletable remains
+	// (handles partial deletes where e.g. the png is gone but a leftover folder stays).
+	AssetsDeleteSavePath(Storage(), aFilePath, false);
+	AssetsDeleteSavePath(Storage(), aFolderPath, true);
+	AssetsDeleteSavePath(Storage(), aAltFolderPath, true);
+	return !CanDeleteCustomAsset(Tab, pName);
+}
+
+static void AssetsResetSelectedToDefault(int Tab)
+{
+	if(Tab == ASSETS_TAB_ENTITIES)
+		str_copy(g_Config.m_ClAssetsEntities, "default");
+	else if(Tab == ASSETS_TAB_GAME)
+		str_copy(g_Config.m_ClAssetGame, "default");
+	else if(Tab == ASSETS_TAB_EMOTICONS)
+		str_copy(g_Config.m_ClAssetEmoticons, "default");
+	else if(Tab == ASSETS_TAB_PARTICLES)
+		str_copy(g_Config.m_ClAssetParticles, "default");
+	else if(Tab == ASSETS_TAB_HUD)
+		str_copy(g_Config.m_ClAssetHud, "default");
+	else if(Tab == ASSETS_TAB_EXTRAS)
+		str_copy(g_Config.m_ClAssetExtras, "default");
+	else if(Tab == ASSETS_TAB_CURSOR)
+		str_copy(g_Config.m_ClAssetCursor, "default");
+	else if(Tab == ASSETS_TAB_ARROW)
+		str_copy(g_Config.m_ClAssetArrow, "default");
+	else if(Tab == ASSETS_TAB_AUDIO)
+		str_copy(g_Config.m_SndPack, "default");
+}
+
+static bool AssetsIsCurrentlySelected(int Tab, const char *pName)
+{
+	if(Tab == ASSETS_TAB_ENTITIES)
+		return str_comp(pName, g_Config.m_ClAssetsEntities) == 0;
+	if(Tab == ASSETS_TAB_GAME)
+		return str_comp(pName, g_Config.m_ClAssetGame) == 0;
+	if(Tab == ASSETS_TAB_EMOTICONS)
+		return str_comp(pName, g_Config.m_ClAssetEmoticons) == 0;
+	if(Tab == ASSETS_TAB_PARTICLES)
+		return str_comp(pName, g_Config.m_ClAssetParticles) == 0;
+	if(Tab == ASSETS_TAB_HUD)
+		return str_comp(pName, g_Config.m_ClAssetHud) == 0;
+	if(Tab == ASSETS_TAB_EXTRAS)
+		return str_comp(pName, g_Config.m_ClAssetExtras) == 0;
+	if(Tab == ASSETS_TAB_CURSOR)
+		return str_comp(pName, g_Config.m_ClAssetCursor) == 0;
+	if(Tab == ASSETS_TAB_ARROW)
+		return str_comp(pName, g_Config.m_ClAssetArrow) == 0;
+	if(Tab == ASSETS_TAB_AUDIO)
+		return str_comp(pName, g_Config.m_SndPack) == 0;
+	return false;
+}
+
+void CMenus::PopupConfirmDeleteAsset()
+{
+	if(m_DeleteAssetTab < 0 || m_DeleteAssetTab >= NUMBER_OF_ASSETS_TABS || m_aDeleteAssetName[0] == '\0')
+		return;
+
+	const int Tab = m_DeleteAssetTab;
+	const bool WasSelected = AssetsIsCurrentlySelected(Tab, m_aDeleteAssetName);
+	if(!DeleteCustomAsset(Tab, m_aDeleteAssetName))
+	{
+		char aError[128 + sizeof(m_aDeleteAssetName)];
+		str_format(aError, sizeof(aError), Localize("Unable to delete the asset '%s'"), m_aDeleteAssetName);
+		PopupMessage(Localize("Error"), aError, Localize("Ok"));
+		m_aDeleteAssetName[0] = '\0';
+		m_DeleteAssetTab = -1;
+		return;
+	}
+
+	RemoveFavoriteAsset(Tab, m_aDeleteAssetName);
+	if(WasSelected)
+		AssetsResetSelectedToDefault(Tab);
+
+	// Drop only the deleted entry — full ClearCustomItems reloads every preview texture and causes hitch.
+	RemoveCustomAssetFromList(Tab, m_aDeleteAssetName);
+
+	if(WasSelected)
+	{
+		if(Tab == ASSETS_TAB_ENTITIES)
+			GameClient()->m_MapImages.ChangeEntitiesPath(g_Config.m_ClAssetsEntities);
+		else if(Tab == ASSETS_TAB_GAME)
+			GameClient()->LoadGameSkin(g_Config.m_ClAssetGame);
+		else if(Tab == ASSETS_TAB_EMOTICONS)
+			GameClient()->LoadEmoticonsSkin(g_Config.m_ClAssetEmoticons);
+		else if(Tab == ASSETS_TAB_PARTICLES)
+			GameClient()->LoadParticlesSkin(g_Config.m_ClAssetParticles);
+		else if(Tab == ASSETS_TAB_HUD)
+			GameClient()->LoadHudSkin(g_Config.m_ClAssetHud);
+		else if(Tab == ASSETS_TAB_EXTRAS)
+			GameClient()->LoadExtrasSkin(g_Config.m_ClAssetExtras);
+		else if(Tab == ASSETS_TAB_CURSOR)
+			GameClient()->LoadCursorAsset(g_Config.m_ClAssetCursor);
+		else if(Tab == ASSETS_TAB_ARROW)
+			GameClient()->LoadArrowAsset(g_Config.m_ClAssetArrow);
+		else if(Tab == ASSETS_TAB_AUDIO)
+			GameClient()->m_Sounds.Clear();
+	}
+
+	gs_aInitCustomList[Tab] = true;
+	m_aDeleteAssetName[0] = '\0';
+	m_DeleteAssetTab = -1;
+}
+
+static void AssetsUnloadEntitiesPreview(CMenus::SCustomEntities &Entity, IGraphics *pGraphics)
+{
+	for(int i = 0; i < MAP_IMAGE_MOD_TYPE_COUNT; ++i)
+	{
+		IGraphics::CTextureHandle &Tex = Entity.m_aImages[i].m_Texture;
+		if(!Tex.IsValid() || Tex.IsNullTexture())
+			continue;
+
+		const int TextureId = Tex.Id();
+		for(int j = i + 1; j < MAP_IMAGE_MOD_TYPE_COUNT; ++j)
+		{
+			if(Entity.m_aImages[j].m_Texture.IsValid() && !Entity.m_aImages[j].m_Texture.IsNullTexture() && Entity.m_aImages[j].m_Texture.Id() == TextureId)
+				Entity.m_aImages[j].m_Texture.Invalidate();
+		}
+		if(Entity.m_RenderTexture.IsValid() && !Entity.m_RenderTexture.IsNullTexture() && Entity.m_RenderTexture.Id() == TextureId)
+			Entity.m_RenderTexture.Invalidate();
+
+		pGraphics->UnloadTexture(&Tex);
+	}
+	Entity.m_RenderTexture.Invalidate();
+}
+
+template<typename TName>
+static void AssetsEraseNamedPreview(std::vector<TName> &vList, IGraphics *pGraphics, const char *pName, bool UnloadTexture)
+{
+	for(auto It = vList.begin(); It != vList.end();)
+	{
+		if(str_comp(It->m_aName, pName) != 0)
+		{
+			++It;
+			continue;
+		}
+		if(UnloadTexture)
+			pGraphics->UnloadTexture(&It->m_RenderTexture);
+		It = vList.erase(It);
+	}
+}
+
+void CMenus::RemoveCustomAssetFromList(int Tab, const char *pName)
+{
+	if(Tab == ASSETS_TAB_ENTITIES)
+	{
+		for(auto It = m_vEntitiesList.begin(); It != m_vEntitiesList.end();)
+		{
+			if(str_comp(It->m_aName, pName) != 0)
+			{
+				++It;
+				continue;
+			}
+			AssetsUnloadEntitiesPreview(*It, Graphics());
+			It = m_vEntitiesList.erase(It);
+		}
+	}
+	else if(Tab == ASSETS_TAB_GAME)
+		AssetsEraseNamedPreview(m_vGameList, Graphics(), pName, true);
+	else if(Tab == ASSETS_TAB_EMOTICONS)
+		AssetsEraseNamedPreview(m_vEmoticonList, Graphics(), pName, true);
+	else if(Tab == ASSETS_TAB_PARTICLES)
+		AssetsEraseNamedPreview(m_vParticlesList, Graphics(), pName, true);
+	else if(Tab == ASSETS_TAB_HUD)
+		AssetsEraseNamedPreview(m_vHudList, Graphics(), pName, true);
+	else if(Tab == ASSETS_TAB_EXTRAS)
+		AssetsEraseNamedPreview(m_vExtrasList, Graphics(), pName, true);
+	else if(Tab == ASSETS_TAB_CURSOR)
+		AssetsEraseNamedPreview(m_vCursorList, Graphics(), pName, true);
+	else if(Tab == ASSETS_TAB_ARROW)
+		AssetsEraseNamedPreview(m_vArrowList, Graphics(), pName, true);
+	else if(Tab == ASSETS_TAB_AUDIO)
+		AssetsEraseNamedPreview(m_vAudioPackList, Graphics(), pName, false);
+}
+
+void CMenus::MarkCustomAssetsDeletable(int Tab)
+{
+	auto MarkList = [this, Tab](auto &vList) {
+		for(auto &Asset : vList)
+			Asset.m_Deletable = CanDeleteCustomAsset(Tab, Asset.m_aName);
+	};
+
+	if(Tab == ASSETS_TAB_ENTITIES)
+		MarkList(m_vEntitiesList);
+	else if(Tab == ASSETS_TAB_GAME)
+		MarkList(m_vGameList);
+	else if(Tab == ASSETS_TAB_EMOTICONS)
+		MarkList(m_vEmoticonList);
+	else if(Tab == ASSETS_TAB_PARTICLES)
+		MarkList(m_vParticlesList);
+	else if(Tab == ASSETS_TAB_HUD)
+		MarkList(m_vHudList);
+	else if(Tab == ASSETS_TAB_EXTRAS)
+		MarkList(m_vExtrasList);
+	else if(Tab == ASSETS_TAB_CURSOR)
+		MarkList(m_vCursorList);
+	else if(Tab == ASSETS_TAB_ARROW)
+		MarkList(m_vArrowList);
+	else if(Tab == ASSETS_TAB_AUDIO)
+		MarkList(m_vAudioPackList);
+}
+
 static std::vector<const CMenus::SCustomEntities *> gs_vpSearchEntitiesList;
 static std::vector<const CMenus::SCustomGame *> gs_vpSearchGamesList;
 static std::vector<const CMenus::SCustomEmoticon *> gs_vpSearchEmoticonsList;
@@ -611,12 +971,7 @@ void CMenus::ClearCustomItems(int CurTab)
 	if(CurTab == ASSETS_TAB_ENTITIES)
 	{
 		for(auto &Entity : m_vEntitiesList)
-		{
-			for(auto &Image : Entity.m_aImages)
-			{
-				Graphics()->UnloadTexture(&Image.m_Texture);
-			}
-		}
+			AssetsUnloadEntitiesPreview(Entity, Graphics());
 		m_vEntitiesList.clear();
 
 		// reload current entities
@@ -682,6 +1037,7 @@ static void InitAssetList(std::vector<TName> &vAssetList, const char *pAssetPath
 	{
 		TName AssetItem;
 		str_copy(AssetItem.m_aName, "default");
+		AssetItem.m_Deletable = false;
 		LoadAsset(&AssetItem, pAssetName, pGraphics);
 		vAssetList.push_back(AssetItem);
 
@@ -763,35 +1119,52 @@ void CMenus::RenderSettingsCustom(CUIRect MainView)
 		{
 			SCustomEntities EntitiesItem;
 			str_copy(EntitiesItem.m_aName, "default");
+			EntitiesItem.m_Deletable = false;
 			LoadEntities(&EntitiesItem, &User);
 			m_vEntitiesList.push_back(EntitiesItem);
 
 			// load entities
 			Storage()->ListDirectory(IStorage::TYPE_ALL, "assets/entities", EntitiesScan, &User);
 			std::sort(m_vEntitiesList.begin(), m_vEntitiesList.end());
+			MarkCustomAssetsDeletable(ASSETS_TAB_ENTITIES);
 		}
 		if(m_vEntitiesList.size() != gs_aCustomListSize[s_CurCustomTab])
 			gs_aInitCustomList[s_CurCustomTab] = true;
 	}
 	else if(s_CurCustomTab == ASSETS_TAB_GAME)
 	{
+		const bool WasEmpty = m_vGameList.empty();
 		InitAssetList(m_vGameList, "assets/game", "game", GameScan, Graphics(), Storage(), &User);
+		if(WasEmpty)
+			MarkCustomAssetsDeletable(ASSETS_TAB_GAME);
 	}
 	else if(s_CurCustomTab == ASSETS_TAB_EMOTICONS)
 	{
+		const bool WasEmpty = m_vEmoticonList.empty();
 		InitAssetList(m_vEmoticonList, "assets/emoticons", "emoticons", EmoticonsScan, Graphics(), Storage(), &User);
+		if(WasEmpty)
+			MarkCustomAssetsDeletable(ASSETS_TAB_EMOTICONS);
 	}
 	else if(s_CurCustomTab == ASSETS_TAB_PARTICLES)
 	{
+		const bool WasEmpty = m_vParticlesList.empty();
 		InitAssetList(m_vParticlesList, "assets/particles", "particles", ParticlesScan, Graphics(), Storage(), &User);
+		if(WasEmpty)
+			MarkCustomAssetsDeletable(ASSETS_TAB_PARTICLES);
 	}
 	else if(s_CurCustomTab == ASSETS_TAB_HUD)
 	{
+		const bool WasEmpty = m_vHudList.empty();
 		InitAssetList(m_vHudList, "assets/hud", "hud", HudScan, Graphics(), Storage(), &User);
+		if(WasEmpty)
+			MarkCustomAssetsDeletable(ASSETS_TAB_HUD);
 	}
 	else if(s_CurCustomTab == ASSETS_TAB_EXTRAS)
 	{
+		const bool WasEmpty = m_vExtrasList.empty();
 		InitAssetList(m_vExtrasList, "assets/extras", "extras", ExtrasScan, Graphics(), Storage(), &User);
+		if(WasEmpty)
+			MarkCustomAssetsDeletable(ASSETS_TAB_EXTRAS);
 	}
 	else if(s_CurCustomTab == ASSETS_TAB_CURSOR)
 	{
@@ -799,18 +1172,23 @@ void CMenus::RenderSettingsCustom(CUIRect MainView)
 		{
 			SCustomCursor CursorItem;
 			str_copy(CursorItem.m_aName, "default");
+			CursorItem.m_Deletable = false;
 			LoadCursorPreview(&CursorItem, Graphics());
 			m_vCursorList.push_back(CursorItem);
 
 			Storage()->ListDirectory(IStorage::TYPE_ALL, "assets/cursor", CursorScan, &User);
 			std::sort(m_vCursorList.begin(), m_vCursorList.end());
+			MarkCustomAssetsDeletable(ASSETS_TAB_CURSOR);
 		}
 		if(m_vCursorList.size() != gs_aCustomListSize[s_CurCustomTab])
 			gs_aInitCustomList[s_CurCustomTab] = true;
 	}
 	else if(s_CurCustomTab == ASSETS_TAB_ARROW)
 	{
+		const bool WasEmpty = m_vArrowList.empty();
 		InitAssetList(m_vArrowList, "assets/arrow", "arrow", ArrowScan, Graphics(), Storage(), &User);
+		if(WasEmpty)
+			MarkCustomAssetsDeletable(ASSETS_TAB_ARROW);
 	}
 	else if(s_CurCustomTab == ASSETS_TAB_AUDIO)
 	{
@@ -818,12 +1196,14 @@ void CMenus::RenderSettingsCustom(CUIRect MainView)
 		{
 			SCustomAudioPack DefaultItem;
 			str_copy(DefaultItem.m_aName, "default");
+			DefaultItem.m_Deletable = false;
 			DefaultItem.m_RenderTexture = IGraphics::CTextureHandle();
 			m_vAudioPackList.push_back(DefaultItem);
 
 			Storage()->ListDirectory(IStorage::TYPE_SAVE, "assets/audio", AudioPackScan, &User);
 			Storage()->ListDirectory(IStorage::TYPE_SAVE, "audio", AudioPackScan, &User);
 			std::sort(m_vAudioPackList.begin(), m_vAudioPackList.end());
+			MarkCustomAssetsDeletable(ASSETS_TAB_AUDIO);
 		}
 		if(m_vAudioPackList.size() != gs_aCustomListSize[s_CurCustomTab])
 			gs_aInitCustomList[s_CurCustomTab] = true;
@@ -902,6 +1282,7 @@ void CMenus::RenderSettingsCustom(CUIRect MainView)
 	float TextureHeight = 150;
 
 	size_t SearchListSize = 0;
+	bool SkipSelectionBecauseDelete = false;
 
 	if(s_CurCustomTab == ASSETS_TAB_ENTITIES)
 	{
@@ -1004,20 +1385,41 @@ void CMenus::RenderSettingsCustom(CUIRect MainView)
 		}
 
 		const bool Favorite = IsFavoriteAsset(s_CurCustomTab, pItem->m_aName);
+		const bool CanDelete = pItem->m_Deletable;
 		const CListboxItem Item = s_ListBox.DoNextItem(pItem, OldSelected >= 0 && (size_t)OldSelected == i);
 		CUIRect ItemRect = Item.m_Rect;
 		ItemRect.Margin(Margin / 2, &ItemRect);
 		if(!Item.m_Visible)
 			continue;
 
-		CUIRect FavoriteButton;
-		ItemRect.HSplitTop(20.0f, &FavoriteButton, nullptr);
-		FavoriteButton.VSplitRight(20.0f, nullptr, &FavoriteButton);
+		CUIRect FavoriteButton, DeleteButton;
+		if(s_CurCustomTab == ASSETS_TAB_AUDIO)
+		{
+			// Thin rows: keep both icons on one line so they don't overlap.
+			CUIRect RightButtons = ItemRect;
+			RightButtons.VSplitRight(20.0f, &RightButtons, &FavoriteButton);
+			if(CanDelete)
+				RightButtons.VSplitRight(20.0f, nullptr, &DeleteButton);
+			else
+				DeleteButton = {0, 0, 0, 0};
+		}
+		else
+		{
+			ItemRect.HSplitTop(20.0f, &FavoriteButton, nullptr);
+			FavoriteButton.VSplitRight(20.0f, nullptr, &FavoriteButton);
+			if(CanDelete)
+			{
+				ItemRect.HSplitBottom(20.0f, nullptr, &DeleteButton);
+				DeleteButton.VSplitRight(20.0f, nullptr, &DeleteButton);
+			}
+			else
+				DeleteButton = {0, 0, 0, 0};
+		}
 
 		if(s_CurCustomTab == ASSETS_TAB_AUDIO)
 		{
 			CUIRect LabelRect = ItemRect;
-			LabelRect.VSplitRight(24.0f, &LabelRect, nullptr);
+			LabelRect.VSplitRight(CanDelete ? 44.0f : 24.0f, &LabelRect, nullptr);
 			Ui()->DoLabel(&LabelRect, pItem->m_aName, 14.0f, TEXTALIGN_ML);
 		}
 		else
@@ -1093,6 +1495,31 @@ void CMenus::RenderSettingsCustom(CUIRect MainView)
 		}
 		} // end else (non-audio rendering)
 
+		if(CanDelete)
+		{
+			TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+			TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
+			const float Alpha = Ui()->HotItem() == &pItem->m_DeleteButtonId ? 0.25f : 0.0f;
+			TextRender()->TextColor(ColorRGBA(0.95f, 0.35f, 0.35f, 0.85f + Alpha));
+			SLabelProperties DeleteProps;
+			DeleteProps.m_MaxWidth = DeleteButton.w;
+			Ui()->DoLabel(&DeleteButton, FontIcon::TRASH, 12.0f, TEXTALIGN_MC, DeleteProps);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+			TextRender()->SetRenderFlags(0);
+			TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+
+			if(Ui()->DoButtonLogic(&pItem->m_DeleteButtonId, 0, &DeleteButton, BUTTONFLAG_LEFT))
+			{
+				SkipSelectionBecauseDelete = true;
+				str_copy(m_aDeleteAssetName, pItem->m_aName);
+				m_DeleteAssetTab = s_CurCustomTab;
+				char aBuf[128 + sizeof(pItem->m_aName)];
+				str_format(aBuf, sizeof(aBuf), Localize("Are you sure that you want to delete '%s'?"), pItem->m_aName);
+				PopupConfirm(Localize("Delete asset"), aBuf, Localize("Yes"), Localize("No"), &CMenus::PopupConfirmDeleteAsset);
+			}
+			GameClient()->m_Tooltips.DoToolTip(&pItem->m_DeleteButtonId, &DeleteButton, Localize("Delete this asset from your assets directory."));
+		}
+
 		if(DoButton_Favorite(&pItem->m_FavoriteButtonId, pItem, Favorite, &FavoriteButton))
 		{
 			if(Favorite)
@@ -1105,7 +1532,7 @@ void CMenus::RenderSettingsCustom(CUIRect MainView)
 	}
 
 	const int NewSelected = s_ListBox.DoEnd();
-	if(OldSelected != NewSelected && NewSelected >= 0)
+	if(OldSelected != NewSelected && NewSelected >= 0 && !SkipSelectionBecauseDelete)
 	{
 		const SCustomItem *pSelectedItem = GetCustomItem(s_CurCustomTab, NewSelected);
 		if(pSelectedItem != nullptr && pSelectedItem->m_aName[0] != '\0')
