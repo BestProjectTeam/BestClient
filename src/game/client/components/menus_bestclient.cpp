@@ -1221,7 +1221,7 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 	const bool MusicPlayerShowStaticColor = MusicPlayerEnabled && g_Config.m_BcMusicPlayerColorMode == 0;
 	static float s_MusicPlayerRevealPhase = 0.0f;
 	UpdateModuleRevealPhase(s_MusicPlayerRevealPhase, MusicPlayerEnabled, Client()->RenderFrameTime());
-	const float MusicPlayerExpandedTargetHeight = (MarginSmall + LineSize) * 8.0f + (MusicPlayerShowStaticColor ? MusicPlayerColorPickerSpacing + MusicPlayerColorPickerLineSize : 0.0f);
+	const float MusicPlayerExpandedTargetHeight = (MarginSmall + LineSize) * 5.0f + (MusicPlayerShowStaticColor ? MusicPlayerColorPickerSpacing + MusicPlayerColorPickerLineSize : 0.0f);
 	const float MusicPlayerExpandedHeight = MusicPlayerExpandedTargetHeight * BCUiAnimations::EaseOutCubic(s_MusicPlayerRevealPhase);
 	const float MusicPlayerContentHeight = LineSize + MarginSmall + LineSize + MusicPlayerExpandedHeight;
 
@@ -1249,11 +1249,8 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 	{
 		g_Config.m_BcMusicPlayerColorMode = DefaultConfig::BcMusicPlayerColorMode;
 		g_Config.m_BcMusicPlayerStaticColor = DefaultConfig::BcMusicPlayerStaticColor;
-		g_Config.m_BcMusicPlayerSizeMode = DefaultConfig::BcMusicPlayerSizeMode;
 		g_Config.m_BcMusicPlayerTextScale = DefaultConfig::BcMusicPlayerTextScale;
 		g_Config.m_BcMusicPlayerVisualizerMode = DefaultConfig::BcMusicPlayerVisualizerMode;
-		g_Config.m_BcMusicPlayerVisualizerSensitivity = DefaultConfig::BcMusicPlayerVisualizerSensitivity;
-		g_Config.m_BcMusicPlayerVisualizerSmoothing = DefaultConfig::BcMusicPlayerVisualizerSmoothing;
 		g_Config.m_BcMusicPlayerVisualizerRounding = DefaultConfig::BcMusicPlayerVisualizerRounding;
 		g_Config.m_BcMusicPlayerVisualizerColumns = DefaultConfig::BcMusicPlayerVisualizerColumns;
 	}
@@ -1288,13 +1285,14 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		static CUi::SDropDownState s_MusicPlayerColorModeState;
 		static CScrollRegion s_MusicPlayerColorModeScrollRegion;
 		s_MusicPlayerColorModeState.m_SelectionPopupContext.m_pScrollRegion = &s_MusicPlayerColorModeScrollRegion;
-		const char *apMusicPlayerColorModes[4] = {
-			Localize("Static color"),
-			Localize("Cover accent color"),
-			Localize("Dominant cover color"),
+		const char *apMusicPlayerColorModes[3] = {
+			Localize("Static"),
+			Localize("Cover"),
 			Localize("Translucent"),
 		};
-		g_Config.m_BcMusicPlayerColorMode = std::clamp(g_Config.m_BcMusicPlayerColorMode, 0, 3);
+		if(g_Config.m_BcMusicPlayerColorMode > 2)
+			g_Config.m_BcMusicPlayerColorMode = 2;
+		g_Config.m_BcMusicPlayerColorMode = std::clamp(g_Config.m_BcMusicPlayerColorMode, 0, 2);
 		g_Config.m_BcMusicPlayerColorMode = Ui()->DoDropDown(&MusicPlayerColorModeSelect, g_Config.m_BcMusicPlayerColorMode, apMusicPlayerColorModes, (int)std::size(apMusicPlayerColorModes), s_MusicPlayerColorModeState);
 
 		if(MusicPlayerShowStaticColor)
@@ -1303,22 +1301,6 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 			MainView.HSplitTop(MusicPlayerColorPickerSpacing, nullptr, &MainView);
 			DoLine_ColorPicker(&s_MusicPlayerStaticColorButton, MusicPlayerColorPickerLineSize, MusicPlayerColorPickerLabelSize, MusicPlayerColorPickerSpacing, &MainView, Localize("Static color"), &g_Config.m_BcMusicPlayerStaticColor, ColorRGBA(0.34f, 0.53f, 0.79f, 1.0f), false);
 		}
-
-		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
-		MainView.HSplitTop(LineSize, &Button, &MainView);
-		CUIRect MusicPlayerSizeModeLabel, MusicPlayerSizeModeSelect;
-		Button.VSplitLeft(150.0f, &MusicPlayerSizeModeLabel, &MusicPlayerSizeModeSelect);
-		Ui()->DoLabel(&MusicPlayerSizeModeLabel, Localize("Size mode"), 14.0f, TEXTALIGN_ML);
-
-		static CUi::SDropDownState s_MusicPlayerSizeModeState;
-		static CScrollRegion s_MusicPlayerSizeModeScrollRegion;
-		s_MusicPlayerSizeModeState.m_SelectionPopupContext.m_pScrollRegion = &s_MusicPlayerSizeModeScrollRegion;
-		const char *apMusicPlayerSizeModes[2] = {
-			Localize("Normal"),
-			Localize("Mini"),
-		};
-		g_Config.m_BcMusicPlayerSizeMode = std::clamp(g_Config.m_BcMusicPlayerSizeMode, 0, 1);
-		g_Config.m_BcMusicPlayerSizeMode = Ui()->DoDropDown(&MusicPlayerSizeModeSelect, g_Config.m_BcMusicPlayerSizeMode, apMusicPlayerSizeModes, (int)std::size(apMusicPlayerSizeModes), s_MusicPlayerSizeModeState);
 
 		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
 		MainView.HSplitTop(LineSize, &Button, &MainView);
@@ -1343,14 +1325,6 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 
 		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
 		MainView.HSplitTop(LineSize, &Button, &MainView);
-		Ui()->DoScrollbarOption(&g_Config.m_BcMusicPlayerVisualizerSensitivity, &g_Config.m_BcMusicPlayerVisualizerSensitivity, &Button, Localize("Sensitivity"), 50, 300, &CUi::ms_LinearScrollbarScale, 0u, "%");
-
-		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
-		MainView.HSplitTop(LineSize, &Button, &MainView);
-		Ui()->DoScrollbarOption(&g_Config.m_BcMusicPlayerVisualizerSmoothing, &g_Config.m_BcMusicPlayerVisualizerSmoothing, &Button, Localize("Smoothing"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
-
-		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
-		MainView.HSplitTop(LineSize, &Button, &MainView);
 		Ui()->DoScrollbarOption(&g_Config.m_BcMusicPlayerVisualizerColumns, &g_Config.m_BcMusicPlayerVisualizerColumns, &Button, Localize("Columns"), 5, 10);
 
 		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
@@ -1361,22 +1335,18 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 
 		static CButtonContainer s_MusicPlayerVisualizerRoundingCube;
 		static CButtonContainer s_MusicPlayerVisualizerRoundingSoft;
-		static CButtonContainer s_MusicPlayerVisualizerRoundingPill;
-		const int MusicPlayerRoundingPreset = g_Config.m_BcMusicPlayerVisualizerRounding < 100 ? 0 : (g_Config.m_BcMusicPlayerVisualizerRounding < 300 ? 1 : 2);
-		CUIRect MusicPlayerCubeButton, MusicPlayerSoftButton, MusicPlayerPillButton, MusicPlayerRoundingRest;
+		if(g_Config.m_BcMusicPlayerVisualizerRounding > 200)
+			g_Config.m_BcMusicPlayerVisualizerRounding = 200;
+		const int MusicPlayerRoundingPreset = g_Config.m_BcMusicPlayerVisualizerRounding < 100 ? 0 : 1;
+		CUIRect MusicPlayerCubeButton, MusicPlayerSoftButton;
 		const float MusicPlayerRoundingSpacing = 2.0f;
-		const float MusicPlayerRoundingButtonWidth = (MusicPlayerRoundingButtons.w - MusicPlayerRoundingSpacing * 2.0f) / 3.0f;
-		MusicPlayerRoundingButtons.VSplitLeft(MusicPlayerRoundingButtonWidth, &MusicPlayerCubeButton, &MusicPlayerRoundingRest);
-		MusicPlayerRoundingRest.VSplitLeft(MusicPlayerRoundingSpacing, nullptr, &MusicPlayerRoundingRest);
-		MusicPlayerRoundingRest.VSplitLeft(MusicPlayerRoundingButtonWidth, &MusicPlayerSoftButton, &MusicPlayerRoundingRest);
-		MusicPlayerRoundingRest.VSplitLeft(MusicPlayerRoundingSpacing, nullptr, &MusicPlayerRoundingRest);
-		MusicPlayerPillButton = MusicPlayerRoundingRest;
+		const float MusicPlayerRoundingButtonWidth = (MusicPlayerRoundingButtons.w - MusicPlayerRoundingSpacing) / 2.0f;
+		MusicPlayerRoundingButtons.VSplitLeft(MusicPlayerRoundingButtonWidth, &MusicPlayerCubeButton, &MusicPlayerSoftButton);
+		MusicPlayerSoftButton.VSplitLeft(MusicPlayerRoundingSpacing, nullptr, &MusicPlayerSoftButton);
 		if(DoButton_Menu(&s_MusicPlayerVisualizerRoundingCube, Localize("Cube"), MusicPlayerRoundingPreset == 0, &MusicPlayerCubeButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_L))
 			g_Config.m_BcMusicPlayerVisualizerRounding = 0;
-		if(DoButton_Menu(&s_MusicPlayerVisualizerRoundingSoft, Localize("Soft"), MusicPlayerRoundingPreset == 1, &MusicPlayerSoftButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_NONE))
+		if(DoButton_Menu(&s_MusicPlayerVisualizerRoundingSoft, Localize("Soft"), MusicPlayerRoundingPreset == 1, &MusicPlayerSoftButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
 			g_Config.m_BcMusicPlayerVisualizerRounding = 200;
-		if(DoButton_Menu(&s_MusicPlayerVisualizerRoundingPill, Localize("Pill"), MusicPlayerRoundingPreset == 2, &MusicPlayerPillButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
-			g_Config.m_BcMusicPlayerVisualizerRounding = 400;
 
 		Ui()->ClipDisable();
 	}

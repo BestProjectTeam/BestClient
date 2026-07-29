@@ -4,6 +4,7 @@
 
 #include "types.h"
 
+#include <array>
 #include <complex>
 #include <vector>
 
@@ -35,6 +36,10 @@ class CVisualizerAnalyzer
 	std::vector<std::complex<float>> m_vBassTwiddles;
 	std::vector<int> m_vMainBitReverse;
 	std::vector<int> m_vBassBitReverse;
+	std::array<float, MAX_VISUALIZER_BANDS> m_aNoiseFloor{};
+	std::array<float, MAX_VISUALIZER_BANDS> m_aBandPeak{};
+	std::array<float, MAX_VISUALIZER_BANDS> m_aSmoothedBands{};
+	float m_BandEnergyPeak = 1e-6f;
 
 	void RebuildPlan();
 	void BuildWindows();
@@ -42,7 +47,11 @@ class CVisualizerAnalyzer
 	void ComputeBandDistribution();
 	void CopyLatestSamples(float *pDst, int Count) const;
 	void RunFft(std::vector<std::complex<float>> &vBuffer, const std::vector<std::complex<float>> &vTwiddles, const std::vector<int> &vBitReverse) const;
+	void ResetBandState();
+	void FadeBandsToSilence(float Factor);
 	static int ResolveMainFftSize(int SampleRate);
+	static float BandEdgeHz(float T);
+	static float BandEq(float BandT);
 
 public:
 	CVisualizerAnalyzer();

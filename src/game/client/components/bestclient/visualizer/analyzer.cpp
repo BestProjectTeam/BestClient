@@ -4,6 +4,7 @@
 #include <base/math.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
 
@@ -13,53 +14,6 @@ namespace BestClientVisualizer
 namespace
 {
 constexpr float PI = 3.14159265358979323846f;
-
-struct SCompactBarRange
-{
-	int m_Start;
-	int m_End;
-	float m_Emphasis;
-};
-
-static constexpr SCompactBarRange gs_aCompactBarRanges[5] = {
-	{0, 4, 1.28f},
-	{4, 9, 1.16f},
-	{9, 15, 1.03f},
-	{15, 23, 0.96f},
-	{23, MAX_VISUALIZER_BANDS, 0.90f},
-};
-
-static float ComputeRenderBarValue(const SVisualizerFrame &Frame, float Start, float End, float Emphasis, int RequestedBarCount)
-{
-	const int IndexStart = std::clamp((int)floorf(Start), 0, MAX_VISUALIZER_BANDS - 1);
-	const int IndexEnd = std::clamp((int)ceilf(End), IndexStart + 1, MAX_VISUALIZER_BANDS);
-	float Sum = 0.0f;
-	float WeightSum = 0.0f;
-	float Peak = 0.0f;
-	const float RangeWidth = maximum(0.001f, End - Start);
-	for(int Band = IndexStart; Band < IndexEnd; ++Band)
-	{
-		const float SegmentStart = maximum(Start, (float)Band);
-		const float SegmentEnd = minimum(End, (float)(Band + 1));
-		const float Span = maximum(0.001f, SegmentEnd - SegmentStart);
-		const float LocalCenter = (SegmentStart + SegmentEnd) * 0.5f;
-		const float LocalT = std::clamp((LocalCenter - Start) / RangeWidth, 0.0f, 1.0f);
-		const float LocalWeight = 1.28f - 0.34f * LocalT;
-		const float BandT = Band / maximum(1.0f, (float)(MAX_VISUALIZER_BANDS - 1));
-		const float Focus = 1.24f - 0.28f * BandT;
-		const float Weight = Span * LocalWeight * Focus;
-		const float Value = Frame.m_aBands[Band];
-		Sum += Value * Weight;
-		WeightSum += Weight;
-		Peak = maximum(Peak, Value);
-	}
-
-	const float Average = WeightSum > 0.0f ? Sum / WeightSum : 0.0f;
-	const float CountBoost = 4.45f * powf(maximum(1.0f, RequestedBarCount / 5.0f), 0.18f);
-	float BarValue = (Average * 0.46f + Peak * 0.54f) * Emphasis * CountBoost;
-	BarValue = powf(std::clamp(BarValue, 0.0f, 1.0f), 0.92f);
-	return std::clamp(BarValue, 0.0f, 1.0f);
-}
 } // namespace
 
 const char *VisualizerBackendStatusName(EVisualizerBackendStatus Status)
@@ -78,6 +32,46 @@ const char *VisualizerBackendStatusName(EVisualizerBackendStatus Status)
 CVisualizerAnalyzer::CVisualizerAnalyzer()
 {
 	Configure(SVisualizerConfig());
+}
+
+void CVisualizerAnalyzer::ResetBandState()
+{
+	m_aNoiseFloor.fill(1e-5f);
+	m_aBandPeak.fill(0.002f);
+	m_aSmoothedBands.fill(0.0f);
+	m_BandEnergyPeak = 1e-6f;
+}
+
+void CVisualizerAnalyzer::FadeBandsToSilence(float Factor)
+{
+	for(float &Value : m_aSmoothedBands)
+	{
+		Value *= Factor;
+		if(Value < 0.001f)
+			Value = 0.0f;
+	}
+}
+
+float CVisualizerAnalyzer::BandEdgeHz(float T)
+{
+	static constexpr float s_aBandEdges[7] = {20.0f, 220.0f, 520.0f, 1200.0f, 2800.0f, 7000.0f, 17000.0f};
+	T = std::clamp(T, 0.0f, 1.0f);
+	const float Pos = T * 6.0f;
+	const int Seg = std::clamp((int)Pos, 0, 5);
+	const float Frac = std::clamp(Pos - (float)Seg, 0.0f, 1.0f);
+	const float A = logf(maximum(1.0f, s_aBandEdges[Seg]));
+	const float B = logf(maximum(1.0f, s_aBandEdges[Seg + 1]));
+	return expf(A + (B - A) * Frac);
+}
+
+float CVisualizerAnalyzer::BandEq(float BandT)
+{
+	static constexpr float s_aBandEq[6] = {1.08f, 1.06f, 1.02f, 1.10f, 1.40f, 1.58f};
+	BandT = std::clamp(BandT, 0.0f, 1.0f);
+	const float Pos = BandT * 5.0f;
+	const int Seg = std::clamp((int)Pos, 0, 4);
+	const float Frac = std::clamp(Pos - (float)Seg, 0.0f, 1.0f);
+	return mix(s_aBandEq[Seg], s_aBandEq[minimum(Seg + 1, 5)], Frac);
 }
 
 int CVisualizerAnalyzer::ResolveMainFftSize(int SampleRate)
@@ -102,8 +96,21 @@ void CVisualizerAnalyzer::Configure(const SVisualizerConfig &Config)
 	Sanitized.m_BassSplitHz = std::clamp(Sanitized.m_BassSplitHz, Sanitized.m_LowCutHz, Sanitized.m_HighCutHz);
 	Sanitized.m_NoiseReduction = std::clamp(Sanitized.m_NoiseReduction, 0.0f, 0.99f);
 	Sanitized.m_Sensitivity = maximum(0.05f, Sanitized.m_Sensitivity);
+
+	const bool PlanChanged =
+		m_MainFftSize == 0 ||
+		Sanitized.m_SampleRate != m_Config.m_SampleRate ||
+		Sanitized.m_BandCount != m_Config.m_BandCount ||
+		Sanitized.m_LowCutHz != m_Config.m_LowCutHz ||
+		Sanitized.m_HighCutHz != m_Config.m_HighCutHz ||
+		Sanitized.m_BassSplitHz != m_Config.m_BassSplitHz;
+
 	m_Config = Sanitized;
-	RebuildPlan();
+	if(PlanChanged)
+	{
+		ResetBandState();
+		RebuildPlan();
+	}
 }
 
 void CVisualizerAnalyzer::RebuildPlan()
@@ -317,52 +324,178 @@ void CVisualizerAnalyzer::Analyze(SVisualizerFrame &OutFrame)
 	OutFrame.m_BackendStatus = EVisualizerBackendStatus::LIVE;
 	OutFrame.m_IsPassiveFallback = false;
 	OutFrame.m_SampleRate = m_Config.m_SampleRate;
-	if(m_vRingBuffer.empty())
-		return;
 
-	CopyLatestSamples(m_vMainSamples.data(), m_MainFftSize);
-	CopyLatestSamples(m_vBassSamples.data(), m_BassFftSize);
-
-	float Peak = 0.0f;
-	double RmsAccum = 0.0;
-	for(int i = 0; i < m_MainFftSize; ++i)
+	const int BandCount = std::clamp(m_Config.m_BandCount, 1, MAX_VISUALIZER_BANDS);
+	const int AnalyzeWindow = m_MainFftSize;
+	if(m_vRingBuffer.empty() || AnalyzeWindow < 4)
 	{
-		const float Sample = m_vMainSamples[i];
-		Peak = maximum(Peak, absolute(Sample));
-		RmsAccum += (double)Sample * (double)Sample;
-		m_vMainBuffer[i] = std::complex<float>(Sample * m_vMainWindow[i], 0.0f);
+		FadeBandsToSilence(0.90f);
+		for(int Band = 0; Band < BandCount; ++Band)
+			OutFrame.m_aBands[Band] = m_aSmoothedBands[Band];
+		OutFrame.m_HasRealtimeSignal = false;
+		return;
 	}
-	for(int i = 0; i < m_BassFftSize; ++i)
-		m_vBassBuffer[i] = std::complex<float>(m_vBassSamples[i] * m_vBassWindow[i], 0.0f);
+
+	CopyLatestSamples(m_vMainSamples.data(), AnalyzeWindow);
+
+	float Mean = 0.0f;
+	for(int i = 0; i < AnalyzeWindow; ++i)
+		Mean += m_vMainSamples[i];
+	Mean /= (float)AnalyzeWindow;
+
+	float InputEnergy = 0.0f;
+	float Peak = 0.0f;
+	for(int i = 0; i < AnalyzeWindow; ++i)
+	{
+		const float Sample = m_vMainSamples[i] - Mean;
+		Peak = maximum(Peak, absolute(Sample));
+		InputEnergy += Sample * Sample;
+		const float WindowMul = 0.5f - 0.5f * cosf((2.0f * PI * i) / maximum(1, AnalyzeWindow - 1));
+		m_vMainBuffer[i] = std::complex<float>(Sample * WindowMul, 0.0f);
+	}
+	for(int i = AnalyzeWindow; i < m_MainFftSize; ++i)
+		m_vMainBuffer[i] = std::complex<float>(0.0f, 0.0f);
+
+	const float InputRms = sqrtf(InputEnergy / (float)AnalyzeWindow);
+	OutFrame.m_Peak = Peak;
+	OutFrame.m_Rms = InputRms;
+
+	constexpr float AUDIBLE_INPUT_RMS_THRESHOLD = 0.00018f;
+	if(InputRms < AUDIBLE_INPUT_RMS_THRESHOLD)
+	{
+		m_aSmoothedBands.fill(0.0f);
+		OutFrame.m_HasRealtimeSignal = false;
+		return;
+	}
+
+	if(InputRms > m_BandEnergyPeak)
+		m_BandEnergyPeak = m_BandEnergyPeak * 0.88f + InputRms * 0.12f;
+	else
+		m_BandEnergyPeak = m_BandEnergyPeak * 0.995f + InputRms * 0.005f;
+	m_BandEnergyPeak = std::clamp(m_BandEnergyPeak, 1e-6f, 0.25f);
+	// Slight headroom for quieter loopback levels without flattening all bars.
+	const float GlobalRmsGain = std::clamp(0.018f / m_BandEnergyPeak, 0.35f, 4.5f);
 
 	RunFft(m_vMainBuffer, m_vMainTwiddles, m_vMainBitReverse);
-	RunFft(m_vBassBuffer, m_vBassTwiddles, m_vBassBitReverse);
 
-	OutFrame.m_Peak = Peak;
-	OutFrame.m_Rms = sqrtf((float)(RmsAccum / maximum(1, m_MainFftSize)));
-	for(int Band = 0; Band < m_Config.m_BandCount; ++Band)
+	const float SampleRate = (float)m_Config.m_SampleRate;
+	const float BinHz = SampleRate / (float)AnalyzeWindow;
+	std::array<float, MAX_VISUALIZER_BANDS> aBandNormalized{};
+	std::array<float, MAX_VISUALIZER_BANDS> aBandClean{};
+	aBandNormalized.fill(0.0f);
+	aBandClean.fill(0.0f);
+
+	for(int Band = 0; Band < BandCount; ++Band)
 	{
-		const bool IsBass = Band < m_BassBandCount;
-		const int Lower = IsBass ? m_vBassLowerCutOff[Band] : m_vMainLowerCutOff[Band];
-		const int Upper = IsBass ? m_vBassUpperCutOff[Band] : m_vMainUpperCutOff[Band];
-		float MagnitudeSum = 0.0f;
-		float PeakMagnitude = 0.0f;
-		for(int Bin = Lower; Bin <= Upper; ++Bin)
+		const float T0 = Band / (float)BandCount;
+		const float T1 = (Band + 1) / (float)BandCount;
+		const float FMin = maximum(BandEdgeHz(T0), BinHz);
+		const float FMax = minimum(BandEdgeHz(T1), SampleRate * 0.49f);
+		if(FMax <= FMin)
+			continue;
+
+		const int KMin = std::clamp((int)floorf(FMin / BinHz), 1, AnalyzeWindow / 2 - 1);
+		const int KMax = std::clamp((int)ceilf(FMax / BinHz), KMin, AnalyzeWindow / 2 - 1);
+		const float Center = (FMin + FMax) * 0.5f;
+		const float Half = maximum(1.0f, (FMax - FMin) * 0.5f);
+		float WeightedPower = 0.0f;
+		float WeightSum = 0.0f;
+		for(int K = KMin; K <= KMax; ++K)
 		{
-			const std::complex<float> Value = IsBass ? m_vBassBuffer[Bin] : m_vMainBuffer[Bin];
-			const float BinMagnitude = std::abs(Value);
-			MagnitudeSum += BinMagnitude;
-			PeakMagnitude = maximum(PeakMagnitude, BinMagnitude);
+			const float Freq = K * BinHz;
+			const float DistNorm = absolute(Freq - Center) / Half;
+			const float Weight = maximum(0.15f, 1.0f - DistNorm);
+			const float Mag = std::abs(m_vMainBuffer[K]) * (2.0f / (float)AnalyzeWindow);
+			const float Power = Mag * Mag;
+			WeightedPower += Power * Weight;
+			WeightSum += Weight;
 		}
-		float Magnitude = (MagnitudeSum + PeakMagnitude * 0.35f) / maximum(1.0f, (float)(IsBass ? m_BassFftSize : m_MainFftSize));
-		if(!std::isfinite(Magnitude))
-			Magnitude = 0.0f;
-		OutFrame.m_aBands[Band] = maximum(0.0f, Magnitude * m_vEq[Band]);
+		if(WeightSum <= 0.0f)
+			continue;
+
+		const float Level = sqrtf(WeightedPower / WeightSum);
+		float &Noise = m_aNoiseFloor[Band];
+		if(Level < Noise)
+			Noise = Noise * 0.92f + Level * 0.08f;
+		else
+			Noise = Noise * 0.998f + Level * 0.002f;
+
+		const float Clean = maximum(0.0f, (Level - Noise * 1.25f) * GlobalRmsGain);
+		aBandClean[Band] = Clean;
+
+		float &BandPeak = m_aBandPeak[Band];
+		if(Clean > BandPeak)
+			BandPeak = Clean;
+		else
+			BandPeak = BandPeak * 0.9985f + Clean * 0.0015f;
+		BandPeak = maximum(BandPeak, 1e-5f);
+
+		const float Normalized = std::clamp(Clean / BandPeak, 0.0f, 1.0f);
+		aBandNormalized[Band] = powf(Normalized, 0.62f);
 	}
 
-	const float SignalThreshold = 0.0032f / m_Config.m_Sensitivity;
-	const float PeakThreshold = 0.0085f / m_Config.m_Sensitivity;
-	OutFrame.m_HasRealtimeSignal = OutFrame.m_Rms >= SignalThreshold || OutFrame.m_Peak >= PeakThreshold;
+	float SumClean = 0.0f;
+	for(int Band = 0; Band < BandCount; ++Band)
+		SumClean += aBandClean[Band];
+	if(SumClean > 1e-8f)
+	{
+		const float InvSum = 1.0f / SumClean;
+		for(int Band = 0; Band < BandCount; ++Band)
+		{
+			const float BandT = BandCount > 1 ? Band / (float)(BandCount - 1) : 0.0f;
+			const float Share = std::clamp((aBandClean[Band] * InvSum) * (float)BandCount, 0.0f, 1.35f);
+			const float ShareWeighted = powf(Share, 0.78f);
+			const float MixVal = aBandNormalized[Band] * 0.74f + ShareWeighted * 0.26f;
+			aBandNormalized[Band] = std::clamp(MixVal * BandEq(BandT), 0.0f, 1.0f);
+		}
+	}
+
+	if(BandCount >= 3)
+	{
+		const float Bass = aBandClean[0];
+		const float LowMid = aBandClean[1] + aBandClean[2];
+		if(Bass > 0.0f && LowMid > 0.0f)
+		{
+			const float Dominance = Bass / LowMid;
+			const float Damp = std::clamp((Dominance - 1.08f) * 0.34f, 0.0f, 0.40f);
+			aBandNormalized[1] *= (1.0f - Damp);
+		}
+	}
+
+	std::array<float, MAX_VISUALIZER_BANDS> aBandCrossSmoothed{};
+	aBandCrossSmoothed.fill(0.0f);
+	for(int Band = 0; Band < BandCount; ++Band)
+	{
+		const float Prev = aBandNormalized[Band > 0 ? Band - 1 : Band];
+		const float Curr = aBandNormalized[Band];
+		const float Next = aBandNormalized[Band + 1 < BandCount ? Band + 1 : Band];
+		aBandCrossSmoothed[Band] = Prev * 0.06f + Curr * 0.88f + Next * 0.06f;
+	}
+
+	if(BandCount >= 2)
+	{
+		float OthersSum = 0.0f;
+		for(int Band = 1; Band < BandCount; ++Band)
+			OthersSum += aBandCrossSmoothed[Band];
+		const float OthersMean = OthersSum / (float)(BandCount - 1);
+		const float BassLimit = OthersMean > 0.03f ? (OthersMean * 3.20f + 0.22f) : 1.00f;
+		if(aBandCrossSmoothed[0] > BassLimit)
+			aBandCrossSmoothed[0] = BassLimit + (aBandCrossSmoothed[0] - BassLimit) * 0.85f;
+	}
+
+	for(int Band = 0; Band < BandCount; ++Band)
+	{
+		const float BandT = BandCount > 1 ? Band / (float)(BandCount - 1) : 0.0f;
+		const float BandGain = Band == 0 ? 1.20f : (BandT <= 0.55f ? 1.22f : 1.30f);
+		const float Target = std::clamp(aBandCrossSmoothed[Band] * BandGain, 0.0f, 1.0f);
+		const float Attack = 0.86f;
+		const float Release = 0.30f;
+		const float Blend = Target > m_aSmoothedBands[Band] ? Attack : Release;
+		m_aSmoothedBands[Band] += (Target - m_aSmoothedBands[Band]) * Blend;
+		OutFrame.m_aBands[Band] = std::clamp(m_aSmoothedBands[Band], 0.0f, 1.0f);
+	}
+
+	OutFrame.m_HasRealtimeSignal = true;
 }
 
 void BuildRenderBars(const SVisualizerFrame &Frame, float *pOutBars, int RequestedBarCount)
@@ -373,23 +506,23 @@ void BuildRenderBars(const SVisualizerFrame &Frame, float *pOutBars, int Request
 	for(int i = 0; i < RequestedBarCount; ++i)
 		pOutBars[i] = 0.0f;
 
-	if(RequestedBarCount == 5)
-	{
-		for(int Bar = 0; Bar < RequestedBarCount; ++Bar)
-		{
-			const SCompactBarRange &Range = gs_aCompactBarRanges[Bar];
-			pOutBars[Bar] = ComputeRenderBarValue(Frame, (float)Range.m_Start, (float)Range.m_End, Range.m_Emphasis, RequestedBarCount);
-		}
-		return;
-	}
-
+	RequestedBarCount = std::clamp(RequestedBarCount, 1, MAX_VISUALIZER_BANDS);
 	for(int Bar = 0; Bar < RequestedBarCount; ++Bar)
 	{
-		const float Start = (float)Bar * MAX_VISUALIZER_BANDS / RequestedBarCount;
-		const float End = (float)(Bar + 1) * MAX_VISUALIZER_BANDS / RequestedBarCount;
-		const float BarT = RequestedBarCount > 1 ? Bar / (float)(RequestedBarCount - 1) : 0.0f;
-		const float Emphasis = 1.28f - 0.38f * BarT;
-		pOutBars[Bar] = ComputeRenderBarValue(Frame, Start, End, Emphasis, RequestedBarCount);
+		const int Start = (Bar * MAX_VISUALIZER_BANDS) / RequestedBarCount;
+		const int End = maximum(Start + 1, ((Bar + 1) * MAX_VISUALIZER_BANDS) / RequestedBarCount);
+		float Sum = 0.0f;
+		float Peak = 0.0f;
+		int Count = 0;
+		for(int Band = Start; Band < End; ++Band)
+		{
+			const float Value = Frame.m_aBands[Band];
+			Sum += Value;
+			Peak = maximum(Peak, Value);
+			++Count;
+		}
+		const float Average = Count > 0 ? Sum / (float)Count : 0.0f;
+		pOutBars[Bar] = std::clamp(Average * 0.40f + Peak * 0.60f, 0.0f, 1.0f);
 	}
 }
 

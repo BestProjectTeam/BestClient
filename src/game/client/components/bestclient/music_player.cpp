@@ -76,6 +76,13 @@ namespace
 	static constexpr int64_t MUSIC_ART_TEXTURE_UPLOAD_BUDGET_US = 1500;
 	static constexpr int MUSIC_ART_MAX_TEXTURE_UPLOADS_PER_FRAME = 1;
 	static constexpr int MUSIC_PLAYER_MAX_VISUALIZER_BARS = 12;
+	static constexpr int COVER_BAR_SEGMENTS = 10;
+	static constexpr size_t COVER_TINT_TARGET_SAMPLES = 4096u;
+	static constexpr int COVER_BAR_TINT_X_SAMPLES = 18;
+	static constexpr int COVER_BAR_TINT_Y_SAMPLES = 28;
+	static constexpr float VISUALIZER_ATTACK_RATE = 46.0f;
+	static constexpr float VISUALIZER_RELEASE_RATE = 19.0f;
+	static constexpr int COVER_BAR_TINT_CELLS = MUSIC_PLAYER_MAX_VISUALIZER_BARS * COVER_BAR_SEGMENTS;
 
 	static CUIRect HudToUiRect(const CUIRect &HudRect, const CUIRect &UiScreen, float HudWidth, float HudHeight)
 	{
@@ -1325,6 +1332,15 @@ namespace
 		bool m_Neutral = true;
 	};
 
+	struct SCoverTintResult
+	{
+		ColorRGBA m_CoverTint = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
+		std::array<ColorRGBA, COVER_BAR_TINT_CELLS> m_aBarTint{};
+		int m_BarCount = 0;
+		bool m_HasCoverTint = false;
+		bool m_HasBarTint = false;
+	};
+
 	struct SMusicPlayerMetrics
 	{
 		float m_Scale = 1.0f;
@@ -1341,7 +1357,8 @@ namespace
 
 	static bool MusicPlayerMiniMode()
 	{
-		return g_Config.m_BcMusicPlayerSizeMode == 1;
+		// Normal size mode removed — player is always mini.
+		return true;
 	}
 
 	static bool MusicPlayerCoverEnabled()
@@ -1392,12 +1409,13 @@ namespace
 
 	static float MusicPlayerVisualizerGap(bool MiniMode, float Scale, float WidthScale)
 	{
-		return (MiniMode ? 0.52f : 0.74f) * Scale * WidthScale * MusicPlayerVisualizerGapScale();
+		// Same gap for Soft and Cube (Cube = Soft without rounding).
+		return (MiniMode ? 0.48f : 0.70f) * Scale * WidthScale * MusicPlayerVisualizerGapScale() + 0.40f * Scale * WidthScale;
 	}
 
 	static float MusicPlayerVisualizerBarWidth(bool MiniMode, float Scale, float WidthScale)
 	{
-		return (MiniMode ? 1.49f : 1.31f) * Scale * WidthScale * MusicPlayerVisualizerColumnWidthScale();
+		return (MiniMode ? 1.65f : 1.55f) * Scale * WidthScale * MusicPlayerVisualizerColumnWidthScale();
 	}
 
 	static float MusicPlayerVisualizerWidth(bool MiniMode, float Scale, float WidthScale, float ExpandT)
@@ -1496,6 +1514,319 @@ namespace
 		return Color;
 	}
 
+	static void GetCenteredSquareCrop(int CoverW, int CoverH, int &OutCropX, int &OutCropY, int &OutCropSize)
+	{
+		OutCropSize = minimum(CoverW, CoverH);
+		OutCropX = maximum(0, (CoverW - OutCropSize) / 2);
+		OutCropY = maximum(0, (CoverH - OutCropSize) / 2);
+	}
+
+	static bool IsSoftVisualizerRounding()
+	{
+		return g_Config.m_BcMusicPlayerVisualizerRounding >= 100;
+	}
+
+	static bool IsTranslucentColorMode()
+	{
+		return g_Config.m_BcMusicPlayerColorMode == 2;
+	}
+
+	static bool IsCoverVisualizerColorMode()
+	{
+		return g_Config.m_BcMusicPlayerColorMode == 1;
+	}
+
+	static bool IsStaticVisualizerColorMode()
+	{
+		return g_Config.m_BcMusicPlayerColorMode == 0;
+	}
+
+	static SCoverTintResult ExtractCoverTints(const CImageInfo &Image, int BarCount)
+	{
+		SCoverTintResult Result;
+		BarCount = std::clamp(BarCount, 1, MUSIC_PLAYER_MAX_VISUALIZER_BARS);
+		Result.m_BarCount = BarCount;
+		Result.m_aBarTint.fill(ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));
+
+		if(Image.m_pData == nullptr || Image.m_Width <= 0 || Image.m_Height <= 0)
+			return Result;
+
+		const int CoverW = (int)Image.m_Width;
+		const int CoverH = (int)Image.m_Height;
+		int CropX = 0;
+		int CropY = 0;
+		int CropSize = 0;
+		GetCenteredSquareCrop(CoverW, CoverH, CropX, CropY, CropSize);
+		if(CropSize <= 0)
+			return Result;
+
+		const size_t PixelCount = (size_t)CropSize * (size_t)CropSize;
+		const size_t Step = maximum<size_t>(1u, PixelCount / COVER_TINT_TARGET_SAMPLES);
+
+		double SumR = 0.0;
+		double SumG = 0.0;
+		double SumB = 0.0;
+		double SumW = 0.0;
+
+		for(size_t Pixel = 0; Pixel < PixelCount; Pixel += Step)
+		{
+			const int X = CropX + (int)(Pixel % (size_t)CropSize);
+			const int Y = CropY + (int)(Pixel / (size_t)CropSize);
+			const ColorRGBA PixelColor = Image.PixelColor((size_t)X, (size_t)Y);
+			if(PixelColor.a < 0.2f)
+				continue;
+			const float R = PixelColor.r;
+			const float G = PixelColor.g;
+			const float B = PixelColor.b;
+			const float MaxC = maximum(R, maximum(G, B));
+			const float MinC = minimum(R, minimum(G, B));
+			const float Chroma = MaxC - MinC;
+			const float Luma = R * 0.2126f + G * 0.7152f + B * 0.0722f;
+			const float Weight = PixelColor.a * (0.35f + Chroma * 1.6f) * (0.45f + Luma * 0.55f);
+			SumR += R * Weight;
+			SumG += G * Weight;
+			SumB += B * Weight;
+			SumW += Weight;
+		}
+
+		if(SumW > 1e-7)
+		{
+			float TintR = (float)(SumR / SumW);
+			float TintG = (float)(SumG / SumW);
+			float TintB = (float)(SumB / SumW);
+			const float MaxTint = maximum(TintR, maximum(TintG, TintB));
+			if(MaxTint > 0.001f)
+			{
+				const float Boost = maximum(1.0f, 0.72f / MaxTint);
+				TintR = minimum(1.0f, TintR * Boost);
+				TintG = minimum(1.0f, TintG * Boost);
+				TintB = minimum(1.0f, TintB * Boost);
+			}
+			Result.m_CoverTint = ColorRGBA(TintR, TintG, TintB, 1.0f);
+			Result.m_HasCoverTint = true;
+		}
+
+		int ValidBarTints = 0;
+		for(int Bar = 0; Bar < BarCount; ++Bar)
+		{
+			const int X0 = CropX + (CropSize * Bar) / BarCount;
+			const int X1 = CropX + maximum((CropSize * Bar) / BarCount + 1, (CropSize * (Bar + 1)) / BarCount);
+			const int StepX = maximum(1, (X1 - X0) / COVER_BAR_TINT_X_SAMPLES);
+
+			for(int Seg = 0; Seg < COVER_BAR_SEGMENTS; ++Seg)
+			{
+				const int Y0 = CropY + (CropSize * Seg) / COVER_BAR_SEGMENTS;
+				const int Y1 = CropY + maximum((CropSize * Seg) / COVER_BAR_SEGMENTS + 1, (CropSize * (Seg + 1)) / COVER_BAR_SEGMENTS);
+				const int StepY = maximum(1, (Y1 - Y0) / COVER_BAR_TINT_Y_SAMPLES);
+
+				double BarSumR = 0.0;
+				double BarSumG = 0.0;
+				double BarSumB = 0.0;
+				double BarSumW = 0.0;
+
+				for(int y = Y0; y < Y1; y += StepY)
+				{
+					for(int x = X0; x < X1; x += StepX)
+					{
+						const ColorRGBA PixelColor = Image.PixelColor((size_t)x, (size_t)y);
+						if(PixelColor.a < 0.15f)
+							continue;
+
+						const float R = PixelColor.r;
+						const float G = PixelColor.g;
+						const float B = PixelColor.b;
+						const float MaxC = maximum(R, maximum(G, B));
+						const float MinC = minimum(R, minimum(G, B));
+						const float Chroma = MaxC - MinC;
+						const float Luma = R * 0.2126f + G * 0.7152f + B * 0.0722f;
+						const float Weight = PixelColor.a * (0.30f + Chroma * 1.55f) * (0.40f + Luma * 0.60f);
+						BarSumR += R * Weight;
+						BarSumG += G * Weight;
+						BarSumB += B * Weight;
+						BarSumW += Weight;
+					}
+				}
+
+				const int Cell = Bar * COVER_BAR_SEGMENTS + Seg;
+				if(BarSumW > 1e-7)
+				{
+					float BarR = (float)(BarSumR / BarSumW);
+					float BarG = (float)(BarSumG / BarSumW);
+					float BarB = (float)(BarSumB / BarSumW);
+					const float Gray = (BarR + BarG + BarB) / 3.0f;
+					const float SatBoost = 1.22f;
+					BarR = std::clamp(Gray + (BarR - Gray) * SatBoost, 0.0f, 1.0f);
+					BarG = std::clamp(Gray + (BarG - Gray) * SatBoost, 0.0f, 1.0f);
+					BarB = std::clamp(Gray + (BarB - Gray) * SatBoost, 0.0f, 1.0f);
+					Result.m_aBarTint[Cell] = ColorRGBA(BarR, BarG, BarB, 1.0f);
+					ValidBarTints++;
+				}
+				else
+				{
+					Result.m_aBarTint[Cell] = Result.m_CoverTint;
+				}
+			}
+		}
+
+		Result.m_HasBarTint = ValidBarTints >= 3;
+		return Result;
+	}
+
+	static void BuildVisualizerBarColors(
+		bool UseCoverColor,
+		bool HasCoverBarTint,
+		bool HasCoverTint,
+		int BarCount,
+		int SourceBarCount,
+		const std::array<ColorRGBA, COVER_BAR_TINT_CELLS> &aCoverBarTint,
+		const ColorRGBA &CoverTint,
+		std::array<ColorRGBA, COVER_BAR_TINT_CELLS> &aOutColors)
+	{
+		BarCount = std::clamp(BarCount, 1, MUSIC_PLAYER_MAX_VISUALIZER_BARS);
+		SourceBarCount = std::clamp(SourceBarCount, 1, MUSIC_PLAYER_MAX_VISUALIZER_BARS);
+		aOutColors.fill(ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));
+
+		if(!UseCoverColor || (!HasCoverBarTint && !HasCoverTint))
+			return;
+
+		std::array<ColorRGBA, COVER_BAR_TINT_CELLS> aMapped{};
+		aMapped.fill(CoverTint);
+		for(int Bar = 0; Bar < BarCount; ++Bar)
+		{
+			const int SrcBar = SourceBarCount <= 1 ? 0 : (Bar * (SourceBarCount - 1) + (BarCount - 1) / 2) / maximum(1, BarCount - 1);
+			for(int Seg = 0; Seg < COVER_BAR_SEGMENTS; ++Seg)
+			{
+				const int SrcCell = SrcBar * COVER_BAR_SEGMENTS + Seg;
+				const int DstCell = Bar * COVER_BAR_SEGMENTS + Seg;
+				ColorRGBA BaseColor = HasCoverBarTint ? aCoverBarTint[SrcCell] : CoverTint;
+				BaseColor.r = BaseColor.r * 0.60f + CoverTint.r * 0.40f;
+				BaseColor.g = BaseColor.g * 0.60f + CoverTint.g * 0.40f;
+				BaseColor.b = BaseColor.b * 0.60f + CoverTint.b * 0.40f;
+				aMapped[DstCell] = BaseColor;
+			}
+		}
+
+		for(int Bar = 0; Bar < BarCount; ++Bar)
+		{
+			const int Prev = Bar > 0 ? Bar - 1 : Bar;
+			const int Next = Bar + 1 < BarCount ? Bar + 1 : Bar;
+			for(int Seg = 0; Seg < COVER_BAR_SEGMENTS; ++Seg)
+			{
+				const ColorRGBA &P = aMapped[Prev * COVER_BAR_SEGMENTS + Seg];
+				const ColorRGBA &C = aMapped[Bar * COVER_BAR_SEGMENTS + Seg];
+				const ColorRGBA &N = aMapped[Next * COVER_BAR_SEGMENTS + Seg];
+				aOutColors[Bar * COVER_BAR_SEGMENTS + Seg] = ColorRGBA(
+					P.r * 0.22f + C.r * 0.56f + N.r * 0.22f,
+					P.g * 0.22f + C.g * 0.56f + N.g * 0.22f,
+					P.b * 0.22f + C.b * 0.56f + N.b * 0.22f,
+					1.0f);
+			}
+		}
+	}
+
+	static ColorRGBA BuildVisualizerBarDrawColor(
+		bool UseCoverColor,
+		bool HasCoverBarTint,
+		bool HasCoverTint,
+		const std::array<ColorRGBA, COVER_BAR_TINT_CELLS> &aVisualizerBarColors,
+		int CellIndex,
+		float ContentAlpha)
+	{
+		ColorRGBA BarColor(1.0f, 1.0f, 1.0f, 1.0f);
+		if(!UseCoverColor || (!HasCoverBarTint && !HasCoverTint))
+		{
+			BarColor.a = 0.8f * ContentAlpha;
+			return BarColor;
+		}
+
+		BarColor = aVisualizerBarColors[CellIndex];
+		const float Luma = BarColor.r * 0.2126f + BarColor.g * 0.7152f + BarColor.b * 0.0722f;
+		if(Luma < 0.50f)
+		{
+			const float Lift = 0.50f / maximum(0.001f, Luma);
+			BarColor.r = minimum(1.0f, BarColor.r * Lift);
+			BarColor.g = minimum(1.0f, BarColor.g * Lift);
+			BarColor.b = minimum(1.0f, BarColor.b * Lift);
+		}
+		const float BrightBoost = 1.10f;
+		BarColor.r = minimum(1.0f, BarColor.r * BrightBoost);
+		BarColor.g = minimum(1.0f, BarColor.g * BrightBoost);
+		BarColor.b = minimum(1.0f, BarColor.b * BrightBoost);
+		BarColor.a = 0.97f * ContentAlpha;
+		return BarColor;
+	}
+
+	static ColorRGBA AverageVisualizerBarColor(
+		bool UseCoverColor,
+		bool HasCoverBarTint,
+		bool HasCoverTint,
+		const std::array<ColorRGBA, COVER_BAR_TINT_CELLS> &aVisualizerBarColors,
+		int BarIndex,
+		float ContentAlpha)
+	{
+		ColorRGBA BarColor(0.0f, 0.0f, 0.0f, 0.0f);
+		for(int Seg = 0; Seg < COVER_BAR_SEGMENTS; ++Seg)
+		{
+			const ColorRGBA Cell = BuildVisualizerBarDrawColor(
+				UseCoverColor,
+				HasCoverBarTint,
+				HasCoverTint,
+				aVisualizerBarColors,
+				BarIndex * COVER_BAR_SEGMENTS + Seg,
+				ContentAlpha);
+			BarColor.r += Cell.r;
+			BarColor.g += Cell.g;
+			BarColor.b += Cell.b;
+			BarColor.a += Cell.a;
+		}
+		BarColor.r /= COVER_BAR_SEGMENTS;
+		BarColor.g /= COVER_BAR_SEGMENTS;
+		BarColor.b /= COVER_BAR_SEGMENTS;
+		BarColor.a /= COVER_BAR_SEGMENTS;
+		return BarColor;
+	}
+
+	static ColorRGBA ResolveVisualizerBarColor(
+		bool UseCoverColor,
+		bool UseStaticColor,
+		bool HasCoverBarTint,
+		bool HasCoverTint,
+		const std::array<ColorRGBA, COVER_BAR_TINT_CELLS> &aVisualizerBarColors,
+		int BarIndex,
+		float ContentAlpha)
+	{
+		if(UseCoverColor)
+		{
+			return AverageVisualizerBarColor(
+				true,
+				HasCoverBarTint,
+				HasCoverTint,
+				aVisualizerBarColors,
+				BarIndex,
+				ContentAlpha);
+		}
+
+		if(UseStaticColor)
+		{
+			ColorRGBA BarColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_BcMusicPlayerStaticColor));
+			const float Luma = BarColor.r * 0.2126f + BarColor.g * 0.7152f + BarColor.b * 0.0722f;
+			if(Luma < 0.50f)
+			{
+				const float Lift = 0.50f / maximum(0.001f, Luma);
+				BarColor.r = minimum(1.0f, BarColor.r * Lift);
+				BarColor.g = minimum(1.0f, BarColor.g * Lift);
+				BarColor.b = minimum(1.0f, BarColor.b * Lift);
+			}
+			BarColor.r = minimum(1.0f, BarColor.r * 1.10f);
+			BarColor.g = minimum(1.0f, BarColor.g * 1.10f);
+			BarColor.b = minimum(1.0f, BarColor.b * 1.10f);
+			BarColor.a = 0.97f * ContentAlpha;
+			return BarColor;
+		}
+
+		return ColorRGBA(1.0f, 1.0f, 1.0f, 0.80f * ContentAlpha);
+	}
+
 	static float RelativeLuminance(const ColorRGBA &Color)
 	{
 		return Color.r * 0.2126f + Color.g * 0.7152f + Color.b * 0.0722f;
@@ -1541,16 +1872,12 @@ namespace
 
 	static ColorRGBA MusicPlayerPanelColor(unsigned BackgroundColor, bool BackgroundEnabled, const SMusicPlayerPalette &Palette, float HoverT)
 	{
-		ColorRGBA LayoutColor = color_cast<ColorRGBA>(ColorHSLA(BackgroundColor, true));
-		if(!BackgroundEnabled)
-			LayoutColor = ColorRGBA(0.12f, 0.13f, 0.16f, 0.72f);
-
-		const bool TranslucentColorMode = g_Config.m_BcMusicPlayerColorMode == 3;
-		const bool CoverColorMode = g_Config.m_BcMusicPlayerColorMode == 1 || g_Config.m_BcMusicPlayerColorMode == 2;
-		const bool DominantColorMode = g_Config.m_BcMusicPlayerColorMode == 2;
-		const float PanelTintT = (DominantColorMode ? 0.72f : (CoverColorMode ? 0.62f : 0.50f)) - HoverT * (DominantColorMode ? 0.03f : 0.04f);
-		const ColorRGBA PanelTintColor = DominantColorMode ? MixColor(Palette.m_Mid, Palette.m_Dark, 0.58f) : (CoverColorMode ? MixColor(Palette.m_Mid, Palette.m_Dark, 0.40f) : Palette.m_Dark);
-		return TranslucentColorMode ? ColorRGBA(0.0f, 0.0f, 0.0f, 0.4f) : WithAlpha(MixColor(LayoutColor, PanelTintColor, PanelTintT), maximum(LayoutColor.a, 0.90f));
+		(void)BackgroundColor;
+		(void)BackgroundEnabled;
+		(void)Palette;
+		(void)HoverT;
+		// Panel always matches translucent mode regardless of visualizer color mode.
+		return ColorRGBA(0.0f, 0.0f, 0.0f, 0.4f);
 	}
 
 	static ColorRGBA DesaturateColor(const ColorRGBA &Color, float Amount)
@@ -1594,18 +1921,15 @@ namespace
 			return Palette;
 		}
 
-		const bool DominantColorMode = g_Config.m_BcMusicPlayerColorMode == 2;
-		const float BaseDesaturation = DominantColorMode ?
-						       (0.04f + (1.0f - Analysis.m_Saturation) * 0.10f) :
-						       (0.10f + (1.0f - Analysis.m_Saturation) * 0.18f);
+		const float BaseDesaturation = 0.10f + (1.0f - Analysis.m_Saturation) * 0.18f;
 		ColorRGBA Base = DesaturateColor(ClampColor(Analysis.m_Base), BaseDesaturation);
-		const float LightLuma = std::clamp((DominantColorMode ? 0.24f : 0.26f) + Analysis.m_Saturation * (DominantColorMode ? 0.11f : 0.12f), 0.20f, 0.38f);
-		const float MidLuma = std::clamp(LightLuma * (DominantColorMode ? 0.48f : 0.56f), 0.10f, 0.21f);
-		const float DarkLuma = std::clamp(MidLuma * (DominantColorMode ? 0.36f : 0.44f), 0.04f, 0.10f);
+		const float LightLuma = std::clamp(0.26f + Analysis.m_Saturation * 0.12f, 0.20f, 0.38f);
+		const float MidLuma = std::clamp(LightLuma * 0.56f, 0.10f, 0.21f);
+		const float DarkLuma = std::clamp(MidLuma * 0.44f, 0.04f, 0.10f);
 		Palette.m_Light = SetColorLuminance(Base, LightLuma);
 		Palette.m_Mid = SetColorLuminance(Base, MidLuma);
 		Palette.m_Dark = SetColorLuminance(Base, DarkLuma);
-		Palette.m_Glow = SetColorLuminance(DesaturateColor(Base, DominantColorMode ? 0.12f : 0.18f), std::clamp(LightLuma + 0.03f, 0.22f, 0.38f));
+		Palette.m_Glow = SetColorLuminance(DesaturateColor(Base, 0.18f), std::clamp(LightLuma + 0.03f, 0.22f, 0.38f));
 		return Palette;
 	}
 
@@ -1622,19 +1946,17 @@ namespace
 
 	static ColorRGBA DefaultPreviewAccentForColorMode(int ColorMode)
 	{
-		if(ColorMode == 2)
+		if(ColorMode == 1)
 			return ColorRGBA(0.18f, 0.68f, 0.52f, 1.0f);
 		return ColorRGBA(0.34f, 0.53f, 0.79f, 1.0f);
 	}
 
 	static ColorRGBA SelectMusicPlayerAccent(const SArtworkColorAnalysis &Analysis)
 	{
-		if(g_Config.m_BcMusicPlayerColorMode == 0)
+		if(IsStaticVisualizerColorMode())
 			return color_cast<ColorRGBA>(ColorHSLA(g_Config.m_BcMusicPlayerStaticColor));
 		if(!Analysis.m_Valid)
 			return DefaultPreviewAccentForColorMode(g_Config.m_BcMusicPlayerColorMode);
-		if(g_Config.m_BcMusicPlayerColorMode == 2)
-			return Analysis.m_Dominant;
 		return Analysis.m_Base;
 	}
 
@@ -1843,21 +2165,21 @@ namespace
 		Metrics.m_WidthScale = Width / maximum(HudLayout::CANVAS_WIDTH, 0.001f);
 		if(MiniMode)
 		{
-			const float TitleFont = 5.8f * Metrics.m_Scale * TextScale;
+			const float TitleFont = 6.0f * Metrics.m_Scale * TextScale;
 			const float PadX = 2.35f * Metrics.m_Scale * Metrics.m_WidthScale;
-			const float PadY = 1.55f * Metrics.m_Scale;
+			const float PadY = 1.5f * Metrics.m_Scale;
 			const float CoverGap = ShowCover ? 1.35f * Metrics.m_Scale * Metrics.m_WidthScale : 0.0f;
 			const float VisualGap = 1.25f * Metrics.m_Scale * Metrics.m_WidthScale;
 			const float VisualW = MusicPlayerVisualizerWidth(true, Metrics.m_Scale, Metrics.m_WidthScale, 0.0f);
-			Metrics.m_CompactH = maximum(10.8f * Metrics.m_Scale, TitleFont + PadY * 2.0f);
-			const float ArtSize = ShowCover ? maximum(0.0f, Metrics.m_CompactH - PadY * 2.0f) : 0.0f;
+			Metrics.m_CompactH = maximum(9.0f * Metrics.m_Scale, TitleFont + PadY * 2.0f);
+			const float ArtSize = ShowCover ? maximum(0.0f, Metrics.m_CompactH - 1.7f * Metrics.m_Scale) : 0.0f;
 			const float DesiredWidth = PadX * 2.0f + DisplayedTextSlotWidth + VisualGap + VisualW + ArtSize + CoverGap;
 			Metrics.m_CompactW = minimum(Width, maximum(18.0f * Metrics.m_Scale * Metrics.m_WidthScale, DesiredWidth));
 		}
 		else
 		{
 			Metrics.m_CompactH = 15.5f * Metrics.m_Scale;
-			const float CompactArtSize = ShowCover ? minimum(Metrics.m_CompactH - 3.0f * Metrics.m_Scale, 11.6f * Metrics.m_Scale) : 0.0f;
+			const float CompactArtSize = ShowCover ? minimum(Metrics.m_CompactH - 1.6f * Metrics.m_Scale, 13.0f * Metrics.m_Scale) : 0.0f;
 			const float CompactVisualW = MusicPlayerVisualizerWidth(false, Metrics.m_Scale, Metrics.m_WidthScale, 0.0f);
 			const float CompactOuterPad = 2.5f * Metrics.m_Scale * Metrics.m_WidthScale;
 			const float CompactInnerGap = 1.15f * Metrics.m_Scale * Metrics.m_WidthScale;
@@ -1867,7 +2189,7 @@ namespace
 
 		Metrics.m_ExpandedH = 25.0f * Metrics.m_Scale;
 		const float ExpandedBaseW = 104.0f * Metrics.m_Scale * Metrics.m_WidthScale;
-		const float ExpandedArtSize = ShowCover ? minimum(Metrics.m_ExpandedH - 3.0f * Metrics.m_Scale, 11.8f * Metrics.m_Scale + 1.8f * Metrics.m_Scale) : 0.0f;
+		const float ExpandedArtSize = ShowCover ? minimum(Metrics.m_ExpandedH - 1.6f * Metrics.m_Scale, 13.2f * Metrics.m_Scale + 2.2f * Metrics.m_Scale) : 0.0f;
 		const float ExpandedTextLeftInset = 1.7f * Metrics.m_Scale * Metrics.m_WidthScale + ExpandedArtSize + (ShowCover ? (0.1f + 1.15f) * Metrics.m_Scale * Metrics.m_WidthScale : 0.0f);
 		const float ExpandedVisualW = MusicPlayerVisualizerWidth(false, Metrics.m_Scale, Metrics.m_WidthScale, 1.0f);
 		const float ExpandedTextRightInset = (1.95f + 1.15f) * Metrics.m_Scale * Metrics.m_WidthScale + ExpandedVisualW;
@@ -2130,12 +2452,18 @@ public:
 	int m_ArtHeight = 0;
 	int64_t m_ArtAnimationStart = 0;
 	std::array<float, VISUALIZER_BARS> m_aVisualizerLevels{};
-	float m_VisualizerRollingPeak = 0.05f;
 	float m_CompactTextSlotWidthAnim = 0.0f;
 	CMusicPlayer::SHudReservation m_HudReservation;
 	SMusicPlayerPalette m_Palette = DefaultMusicPlayerPalette();
 	ColorRGBA m_Accent = DefaultMusicPlayerAccent();
 	SArtworkColorAnalysis m_LastArtAnalysis;
+	ColorRGBA m_CoverTint = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
+	std::array<ColorRGBA, COVER_BAR_TINT_CELLS> m_aCoverBarTint{};
+	std::array<ColorRGBA, COVER_BAR_TINT_CELLS> m_aVisualizerBarColors{};
+	int m_CoverTintBarCount = 0;
+	bool m_HasCoverTint = false;
+	bool m_HasCoverBarTint = false;
+	bool m_VisualizerBarColorsInitialized = false;
 	int m_LastAppliedColorMode = -1;
 	unsigned m_LastAppliedStaticColor = 0;
 	bool m_DebugLastProviderValid = false;
@@ -2150,6 +2478,8 @@ public:
 	CImpl()
 	{
 		m_aVisualizerLevels.fill(0.18f);
+		m_aCoverBarTint.fill(ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));
+		m_aVisualizerBarColors.fill(ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));
 		m_VisualizerData.m_IsPassiveFallback = true;
 		m_VisualizerData.m_BackendStatus = BestClientVisualizer::EVisualizerBackendStatus::FALLBACK;
 #if defined(CONF_PLATFORM_LINUX)
@@ -2175,7 +2505,6 @@ public:
 		m_VisualPositionMs = 0.0f;
 		m_VisualTrackKey.clear();
 		m_aVisualizerLevels.fill(0.18f);
-		m_VisualizerRollingPeak = 0.05f;
 		m_CompactTextSlotWidthAnim = 0.0f;
 		m_HudReservation = CMusicPlayer::SHudReservation();
 		m_DebugLastRenderPath.clear();
@@ -2301,6 +2630,55 @@ public:
 		}
 	}
 
+	void ClearCoverVisualizerTints()
+	{
+		m_CoverTint = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
+		m_aCoverBarTint.fill(ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));
+		m_aVisualizerBarColors.fill(ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));
+		m_CoverTintBarCount = 0;
+		m_HasCoverTint = false;
+		m_HasCoverBarTint = false;
+		m_VisualizerBarColorsInitialized = false;
+	}
+
+	void ApplyCoverVisualizerTints(const CImageInfo &Image)
+	{
+		const SCoverTintResult Result = ExtractCoverTints(Image, MUSIC_PLAYER_MAX_VISUALIZER_BARS);
+		m_CoverTint = Result.m_CoverTint;
+		m_aCoverBarTint = Result.m_aBarTint;
+		m_CoverTintBarCount = Result.m_BarCount;
+		m_HasCoverTint = Result.m_HasCoverTint;
+		m_HasCoverBarTint = Result.m_HasBarTint;
+		m_VisualizerBarColorsInitialized = false;
+	}
+
+	const std::array<ColorRGBA, COVER_BAR_TINT_CELLS> &UpdateVisualizerBarColors(int BarCount, float FrameTime, bool UseCoverColor)
+	{
+		BarCount = std::clamp(BarCount, 1, VISUALIZER_BARS);
+		std::array<ColorRGBA, COVER_BAR_TINT_CELLS> aTargetColors{};
+		BuildVisualizerBarColors(
+			UseCoverColor,
+			m_HasCoverBarTint,
+			m_HasCoverTint,
+			BarCount,
+			maximum(1, m_CoverTintBarCount),
+			m_aCoverBarTint,
+			m_CoverTint,
+			aTargetColors);
+
+		if(!m_VisualizerBarColorsInitialized)
+		{
+			m_aVisualizerBarColors = aTargetColors;
+			m_VisualizerBarColorsInitialized = true;
+			return m_aVisualizerBarColors;
+		}
+
+		const float Blend = 1.0f - std::exp(-FrameTime * 4.0f);
+		for(size_t i = 0; i < m_aVisualizerBarColors.size(); ++i)
+			m_aVisualizerBarColors[i] = MixColor(m_aVisualizerBarColors[i], aTargetColors[i], Blend);
+		return m_aVisualizerBarColors;
+	}
+
 	void ResetArtwork(IGraphics *pGraphics)
 	{
 		if(m_pArtRequest)
@@ -2322,6 +2700,7 @@ public:
 		m_ArtHeight = 0;
 		m_ArtAnimationStart = 0;
 		m_LastArtAnalysis = SArtworkColorAnalysis();
+		ClearCoverVisualizerTints();
 		m_Palette = DefaultMusicPlayerPalette();
 		m_Accent = DefaultMusicPlayerAccent();
 	}
@@ -2399,14 +2778,17 @@ public:
 
 				if(!m_OptArtDecodedFrames->m_vFrames.empty())
 				{
-					const SArtworkColorAnalysis Analysis = AnalyzeArtworkBaseColor(m_OptArtDecodedFrames->m_vFrames.front().m_Image);
+					const CImageInfo &ArtImage = m_OptArtDecodedFrames->m_vFrames.front().m_Image;
+					const SArtworkColorAnalysis Analysis = AnalyzeArtworkBaseColor(ArtImage);
 					m_LastArtAnalysis = Analysis;
 					m_Accent = SelectMusicPlayerAccent(Analysis);
 					m_Palette = BuildPaletteFromAccent(m_Accent);
+					ApplyCoverVisualizerTints(ArtImage);
 				}
 				else
 				{
 					m_LastArtAnalysis = SArtworkColorAnalysis();
+					ClearCoverVisualizerTints();
 					m_Palette = DefaultMusicPlayerPalette();
 					m_Accent = DefaultMusicPlayerAccent();
 				}
@@ -2420,6 +2802,7 @@ public:
 				m_ArtAnimated = false;
 				m_ArtAnimationStart = 0;
 				m_LastArtAnalysis = SArtworkColorAnalysis();
+				ClearCoverVisualizerTints();
 				m_Palette = DefaultMusicPlayerPalette();
 				m_Accent = DefaultMusicPlayerAccent();
 				MediaDecoder::UnloadFrames(pOwner->Graphics(), m_vArtFrames);
@@ -2463,6 +2846,7 @@ public:
 				m_ArtWidth = 0;
 				m_ArtHeight = 0;
 				m_LastArtAnalysis = SArtworkColorAnalysis();
+				ClearCoverVisualizerTints();
 				m_Palette = DefaultMusicPlayerPalette();
 				m_Accent = DefaultMusicPlayerAccent();
 				return;
@@ -2501,6 +2885,7 @@ public:
 		m_ArtHeight = 0;
 		m_ArtAnimationStart = 0;
 		m_LastArtAnalysis = SArtworkColorAnalysis();
+		ClearCoverVisualizerTints();
 		m_Palette = DefaultMusicPlayerPalette();
 		m_Accent = DefaultMusicPlayerAccent();
 		m_LastArtKey = m_Snapshot.m_Art.m_Key;
@@ -2691,8 +3076,7 @@ public:
 		RequestedBars = std::clamp(RequestedBars, 2, VISUALIZER_BARS);
 
 		const float Smoothing = std::clamp(g_Config.m_BcMusicPlayerVisualizerSmoothing / 100.0f, 0.0f, 1.0f);
-		const float AttackSpeed = mix(34.0f, 16.0f, Smoothing);
-		const float ReleaseSpeed = mix(18.0f, 7.5f, Smoothing);
+		const float FallbackReleaseSpeed = mix(18.0f, 7.5f, Smoothing);
 		const bool UseRealtimeVisualizer =
 			Snapshot.m_PlaybackState == EMusicPlaybackState::PLAYING &&
 			Snapshot.m_HasVisualizer &&
@@ -2703,34 +3087,40 @@ public:
 			std::array<float, VISUALIZER_BARS> aTarget{};
 			BestClientVisualizer::BuildRenderBars(Snapshot.m_Visualizer, aTarget.data(), RequestedBars);
 
-			// Soft auto-gain: track rolling peak to keep bars visible at any volume
-			float PeakBar = 0.0f;
-			for(int i = 0; i < RequestedBars; ++i)
-				PeakBar = maximum(PeakBar, aTarget[i]);
-			const float PeakFloor = 0.02f;
-			if(PeakBar > m_VisualizerRollingPeak)
-				m_VisualizerRollingPeak = ApproachAnim(m_VisualizerRollingPeak, PeakBar, Delta, 10.0f);
-			else
-				m_VisualizerRollingPeak = ApproachAnim(m_VisualizerRollingPeak, maximum(PeakBar, PeakFloor), Delta, 2.0f);
-			const float BoostFactor = std::clamp(0.72f / maximum(m_VisualizerRollingPeak, 0.015f), 1.0f, 20.0f);
-			for(int i = 0; i < RequestedBars; ++i)
-				aTarget[i] = std::clamp(aTarget[i] * BoostFactor, 0.0f, 1.0f);
-
 			std::array<float, VISUALIZER_BARS> aShaped{};
 			for(int i = 0; i < RequestedBars; ++i)
 			{
+				// Light neighbor blend only — heavy blend made bars look almost flat.
 				const float Prev = i > 0 ? aTarget[i - 1] : aTarget[i];
 				const float Next = i + 1 < RequestedBars ? aTarget[i + 1] : aTarget[i];
-				float Target = Prev * 0.04f + aTarget[i] * 0.92f + Next * 0.04f;
-				if(Target < 0.0025f)
-					Target = 0.0f;
-				aShaped[i] = std::clamp(Target, 0.0f, 1.0f);
+				aShaped[i] = std::clamp(Prev * 0.02f + aTarget[i] * 0.96f + Next * 0.02f, 0.0f, 1.0f);
 			}
+
+			// Restore bar-to-bar contrast after per-band AGC flattens everything high.
+			float LevelMin = 1.0f;
+			float LevelMax = 0.0f;
+			for(int i = 0; i < RequestedBars; ++i)
+			{
+				LevelMin = minimum(LevelMin, aShaped[i]);
+				LevelMax = maximum(LevelMax, aShaped[i]);
+			}
+			const float LevelRange = LevelMax - LevelMin;
+			if(LevelRange > 0.02f)
+			{
+				for(int i = 0; i < RequestedBars; ++i)
+				{
+					const float T = (aShaped[i] - LevelMin) / LevelRange;
+					aShaped[i] = std::clamp(0.18f + T * 0.82f, 0.0f, 1.0f);
+				}
+			}
+
+			const float BarsAttack = 1.0f - std::exp(-Delta * VISUALIZER_ATTACK_RATE);
+			const float BarsRelease = 1.0f - std::exp(-Delta * VISUALIZER_RELEASE_RATE);
 			for(int i = 0; i < VISUALIZER_BARS; ++i)
 			{
 				const float Target = i < RequestedBars ? aShaped[i] : 0.0f;
-				const float Speed = Target > m_aVisualizerLevels[i] ? AttackSpeed : ReleaseSpeed;
-				m_aVisualizerLevels[i] = ApproachAnim(m_aVisualizerLevels[i], Target, Delta, Speed);
+				const float Blend = Target > m_aVisualizerLevels[i] ? BarsAttack : BarsRelease;
+				m_aVisualizerLevels[i] += (Target - m_aVisualizerLevels[i]) * Blend;
 			}
 			return;
 		}
@@ -2741,7 +3131,7 @@ public:
 		{
 			DebugLogRenderDecision(BackendSilent ? "silent" : "connecting", Snapshot);
 			for(float &Level : m_aVisualizerLevels)
-				Level = ApproachAnim(Level, 0.0f, Delta, BackendSilent ? ReleaseSpeed * 0.42f : ReleaseSpeed * 0.70f);
+				Level = ApproachAnim(Level, 0.0f, Delta, BackendSilent ? FallbackReleaseSpeed * 0.42f : FallbackReleaseSpeed * 0.70f);
 			return;
 		}
 
@@ -2806,7 +3196,7 @@ public:
 		const float CompactScale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
 		const float CompactWidthScale = Width / maximum(HudLayout::CANVAS_WIDTH, 0.001f);
 		const float CompactTitleFont = 6.6f * CompactScale * TextScale;
-		const float MiniTitleFont = 5.8f * CompactScale * TextScale;
+		const float MiniTitleFont = 6.0f * CompactScale * TextScale;
 		const float CompactTextSlotWidth = ComputeCompactTextSlotWidth(pOwner->TextRender(), GameTimer, CompactTitleFont, CompactScale, CompactWidthScale);
 		const float MiniTextSlotWidth = ComputeMiniTextSlotWidth(pOwner->TextRender(), m_Snapshot, GameTimer, MiniTitleFont, CompactScale, CompactWidthScale);
 		const CUIRect UiScreen = *pOwner->Ui()->Screen();
@@ -3004,7 +3394,7 @@ CUIRect CMusicPlayer::GetHudEditorRect(bool ForcePreview) const
 	const float LayoutScale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
 	const float LayoutWidthScale = Width / maximum(HudLayout::CANVAS_WIDTH, 0.001f);
 	const float CompactTitleFont = 6.6f * LayoutScale * TextScale;
-	const float MiniTitleFont = 5.8f * LayoutScale * TextScale;
+	const float MiniTitleFont = 6.0f * LayoutScale * TextScale;
 	const SGameTimerDisplay GameTimer = BuildGameTimerDisplay(GameClient()->m_Snap.m_pGameInfoObj, Client()->GameTick(g_Config.m_ClDummy), Client()->GameTickSpeed(), true);
 	SNowPlayingSnapshot PreviewSnapshot;
 	PreviewSnapshot.m_Title = "Blinding Lights";
@@ -3127,7 +3517,7 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	const float LayoutScale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
 	const float LayoutWidthScale = Width / maximum(HudLayout::CANVAS_WIDTH, 0.001f);
 	const float CompactTitleFont = 6.6f * LayoutScale * TextScale;
-	const float MiniTitleFont = 5.8f * LayoutScale * TextScale;
+	const float MiniTitleFont = 6.0f * LayoutScale * TextScale;
 	const float CompactTextSlotWidth = ComputeCompactTextSlotWidth(TextRender(), GameTimer, CompactTitleFont, LayoutScale, LayoutWidthScale);
 	const float MiniTextSlotWidth = ComputeMiniTextSlotWidth(TextRender(), Snapshot, GameTimer, MiniTitleFont, LayoutScale, LayoutWidthScale);
 	const int NumBars = MusicPlayerVisualizerColumns();
@@ -3164,11 +3554,10 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	const SMusicPlayerPalette Palette = ForcePreview ?
 						    BuildPaletteFromAccent(g_Config.m_BcMusicPlayerColorMode == 0 ? color_cast<ColorRGBA>(ColorHSLA(g_Config.m_BcMusicPlayerStaticColor)) : DefaultPreviewAccentForColorMode(g_Config.m_BcMusicPlayerColorMode)) :
 						    m_pImpl->m_Palette;
-	const bool TranslucentColorMode = g_Config.m_BcMusicPlayerColorMode == 3;
-	const bool CoverColorMode = g_Config.m_BcMusicPlayerColorMode == 1 || g_Config.m_BcMusicPlayerColorMode == 2;
-	const bool DominantColorMode = g_Config.m_BcMusicPlayerColorMode == 2;
+	const bool CoverColorMode = IsCoverVisualizerColorMode();
+	const bool StaticVisualizerColorMode = IsStaticVisualizerColorMode();
 	ColorRGBA PanelColor = MusicPlayerPanelColor(BackgroundColor, BackgroundEnabled, Palette, HoverT);
-	ColorRGBA GlowColor = TranslucentColorMode ? ColorRGBA(0.0f, 0.0f, 0.0f, 0.0f) : WithAlpha(MixColor(Palette.m_Glow, Palette.m_Light, DominantColorMode ? 0.40f : (CoverColorMode ? 0.28f : 0.18f)), (DominantColorMode ? 0.04f : 0.02f) + (DominantColorMode ? 0.07f : 0.05f) * HoverT);
+	ColorRGBA GlowColor = ColorRGBA(0.0f, 0.0f, 0.0f, 0.0f);
 	PanelColor.a *= MusicPlayerHudAlphaScale();
 	GlowColor.a *= MusicPlayerHudAlphaScale();
 	const float OuterPad = 0.42f * Scale + HoverT * 0.48f * Scale;
@@ -3197,7 +3586,7 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	const bool RenderVisualizer = true;
 	const float VisualW = MusicPlayerVisualizerWidth(RenderMiniLayout, Scale, WidthScale, ExpandT);
 	const bool HasMusic = Snapshot.m_PlaybackState == EMusicPlaybackState::PLAYING;
-	const float VisualH = RenderMiniLayout ? maximum(3.2f * Scale, View.h - 5.6f * Scale) : (HasMusic ? (8.2f * Scale + ExpandT * 2.1f * Scale) : (3.6f * Scale + ExpandT * 0.6f * Scale));
+	const float VisualH = RenderMiniLayout ? maximum(0.0f, View.h - 1.8f * Scale) : (HasMusic ? (8.2f * Scale + ExpandT * 2.1f * Scale) : (3.6f * Scale + ExpandT * 0.6f * Scale));
 	CUIRect ArtRect{};
 	CUIRect VisualRect{};
 	CUIRect TextArea = Content;
@@ -3205,7 +3594,7 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	{
 		const float MiniVisualPad = 1.05f * Scale * WidthScale;
 		const float MiniCoverPad = 0.95f * Scale * WidthScale;
-		const float MiniArtSize = RenderCover ? maximum(0.0f, View.h - 3.0f * Scale) : 0.0f;
+		const float MiniArtSize = RenderCover ? maximum(0.0f, View.h - 1.7f * Scale) : 0.0f;
 		ArtRect = {Content.x + (RenderCover ? 0.1f * Scale * WidthScale : 0.0f), View.y + (View.h - MiniArtSize) * 0.5f, MiniArtSize, MiniArtSize};
 		VisualRect = RenderVisualizer ?
 			CUIRect{View.x + View.w - 1.70f * Scale * WidthScale - VisualW, View.y + (View.h - VisualH) * 0.5f, VisualW, VisualH} :
@@ -3218,7 +3607,7 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	else
 	{
 		const float VisualPad = 1.15f * Scale * WidthScale;
-		const float ArtSize = RenderCover ? minimum(View.h - 3.0f * Scale, 11.8f * Scale + ExpandT * 1.8f * Scale) : 0.0f;
+		const float ArtSize = RenderCover ? minimum(View.h - 1.6f * Scale, 13.2f * Scale + ExpandT * 2.2f * Scale) : 0.0f;
 		ArtRect = {Content.x + (RenderCover ? 0.1f * Scale * WidthScale : 0.0f), View.y + (View.h - ArtSize) * 0.5f, ArtSize, ArtSize};
 		VisualRect = RenderVisualizer ?
 			CUIRect{View.x + View.w - 1.95f * Scale * WidthScale - VisualW, View.y + (View.h - VisualH) * 0.5f, VisualW, VisualH} :
@@ -3265,7 +3654,7 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	const bool ShowGameTimer = GameTimer.m_Valid && (RenderMiniLayout || !PlayerHovered);
 	const std::string Title = ShowGameTimer ? GameTimer.m_Text : TrackTitle;
 	const std::string Artist = Snapshot.m_Artist.empty() ? Localize("Unknown artist") : Snapshot.m_Artist;
-	const float TitleFont = (RenderMiniLayout ? 5.8f : (ShowGameTimer ? 6.6f : 5.25f)) * Scale * TextScale;
+	const float TitleFont = (RenderMiniLayout ? 6.0f : (ShowGameTimer ? 6.6f : 5.25f)) * Scale * TextScale;
 	const float ArtistFont = 3.45f * Scale * TextScale;
 	const bool ShowArtist = !RenderMiniLayout && TextT > 0.38f && ExpandT > 0.42f;
 	const bool MiniControlsVisible = RenderMiniLayout && AllowInteraction && PlayerHovered;
@@ -3279,70 +3668,64 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	if(RenderVisualizer && (!RenderMiniLayout || !MiniControlsVisible))
 	{
 		const float PositionMs = ForcePreview ? (float)Snapshot.m_PositionMs : m_pImpl->VisualPositionMs(Delta);
-			m_pImpl->UpdateVisualizerLevels(this, Snapshot, (int64_t)PositionMs, NumBars, Delta);
+		m_pImpl->UpdateVisualizerLevels(this, Snapshot, (int64_t)PositionMs, NumBars, Delta);
 
-			const float VisualizerRoundingT = std::clamp(g_Config.m_BcMusicPlayerVisualizerRounding / 400.0f, 0.0f, 1.0f);
-			const float VisualInnerPadX = MusicPlayerVisualizerInnerPadX(RenderMiniLayout, Scale, WidthScale);
-			const float VisualInnerPadY = RenderMiniLayout ? 0.70f * Scale : 0.20f * Scale;
-			const float VisualInnerW = maximum(0.0f, VisualRect.w - VisualInnerPadX * 2.0f);
-			const float VisualInnerH = maximum(0.0f, VisualRect.h - VisualInnerPadY * 2.0f);
-			const float Gap = MusicPlayerVisualizerGap(RenderMiniLayout, Scale, WidthScale);
-			const float BarW = maximum(PixelWidth, minimum(MusicPlayerVisualizerBarWidth(RenderMiniLayout, Scale, WidthScale), (VisualInnerW - Gap * (NumBars - 1)) / maximum(1.0f, (float)NumBars)));
-			const float BarsTotalW = NumBars * BarW + (NumBars - 1) * Gap;
+		const bool SoftRounding = IsSoftVisualizerRounding();
+		const float VisualInnerPadX = MusicPlayerVisualizerInnerPadX(RenderMiniLayout, Scale, WidthScale);
+		const float VisualInnerPadY = RenderMiniLayout ? maximum(0.8f, 0.9f * Scale) : 0.20f * Scale;
+		const float VisualInnerW = maximum(0.0f, VisualRect.w - VisualInnerPadX * 2.0f);
+		const float VisualInnerH = maximum(0.0f, VisualRect.h - VisualInnerPadY * 2.0f);
+		const float Gap = MusicPlayerVisualizerGap(RenderMiniLayout, Scale, WidthScale);
+		const float BarW = maximum(PixelWidth, minimum(MusicPlayerVisualizerBarWidth(RenderMiniLayout, Scale, WidthScale), (VisualInnerW - Gap * (NumBars - 1)) / maximum(1.0f, (float)NumBars)));
+		const float BarsTotalW = NumBars * BarW + (NumBars - 1) * Gap;
 		const float BarsStartX = VisualRect.x + VisualInnerPadX + maximum(0.0f, (VisualInnerW - BarsTotalW) * 0.5f);
-		const float LaneH = maximum(RenderMiniLayout ? 2.8f * Scale : 5.2f * Scale, VisualInnerH * (RenderMiniLayout ? 0.88f : 0.94f));
+		const float LaneH = maximum(RenderMiniLayout ? 2.8f * Scale : 5.2f * Scale, VisualInnerH);
 		const float LaneY = VisualRect.y + VisualInnerPadY + (VisualInnerH - LaneH) * 0.5f;
 		const float BaseMidY = LaneY + LaneH * 0.5f;
-		const float RawLaneW = BarW * 0.72f;
-		const float SnappedLaneW = maximum(PixelWidth, roundf(RawLaneW / PixelWidth) * PixelWidth);
-			const int VisualizerMode = std::clamp(g_Config.m_BcMusicPlayerVisualizerMode, 0, 2);
-			const bool CenterMode = RenderMiniLayout || VisualizerMode == 1;
-			const bool UpMode = !RenderMiniLayout && VisualizerMode == 2;
+		const int VisualizerMode = std::clamp(g_Config.m_BcMusicPlayerVisualizerMode, 0, 2);
+		// Mini stays centered; normal layout respects Bottom / Center / Up.
+		const bool CenterMode = RenderMiniLayout || VisualizerMode == 1;
+		const bool UpMode = !RenderMiniLayout && VisualizerMode == 2;
+		const bool UseCoverVisualizerColor = CoverColorMode && (m_pImpl->m_HasCoverTint || m_pImpl->m_HasCoverBarTint);
+		const float ContentAlpha = std::clamp(0.86f + 0.08f * HoverT, 0.0f, 1.0f);
+		const std::array<ColorRGBA, COVER_BAR_TINT_CELLS> &aVisualizerBarColors = m_pImpl->UpdateVisualizerBarColors(NumBars, Delta, UseCoverVisualizerColor);
+		const float BarsMaxHalf = maximum(0.95f, VisualInnerH * 0.48f);
+		const float BarsDotHalf = maximum(0.55f, minimum(BarsMaxHalf, BarW * 0.42f));
+		// Soft = full-width rounded pills; Cube = thinner sharp bars.
+		float DrawW = SoftRounding ? BarW : maximum(PixelWidth, BarW * 0.82f);
+		float SlotStep = BarW + Gap;
+		float BarsOriginX = BarsStartX;
+		float BarInsetX = (BarW - DrawW) * 0.5f;
+		// Lock Cube geometry to whole screen pixels so every column matches
+		// (subpixel X otherwise makes bars 1/2/5 thinner than 3/4).
+		if(!SoftRounding && PixelWidth > 0.0f)
+		{
+			DrawW = maximum(PixelWidth, roundf(DrawW / PixelWidth) * PixelWidth);
+			SlotStep = maximum(DrawW, roundf(SlotStep / PixelWidth) * PixelWidth);
+			BarsOriginX = roundf(BarsStartX / PixelWidth) * PixelWidth;
+			BarInsetX = roundf(((BarW - DrawW) * 0.5f) / PixelWidth) * PixelWidth;
+		}
+		const float BarRounding = SoftRounding ? (DrawW * 0.5f) : 0.0f;
+
 		for(int i = 0; i < NumBars; ++i)
 		{
-			const float BarT = i / maximum(1.0f, (float)(NumBars - 1));
-			const float Centered = absolute(BarT * 2.0f - 1.0f);
-			const float X = BarsStartX + i * (BarW + Gap);
-			const float LaneX = X + (BarW - RawLaneW) * 0.5f;
-			const float SnappedLaneX = roundf((LaneX + (RawLaneW - SnappedLaneW) * 0.5f) / PixelWidth) * PixelWidth;
-			if(!HasMusic)
-			{
-				const float PassiveLevel = m_pImpl->m_aVisualizerLevels[i];
-				float DotSize = maximum(1.00f * Scale, SnappedLaneW * (0.28f + PassiveLevel * 0.22f));
-				float DotX = SnappedLaneX + (SnappedLaneW - DotSize) * 0.5f;
-				SnapRectXToPixelGrid(PixelWidth, DotX, DotSize);
-				const float DotY = VisualRect.y + VisualRect.h * 0.5f - DotSize * 0.5f;
-				ColorRGBA DotColor = MixColor(Palette.m_Glow, Palette.m_Light, 0.22f + (1.0f - Centered) * 0.58f);
-				DotColor = MixColor(DotColor, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), 0.06f + BarT * 0.08f);
-				DotColor.a = 0.40f + PassiveLevel * 0.32f + 0.12f * HoverT;
-				if(TranslucentColorMode)
-					DotColor = ColorRGBA(1.0f, 1.0f, 1.0f, DotColor.a);
-				Graphics()->DrawRect(DotX, DotY, DotSize, DotSize, DotColor, IGraphics::CORNER_ALL, DotSize * 0.5f * VisualizerRoundingT);
-				continue;
-			}
+			const float Activity = std::clamp(m_pImpl->m_aVisualizerLevels[i], 0.0f, 1.0f);
+			const float HalfLen = BarsDotHalf + (BarsMaxHalf - BarsDotHalf) * Activity;
+			const float FullH = HalfLen * 2.0f;
+			const float BX = BarsOriginX + i * SlotStep + BarInsetX;
+			float BY = BaseMidY - HalfLen;
+			if(!CenterMode)
+				BY = UpMode ? LaneY : (LaneY + LaneH - FullH);
 
-			const int SourceIndex = i;
-			const float HeightFactor = powf(std::clamp(m_pImpl->m_aVisualizerLevels[SourceIndex], 0.0f, 1.0f), 0.60f);
-			const float H = minimum(LaneH, maximum(0.0f, LaneH * HeightFactor));
-			const float Y = CenterMode ? (BaseMidY - H * 0.5f) : (UpMode ? LaneY : (LaneY + LaneH - H));
-			const float LaneDrawX = SnappedLaneX;
-			const float LaneDrawW = SnappedLaneW;
-			const float LightT = 0.18f + (1.0f - Centered) * 0.52f;
-			ColorRGBA BarColor = MixColor(Palette.m_Glow, Palette.m_Light, LightT);
-			BarColor = MixColor(BarColor, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), 0.05f + BarT * 0.10f);
-			if(Snapshot.m_HasVisualizer && Snapshot.m_Visualizer.m_IsPassiveFallback)
-				BarColor = MixColor(BarColor, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), 0.03f);
-			BarColor.a = 0.86f + 0.08f * HoverT;
-			ColorRGBA LaneColor = WithAlpha(MixColor(Palette.m_Dark, Palette.m_Glow, 0.10f + 0.04f * (1.0f - Centered)), 0.02f + 0.015f * HoverT);
-			if(TranslucentColorMode)
-			{
-				BarColor = ColorRGBA(1.0f, 1.0f, 1.0f, BarColor.a);
-				LaneColor = ColorRGBA(1.0f, 1.0f, 1.0f, 0.0f);
-			}
-			const float LaneRounding = minimum(LaneDrawW, LaneH) * 0.5f * VisualizerRoundingT;
-			const float BarRounding = minimum(LaneDrawW, H) * 0.5f * VisualizerRoundingT;
-			Graphics()->DrawRect(LaneDrawX, LaneY, LaneDrawW, LaneH, LaneColor, IGraphics::CORNER_ALL, LaneRounding);
-			Graphics()->DrawRect(LaneDrawX, Y, LaneDrawW, H, BarColor, IGraphics::CORNER_ALL, BarRounding);
+			ColorRGBA BarColor = ResolveVisualizerBarColor(
+				UseCoverVisualizerColor,
+				StaticVisualizerColorMode,
+				m_pImpl->m_HasCoverBarTint,
+				m_pImpl->m_HasCoverTint,
+				aVisualizerBarColors,
+				i,
+				ContentAlpha);
+			Graphics()->DrawRect(BX, BY, DrawW, FullH, BarColor, IGraphics::CORNER_ALL, BarRounding);
 		}
 	}
 

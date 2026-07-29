@@ -459,6 +459,17 @@ public:
 	void SetConfig(const SVisualizerConfig &Config) override
 	{
 		std::lock_guard<std::mutex> Lock(m_Mutex);
+		if(m_Config.m_SampleRate == Config.m_SampleRate &&
+			m_Config.m_BandCount == Config.m_BandCount &&
+			m_Config.m_LowCutHz == Config.m_LowCutHz &&
+			m_Config.m_HighCutHz == Config.m_HighCutHz &&
+			m_Config.m_BassSplitHz == Config.m_BassSplitHz &&
+			m_Config.m_NoiseReduction == Config.m_NoiseReduction &&
+			m_Config.m_Sensitivity == Config.m_Sensitivity &&
+			m_Config.m_ChannelMode == Config.m_ChannelMode)
+		{
+			return;
+		}
 		m_Config = Config;
 		++m_ConfigRevision;
 	}
