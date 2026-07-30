@@ -51,6 +51,18 @@ namespace
 	constexpr float KEYSTROKES_MC_GAP = 8.0f;
 	constexpr int KEYSTROKES_MC_MAX_KEYS = 8;
 	constexpr int KEYSTROKES_STYLE_MINECRAFT = 1;
+
+	CUIRect PushHudRectFromMusicPlayer(CGameClient *pGameClient, CUIRect Rect, float HudWidth, float HudHeight, bool ForcePreview)
+	{
+		if(ForcePreview || pGameClient == nullptr || Rect.w <= 0.0f || Rect.h <= 0.0f)
+			return Rect;
+
+		const vec2 Offset = pGameClient->m_MusicPlayer.GetHudPushOffsetForRect(Rect, HudWidth, HudHeight, 2.0f);
+		Rect.x += Offset.x;
+		Rect.y += Offset.y;
+		return Rect;
+	}
+
 	void FormatPredictionTime(int64_t Milliseconds, bool ShowMillis, char *pBuf, size_t BufSize)
 	{
 		const int64_t TimeCentiseconds = maximum<int64_t>(0, (Milliseconds + 5) / 10);
@@ -813,8 +825,8 @@ CUIRect CHud::GetScoreHudRect(bool ForcePreview) const
 		RawRect = {m_Width - Width, 285.0f - Height, Width, Height, 5.0f * Scale};
 	else
 		RawRect = {Layout.m_X, Layout.m_Y, Width, Height, 5.0f * Scale};
-	const auto Rect = HudLayout::ClampRectToScreen(RawRect, m_Width, m_Height);
-	return {Rect.m_X, Rect.m_Y, Rect.m_W, Rect.m_H};
+	const auto ClampedRect = HudLayout::ClampRectToScreen(RawRect, m_Width, m_Height);
+	return PushHudRectFromMusicPlayer(GameClient(), {ClampedRect.m_X, ClampedRect.m_Y, ClampedRect.m_W, ClampedRect.m_H}, m_Width, m_Height, ForcePreview);
 }
 
 void CHud::RenderScoreHud(bool ForcePreview)
@@ -1285,7 +1297,9 @@ void CHud::RenderTextInfo()
 			str_format(aBuf, sizeof(aBuf), "%d / %d", NumInTeam - NumFrozen, NumInTeam);
 		else if(g_Config.m_TcShowFrozenText == 2)
 			str_format(aBuf, sizeof(aBuf), "%d / %d", NumFrozen, NumInTeam);
-		TextRender()->Text(m_Width / 2.0f - TextRender()->TextWidth(10.0f, aBuf) / 2.0f, 12.0f, 10.0f, aBuf);
+		const float TextWidth = TextRender()->TextWidth(10.0f, aBuf);
+		const CUIRect TextRect = PushHudRectFromMusicPlayer(GameClient(), {m_Width / 2.0f - TextWidth / 2.0f, 12.0f, TextWidth, 10.0f}, m_Width, m_Height, false);
+		TextRender()->Text(TextRect.x, TextRect.y, 10.0f, aBuf);
 	}
 }
 
@@ -1322,7 +1336,7 @@ CUIRect CHud::GetNotifyLastRect(bool ForcePreview) const
 	Rect.h = FontSize + 2.0f * Scale;
 	Rect.x = std::clamp(Rect.x, 0.0f, maximum(0.0f, m_Width - Rect.w));
 	Rect.y = std::clamp(Rect.y, 0.0f, maximum(0.0f, m_Height - Rect.h));
-	return Rect;
+	return PushHudRectFromMusicPlayer(GameClient(), Rect, m_Width, m_Height, ForcePreview);
 }
 
 void CHud::RenderNotifyLast(bool ForcePreview)
@@ -1409,7 +1423,7 @@ CUIRect CHud::GetFrozenHudRect(bool ForcePreview) const
 		Rect.x = Layout.m_X - TeeSize / 2.0f;
 	Rect.x = std::clamp(Rect.x, 0.0f, maximum(0.0f, m_Width - Rect.w));
 	Rect.y = std::clamp(Rect.y, 0.0f, maximum(0.0f, m_Height - Rect.h));
-	return Rect;
+	return PushHudRectFromMusicPlayer(GameClient(), Rect, m_Width, m_Height, ForcePreview);
 }
 
 void CHud::RenderFrozenHud(bool ForcePreview)
@@ -2756,8 +2770,8 @@ CUIRect CHud::GetSpectatorCountRect(bool ForcePreview)
 		RawRect = {X, Y, BoxWidth, BoxHeight, 5.0f * Scale};
 	}
 
-	const auto Rect = HudLayout::ClampRectToScreen(RawRect, m_Width, m_Height);
-	return {Rect.m_X, Rect.m_Y, Rect.m_W, Rect.m_H};
+	const auto ClampedRect = HudLayout::ClampRectToScreen(RawRect, m_Width, m_Height);
+	return PushHudRectFromMusicPlayer(GameClient(), {ClampedRect.m_X, ClampedRect.m_Y, ClampedRect.m_W, ClampedRect.m_H}, m_Width, m_Height, ForcePreview);
 }
 
 void CHud::RenderSpectatorCount(bool ForcePreview)
@@ -2841,8 +2855,8 @@ CUIRect CHud::GetDummyActionsRect(bool ForcePreview) const
 		RawRect = {X, Y, BoxWidth, BoxHeight, 5.0f * Scale};
 	}
 
-	const auto Rect = HudLayout::ClampRectToScreen(RawRect, m_Width, m_Height);
-	return {Rect.m_X, Rect.m_Y, Rect.m_W, Rect.m_H};
+	const auto ClampedRect = HudLayout::ClampRectToScreen(RawRect, m_Width, m_Height);
+	return PushHudRectFromMusicPlayer(GameClient(), {ClampedRect.m_X, ClampedRect.m_Y, ClampedRect.m_W, ClampedRect.m_H}, m_Width, m_Height, ForcePreview);
 }
 
 void CHud::RenderDummyActions(bool ForcePreview)
@@ -3135,8 +3149,8 @@ CUIRect CHud::GetMovementInformationRect(bool ForcePreview) const
 		RawRect = {X, Y, BoxWidth, BoxHeight, 5.0f * Scale};
 	}
 
-	const auto Rect = HudLayout::ClampRectToScreen(RawRect, m_Width, m_Height);
-	return {Rect.m_X, Rect.m_Y, Rect.m_W, Rect.m_H};
+	const auto ClampedRect = HudLayout::ClampRectToScreen(RawRect, m_Width, m_Height);
+	return PushHudRectFromMusicPlayer(GameClient(), {ClampedRect.m_X, ClampedRect.m_Y, ClampedRect.m_W, ClampedRect.m_H}, m_Width, m_Height, ForcePreview);
 }
 
 void CHud::RenderMovementInformation(bool ForcePreview)
@@ -3412,7 +3426,7 @@ CUIRect CHud::GetLocalTimeRect(bool ForcePreview) const
 	const float FontSize = 5.0f * Scale;
 	const float Padding = 5.0f * Scale;
 	const float Width = std::round(TextRender()->TextBoundingBox(FontSize, aTimeStr).m_W);
-	return {x - Width - Padding * 3.0f, y, Width + Padding * 2.0f, 12.5f * Scale};
+	return PushHudRectFromMusicPlayer(GameClient(), {x - Width - Padding * 3.0f, y, Width + Padding * 2.0f, 12.5f * Scale}, m_Width, m_Height, ForcePreview);
 }
 
 void CHud::RenderLocalTime(bool ForcePreview)
@@ -3424,9 +3438,6 @@ void CHud::RenderLocalTime(bool ForcePreview)
 
 	const auto Layout = HudLayout::Get(HudLayout::MODULE_LOCAL_TIME, m_Width, m_Height);
 	const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
-	const bool HasOverride = HudLayout::HasRuntimeOverride(HudLayout::MODULE_LOCAL_TIME);
-	const float x = HasOverride ? Layout.m_X : (m_Width / 7.0f) * 3.0f;
-	const float y = HasOverride ? Layout.m_Y : 0.0f;
 
 	const bool Seconds = g_Config.m_TcShowLocalTimeSeconds; // TClient
 
@@ -3434,16 +3445,12 @@ void CHud::RenderLocalTime(bool ForcePreview)
 	str_timestamp_format(aTimeStr, sizeof(aTimeStr), Seconds ? "%H:%M.%S" : "%H:%M");
 	const float FontSize = 5.0f * Scale;
 	const float Padding = 5.0f * Scale;
-	const float Width = std::round(TextRender()->TextBoundingBox(FontSize, aTimeStr).m_W);
 
-	const float RectX = x - Width - Padding * 3.0f;
-	const float RectY = y;
-	const float RectWidth = Width + Padding * 2.0f;
-	const float RectHeight = 12.5f * Scale;
-	const int Corners = HudLayout::BackgroundCorners(IGraphics::CORNER_ALL, RectX, RectY, RectWidth, RectHeight, m_Width, m_Height);
+	const CUIRect Rect = GetLocalTimeRect(ForcePreview);
+	const int Corners = HudLayout::BackgroundCorners(IGraphics::CORNER_ALL, Rect.x, Rect.y, Rect.w, Rect.h, m_Width, m_Height);
 	if(Layout.m_BackgroundEnabled)
-		Graphics()->DrawRect(RectX, RectY, RectWidth, RectHeight, color_cast<ColorRGBA>(ColorHSLA(Layout.m_BackgroundColor, true)), Corners, 3.75f * Scale);
-	TextRender()->Text(RectX + Padding, RectY + (RectHeight - FontSize) / 2.f, FontSize, aTimeStr, -1.0f);
+		Graphics()->DrawRect(Rect.x, Rect.y, Rect.w, Rect.h, color_cast<ColorRGBA>(ColorHSLA(Layout.m_BackgroundColor, true)), Corners, 3.75f * Scale);
+	TextRender()->Text(Rect.x + Padding, Rect.y + (Rect.h - FontSize) / 2.f, FontSize, aTimeStr, -1.0f);
 }
 
 bool CHud::RebuildFinishPredictionPathData() const
@@ -3951,7 +3958,7 @@ CUIRect CHud::GetFinishPredictionRect(bool ForcePreview) const
 	CUIRect Rect = {Layout.m_X, Layout.m_Y, RectWidth, RectHeight};
 	Rect.x = std::clamp(Rect.x, 0.0f, maximum(0.0f, m_Width - Rect.w));
 	Rect.y = std::clamp(Rect.y, 0.0f, maximum(0.0f, m_Height - Rect.h));
-	return Rect;
+	return PushHudRectFromMusicPlayer(GameClient(), Rect, m_Width, m_Height, ForcePreview);
 }
 
 void CHud::RenderFinishPrediction(bool ForcePreview)
