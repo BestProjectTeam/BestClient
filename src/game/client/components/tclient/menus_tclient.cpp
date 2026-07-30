@@ -3066,6 +3066,7 @@ void CMenus::RenderSettingsTClientConfigs(CUIRect MainView)
 
 		CUIRect EyeBtn;
 		NameLine.VSplitRight(24.0f, &NameLine, &EyeBtn);
+		Right.VSplitLeft(5.0f, nullptr, &Right);
 		EyeBtn.h = LineSize;
 		EyeBtn.y = TopLine.y + (TopLine.h - LineSize) / 2.0f;
 
@@ -3125,7 +3126,7 @@ void CMenus::RenderSettingsTClientConfigs(CUIRect MainView)
 				PopupCtx.m_ColorPickerContext.m_Alpha = false;
 				PopupCtx.m_ColorPickerContext.m_pHslaColor = nullptr;
 				PopupCtx.m_ColorPickerContext.m_State = EEditState::NONE;
-				float PopupHeight = 90.0f + PopupCtx.m_vConditions.size() * 19.0f;
+				float PopupHeight = 100.0f + PopupCtx.m_vConditions.size() * 19.0f;
 				Ui()->DoPopupMenu(&PopupCtx, EyeBtn.x, EyeBtn.y, 240.0f, PopupHeight, &PopupCtx, WatchEditPopupFunc);
 			}
 			else
@@ -3134,7 +3135,7 @@ void CMenus::RenderSettingsTClientConfigs(CUIRect MainView)
 				if(it != s_EditPopups.end() && it->second.m_NeedsReopen)
 				{
 					it->second.m_NeedsReopen = false;
-					float PopupHeight = 90.0f + it->second.m_vConditions.size() * 19.0f;
+					float PopupHeight = 100.0f + it->second.m_vConditions.size() * 19.0f;
 					Ui()->DoPopupMenu(&it->second, EyeBtn.x, EyeBtn.y, 240.0f, PopupHeight, &it->second, WatchEditPopupFunc);
 				}
 			}
