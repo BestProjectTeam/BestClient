@@ -42,8 +42,7 @@ public:
 	void OnWindowResize() override;
 
 	SHudReservation HudReservation() const;
-	float GetHudPushOffsetForRect(const CUIRect &Rect, float CanvasWidth, float Padding = 0.0f) const;
-	float GetHudPushDownOffsetForRect(const CUIRect &Rect, float CanvasHeight, float Padding = 0.0f) const;
+	vec2 GetHudPushOffsetForRect(const CUIRect &Rect, float CanvasWidth, float CanvasHeight, float Padding = 0.0f) const;
 	bool GetNowPlayingInfo(SNowPlayingInfo &Out) const;
 	bool GetHudThemeColor(ColorRGBA &Out, bool ForcePreview = false) const;
 	CUIRect GetHudEditorRect(bool ForcePreview = false) const;

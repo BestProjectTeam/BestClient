@@ -1625,8 +1625,9 @@ CUIRect CVoiceChat::GetHudMuteStatusIndicatorRect(float HudWidth, float HudHeigh
 	const bool MusicPlayerHudActive = !MusicPlayerComponentDisabled && g_Config.m_BcMusicPlayer != 0 && MusicReservation.m_Visible && MusicReservation.m_Active;
 	if(MusicPlayerHudActive)
 	{
-		const float Offset = GameClient()->m_MusicPlayer.GetHudPushOffsetForRect(Rect, HudWidth, 2.0f);
-		Rect.x += Offset;
+		const vec2 Offset = GameClient()->m_MusicPlayer.GetHudPushOffsetForRect(Rect, HudWidth, HudHeight, 2.0f);
+		Rect.x += Offset.x;
+		Rect.y += Offset.y;
 	}
 
 	Rect.x = std::clamp(Rect.x, 0.0f, maximum(0.0f, HudWidth - Rect.w));
