@@ -39,6 +39,10 @@ MACRO_CONFIG_INT(BcCameraDrift, bc_camera_drift, 0, 0, 1, CFGFLAG_CLIENT | CFGFL
 MACRO_CONFIG_INT(BcCameraDriftAmount, bc_camera_drift_amount, 50, 1, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Amount of camera drift during demo playback")
 MACRO_CONFIG_INT(BcCameraDriftSmoothness, bc_camera_drift_smoothness, 20, 1, 20, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Smoothness of camera drift during demo playback")
 MACRO_CONFIG_INT(BcCameraDriftReverse, bc_camera_drift_reverse, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Reverse camera drift direction during demo playback")
+// Freeview Numpad Camera (spectator/demo playback)
+MACRO_CONFIG_INT(BcFreeviewNumpad, bc_freeview_numpad, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable numpad camera movement in freeview/spectator mode")
+MACRO_CONFIG_INT(BcFreeviewSpeed, bc_freeview_speed, 180, 1, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Freeview camera movement speed")
+MACRO_CONFIG_INT(BcFreeviewSmoothness, bc_freeview_smoothness, 25, 1, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Freeview camera smoothness (acceleration)")
 
 // DynamicFov (demo playback only)
 MACRO_CONFIG_INT(BcDynamicFov, bc_dynamic_fov, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable dynamic FOV during demo playback")
