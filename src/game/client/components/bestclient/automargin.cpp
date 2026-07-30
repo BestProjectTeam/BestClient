@@ -12,8 +12,8 @@
 
 namespace
 {
-constexpr int BASE_MARGIN = 9;
-constexpr int MAX_MARGIN = 300;
+constexpr int BASE_MARGIN = 90;
+constexpr int MAX_MARGIN = 3000;
 constexpr float CHECK_INTERVAL_SECONDS = 0.5f;
 constexpr float PING_SMOOTH_FACTOR_RISE = 0.45f;
 constexpr float PING_SMOOTH_FACTOR_FALL = 0.20f;
@@ -23,12 +23,13 @@ constexpr int HIGH_PING_ENTER_MS = 50;
 constexpr int HIGH_PING_EXIT_MS = 42;
 constexpr float JITTER_ENTER_MS = 4.0f;
 constexpr float JITTER_EXIT_MS = 2.0f;
-constexpr int MARGIN_DEADZONE = 1;
-constexpr int MARGIN_STEP_DOWN = 5;
+constexpr int MARGIN_DEADZONE = 10;
+constexpr int MARGIN_STEP_DOWN = 50;
 
 float MarginFromPing(float Ping)
 {
-	return std::max((float)BASE_MARGIN, Ping * 0.25f);
+	// Returns margin in 0.1 ms units
+	return std::max((float)BASE_MARGIN, Ping * 2.5f);
 }
 }
 
@@ -127,7 +128,7 @@ void CBcAutoMargin::OnUpdate()
 	if(m_HighPing)
 	{
 		const float StableMargin = MarginFromPing(EffectivePing);
-		const float JitterMargin = std::max(m_SmoothedJitter * 0.90f, IntervalJitter * 0.35f);
+		const float JitterMargin = std::max(m_SmoothedJitter * 9.0f, IntervalJitter * 3.5f);
 		TargetMargin = std::clamp((int)std::round(StableMargin + JitterMargin), BASE_MARGIN, MAX_MARGIN);
 	}
 

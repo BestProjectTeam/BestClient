@@ -391,7 +391,7 @@ void CClient::SendInput()
 
 			m_aInputs[i][m_aCurrentInput[i]].m_Tick = m_aPredTick[g_Config.m_ClDummy];
 			m_aInputs[i][m_aCurrentInput[i]].m_PredictedTime = m_PredictedTime.Get(Now);
-			m_aInputs[i][m_aCurrentInput[i]].m_PredictionMargin = PredictionMargin() * time_freq() / 1000;
+			m_aInputs[i][m_aCurrentInput[i]].m_PredictionMargin = (int64_t)PredictionMargin() * time_freq() / 10000;
 			if(g_Config.m_TcSmoothPredictionMargin)
 				m_aInputs[i][m_aCurrentInput[i]].m_PredictionMargin = m_PredictedTime.GetMargin(Now);
 			m_aInputs[i][m_aCurrentInput[i]].m_Time = Now;
@@ -2312,7 +2312,7 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket, int Conn, bool Dummy)
 						{
 							m_PredictedTime.Init(GameTick * time_freq() / GameTickSpeed());
 							m_PredictedTime.SetAdjustSpeed(CSmoothTime::ADJUSTDIRECTION_UP, 1000.0f);
-							m_PredictedTime.UpdateMargin(PredictionMargin() * time_freq() / 1000);
+							m_PredictedTime.UpdateMargin((int64_t)PredictionMargin() * time_freq() / 10000);
 						}
 						m_aGameTime[Conn].Init((GameTick - 1) * time_freq() / GameTickSpeed());
 						m_aapSnapshots[Conn][SNAP_PREV] = m_aSnapshotStorage[Conn].m_pFirst;
@@ -3139,7 +3139,7 @@ void CClient::Update()
 		m_ReconnectTime = 0;
 	}
 
-	m_PredictedTime.UpdateMargin(PredictionMargin() * time_freq() / 1000);
+	m_PredictedTime.UpdateMargin((int64_t)PredictionMargin() * time_freq() / 10000);
 }
 
 void CClient::RegisterInterfaces()
@@ -5082,7 +5082,19 @@ int main(int argc, const char **argv)
 			g_Config.m_ClAntiPingWeapons = 1;
 		}
 	}
-	g_Config.m_ClConfigVersion = 1;
+	if(g_Config.m_ClConfigVersion < 2)
+	{
+		// cl_prediction_margin switched from whole ms to 0.1 ms units.
+		// Old clients persisted cl_config_version as 1. Their default margin (10ms) was often
+		// omitted from the config file; after this update that loads as the new default 100
+		// (= 10.0ms already in tenths) and must NOT be scaled again.
+		// Same for a brand-new install (version 0 + default 100).
+		// Note: an old explicit value of exactly 100ms is indistinguishable from the omitted
+		// default and stays at 10.0ms — that case was rare (TClient UI capped at 75).
+		if(g_Config.m_ClPredictionMargin != 100)
+			g_Config.m_ClPredictionMargin = std::clamp(g_Config.m_ClPredictionMargin * 10, 1, 3000);
+	}
+	g_Config.m_ClConfigVersion = 2;
 
 	// parse the command line arguments
 	pConsole->SetUnknownCommandCallback(UnknownArgumentCallback, pClient);
@@ -5337,12 +5349,13 @@ std::optional<SWarning> CClient::CurrentWarning()
 
 int CClient::MaxLatencyTicks() const
 {
-	return GameTickSpeed() + (PredictionMargin() * GameTickSpeed()) / 1000;
+	return GameTickSpeed() + ((int64_t)PredictionMargin() * GameTickSpeed()) / 10000;
 }
 
 int CClient::PredictionMargin() const
 {
-	return m_ServerCapabilities.m_SyncWeaponInput ? g_Config.m_ClPredictionMargin : 10;
+	// Returns prediction margin in 0.1 ms units
+	return m_ServerCapabilities.m_SyncWeaponInput ? g_Config.m_ClPredictionMargin : 100;
 }
 
 int CClient::UdpConnectivity(int NetType)

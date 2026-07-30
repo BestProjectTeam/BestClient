@@ -262,7 +262,7 @@ class CClient : public IClient, public CDemoPlayer::IListener
 
 	void UpdateDemoIntraTimers();
 	int MaxLatencyTicks() const;
-	int PredictionMargin() const;
+	int PredictionMargin() const; // returns margin in 0.1 ms units
 
 	std::shared_ptr<ILogger> m_pFileLogger = nullptr;
 	std::shared_ptr<ILogger> m_pStdoutLogger = nullptr;

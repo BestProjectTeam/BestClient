@@ -181,6 +181,47 @@ bool CMenus::DoSliderWithScaledValue(const void *pId, int *pOption, const CUIRec
 	return false;
 }
 
+bool CMenus::DoSliderWithDividedValue(const void *pId, int *pOption, const CUIRect *pRect, const char *pStr, int Min, int Max, int Divisor, const IScrollbarScale *pScale, unsigned Flags, const char *pSuffix)
+{
+	dbg_assert(Divisor > 0, "DoSliderWithDividedValue: Divisor must be > 0");
+	dbg_assert(Max >= Min, "DoSliderWithDividedValue: Max must be >= Min");
+
+	const bool NoClampValue = Flags & CUi::SCROLLBAR_OPTION_NOCLAMPVALUE;
+	int Value = *pOption;
+
+	if(Input()->ModifierIsPressed() && Input()->KeyPress(KEY_MOUSE_WHEEL_UP) && Ui()->MouseInside(pRect))
+		Value = std::clamp(Value + 1, Min, Max);
+	if(Input()->ModifierIsPressed() && Input()->KeyPress(KEY_MOUSE_WHEEL_DOWN) && Ui()->MouseInside(pRect))
+		Value = std::clamp(Value - 1, Min, Max);
+
+	char aBuf[256];
+	// Format as tenths explicitly (e.g. 105 → "10.5") so the label is always xx.x, not raw tenths.
+	if(Divisor == 10)
+		str_format(aBuf, sizeof(aBuf), "%s: %d.%d%s", pStr, Value / Divisor, Value % Divisor, pSuffix);
+	else
+		str_format(aBuf, sizeof(aBuf), "%s: %.1f%s", pStr, Value / (float)Divisor, pSuffix);
+
+	const int PrevValue = Value;
+	Value = std::clamp(Value, Min, Max);
+
+	CUIRect Label, ScrollBar;
+	pRect->VSplitMid(&Label, &ScrollBar, minimum(10.0f, pRect->w * 0.05f));
+
+	const float LabelFontSize = Label.h * CUi::ms_FontmodHeight * 0.8f;
+	Ui()->DoLabel(&Label, aBuf, LabelFontSize, TEXTALIGN_ML);
+
+	Value = pScale->ToAbsolute(Ui()->DoScrollbarH(pId, &ScrollBar, pScale->ToRelative(Value, Min, Max)), Min, Max);
+	if(NoClampValue && ((Value == Min && PrevValue < Min) || (Value == Max && PrevValue > Max)))
+		Value = PrevValue;
+
+	if(*pOption != Value)
+	{
+		*pOption = Value;
+		return true;
+	}
+	return false;
+}
+
 bool CMenus::DoEditBoxWithLabel(CLineInput *LineInput, const CUIRect *pRect, const char *pLabel, const char *pDefault, char *pBuf, size_t BufSize)
 {
 	CUIRect Button, Label;
@@ -559,7 +600,7 @@ void CMenus::RenderSettingsTClientSettings(CUIRect MainView)
 	Column.HSplitTop(MarginSmall, nullptr, &Column);
 
 	Column.HSplitTop(LineSize, &Button, &Column);
-	Ui()->DoScrollbarOption(&g_Config.m_ClPredictionMargin, &g_Config.m_ClPredictionMargin, &Button, TCLocalize("Prediction Margin"), 10, 75, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "ms");
+	DoSliderWithDividedValue(&g_Config.m_ClPredictionMargin, &g_Config.m_ClPredictionMargin, &Button, TCLocalize("Prediction Margin"), 1, 750, 10, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "ms");
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcRemoveAnti, TCLocalize("Remove prediction & antiping in freeze"), &g_Config.m_TcRemoveAnti, &Column, LineSize);
 	if(g_Config.m_TcRemoveAnti)
 	{
