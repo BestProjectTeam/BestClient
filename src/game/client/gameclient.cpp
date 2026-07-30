@@ -310,6 +310,7 @@ void CGameClient::OnConsoleInit()
 						  &m_MovingTilesBackground, // TClient
 						  &m_FastPractice, // BestClient
 						  &m_CloudInput, // BestClient
+						  &m_BcAutoMargin, // BestClient
 						  &m_MapLayersForeground,
 						  &m_MovingTilesForeground, // TClient
 					      &m_SelfTimeCp, // BestClient

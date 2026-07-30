@@ -2827,6 +2827,8 @@ if(CLIENT)
     components/bestclient/3d_particles.h
     components/bestclient/admin_panel.cpp
     components/bestclient/admin_panel.h
+    components/bestclient/automargin.cpp
+    components/bestclient/automargin.h
     components/bestclient/clientindicator/browser_cache.cpp
     components/bestclient/clientindicator/browser_cache.h
     components/bestclient/clientindicator/client_indicator.cpp

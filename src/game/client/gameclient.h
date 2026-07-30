@@ -84,6 +84,7 @@
 #include "components/tclient/trails.h"
 #include "components/bestclient/3d_particles.h"
 #include "components/bestclient/admin_panel.h"
+#include "components/bestclient/automargin.h"
 #include "components/bestclient/cherry_gifs.h"
 #include "components/bestclient/chat_bubbles.h"
 #include "components/bestclient/cloud_input.h"
@@ -259,6 +260,7 @@ public:
 	CClientIndicator m_ClientIndicator; // BestClient
 	CMusicPlayer m_MusicPlayer; // BestClient
 	CAdminPanel m_AdminPanel; // BestClient
+	CBcAutoMargin m_BcAutoMargin; // BestClient
 	CVoiceChat m_VoiceChat; // BestClient
 	CClans m_Clans; // BestClient
 	CHudEditor m_HudEditor; // BestClient

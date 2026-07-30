@@ -322,7 +322,7 @@ MACRO_CONFIG_INT(BcFInputAmount, bc_f_input_amount, 0, 0, 5000, CFGFLAG_CLIENT |
 MACRO_CONFIG_INT(BcFInputOthers, bc_f_input_others, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Apply F input to other tees")
 MACRO_CONFIG_INT(BcCloudInputAmount, bc_cloud_input_amount, 0, 0, 500, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Cloud input amount in 0.01 ticks")
 MACRO_CONFIG_INT(BcCloudInputOthers, bc_cloud_input_others, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Apply cloud input to other tees")
-MACRO_CONFIG_INT(BcAutoMargin, bc_auto_margin, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically adjusts prediction margin in real time for the active input mode, latency and connection stability")
+MACRO_CONFIG_INT(BcAutoMargin, bc_auto_margin, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Auto margin")
 MACRO_CONFIG_INT(BcSnapTap, bc_snap_tap, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable Snap Tap for opposite left/right inputs")
 MACRO_CONFIG_INT(BcSnapTapDelay, bc_snap_tap_delay, 0, 0, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Snap Tap direction switch delay in milliseconds (0 = off)")
 
