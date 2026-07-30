@@ -19,6 +19,7 @@
 #include <cctype>
 #include <cmath>
 #include <deque>
+#include <functional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -40,6 +41,7 @@ namespace
 		FUN_GAME_MEMORY,
 		FUN_GAME_PONG,
 		FUN_GAME_BRICK_BREAKER,
+		FUN_GAME_SUDOKU,
 		NUM_FUN_GAMES
 	};
 
@@ -97,6 +99,7 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 		{"Memory", FontIcon::LAYER_GROUP, "Find all matching pairs"},
 		{"Pong", FontIcon::TABLE_TENNIS_PADDLE_BALL, "W/S or Up/Down to move paddle"},
 		{"Brick Breaker", FontIcon::BORDER_ALL, "Break all bricks with the ball"},
+		{"Sudoku", FontIcon::PEN_TO_SQUARE, "Click cell, 1-9 place, 0/Del clear"},
 	};
 
 	auto RenderIconLabel = [&](const CUIRect &Rect, const char *pIcon, float Size, int Align, const ColorRGBA *pColor = nullptr) {
@@ -1221,9 +1224,67 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 		};
 
 		auto EvaluateBoard = [&](const TChessBoard &Board) {
+			// Piece-square tables from white's perspective (rank 7 -> index 0).
+			static const int s_aPstP[64] = {
+				0, 0, 0, 0, 0, 0, 0, 0,
+				50, 50, 50, 50, 50, 50, 50, 50,
+				10, 10, 20, 30, 30, 20, 10, 10,
+				5, 5, 10, 25, 25, 10, 5, 5,
+				0, 0, 0, 20, 20, 0, 0, 0,
+				5, -5, -10, 0, 0, -10, -5, 5,
+				5, 10, 10, -20, -20, 10, 10, 5,
+				0, 0, 0, 0, 0, 0, 0, 0};
+			static const int s_aPstN[64] = {
+				-50, -40, -30, -30, -30, -30, -40, -50,
+				-40, -20, 0, 0, 0, 0, -20, -40,
+				-30, 0, 10, 15, 15, 10, 0, -30,
+				-30, 5, 15, 20, 20, 15, 5, -30,
+				-30, 0, 15, 20, 20, 15, 0, -30,
+				-30, 5, 10, 15, 15, 10, 5, -30,
+				-40, -20, 0, 5, 5, 0, -20, -40,
+				-50, -40, -30, -30, -30, -30, -40, -50};
+			static const int s_aPstB[64] = {
+				-20, -10, -10, -10, -10, -10, -10, -20,
+				-10, 0, 0, 0, 0, 0, 0, -10,
+				-10, 0, 5, 10, 10, 5, 0, -10,
+				-10, 5, 5, 10, 10, 5, 5, -10,
+				-10, 0, 10, 10, 10, 10, 0, -10,
+				-10, 10, 10, 10, 10, 10, 10, -10,
+				-10, 5, 0, 0, 0, 0, 5, -10,
+				-20, -10, -10, -10, -10, -10, -10, -20};
+			static const int s_aPstR[64] = {
+				0, 0, 0, 0, 0, 0, 0, 0,
+				5, 10, 10, 10, 10, 10, 10, 5,
+				-5, 0, 0, 0, 0, 0, 0, -5,
+				-5, 0, 0, 0, 0, 0, 0, -5,
+				-5, 0, 0, 0, 0, 0, 0, -5,
+				-5, 0, 0, 0, 0, 0, 0, -5,
+				-5, 0, 0, 0, 0, 0, 0, -5,
+				0, 0, 0, 5, 5, 0, 0, 0};
+			static const int s_aPstQ[64] = {
+				-20, -10, -10, -5, -5, -10, -10, -20,
+				-10, 0, 0, 0, 0, 0, 0, -10,
+				-10, 0, 5, 5, 5, 5, 0, -10,
+				-5, 0, 5, 5, 5, 5, 0, -5,
+				0, 0, 5, 5, 5, 5, 0, -5,
+				-10, 5, 5, 5, 5, 5, 0, -10,
+				-10, 0, 5, 0, 0, 0, 0, -10,
+				-20, -10, -10, -5, -5, -10, -10, -20};
+			static const int s_aPstKMid[64] = {
+				-30, -40, -40, -50, -50, -40, -40, -30,
+				-30, -40, -40, -50, -50, -40, -40, -30,
+				-30, -40, -40, -50, -50, -40, -40, -30,
+				-30, -40, -40, -50, -50, -40, -40, -30,
+				-20, -30, -30, -40, -40, -30, -30, -20,
+				-10, -20, -20, -20, -20, -20, -20, -10,
+				20, 20, 0, 0, 0, 0, 20, 20,
+				20, 30, 10, 0, 0, 10, 30, 20};
+
 			bool WhiteKingAlive = false;
 			bool BlackKingAlive = false;
-			int Score = 0; // positive = better for black(bot)
+			int Score = 0; // positive = better for black (bot)
+			int WhiteMaterial = 0;
+			int BlackMaterial = 0;
 			for(int y = 0; y < 8; ++y)
 			{
 				for(int x = 0; x < 8; ++x)
@@ -1233,21 +1294,45 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 						continue;
 
 					const bool White = IsWhitePiece(Piece);
-					if(Piece == 'K')
-						WhiteKingAlive = true;
-					else if(Piece == 'k')
-						BlackKingAlive = true;
-
-					int Local = PieceValue(Piece);
-					const float CenterDist = absolute((float)x - 3.5f) + absolute((float)y - 3.5f);
-					Local += round_to_int((3.5f - 0.5f * CenterDist) * 8.0f);
-
 					const char Upper = (char)toupper((unsigned char)Piece);
-					if(Upper == 'P')
-						Local += White ? (6 - y) * 3 : (y - 1) * 3;
-					else if(Upper == 'K')
-						Local += White ? (y - 4) * 2 : (3 - y) * 2;
+					if(Upper == 'K')
+					{
+						if(White)
+							WhiteKingAlive = true;
+						else
+							BlackKingAlive = true;
+					}
 
+					const int Material = PieceValue(Piece);
+					if(Upper != 'K')
+					{
+						if(White)
+							WhiteMaterial += Material;
+						else
+							BlackMaterial += Material;
+					}
+
+					const int SqWhite = y * 8 + x;
+					const int SqBlack = (7 - y) * 8 + x;
+					const int Sq = White ? SqWhite : SqBlack;
+					int Pst = 0;
+					switch(Upper)
+					{
+					case 'P': Pst = s_aPstP[Sq]; break;
+					case 'N': Pst = s_aPstN[Sq]; break;
+					case 'B': Pst = s_aPstB[Sq]; break;
+					case 'R': Pst = s_aPstR[Sq]; break;
+					case 'Q': Pst = s_aPstQ[Sq]; break;
+					case 'K': Pst = s_aPstKMid[Sq]; break;
+					default: break;
+					}
+
+					int Local = Material + Pst;
+					if(Upper == 'P')
+					{
+						// Passed-pawn-ish push bonus
+						Local += White ? (6 - y) * 4 : (y - 1) * 4;
+					}
 					Score += White ? -Local : Local;
 				}
 			}
@@ -1256,6 +1341,14 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 				return -1000000;
 			if(!WhiteKingAlive)
 				return 1000000;
+
+			// Prefer trading when ahead.
+			const int MaterialDiff = BlackMaterial - WhiteMaterial;
+			if(MaterialDiff > 200)
+				Score += MaterialDiff / 20;
+			else if(MaterialDiff < -200)
+				Score += MaterialDiff / 20;
+
 			return Score;
 		};
 
@@ -1263,55 +1356,98 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			return IsValidMoveOnBoard(s_Chess.m_aBoard, FromX, FromY, ToX, ToY);
 		};
 
+		auto OrderMovesForSearch = [&](const TChessBoard &Board, std::vector<SChessMove> &vMoves) {
+			std::sort(vMoves.begin(), vMoves.end(), [&](const SChessMove &A, const SChessMove &B) {
+				const char CapA = Board[A.m_ToY][A.m_ToX];
+				const char CapB = Board[B.m_ToY][B.m_ToX];
+				const int ScoreA = PieceValue(CapA) * 16 - PieceValue(Board[A.m_FromY][A.m_FromX]) / 10;
+				const int ScoreB = PieceValue(CapB) * 16 - PieceValue(Board[B.m_FromY][B.m_FromX]) / 10;
+				return ScoreA > ScoreB;
+			});
+		};
+
 		auto PickBotMove = [&](SChessMove &OutMove) {
 			const TChessBoard RootBoard = CopyChessBoard();
-			std::vector<SChessMove> vMoves = CollectLegalMovesOnBoard(RootBoard, false);
-			if(vMoves.empty())
+			std::vector<SChessMove> vRootMoves = CollectLegalMovesOnBoard(RootBoard, false);
+			if(vRootMoves.empty())
 				return false;
 
-			int BestScore = -10000000;
+			OrderMovesForSearch(RootBoard, vRootMoves);
+
+			constexpr int INF = 10000000;
+			constexpr int SEARCH_DEPTH = 3; // ~2-3x stronger than previous 1-reply search
+
+			std::function<int(const TChessBoard &, int, int, int, bool)> Minimax =
+				[&](const TChessBoard &Board, int Depth, int Alpha, int Beta, bool MaximizingBlack) -> int {
+				if(Depth <= 0)
+					return EvaluateBoard(Board);
+
+				const bool WhiteToMove = !MaximizingBlack;
+				std::vector<SChessMove> vMoves = CollectLegalMovesOnBoard(Board, WhiteToMove);
+				if(vMoves.empty())
+				{
+					if(IsCheckOnBoard(Board, WhiteToMove))
+						return MaximizingBlack ? -INF + (SEARCH_DEPTH - Depth) : INF - (SEARCH_DEPTH - Depth);
+					return 0; // stalemate
+				}
+
+				OrderMovesForSearch(Board, vMoves);
+
+				if(MaximizingBlack)
+				{
+					int Best = -INF;
+					for(const SChessMove &Move : vMoves)
+					{
+						TChessBoard Next = Board;
+						ApplyMoveOnBoard(Next, Move);
+						Best = maximum(Best, Minimax(Next, Depth - 1, Alpha, Beta, false));
+						Alpha = maximum(Alpha, Best);
+						if(Beta <= Alpha)
+							break;
+					}
+					return Best;
+				}
+
+				int Best = INF;
+				for(const SChessMove &Move : vMoves)
+				{
+					TChessBoard Next = Board;
+					ApplyMoveOnBoard(Next, Move);
+					Best = minimum(Best, Minimax(Next, Depth - 1, Alpha, Beta, true));
+					Beta = minimum(Beta, Best);
+					if(Beta <= Alpha)
+						break;
+				}
+				return Best;
+			};
+
+			int BestScore = -INF;
 			std::vector<SChessMove> vBestMoves;
-			for(const SChessMove &Move : vMoves)
+			for(const SChessMove &Move : vRootMoves)
 			{
 				TChessBoard AfterBot = RootBoard;
 				const char CapturedByBot = ApplyMoveOnBoard(AfterBot, Move);
-				int Score = EvaluateBoard(AfterBot);
+				int Score;
 				if(CapturedByBot == 'K')
-					Score = 1000000;
+					Score = INF;
 				else
-				{
-					std::vector<SChessMove> vReplies = CollectLegalMovesOnBoard(AfterBot, true);
-					if(!vReplies.empty())
-					{
-						int WorstReplyScore = 10000000;
-						for(const SChessMove &Reply : vReplies)
-						{
-							TChessBoard AfterReply = AfterBot;
-							const char CapturedByWhite = ApplyMoveOnBoard(AfterReply, Reply);
-							int ReplyScore = EvaluateBoard(AfterReply);
-							if(CapturedByWhite == 'k')
-								ReplyScore = -1000000;
-							WorstReplyScore = std::min(WorstReplyScore, ReplyScore);
-						}
-						Score = WorstReplyScore;
-					}
-				}
+					Score = Minimax(AfterBot, SEARCH_DEPTH - 1, -INF, INF, false);
 
-				Score += PieceValue(CapturedByBot) / 5;
-				Score += Move.m_ToY - Move.m_FromY;
-
-				if(Score > BestScore + 10)
+				// Tiny jitter band so equally good lines still feel natural
+				if(Score > BestScore + 8)
 				{
 					BestScore = Score;
 					vBestMoves.clear();
 					vBestMoves.push_back(Move);
 				}
-				else if(abs(Score - BestScore) <= 10)
+				else if(abs(Score - BestScore) <= 8)
 				{
 					vBestMoves.push_back(Move);
 				}
 			}
 
+			if(vBestMoves.empty())
+				return false;
 			OutMove = vBestMoves[rand() % vBestMoves.size()];
 			return true;
 		};
@@ -1487,7 +1623,8 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 		if(!s_Chess.m_GameOver)
 		{
 			const bool BotTurn = !s_Chess.m_WhiteTurn;
-			if(BotTurn && !s_Chess.m_Dragging)
+			const bool MoveAnimBusy = s_Chess.m_HasMoveAnim && AnimTime - s_Chess.m_AnimStart < s_Chess.m_AnimDuration;
+			if(BotTurn && !s_Chess.m_Dragging && !MoveAnimBusy)
 			{
 				SChessMove BotMove;
 				if(!PickBotMove(BotMove))
@@ -2263,6 +2400,440 @@ void CMenus::RenderSettingsBestClientFun(CUIRect MainView)
 			CUIRect Overlay = Arena;
 			Overlay.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.40f), IGraphics::CORNER_ALL, 6.0f);
 			Ui()->DoLabel(&Overlay, s_Brick.m_Won ? TCLocalize("All bricks cleared") : TCLocalize("Game Over"), HEADLINE_FONT_SIZE, TEXTALIGN_MC);
+		}
+	}
+	else if(s_SelectedGame == FUN_GAME_SUDOKU)
+	{
+		struct SSudokuState
+		{
+			bool m_Initialized = false;
+			int m_aSolution[9][9] = {};
+			int m_aGrid[9][9] = {};
+			uint8_t m_aGiven[9][9] = {};
+			int m_SelectedX = -1;
+			int m_SelectedY = -1;
+			int m_Difficulty = 1; // 0 easy, 1 medium, 2 hard
+			int m_EmptyCells = 0;
+			int m_Mistakes = 0;
+			bool m_Won = false;
+			bool m_HasConflict = false;
+		};
+
+		static SSudokuState s_Sudoku;
+		static CButtonContainer s_SudokuRestartButton;
+		static CButtonContainer s_aSudokuDiffButtons[3];
+		static CButtonContainer s_aSudokuNumButtons[10];
+
+		auto IsSafe = [&](const int aBoard[9][9], int Row, int Col, int Num) {
+			for(int i = 0; i < 9; ++i)
+			{
+				if(aBoard[Row][i] == Num || aBoard[i][Col] == Num)
+					return false;
+			}
+			const int BoxRow = (Row / 3) * 3;
+			const int BoxCol = (Col / 3) * 3;
+			for(int y = 0; y < 3; ++y)
+				for(int x = 0; x < 3; ++x)
+					if(aBoard[BoxRow + y][BoxCol + x] == Num)
+						return false;
+			return true;
+		};
+
+		auto FindEmpty = [&](const int aBoard[9][9], int &OutRow, int &OutCol) {
+			for(int y = 0; y < 9; ++y)
+				for(int x = 0; x < 9; ++x)
+					if(aBoard[y][x] == 0)
+					{
+						OutRow = y;
+						OutCol = x;
+						return true;
+					}
+			return false;
+		};
+
+		auto SolveBoard = [&](auto &&Self, int aBoard[9][9]) -> bool {
+			int Row = 0;
+			int Col = 0;
+			if(!FindEmpty(aBoard, Row, Col))
+				return true;
+
+			int aOrder[9] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+			for(int i = 8; i > 0; --i)
+				std::swap(aOrder[i], aOrder[rand() % (i + 1)]);
+
+			for(int i = 0; i < 9; ++i)
+			{
+				const int Num = aOrder[i];
+				if(!IsSafe(aBoard, Row, Col, Num))
+					continue;
+				aBoard[Row][Col] = Num;
+				if(Self(Self, aBoard))
+					return true;
+				aBoard[Row][Col] = 0;
+			}
+			return false;
+		};
+
+		auto CountSolutions = [&](auto &&Self, int aBoard[9][9], int &Count, int Limit) -> void {
+			if(Count >= Limit)
+				return;
+			int Row = 0;
+			int Col = 0;
+			if(!FindEmpty(aBoard, Row, Col))
+			{
+				Count++;
+				return;
+			}
+			for(int Num = 1; Num <= 9; ++Num)
+			{
+				if(!IsSafe(aBoard, Row, Col, Num))
+					continue;
+				aBoard[Row][Col] = Num;
+				Self(Self, aBoard, Count, Limit);
+				aBoard[Row][Col] = 0;
+				if(Count >= Limit)
+					return;
+			}
+		};
+
+		auto CellConflicts = [&](int Row, int Col, int Num) {
+			if(Num <= 0)
+				return false;
+			for(int i = 0; i < 9; ++i)
+			{
+				if(i != Col && s_Sudoku.m_aGrid[Row][i] == Num)
+					return true;
+				if(i != Row && s_Sudoku.m_aGrid[i][Col] == Num)
+					return true;
+			}
+			const int BoxRow = (Row / 3) * 3;
+			const int BoxCol = (Col / 3) * 3;
+			for(int y = 0; y < 3; ++y)
+				for(int x = 0; x < 3; ++x)
+				{
+					const int Cy = BoxRow + y;
+					const int Cx = BoxCol + x;
+					if((Cy != Row || Cx != Col) && s_Sudoku.m_aGrid[Cy][Cx] == Num)
+						return true;
+				}
+			return false;
+		};
+
+		auto RecalcStats = [&]() {
+			s_Sudoku.m_EmptyCells = 0;
+			s_Sudoku.m_HasConflict = false;
+			for(int y = 0; y < 9; ++y)
+				for(int x = 0; x < 9; ++x)
+				{
+					const int Val = s_Sudoku.m_aGrid[y][x];
+					if(Val == 0)
+					{
+						s_Sudoku.m_EmptyCells++;
+						continue;
+					}
+					if(CellConflicts(y, x, Val))
+						s_Sudoku.m_HasConflict = true;
+				}
+			s_Sudoku.m_Won = s_Sudoku.m_EmptyCells == 0 && !s_Sudoku.m_HasConflict;
+		};
+
+		auto ResetSudoku = [&]() {
+			s_Sudoku.m_Initialized = true;
+			s_Sudoku.m_SelectedX = -1;
+			s_Sudoku.m_SelectedY = -1;
+			s_Sudoku.m_Mistakes = 0;
+			s_Sudoku.m_Won = false;
+			s_Sudoku.m_HasConflict = false;
+
+			for(int y = 0; y < 9; ++y)
+				for(int x = 0; x < 9; ++x)
+					s_Sudoku.m_aSolution[y][x] = 0;
+
+			// Seed independent diagonal boxes, then solve the rest.
+			for(int Box = 0; Box < 3; ++Box)
+			{
+				int aNums[9] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+				for(int i = 8; i > 0; --i)
+					std::swap(aNums[i], aNums[rand() % (i + 1)]);
+				int Idx = 0;
+				for(int y = 0; y < 3; ++y)
+					for(int x = 0; x < 3; ++x)
+						s_Sudoku.m_aSolution[Box * 3 + y][Box * 3 + x] = aNums[Idx++];
+			}
+			SolveBoard(SolveBoard, s_Sudoku.m_aSolution);
+
+			for(int y = 0; y < 9; ++y)
+				for(int x = 0; x < 9; ++x)
+				{
+					s_Sudoku.m_aGrid[y][x] = s_Sudoku.m_aSolution[y][x];
+					s_Sudoku.m_aGiven[y][x] = 1;
+				}
+
+			const int TargetClues = s_Sudoku.m_Difficulty == 0 ? 40 : (s_Sudoku.m_Difficulty == 1 ? 32 : 26);
+			std::vector<ivec2> vCells;
+			vCells.reserve(81);
+			for(int y = 0; y < 9; ++y)
+				for(int x = 0; x < 9; ++x)
+					vCells.push_back(ivec2(x, y));
+			ShuffleVector(vCells);
+
+			int Clues = 81;
+			int UniqueFails = 0;
+			for(const ivec2 &Cell : vCells)
+			{
+				if(Clues <= TargetClues)
+					break;
+
+				const int Backup = s_Sudoku.m_aGrid[Cell.y][Cell.x];
+				s_Sudoku.m_aGrid[Cell.y][Cell.x] = 0;
+
+				// Keep uniqueness while cheap; after repeated conflicts just carve clues.
+				bool KeepRemoved = true;
+				if(UniqueFails < 18)
+				{
+					int aProbe[9][9];
+					for(int y = 0; y < 9; ++y)
+						for(int x = 0; x < 9; ++x)
+							aProbe[y][x] = s_Sudoku.m_aGrid[y][x];
+
+					int Solutions = 0;
+					CountSolutions(CountSolutions, aProbe, Solutions, 2);
+					if(Solutions != 1)
+					{
+						s_Sudoku.m_aGrid[Cell.y][Cell.x] = Backup;
+						UniqueFails++;
+						KeepRemoved = false;
+					}
+				}
+
+				if(!KeepRemoved)
+					continue;
+
+				s_Sudoku.m_aGiven[Cell.y][Cell.x] = 0;
+				Clues--;
+			}
+
+			RecalcStats();
+		};
+
+		auto PlaceNumber = [&](int Num) {
+			if(s_Sudoku.m_Won)
+				return;
+			if(s_Sudoku.m_SelectedX < 0 || s_Sudoku.m_SelectedY < 0)
+				return;
+			if(s_Sudoku.m_aGiven[s_Sudoku.m_SelectedY][s_Sudoku.m_SelectedX])
+				return;
+
+			const int Prev = s_Sudoku.m_aGrid[s_Sudoku.m_SelectedY][s_Sudoku.m_SelectedX];
+			if(Prev == Num)
+				return;
+
+			s_Sudoku.m_aGrid[s_Sudoku.m_SelectedY][s_Sudoku.m_SelectedX] = Num;
+			if(Num != 0 && Num != s_Sudoku.m_aSolution[s_Sudoku.m_SelectedY][s_Sudoku.m_SelectedX])
+				s_Sudoku.m_Mistakes++;
+			RecalcStats();
+		};
+
+		if(!s_Sudoku.m_Initialized)
+			ResetSudoku();
+
+		CUIRect TopBarSudoku, BoardArea;
+		GameContent.HSplitTop(LINE_SIZE * 1.2f, &TopBarSudoku, &BoardArea);
+		BoardArea.HSplitTop(MARGIN_SMALL, nullptr, &BoardArea);
+
+		CUIRect StatsLabel, DiffArea, RestartButton;
+		TopBarSudoku.VSplitLeft(260.0f, &StatsLabel, &DiffArea);
+		DiffArea.VSplitRight(110.0f, &DiffArea, &RestartButton);
+
+		char aStats[128];
+		str_format(aStats, sizeof(aStats), "Empty: %d   Mistakes: %d", s_Sudoku.m_EmptyCells, s_Sudoku.m_Mistakes);
+		Ui()->DoLabel(&StatsLabel, aStats, FONT_SIZE, TEXTALIGN_ML);
+
+		static const char *s_apDiffNames[3] = {"Easy", "Medium", "Hard"};
+		const float DiffBtnW = DiffArea.w / 3.0f;
+		for(int i = 0; i < 3; ++i)
+		{
+			CUIRect DiffBtn;
+			DiffBtn.x = DiffArea.x + i * DiffBtnW;
+			DiffBtn.y = DiffArea.y;
+			DiffBtn.w = DiffBtnW - 2.0f;
+			DiffBtn.h = DiffArea.h;
+			const int Active = s_Sudoku.m_Difficulty == i ? 1 : 0;
+			if(DoButton_Menu(&s_aSudokuDiffButtons[i], TCLocalize(s_apDiffNames[i]), Active, &DiffBtn))
+			{
+				if(s_Sudoku.m_Difficulty != i)
+				{
+					s_Sudoku.m_Difficulty = i;
+					ResetSudoku();
+				}
+			}
+		}
+
+		if(DoButton_Menu(&s_SudokuRestartButton, TCLocalize("Restart"), 0, &RestartButton))
+			ResetSudoku();
+
+		CUIRect PlayArea, PadArea;
+		BoardArea.VSplitRight(minimum(168.0f, BoardArea.w * 0.26f), &PlayArea, &PadArea);
+		PadArea.VSplitLeft(MARGIN_SMALL, nullptr, &PadArea);
+
+		const float GridSize = minimum(PlayArea.w, PlayArea.h);
+		const float CellSize = GridSize / 9.0f;
+		CUIRect Board;
+		Board.w = GridSize;
+		Board.h = GridSize;
+		Board.x = PlayArea.x + (PlayArea.w - Board.w) * 0.5f;
+		Board.y = PlayArea.y + (PlayArea.h - Board.h) * 0.5f;
+		Board.Draw(ColorRGBA(0.04f, 0.06f, 0.10f, 0.92f), IGraphics::CORNER_ALL, 4.0f);
+
+		int HoverX = -1;
+		int HoverY = -1;
+		if(Ui()->MouseInside(&Board))
+		{
+			const vec2 Mouse = Ui()->MousePos();
+			HoverX = std::clamp((int)((Mouse.x - Board.x) / CellSize), 0, 8);
+			HoverY = std::clamp((int)((Mouse.y - Board.y) / CellSize), 0, 8);
+			if(Ui()->MouseButtonClicked(0) && !s_Sudoku.m_Won)
+			{
+				s_Sudoku.m_SelectedX = HoverX;
+				s_Sudoku.m_SelectedY = HoverY;
+			}
+		}
+
+		const int SelectedValue = (s_Sudoku.m_SelectedX >= 0 && s_Sudoku.m_SelectedY >= 0) ? s_Sudoku.m_aGrid[s_Sudoku.m_SelectedY][s_Sudoku.m_SelectedX] : 0;
+
+		for(int y = 0; y < 9; ++y)
+		{
+			for(int x = 0; x < 9; ++x)
+			{
+				CUIRect Cell;
+				Cell.x = Board.x + x * CellSize;
+				Cell.y = Board.y + y * CellSize;
+				Cell.w = CellSize;
+				Cell.h = CellSize;
+
+				const bool InSelectedBox = s_Sudoku.m_SelectedX >= 0 &&
+					(x / 3) == (s_Sudoku.m_SelectedX / 3) && (y / 3) == (s_Sudoku.m_SelectedY / 3);
+				const bool SameRowCol = s_Sudoku.m_SelectedX >= 0 && (x == s_Sudoku.m_SelectedX || y == s_Sudoku.m_SelectedY);
+				ColorRGBA Col = ((x / 3 + y / 3) % 2 == 0) ? ColorRGBA(0.14f, 0.16f, 0.20f, 0.96f) : ColorRGBA(0.11f, 0.13f, 0.17f, 0.96f);
+				if(SameRowCol || InSelectedBox)
+					Col = BlendColors(Col, ColorRGBA(0.30f, 0.45f, 0.70f, 0.55f), 0.35f);
+				if(x == s_Sudoku.m_SelectedX && y == s_Sudoku.m_SelectedY)
+					Col = BlendColors(Col, ColorRGBA(0.35f, 0.65f, 1.0f, 0.9f), 0.55f);
+				else if(x == HoverX && y == HoverY)
+					Col = BlendColors(Col, ColorRGBA(1.0f, 1.0f, 1.0f, 0.2f), 0.45f);
+
+				const int Val = s_Sudoku.m_aGrid[y][x];
+				const bool Conflict = Val != 0 && CellConflicts(y, x, Val);
+				if(Conflict)
+					Col = BlendColors(Col, ColorRGBA(0.95f, 0.25f, 0.28f, 0.85f), 0.45f);
+				else if(SelectedValue != 0 && Val == SelectedValue)
+					Col = BlendColors(Col, ColorRGBA(0.35f, 0.75f, 0.95f, 0.7f), 0.40f);
+
+				const float Pad = maximum(0.5f, CellSize * 0.04f);
+				CUIRect Inner = Cell;
+				Inner.Margin(Pad, &Inner);
+				Inner.Draw(Col, IGraphics::CORNER_NONE, 0.0f);
+
+				if(Val != 0)
+				{
+					char aValue[4];
+					str_format(aValue, sizeof(aValue), "%d", Val);
+					const bool Given = s_Sudoku.m_aGiven[y][x] != 0;
+					TextRender()->TextColor(Conflict ? ColorRGBA(1.0f, 0.45f, 0.45f, 1.0f) : (Given ? ColorRGBA(0.95f, 0.96f, 0.98f, 1.0f) : ColorRGBA(0.45f, 0.78f, 1.0f, 1.0f)));
+					Ui()->DoLabel(&Inner, aValue, Inner.h * 0.55f, TEXTALIGN_MC);
+					TextRender()->TextColor(TextRender()->DefaultTextColor());
+				}
+			}
+		}
+
+		// Box outlines
+		for(int i = 0; i <= 3; ++i)
+		{
+			CUIRect LineH, LineV;
+			LineH.x = Board.x;
+			LineH.y = Board.y + i * CellSize * 3.0f - 1.0f;
+			LineH.w = Board.w;
+			LineH.h = 2.0f;
+			LineH.Draw(ColorRGBA(0.75f, 0.82f, 0.95f, 0.55f), IGraphics::CORNER_NONE, 0.0f);
+
+			LineV.x = Board.x + i * CellSize * 3.0f - 1.0f;
+			LineV.y = Board.y;
+			LineV.w = 2.0f;
+			LineV.h = Board.h;
+			LineV.Draw(ColorRGBA(0.75f, 0.82f, 0.95f, 0.55f), IGraphics::CORNER_NONE, 0.0f);
+		}
+
+		// Number pad (3x3 + clear)
+		{
+			CUIRect PadTitle;
+			PadArea.HSplitTop(LINE_SIZE, &PadTitle, &PadArea);
+			Ui()->DoLabel(&PadTitle, TCLocalize("Numbers"), FONT_SIZE, TEXTALIGN_MC);
+			PadArea.HSplitTop(MARGIN_SMALL, nullptr, &PadArea);
+
+			const float Gap = MARGIN_SMALL * 0.6f;
+			const float NumBtnSize = minimum((PadArea.w - Gap * 2.0f) / 3.0f, (PadArea.h - Gap * 4.0f) / 4.0f);
+			for(int n = 1; n <= 9; ++n)
+			{
+				const int Row = (n - 1) / 3;
+				const int Col = (n - 1) % 3;
+				CUIRect NumBtn;
+				NumBtn.w = NumBtnSize;
+				NumBtn.h = NumBtnSize;
+				NumBtn.x = PadArea.x + Col * (NumBtnSize + Gap);
+				NumBtn.y = PadArea.y + Row * (NumBtnSize + Gap);
+				char aNum[4];
+				str_format(aNum, sizeof(aNum), "%d", n);
+				if(DoButton_Menu(&s_aSudokuNumButtons[n], aNum, 0, &NumBtn))
+					PlaceNumber(n);
+			}
+
+			CUIRect ClearBtn;
+			ClearBtn.w = NumBtnSize * 3.0f + Gap * 2.0f;
+			ClearBtn.h = NumBtnSize;
+			ClearBtn.x = PadArea.x;
+			ClearBtn.y = PadArea.y + 3.0f * (NumBtnSize + Gap);
+			if(DoButton_Menu(&s_aSudokuNumButtons[0], TCLocalize("Clear"), 0, &ClearBtn))
+				PlaceNumber(0);
+		}
+
+		if(!s_Sudoku.m_Won)
+		{
+			static const int s_aNumKeys[9] = {KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8, KEY_9};
+			static const int s_aKpKeys[9] = {KEY_KP_1, KEY_KP_2, KEY_KP_3, KEY_KP_4, KEY_KP_5, KEY_KP_6, KEY_KP_7, KEY_KP_8, KEY_KP_9};
+			for(int i = 0; i < 9; ++i)
+			{
+				if(Input()->KeyPress(s_aNumKeys[i]) || Input()->KeyPress(s_aKpKeys[i]))
+					PlaceNumber(i + 1);
+			}
+			if(Input()->KeyPress(KEY_0) || Input()->KeyPress(KEY_KP_0) || Input()->KeyPress(KEY_BACKSPACE) || Input()->KeyPress(KEY_DELETE))
+				PlaceNumber(0);
+
+			if(Input()->KeyPress(KEY_LEFT) || Input()->KeyPress(KEY_RIGHT) || Input()->KeyPress(KEY_UP) || Input()->KeyPress(KEY_DOWN))
+			{
+				if(s_Sudoku.m_SelectedX < 0 || s_Sudoku.m_SelectedY < 0)
+				{
+					s_Sudoku.m_SelectedX = 4;
+					s_Sudoku.m_SelectedY = 4;
+				}
+				else
+				{
+					if(Input()->KeyPress(KEY_LEFT))
+						s_Sudoku.m_SelectedX = (s_Sudoku.m_SelectedX + 8) % 9;
+					if(Input()->KeyPress(KEY_RIGHT))
+						s_Sudoku.m_SelectedX = (s_Sudoku.m_SelectedX + 1) % 9;
+					if(Input()->KeyPress(KEY_UP))
+						s_Sudoku.m_SelectedY = (s_Sudoku.m_SelectedY + 8) % 9;
+					if(Input()->KeyPress(KEY_DOWN))
+						s_Sudoku.m_SelectedY = (s_Sudoku.m_SelectedY + 1) % 9;
+				}
+			}
+		}
+
+		if(s_Sudoku.m_Won)
+		{
+			CUIRect Overlay = Board;
+			Overlay.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.40f), IGraphics::CORNER_ALL, 4.0f);
+			Ui()->DoLabel(&Overlay, TCLocalize("Sudoku Solved"), HEADLINE_FONT_SIZE, TEXTALIGN_MC);
 		}
 	}
 	else if(s_SelectedGame == FUN_GAME_CASINO)
