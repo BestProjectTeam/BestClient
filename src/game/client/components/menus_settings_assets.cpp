@@ -1594,23 +1594,46 @@ void CMenus::RenderSettingsCustom(CUIRect MainView)
 		gs_aInitCustomList[s_CurCustomTab] = true;
 	}
 
+	DirectoryButton.HSplitTop(5.0f, nullptr, &DirectoryButton);
+
 	if(s_CurCustomTab == ASSETS_TAB_ENTITIES)
 	{
 		CUIRect ToggleRect;
+		DirectoryButton.VSplitLeft(10.0f, nullptr, &DirectoryButton);
+		DirectoryButton.VSplitLeft(25.0f, &ToggleRect, &DirectoryButton);
 		DirectoryButton.VSplitLeft(5.0f, nullptr, &DirectoryButton);
-		DirectoryButton.VSplitLeft(140.0f, &ToggleRect, &DirectoryButton);
-		DirectoryButton.VSplitLeft(5.0f, nullptr, &DirectoryButton);
-		ToggleRect.HSplitTop(5.0f, nullptr, &ToggleRect);
+		TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+		TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING | ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT | ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
 		static CButtonContainer s_EntityPreviewToggleId;
-		if(DoButton_Menu(&s_EntityPreviewToggleId, Localize("Better Preview"), s_EntityGamePreview, &ToggleRect))
+		if(DoButton_Menu(&s_EntityPreviewToggleId, s_EntityGamePreview ? FontIcon::EYE : FontIcon::IMAGE, s_EntityGamePreview, &ToggleRect))
 			s_EntityGamePreview = !s_EntityGamePreview;
+		TextRender()->SetRenderFlags(0);
+		TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 		GameClient()->m_Tooltips.DoToolTip(&s_EntityPreviewToggleId, &ToggleRect, Localize("Toggle between game scene preview and raw texture"));
 	}
 
-	DirectoryButton.HSplitTop(5.0f, nullptr, &DirectoryButton);
-	DirectoryButton.VSplitRight(175.0f, nullptr, &DirectoryButton);
-	DirectoryButton.VSplitRight(25.0f, &DirectoryButton, &ReloadButton);
-	DirectoryButton.VSplitRight(10.0f, &DirectoryButton, nullptr);
+	// Right cluster: Assets editor | gap | Assets directory | gap | Reload
+	constexpr float AssetsEditorW = 140.0f;
+	constexpr float AssetsDirectoryW = 140.0f;
+	constexpr float ReloadW = 25.0f;
+	constexpr float RightGap = 10.0f;
+	const float RightClusterW = AssetsEditorW + RightGap + AssetsDirectoryW + RightGap + ReloadW;
+
+	CUIRect RightCluster, AssetsEditorButton;
+	DirectoryButton.VSplitRight(RightClusterW, nullptr, &RightCluster);
+	RightCluster.VSplitRight(ReloadW, &RightCluster, &ReloadButton);
+	RightCluster.VSplitRight(RightGap, &RightCluster, nullptr);
+	RightCluster.VSplitRight(AssetsDirectoryW, &RightCluster, &DirectoryButton);
+	RightCluster.VSplitRight(RightGap, &RightCluster, nullptr);
+	AssetsEditorButton = RightCluster;
+
+	static CButtonContainer s_AssetsEditorButton;
+	if(DoButton_Menu(&s_AssetsEditorButton, Localize("Assets editor"), 0, &AssetsEditorButton))
+	{
+		m_AssetsEditorState.m_VisualsEditorOpen = true;
+		m_AssetsEditorState.m_FullscreenOpen = true;
+	}
+
 	static CButtonContainer s_AssetsDirId;
 	if(DoButton_Menu(&s_AssetsDirId, Localize("Assets directory"), 0, &DirectoryButton))
 	{

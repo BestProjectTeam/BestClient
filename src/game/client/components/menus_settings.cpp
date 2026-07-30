@@ -1607,6 +1607,11 @@ void CMenus::RenderSettings(CUIRect MainView)
 		RenderSettingsBestClientGifWheelFullscreen(*Ui()->Screen());
 		return;
 	}
+	if(m_AssetsEditorState.m_VisualsEditorOpen && m_AssetsEditorState.m_FullscreenOpen)
+	{
+		RenderAssetsEditorScreen(*Ui()->Screen());
+		return;
+	}
 
 	g_Config.m_BcSettingsLayout = minimum(maximum(g_Config.m_BcSettingsLayout, 0), 1);
 

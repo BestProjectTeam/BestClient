@@ -1040,7 +1040,7 @@ private:
 	SAssetsEditorState m_AssetsEditorState;
 	void RenderAssetsEditorScreen(CUIRect MainView);
 	void AssetsEditorClearAssets();
-	void AssetsEditorReloadAssets();
+	void AssetsEditorReloadAssets(int OnlyType = -1);
 	void AssetsEditorReloadAssetsImagesOnly();
 	void AssetsEditorResetPartSlots();
 	void AssetsEditorEnsureDefaultExportNames();

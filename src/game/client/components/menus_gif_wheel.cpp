@@ -412,15 +412,7 @@ void CMenus::RenderSettingsBestClientChatMediaBlock(CUIRect &Column)
 	ChatMediaBlockBg.Draw(BlockColor, IGraphics::CORNER_ALL, 10.0f);
 
 	ChatMediaBlock.HSplitTop(ChatMediaLineSize, &Label, &ChatMediaBlock);
-	CUIRect ChatMediaBadge = Label;
-	ChatMediaBadge.VSplitRight(36.0f, nullptr, &ChatMediaBadge);
-	ChatMediaBadge.HMargin(1.5f, &ChatMediaBadge);
 	Ui()->DoLabel(&Label, Localize("Chat Media"), ChatMediaHeadlineFontSize, TEXTALIGN_ML);
-	Graphics()->DrawRect4(ChatMediaBadge.x, ChatMediaBadge.y, ChatMediaBadge.w, ChatMediaBadge.h,
-		ColorRGBA(1.00f, 0.76f, 0.16f, 1.0f), ColorRGBA(0.92f, 0.56f, 0.02f, 1.0f),
-		ColorRGBA(1.00f, 0.76f, 0.16f, 1.0f), ColorRGBA(0.92f, 0.56f, 0.02f, 1.0f),
-		IGraphics::CORNER_ALL, 5.0f);
-	Ui()->DoLabel(&ChatMediaBadge, Localize("UPD"), 11.0f, TEXTALIGN_MC);
 	ChatMediaBlock.HSplitTop(ChatMediaMarginSmall, nullptr, &ChatMediaBlock);
 
 	ChatMediaBlock.HSplitTop(ChatMediaLineSize, &Button, &ChatMediaBlock);

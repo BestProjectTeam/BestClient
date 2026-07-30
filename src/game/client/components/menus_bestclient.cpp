@@ -70,12 +70,6 @@ enum
 
 void CMenus::RenderSettingsBestClient(CUIRect MainView)
 {
-	if(m_AssetsEditorState.m_VisualsEditorOpen && m_AssetsEditorState.m_FullscreenOpen)
-	{
-		RenderAssetsEditorScreen(*Ui()->Screen());
-		return;
-	}
-
 	// Match original old-layout: shift content up past the 20px margin so tab bar
 	// appears 8px from the panel border instead of 20px from content area start.
 	MainView.y -= 20.0f;
@@ -368,8 +362,6 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		g_Config.m_BcNameplateGradientAnimateSpeed = DefaultConfig::BcNameplateGradientAnimateSpeed;
 	}
 	GradientTitleLabel.VSplitRight(MarginSmall, &GradientTitleLabel, nullptr);
-	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &GradientTitleLabel, Localize("NEW"), 12.0f,
-		ColorRGBA(0.25f, 0.85f, 0.40f, 1.0f), ColorRGBA(0.10f, 0.60f, 0.25f, 1.0f), MarginSmall);
 	Ui()->DoLabel(&GradientTitleLabel, Localize("Gradient"), HeadlineFontSize, TEXTALIGN_ML);
 
 	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
@@ -2265,8 +2257,6 @@ void CMenus::RenderSettingsBestClientGameplay(CUIRect MainView)
 	SelfTimeCpBlockBg.Draw(BlockColor, IGraphics::CORNER_ALL, 10.0f);
 
 	SelfTimeCpBlock.HSplitTop(LineSize, &Label, &SelfTimeCpBlock);
-	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &Label, Localize("NEW"), 12.0f,
-		ColorRGBA(0.25f, 0.85f, 0.40f, 1.0f), ColorRGBA(0.10f, 0.60f, 0.25f, 1.0f), MarginSmall);
 	Ui()->DoLabel(&Label, Localize("Self timeCP"), HeadlineFontSize, TEXTALIGN_ML);
 	SelfTimeCpBlock.HSplitTop(MarginSmall, nullptr, &SelfTimeCpBlock);
 
@@ -2812,11 +2802,7 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowPointsInTab, Localize("Show points in tab"), &g_Config.m_BcShowPointsInTab, &ShowPointsButtonView, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcMastersrv, Localize("Use BestClient MasterServer"), &g_Config.m_BcMastersrv, &MiscBlock, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowhudDummyCoordIndicator, Localize("Show player below indicator"), &g_Config.m_BcShowhudDummyCoordIndicator, &MiscBlock, LineSize);
-	CUIRect CheckpointButtonView;
-	MiscBlock.HSplitTop(LineSize, &CheckpointButtonView, &MiscBlock);
-	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &CheckpointButtonView, Localize("NEW"), 11.0f,
-		ColorRGBA(0.25f, 0.85f, 0.40f, 1.0f), ColorRGBA(0.10f, 0.60f, 0.25f, 1.0f), MarginSmall);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowCorrectCheckpoint, Localize("Show correct checkpoint"), &g_Config.m_BcShowCorrectCheckpoint, &CheckpointButtonView, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowCorrectCheckpoint, Localize("Show correct checkpoint"), &g_Config.m_BcShowCorrectCheckpoint, &MiscBlock, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowRealHitbox, Localize("Show real hitbox"), &g_Config.m_BcShowRealHitbox, &MiscBlock, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcAutoTeamLock, Localize("Lock team automatically after joining"), &g_Config.m_BcAutoTeamLock, &MiscBlock, LineSize);
 	if(g_Config.m_BcAutoTeamLock)
@@ -2944,8 +2930,6 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	ChatFilterBlockBg.Draw(BlockColor, IGraphics::CORNER_ALL, 10.0f);
 
 	ChatFilterBlock.HSplitTop(LineSize, &Label, &ChatFilterBlock);
-	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &Label, Localize("NEW"), 12.0f,
-		ColorRGBA(0.25f, 0.85f, 0.40f, 1.0f), ColorRGBA(0.10f, 0.60f, 0.25f, 1.0f), MarginSmall);
 	Ui()->DoLabel(&Label, Localize("Chat Filter"), HeadlineFontSize, TEXTALIGN_ML);
 	ChatFilterBlock.HSplitTop(MarginSmall, nullptr, &ChatFilterBlock);
 
@@ -3308,35 +3292,6 @@ void CMenus::RenderSettingsBestClientInfo(CUIRect MainView)
 		Client()->ViewLink("https://bestclient.fun");
 	// "Check update" rendered without action (not yet ported)
 	DoButtonLineSize_Menu(&s_CheckUpdateButton, Localize("Check update"), 0, &ButtonRight, LineSize, false, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f));
-
-	// ── Editors ────────────────────────────────────────────────────────────
-	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
-	Ui()->DoLabel(&Label, Localize("Editors"), HeadlineFontSize, TEXTALIGN_ML);
-	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-	{
-		const float LSize = 20.0f;
-		CUIRect EditorLabel, EditorButton;
-
-		LeftView.HSplitTop(LSize, &EditorLabel, &LeftView);
-		Ui()->DoLabel(&EditorLabel, Localize("Create mixed assets or jump to the name plate editor."), 14.0f, TEXTALIGN_ML);
-		LeftView.HSplitTop(5.0f, nullptr, &LeftView);
-		static CButtonContainer s_AssetsEditorButton;
-		LeftView.HSplitTop(LSize + 4.0f, &EditorButton, &LeftView);
-		if(DoButton_Menu(&s_AssetsEditorButton, Localize("Assets editor"), 0, &EditorButton))
-		{
-			m_AssetsEditorState.m_VisualsEditorOpen = true;
-			m_AssetsEditorState.m_FullscreenOpen = true;
-			if(!m_AssetsEditorState.m_VisualsEditorInitialized)
-			{
-				AssetsEditorReloadAssets();
-				AssetsEditorResetPartSlots();
-				AssetsEditorEnsureDefaultExportNames();
-				AssetsEditorSyncExportNameFromType();
-				m_AssetsEditorState.m_VisualsEditorInitialized = true;
-			}
-		}
-	}
 
 	// ── Config Files (anchored to the bottom of the left column) ──────────
 	LeftView = LowerLeftView;
