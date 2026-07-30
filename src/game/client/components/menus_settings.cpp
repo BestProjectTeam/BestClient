@@ -507,7 +507,7 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 	const float EyeButtonSize = 40.0f;
 	const bool RenderEyesBelow = MainView.w < 750.0f;
 	CUIRect YourSkin, Checkboxes, SkinPrefix, Eyes, Button, Label;
-	MainView.HSplitTop(130.0f, &YourSkin, &MainView);
+	MainView.HSplitTop(172.0f, &YourSkin, &MainView);
 	if(RenderEyesBelow)
 	{
 		YourSkin.VSplitLeft(MainView.w * 0.45f, &YourSkin, &Checkboxes);
@@ -590,6 +590,21 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 		SkinPrefix.HSplitTop(20.0f, &Button, &SkinPrefix);
 		static CLineInput s_FrozenSkinInput(g_Config.m_TcFrozenSkin, sizeof(g_Config.m_TcFrozenSkin));
 		Ui()->DoClearableEditBox(&s_FrozenSkinInput, &Button, 14.0f);
+
+		SkinPrefix.HSplitTop(2.0f, nullptr, &SkinPrefix);
+		SkinPrefix.HSplitTop(40.0f, &Button, &SkinPrefix);
+		{
+			CUIRect ScrollBar, ValueLabel;
+			Button.HSplitMid(&ScrollBar, &ValueLabel);
+			if(g_Config.m_TcFrozenSkinDarken > 70)
+				g_Config.m_TcFrozenSkinDarken = 70;
+			g_Config.m_TcFrozenSkinDarken = CUi::ms_LinearScrollbarScale.ToAbsolute(
+				Ui()->DoScrollbarH(&g_Config.m_TcFrozenSkinDarken, &ScrollBar, CUi::ms_LinearScrollbarScale.ToRelative(g_Config.m_TcFrozenSkinDarken, 0, 70)),
+				0, 70);
+			char aBuf[64];
+			str_format(aBuf, sizeof(aBuf), "%s: %i%%", Localize("Darken"), g_Config.m_TcFrozenSkinDarken);
+			Ui()->DoLabel(&ValueLabel, aBuf, ValueLabel.h * CUi::ms_FontmodHeight * 0.8f, TEXTALIGN_ML);
+		}
 	}
 	CUIRect RandomColorsButton;
 

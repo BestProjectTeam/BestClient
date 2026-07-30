@@ -1682,8 +1682,9 @@ void CPlayers::OnRender()
 			aRenderInfo[i].m_aSixup[g_Config.m_ClDummy].Reset();
 			if(UseFrozenSkinOverride)
 			{
-				aRenderInfo[i].m_ColorBody = ColorRGBA(1, 1, 1);
-				aRenderInfo[i].m_ColorFeet = ColorRGBA(1, 1, 1);
+				const float Brightness = 1.0f - (g_Config.m_TcFrozenSkinDarken / 100.0f);
+				aRenderInfo[i].m_ColorBody = ColorRGBA(Brightness, Brightness, Brightness);
+				aRenderInfo[i].m_ColorFeet = ColorRGBA(Brightness, Brightness, Brightness);
 				aRenderInfo[i].m_CustomColoredSkin = false;
 				aRenderInfo[i].Apply(pFrozenSkin);
 			}
