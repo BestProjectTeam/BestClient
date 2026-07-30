@@ -95,7 +95,6 @@ private:
 	void RenderTabs(CUIRect TabBar);
 	void RenderPlayersTab(CUIRect View);
 	void RenderPlayerActions(CUIRect View);
-	void RenderPlayerListAndInfo(CUIRect View);
 	void RenderPlayerInfo(CUIRect View, int ClientId);
 	void RenderTunings(CUIRect View);
 	void RenderLogs(CUIRect View);
@@ -124,6 +123,8 @@ private:
 	CLineInputBuffered<16> m_ActionDurationInput;
 
 	std::deque<SLogLine> m_RconLogLines;
+	bool m_LogStickToBottom = true;
+	bool m_LogScrollToBottomPending = false;
 
 	CButtonContainer m_TabPlayersButton;
 	CButtonContainer m_TabTuningsButton;

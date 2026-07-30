@@ -25,22 +25,25 @@
 
 namespace
 {
-constexpr float PANEL_PADDING = 12.0f;
-constexpr float HEADER_HEIGHT = 28.0f;
-constexpr float TAB_HEIGHT = 22.0f;
-constexpr float LIST_ROW_HEIGHT = 28.0f;
+constexpr float PANEL_PADDING = 10.0f;
+constexpr float HEADER_HEIGHT = 26.0f;
+constexpr float TAB_HEIGHT = 24.0f;
+constexpr float LIST_ROW_HEIGHT = 26.0f;
 constexpr float ACTION_BUTTON_HEIGHT = 22.0f;
-constexpr float ACTION_SPACING = 6.0f;
-constexpr float ACTION_LABEL_HEIGHT = 18.0f;
-constexpr float ACTION_BLOCK_MARGIN = 10.0f;
-constexpr float INFO_ROW_HEIGHT = 18.0f;
+constexpr float ACTION_SPACING = 4.0f;
+constexpr float ACTION_LABEL_HEIGHT = 16.0f;
+constexpr float ACTION_BLOCK_MARGIN = 8.0f;
+constexpr float INFO_ROW_HEIGHT = 16.0f;
+constexpr float INFO_BLOCK_HEIGHT = 38.0f;
 constexpr float LOGIN_ROW_HEIGHT = 24.0f;
 constexpr int MAX_LOG_LINES = 200;
 constexpr int MAX_LOG_LENGTH = 256;
 
-constexpr ColorRGBA PANEL_COLOR(0.0f, 0.0f, 0.0f, 0.68f);
-constexpr ColorRGBA SECTION_COLOR(0.0f, 0.0f, 0.0f, 0.28f);
-constexpr ColorRGBA SECTION_DARK_COLOR(0.0f, 0.0f, 0.0f, 0.38f);
+constexpr ColorRGBA PANEL_COLOR(0.05f, 0.06f, 0.08f, 0.82f);
+constexpr ColorRGBA SECTION_COLOR(0.0f, 0.0f, 0.0f, 0.32f);
+constexpr ColorRGBA SECTION_DARK_COLOR(0.0f, 0.0f, 0.0f, 0.42f);
+constexpr ColorRGBA INFO_BLOCK_COLOR(0.0f, 0.0f, 0.0f, 0.45f);
+constexpr ColorRGBA INFO_LABEL_COLOR(0.62f, 0.62f, 0.62f, 1.0f);
 constexpr ColorRGBA DISABLED_TEXT_COLOR(0.65f, 0.65f, 0.65f, 0.85f);
 
 const CAdminPanel::SActionSpec s_aActionSpecs[] = {
@@ -127,6 +130,8 @@ void CAdminPanel::OnReset()
 	m_SelectedTuning = -1;
 	m_LastSelectedTuning = -1;
 	m_RconLogLines.clear();
+	m_LogStickToBottom = true;
+	m_LogScrollToBottomPending = false;
 	CloseActionPopup();
 	m_ActionPopupType = EAction::NONE;
 	m_ActionPopupClientId = -1;
@@ -236,7 +241,13 @@ bool CAdminPanel::HasCommand(const char *pCommand, int FallbackAuth) const
 	if(!Client()->RconAuthed())
 		return false;
 	if(Client()->UseTempRconCommands())
-		return Console()->GetCommandInfo(pCommand, CFGFLAG_SERVER, true) != nullptr;
+	{
+		if(Console()->GetCommandInfo(pCommand, CFGFLAG_SERVER, true) != nullptr)
+			return true;
+		// Catalog still downloading — allow actions immediately (rcon accepts typed cmds anyway).
+		// Do NOT use GotRconCommandsPercentage(): it returns -1 when idle, and -1 < 1 is always true.
+		return Client()->ReceivingRconCommands();
+	}
 	return LocalAuthLevel() >= FallbackAuth;
 }
 
@@ -441,20 +452,19 @@ void CAdminPanel::RenderPlayerActions(CUIRect View)
 
 	CUIRect Header;
 	View.HSplitTop(ACTION_LABEL_HEIGHT, &Header, &View);
-	Ui()->DoLabel(&Header, aTitle, 14.0f, TEXTALIGN_ML);
+	Ui()->DoLabel(&Header, aTitle, 13.0f, TEXTALIGN_ML);
 	View.HSplitTop(ACTION_SPACING, nullptr, &View);
 
 	static CScrollRegion s_ActionScroll;
 	static vec2 s_ActionScrollOffset(0.0f, 0.0f);
 	CScrollRegionParams ScrollParams;
 	ScrollParams.m_ScrollUnit = 30.0f;
-	ScrollParams.m_Flags = CScrollRegionParams::FLAG_CONTENT_STATIC_WIDTH;
+	ScrollParams.m_ScrollbarWidth = 14.0f;
+	ScrollParams.m_ScrollbarMargin = 3.0f;
 	s_ActionScroll.Begin(&View, &s_ActionScrollOffset, &ScrollParams);
 	View.y += s_ActionScrollOffset.y;
 
-	auto DoActionPopupButton = [&](CButtonContainer &Button, const SActionSpec &Spec) {
-		CUIRect ButtonRect;
-		View.HSplitTop(ACTION_BUTTON_HEIGHT, &ButtonRect, &View);
+	auto DoActionPopupButton = [&](CButtonContainer &Button, const SActionSpec &Spec, CUIRect ButtonRect) {
 		const bool Enabled = IsActionEnabled(Spec, m_SelectedClientId);
 		if(s_ActionScroll.AddRect(ButtonRect))
 		{
@@ -463,17 +473,29 @@ void CAdminPanel::RenderPlayerActions(CUIRect View)
 				OpenActionPopup(Spec, Spec.m_NeedsPlayer ? m_SelectedClientId : -1);
 			TextRender()->TextColor(TextRender()->DefaultTextColor());
 		}
+	};
+
+	auto DoActionRow = [&](CButtonContainer &LeftButton, const SActionSpec &LeftSpec, CButtonContainer *pRightButton, const SActionSpec *pRightSpec) {
+		CUIRect Row, Left, Right;
+		View.HSplitTop(ACTION_BUTTON_HEIGHT, &Row, &View);
+		if(pRightButton && pRightSpec)
+		{
+			Row.VSplitMid(&Left, &Right, ACTION_SPACING);
+			DoActionPopupButton(LeftButton, LeftSpec, Left);
+			DoActionPopupButton(*pRightButton, *pRightSpec, Right);
+		}
+		else
+		{
+			DoActionPopupButton(LeftButton, LeftSpec, Row);
+		}
 		View.HSplitTop(ACTION_SPACING, nullptr, &View);
 	};
 
-	DoActionPopupButton(m_SayButton, s_aActionSpecs[0]);
-	DoActionPopupButton(m_SayTeamButton, s_aActionSpecs[1]);
-	DoActionPopupButton(m_BroadcastButton, s_aActionSpecs[2]);
-	DoActionPopupButton(m_MuteButton, s_aActionSpecs[3]);
-	DoActionPopupButton(m_BanButton, s_aActionSpecs[4]);
-	DoActionPopupButton(m_KickButton, s_aActionSpecs[5]);
-	DoActionPopupButton(m_RespawnButton, s_aActionSpecs[6]);
-	DoActionPopupButton(m_ForcePauseButton, s_aActionSpecs[7]);
+	DoActionRow(m_SayButton, s_aActionSpecs[0], &m_SayTeamButton, &s_aActionSpecs[1]);
+	DoActionRow(m_BroadcastButton, s_aActionSpecs[2], nullptr, nullptr);
+	DoActionRow(m_MuteButton, s_aActionSpecs[3], &m_BanButton, &s_aActionSpecs[4]);
+	DoActionRow(m_KickButton, s_aActionSpecs[5], &m_RespawnButton, &s_aActionSpecs[6]);
+	DoActionRow(m_ForcePauseButton, s_aActionSpecs[7], nullptr, nullptr);
 
 	struct SDirectAction
 	{
@@ -491,35 +513,72 @@ void CAdminPanel::RenderPlayerActions(CUIRect View)
 		{&m_SpectateButton, "set_team", AUTH_FALLBACK_MOD},
 		{&m_UnspectateButton, "set_team", AUTH_FALLBACK_MOD},
 	};
+	const int NumDirectActions = (int)(sizeof(aDirectActions) / sizeof(aDirectActions[0]));
 
-	for(int i = 0; i < (int)(sizeof(aDirectActions) / sizeof(aDirectActions[0])); ++i)
+	for(int i = 0; i < NumDirectActions;)
 	{
-		const SDirectAction &Action = aDirectActions[i];
-		CUIRect ButtonRect;
-		View.HSplitTop(ACTION_BUTTON_HEIGHT, &ButtonRect, &View);
-		const bool Enabled = HasPlayer(m_SelectedClientId) && HasCommand(Action.m_pCommand, Action.m_FallbackAuth);
-		if(s_ActionScroll.AddRect(ButtonRect))
-		{
+		CUIRect Row, Left, Right;
+		View.HSplitTop(ACTION_BUTTON_HEIGHT, &Row, &View);
+		const bool HasPair = i + 1 < NumDirectActions;
+		if(HasPair)
+			Row.VSplitMid(&Left, &Right, ACTION_SPACING);
+		else
+			Left = Row;
+
+		auto RenderDirect = [&](const SDirectAction &Action, CUIRect ButtonRect) {
+			bool Enabled = HasPlayer(m_SelectedClientId);
+			if(Enabled)
+			{
+				if(Action.m_pButton == &m_TeleportToPlayerButton)
+					Enabled = HasCommand("move_raw", Action.m_FallbackAuth) || HasCommand("tele", Action.m_FallbackAuth);
+				else
+					Enabled = HasCommand(Action.m_pCommand, Action.m_FallbackAuth);
+			}
+			if(!s_ActionScroll.AddRect(ButtonRect))
+				return;
 			TextRender()->TextColor(ButtonTextColor(Enabled));
 			const char *pLabel = DirectActionLabel(Action.m_pCommand, Action.m_pButton, &m_VoteMuteButton, &m_TeleportButton, &m_TeleportToPlayerButton, &m_SpectateButton, &m_UnspectateButton);
 			if(GameClient()->m_Menus.DoButton_Menu(Action.m_pButton, pLabel, Enabled ? 0 : -1, &ButtonRect) && Enabled)
 			{
-				char aCmd[128];
+				char aCmd[128] = "";
+				const int LocalId = GameClient()->m_Snap.m_LocalClientId;
 				if(Action.m_pButton == &m_VoteMuteButton)
 					str_format(aCmd, sizeof(aCmd), "vote_muteid %d 600 Muted by admin panel", m_SelectedClientId);
-				else if(Action.m_pButton == &m_TeleportButton)
-					str_format(aCmd, sizeof(aCmd), "tele %d %d", m_SelectedClientId, GameClient()->m_Snap.m_LocalClientId);
+				else if(Action.m_pButton == &m_TeleportButton && LocalId >= 0)
+					str_format(aCmd, sizeof(aCmd), "tele %d %d", m_SelectedClientId, LocalId);
 				else if(Action.m_pButton == &m_TeleportToPlayerButton)
-					str_format(aCmd, sizeof(aCmd), "tele %d %d", GameClient()->m_Snap.m_LocalClientId, m_SelectedClientId);
+				{
+					// Prefer predicted pos; fall back to snap so we still tele when prediction is cold.
+					vec2 TargetPos = GameClient()->m_aClients[m_SelectedClientId].m_Predicted.m_Pos;
+					if(GameClient()->m_Snap.m_aCharacters[m_SelectedClientId].m_Active)
+					{
+						TargetPos.x = GameClient()->m_Snap.m_aCharacters[m_SelectedClientId].m_Cur.m_X;
+						TargetPos.y = GameClient()->m_Snap.m_aCharacters[m_SelectedClientId].m_Cur.m_Y;
+					}
+					const vec2 Diff = TargetPos - GameClient()->m_LocalCharacterPos;
+					if(HasCommand("move_raw", AUTH_FALLBACK_MOD) || Client()->ReceivingRconCommands())
+						str_format(aCmd, sizeof(aCmd), "move_raw %d %d", round_to_int(Diff.x), round_to_int(Diff.y));
+					else if(LocalId >= 0)
+						str_format(aCmd, sizeof(aCmd), "tele %d %d", LocalId, m_SelectedClientId);
+				}
 				else if(Action.m_pButton == &m_SpectateButton)
 					str_format(aCmd, sizeof(aCmd), "set_team %d -1 0", m_SelectedClientId);
 				else if(Action.m_pButton == &m_UnspectateButton)
 					str_format(aCmd, sizeof(aCmd), "set_team %d 0 0", m_SelectedClientId);
-				else
+				else if(Action.m_pButton != &m_TeleportButton)
 					str_format(aCmd, sizeof(aCmd), "%s %d", Action.m_pCommand, m_SelectedClientId);
-				Client()->Rcon(aCmd);
+				if(aCmd[0] != '\0')
+					Client()->Rcon(aCmd);
 			}
 			TextRender()->TextColor(TextRender()->DefaultTextColor());
+		};
+
+		RenderDirect(aDirectActions[i], Left);
+		++i;
+		if(HasPair)
+		{
+			RenderDirect(aDirectActions[i], Right);
+			++i;
 		}
 		View.HSplitTop(ACTION_SPACING, nullptr, &View);
 	}
@@ -548,38 +607,28 @@ void CAdminPanel::RenderPlayerInfo(CUIRect View, int ClientId)
 	const CNetObj_PlayerInfo *pInfo = GameClient()->m_Snap.m_apPlayerInfos[ClientId];
 	const CGameClient::CClientData &ClientData = GameClient()->m_aClients[ClientId];
 
-	auto RenderRow = [&](const char *pLabel, const char *pValue) {
-		CUIRect Row, Label, Value;
-		View.HSplitTop(INFO_ROW_HEIGHT, &Row, &View);
-		Row.VSplitLeft(115.0f, &Label, &Value);
-		Value.VMargin(6.0f, &Value);
+	auto RenderBlock = [&](CUIRect Block, const char *pLabel, const char *pValue) {
+		Block.Draw(INFO_BLOCK_COLOR, IGraphics::CORNER_ALL, 5.0f);
+		Block.VMargin(8.0f, &Block);
+		Block.HMargin(4.0f, &Block);
+		CUIRect Label, Value;
+		Block.HSplitTop(11.0f, &Label, &Value);
+		TextRender()->TextColor(INFO_LABEL_COLOR);
+		Ui()->DoLabel(&Label, pLabel, 10.0f, TEXTALIGN_ML);
+		TextRender()->TextColor(ColorRGBA(0.95f, 0.95f, 0.95f, 1.0f));
 		SLabelProperties ValueProps;
-		ValueProps.m_MaxWidth = Value.w;
+		ValueProps.m_MaxWidth = maximum(1.0f, Value.w);
 		ValueProps.m_EllipsisAtEnd = true;
-		Ui()->DoLabel(&Label, pLabel, 12.0f, TEXTALIGN_ML);
 		Ui()->DoLabel(&Value, pValue, 12.0f, TEXTALIGN_ML, ValueProps);
-		View.HSplitTop(2.0f, nullptr, &View);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
 	};
 
-	char aBuf[256];
-	RenderRow(Localize("Name"), ClientData.m_aName);
-	RenderRow(Localize("Clan"), ClientData.m_aClan[0] ? ClientData.m_aClan : "-");
-	str_format(aBuf, sizeof(aBuf), "%d", ClientId);
-	RenderRow(Localize("Client ID"), aBuf);
-	RenderRow(Localize("Team"), pInfo->m_Team == TEAM_SPECTATORS ? Localize("Spectators") : Localize("Game"));
-	str_format(aBuf, sizeof(aBuf), "%d", pInfo->m_Score);
-	RenderRow(Localize("Score"), aBuf);
-	str_format(aBuf, sizeof(aBuf), "%d", std::clamp(pInfo->m_Latency, 0, 999));
-	RenderRow(Localize("Ping"), aBuf);
-
-	const char *pAuth = Localize("None");
-	if(ClientData.m_AuthLevel == AUTHED_ADMIN)
-		pAuth = Localize("Admin");
-	else if(ClientData.m_AuthLevel == AUTHED_MOD)
-		pAuth = Localize("Moderator");
-	else if(ClientData.m_AuthLevel == AUTHED_HELPER)
-		pAuth = Localize("Helper");
-	RenderRow(Localize("Auth"), pAuth);
+	char aId[32];
+	char aScore[32];
+	char aPing[32];
+	str_format(aId, sizeof(aId), "%d", ClientId);
+	str_format(aScore, sizeof(aScore), "%d", pInfo->m_Score);
+	str_format(aPing, sizeof(aPing), "%d", std::clamp(pInfo->m_Latency, 0, 999));
 
 	char aStatus[256];
 	aStatus[0] = '\0';
@@ -601,18 +650,44 @@ void CAdminPanel::RenderPlayerInfo(CUIRect View, int ClientId)
 	AddStatus(ClientData.m_FreezeEnd > 0, Localize("Frozen"));
 	if(aStatus[0] == '\0')
 		str_copy(aStatus, Localize("Normal"));
-	RenderRow(Localize("Status"), aStatus);
+
+	const float RowH = (View.h - ACTION_SPACING * 2.0f) / 3.0f;
+	CUIRect Row, Left, Right;
+
+	View.HSplitTop(RowH, &Row, &View);
+	View.HSplitTop(ACTION_SPACING, nullptr, &View);
+	Row.VSplitMid(&Left, &Right, PANEL_PADDING);
+	RenderBlock(Left, Localize("Name"), ClientData.m_aName);
+	RenderBlock(Right, Localize("Score"), aScore);
+
+	View.HSplitTop(RowH, &Row, &View);
+	View.HSplitTop(ACTION_SPACING, nullptr, &View);
+	Row.VSplitMid(&Left, &Right, PANEL_PADDING);
+	RenderBlock(Left, Localize("Clan"), ClientData.m_aClan[0] ? ClientData.m_aClan : "-");
+	RenderBlock(Right, Localize("Ping"), aPing);
+
+	View.HSplitTop(RowH, &Row, &View);
+	Row.VSplitMid(&Left, &Right, PANEL_PADDING);
+	RenderBlock(Left, Localize("Client ID"), aId);
+	RenderBlock(Right, Localize("Status"), aStatus);
 }
 
-void CAdminPanel::RenderPlayerListAndInfo(CUIRect View)
+void CAdminPanel::RenderPlayersTab(CUIRect View)
 {
-	CUIRect List, Info;
-	View.HSplitTop(View.h * 0.55f, &List, &Info);
-	const CUIRect InfoClip = Info;
-	List.Draw(SECTION_DARK_COLOR, IGraphics::CORNER_ALL, 6.0f);
-	Info.Draw(SECTION_COLOR, IGraphics::CORNER_ALL, 6.0f);
-	List.Margin(ACTION_BLOCK_MARGIN, &List);
-	Info.Margin(ACTION_BLOCK_MARGIN, &Info);
+	CUIRect Top, InfoBottom, Left, Right;
+	const float InfoHeight = std::clamp(View.h * 0.38f, 180.0f, 260.0f);
+	View.HSplitBottom(InfoHeight, &Top, &InfoBottom);
+	InfoBottom.HSplitTop(ACTION_SPACING, nullptr, &InfoBottom);
+
+	Top.VSplitLeft(Top.w * 0.42f, &Left, &Right);
+	Right.VSplitLeft(PANEL_PADDING, nullptr, &Right);
+
+	Left.Draw(SECTION_COLOR, IGraphics::CORNER_ALL, 6.0f);
+	Left.Margin(ACTION_BLOCK_MARGIN, &Left);
+	RenderPlayerActions(Left);
+
+	Right.Draw(SECTION_DARK_COLOR, IGraphics::CORNER_ALL, 6.0f);
+	Right.Margin(ACTION_BLOCK_MARGIN, &Right);
 
 	int NumOptions = 0;
 	int Selected = -1;
@@ -629,16 +704,21 @@ void CAdminPanel::RenderPlayerListAndInfo(CUIRect View)
 		aPlayerIds[NumOptions++] = ClientId;
 	}
 
+	CUIRect ListHeader;
+	Right.HSplitTop(ACTION_LABEL_HEIGHT, &ListHeader, &Right);
+	Ui()->DoLabel(&ListHeader, Localize("Players"), 13.0f, TEXTALIGN_ML);
+	Right.HSplitTop(ACTION_SPACING, nullptr, &Right);
+
 	if(NumOptions == 0)
 	{
-		Ui()->DoLabel(&List, Localize("No other players"), 14.0f, TEXTALIGN_ML);
+		Ui()->DoLabel(&Right, Localize("No other players"), 13.0f, TEXTALIGN_ML);
 		m_SelectedClientId = -1;
 	}
 	else
 	{
 		static CListBox s_ListBox;
 		s_ListBox.SetActive(true);
-		s_ListBox.DoStart(LIST_ROW_HEIGHT, NumOptions, 1, 6, Selected, &List, false, IGraphics::CORNER_ALL);
+		s_ListBox.DoStart(LIST_ROW_HEIGHT, NumOptions, 1, 6, Selected, &Right, false, IGraphics::CORNER_ALL);
 
 		for(int i = 0; i < NumOptions; i++)
 		{
@@ -662,7 +742,7 @@ void CAdminPanel::RenderPlayerListAndInfo(CUIRect View)
 			{
 				CUIRect NameRect, AuthRect;
 				Label.VSplitRight(Label.h, &NameRect, &AuthRect);
-				Ui()->DoLabel(&NameRect, GameClient()->m_aClients[aPlayerIds[i]].m_aName, 14.0f, TEXTALIGN_ML);
+				Ui()->DoLabel(&NameRect, GameClient()->m_aClients[aPlayerIds[i]].m_aName, 13.0f, TEXTALIGN_ML);
 				TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
 				TextRender()->TextColor(PlayerAuth == AUTHED_ADMIN ? ColorRGBA(1.0f, 0.7f, 0.2f, 1.0f) : PlayerAuth == AUTHED_MOD ? ColorRGBA(0.4f, 0.8f, 1.0f, 1.0f) : ColorRGBA(0.5f, 1.0f, 0.5f, 1.0f));
 				Ui()->DoLabel(&AuthRect, FontIcon::LOCK, AuthRect.h * 0.65f, TEXTALIGN_MC);
@@ -670,7 +750,7 @@ void CAdminPanel::RenderPlayerListAndInfo(CUIRect View)
 				TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 			}
 			else
-				Ui()->DoLabel(&Label, GameClient()->m_aClients[aPlayerIds[i]].m_aName, 14.0f, TEXTALIGN_ML);
+				Ui()->DoLabel(&Label, GameClient()->m_aClients[aPlayerIds[i]].m_aName, 13.0f, TEXTALIGN_ML);
 		}
 
 		Selected = s_ListBox.DoEnd();
@@ -680,39 +760,39 @@ void CAdminPanel::RenderPlayerListAndInfo(CUIRect View)
 			m_SelectedClientId = -1;
 	}
 
+	InfoBottom.Draw(SECTION_COLOR, IGraphics::CORNER_ALL, 6.0f);
+	InfoBottom.Margin(ACTION_BLOCK_MARGIN, &InfoBottom);
+	const CUIRect InfoClip = InfoBottom;
 	Ui()->ClipEnable(&InfoClip);
-	Info.HSplitTop(ACTION_LABEL_HEIGHT, &List, &Info);
-	Ui()->DoLabel(&List, Localize("Player info"), 14.0f, TEXTALIGN_ML);
-	Info.HSplitTop(ACTION_SPACING, nullptr, &Info);
-	RenderPlayerInfo(Info, m_SelectedClientId);
+	CUIRect InfoHeader;
+	InfoBottom.HSplitTop(ACTION_LABEL_HEIGHT, &InfoHeader, &InfoBottom);
+	Ui()->DoLabel(&InfoHeader, Localize("Player info"), 13.0f, TEXTALIGN_ML);
+	InfoBottom.HSplitTop(ACTION_SPACING, nullptr, &InfoBottom);
+	RenderPlayerInfo(InfoBottom, m_SelectedClientId);
 	Ui()->ClipDisable();
-}
-
-void CAdminPanel::RenderPlayersTab(CUIRect View)
-{
-	CUIRect Left, Right;
-	View.VSplitMid(&Left, &Right, PANEL_PADDING);
-	Left.Draw(SECTION_COLOR, IGraphics::CORNER_ALL, 6.0f);
-	Left.Margin(ACTION_BLOCK_MARGIN, &Left);
-	RenderPlayerActions(Left);
-	RenderPlayerListAndInfo(Right);
 }
 
 void CAdminPanel::RenderTunings(CUIRect View)
 {
-	CUIRect Top, Search, Left, Right;
-	View.HSplitTop(ACTION_LABEL_HEIGHT, &Top, &View);
-	Ui()->DoLabel(&Top, Localize("Tunings"), 14.0f, TEXTALIGN_ML);
-	View.HSplitTop(6.0f, nullptr, &View);
-	View.HSplitTop(LOGIN_ROW_HEIGHT, &Search, &View);
-	Ui()->DoEditBox_Search(&m_TuningSearchInput, &Search, 12.0f, !Ui()->IsPopupOpen());
-	View.HSplitTop(8.0f, nullptr, &View);
+	CUIRect SearchBar, Body, Left, Right;
+	View.HSplitTop(LOGIN_ROW_HEIGHT + ACTION_BLOCK_MARGIN * 2.0f, &SearchBar, &Body);
+	SearchBar.Draw(SECTION_COLOR, IGraphics::CORNER_ALL, 6.0f);
+	SearchBar.Margin(ACTION_BLOCK_MARGIN, &SearchBar);
+	Ui()->DoEditBox_Search(&m_TuningSearchInput, &SearchBar, 12.0f, !Ui()->IsPopupOpen());
+	Body.HSplitTop(ACTION_SPACING, nullptr, &Body);
 
-	View.VSplitMid(&Left, &Right, PANEL_PADDING);
-	Left.Draw(SECTION_COLOR, IGraphics::CORNER_ALL, 6.0f);
+	Body.VSplitLeft(Body.w * 0.48f, &Left, &Right);
+	Right.VSplitLeft(PANEL_PADDING, nullptr, &Right);
+
+	Left.Draw(SECTION_DARK_COLOR, IGraphics::CORNER_ALL, 6.0f);
 	Right.Draw(SECTION_COLOR, IGraphics::CORNER_ALL, 6.0f);
 	Left.Margin(ACTION_BLOCK_MARGIN, &Left);
 	Right.Margin(ACTION_BLOCK_MARGIN, &Right);
+
+	CUIRect ListHeader;
+	Left.HSplitTop(ACTION_LABEL_HEIGHT, &ListHeader, &Left);
+	Ui()->DoLabel(&ListHeader, Localize("Tunings"), 13.0f, TEXTALIGN_ML);
+	Left.HSplitTop(ACTION_SPACING, nullptr, &Left);
 
 	static std::vector<int> s_vTuneIndices;
 	s_vTuneIndices.clear();
@@ -751,9 +831,11 @@ void CAdminPanel::RenderTunings(CUIRect View)
 		char aValue[32];
 		str_format(aValue, sizeof(aValue), "%.2f", CurrentValue);
 		CUIRect Name, Value;
-		Item.m_Rect.VSplitLeft(Item.m_Rect.w * 0.7f, &Name, &Value);
+		Item.m_Rect.VSplitLeft(Item.m_Rect.w * 0.68f, &Name, &Value);
 		Ui()->DoLabel(&Name, CTuningParams::Name(s_vTuneIndices[i]), 12.0f, TEXTALIGN_ML);
+		TextRender()->TextColor(INFO_LABEL_COLOR);
 		Ui()->DoLabel(&Value, aValue, 12.0f, TEXTALIGN_MR);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
 	}
 	Selected = s_TuningList.DoEnd();
 	if(Selected != -1)
@@ -771,40 +853,62 @@ void CAdminPanel::RenderTunings(CUIRect View)
 		m_LastSelectedTuning = m_SelectedTuning;
 	}
 
+	CUIRect EditorHeader, ButtonsBar;
+	Right.HSplitTop(ACTION_LABEL_HEIGHT, &EditorHeader, &Right);
+	Ui()->DoLabel(&EditorHeader, Localize("Tuning editor"), 13.0f, TEXTALIGN_ML);
+	Right.HSplitTop(ACTION_SPACING, nullptr, &Right);
+	Right.HSplitBottom(ACTION_BUTTON_HEIGHT, &Right, &ButtonsBar);
+
 	if(m_SelectedTuning == -1)
 	{
-		Ui()->DoLabel(&Right, Localize("Select a tuning"), 14.0f, TEXTALIGN_ML);
+		Ui()->DoLabel(&Right, Localize("Select a tuning"), 13.0f, TEXTALIGN_ML);
 		return;
 	}
 
-	CUIRect Row, Label, Field;
-	Right.HSplitTop(ACTION_LABEL_HEIGHT, &Row, &Right);
-	Ui()->DoLabel(&Row, CTuningParams::Name(m_SelectedTuning), 14.0f, TEXTALIGN_ML);
-	Right.HSplitTop(8.0f, nullptr, &Right);
+	auto RenderInfoBlock = [&](CUIRect &Area, const char *pLabel, const char *pValue, float Height) {
+		CUIRect Block, Label, Value;
+		Area.HSplitTop(Height, &Block, &Area);
+		Area.HSplitTop(ACTION_SPACING, nullptr, &Area);
+		Block.Draw(INFO_BLOCK_COLOR, IGraphics::CORNER_ALL, 5.0f);
+		Block.VMargin(8.0f, &Block);
+		Block.HMargin(4.0f, &Block);
+		Block.HSplitTop(11.0f, &Label, &Value);
+		TextRender()->TextColor(INFO_LABEL_COLOR);
+		Ui()->DoLabel(&Label, pLabel, 10.0f, TEXTALIGN_ML);
+		TextRender()->TextColor(ColorRGBA(0.95f, 0.95f, 0.95f, 1.0f));
+		SLabelProperties ValueProps;
+		ValueProps.m_MaxWidth = maximum(1.0f, Value.w);
+		ValueProps.m_EllipsisAtEnd = true;
+		Ui()->DoLabel(&Value, pValue, 12.0f, TEXTALIGN_ML, ValueProps);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+	};
+
+	RenderInfoBlock(Right, Localize("Parameter"), CTuningParams::Name(m_SelectedTuning), INFO_BLOCK_HEIGHT);
 
 	float CurrentValue = 0.0f;
 	pTuning->Get(m_SelectedTuning, &CurrentValue);
 	char aCurrent[64];
-	str_format(aCurrent, sizeof(aCurrent), "%s: %.2f", Localize("Current"), CurrentValue);
-	Right.HSplitTop(INFO_ROW_HEIGHT, &Row, &Right);
-	Ui()->DoLabel(&Row, aCurrent, 12.0f, TEXTALIGN_ML);
-	Right.HSplitTop(8.0f, nullptr, &Right);
+	str_format(aCurrent, sizeof(aCurrent), "%.2f", CurrentValue);
+	RenderInfoBlock(Right, Localize("Current"), aCurrent, INFO_BLOCK_HEIGHT);
 
-	Right.HSplitTop(LOGIN_ROW_HEIGHT, &Row, &Right);
-	Row.VSplitLeft(120.0f, &Label, &Field);
-	Ui()->DoLabel(&Label, Localize("New value"), 12.0f, TEXTALIGN_ML);
-	Ui()->DoEditBox(&m_TuningValueInput, &Field, 12.0f);
-	Right.HSplitTop(10.0f, nullptr, &Right);
+	// Stretch the new-value block across leftover editor space so the panel doesn't look empty.
+	CUIRect ValueBlock, ValueLabel, ValueField;
+	ValueBlock = Right;
+	if(ValueBlock.h > ACTION_SPACING)
+		ValueBlock.HSplitBottom(ACTION_SPACING, &ValueBlock, nullptr);
+	ValueBlock.Draw(INFO_BLOCK_COLOR, IGraphics::CORNER_ALL, 5.0f);
+	ValueBlock.VMargin(8.0f, &ValueBlock);
+	ValueBlock.HMargin(6.0f, &ValueBlock);
+	ValueBlock.HSplitTop(12.0f, &ValueLabel, &ValueField);
+	ValueField.HSplitTop(LOGIN_ROW_HEIGHT, &ValueField, nullptr);
+	TextRender()->TextColor(INFO_LABEL_COLOR);
+	Ui()->DoLabel(&ValueLabel, Localize("New value"), 10.0f, TEXTALIGN_ML);
+	TextRender()->TextColor(TextRender()->DefaultTextColor());
+	Ui()->DoEditBox(&m_TuningValueInput, &ValueField, 12.0f);
 
-	CUIRect Buttons, Apply, Reset, ResetAll;
-	Right.HSplitTop(LOGIN_ROW_HEIGHT, &Buttons, &Right);
-	const float Gap = 6.0f;
-	const float ButtonWidth = maximum(60.0f, (Buttons.w - 2.0f * Gap) / 3.0f);
-	Buttons.VSplitLeft(ButtonWidth, &Apply, &Buttons);
-	Buttons.VSplitLeft(Gap, nullptr, &Buttons);
-	Buttons.VSplitLeft(ButtonWidth, &Reset, &Buttons);
-	Buttons.VSplitLeft(Gap, nullptr, &Buttons);
-	Buttons.VSplitLeft(ButtonWidth, &ResetAll, &Buttons);
+	CUIRect Apply, Reset, ResetAll;
+	ButtonsBar.VSplitMid(&Apply, &ButtonsBar, ACTION_SPACING);
+	ButtonsBar.VSplitMid(&Reset, &ResetAll, ACTION_SPACING);
 
 	const bool CanTune = HasCommand("tune", AUTH_FALLBACK_ADMIN);
 	const bool CanTuneReset = HasCommand("tune_reset", AUTH_FALLBACK_ADMIN);
@@ -832,47 +936,81 @@ void CAdminPanel::RenderLogs(CUIRect View)
 	View.Draw(SECTION_COLOR, IGraphics::CORNER_ALL, 6.0f);
 	View.Margin(ACTION_BLOCK_MARGIN, &View);
 
+	static CScrollRegion s_LogScroll;
+	static vec2 s_LogScrollOffset(0.0f, 0.0f);
+
 	CUIRect Header, ClearButton;
 	View.HSplitTop(LOGIN_ROW_HEIGHT, &Header, &View);
-	Header.VSplitRight(100.0f, &Header, &ClearButton);
-	Ui()->DoLabel(&Header, Localize("RCON log"), 14.0f, TEXTALIGN_ML);
+	Header.VSplitRight(90.0f, &Header, &ClearButton);
+	Ui()->DoLabel(&Header, Localize("RCON log"), 13.0f, TEXTALIGN_ML);
 	if(GameClient()->m_Menus.DoButton_Menu(&m_ClearLogsButton, Localize("Clear"), 0, &ClearButton))
+	{
 		m_RconLogLines.clear();
+		m_LogStickToBottom = true;
+		m_LogScrollToBottomPending = false;
+		s_LogScroll.Reset();
+		s_LogScrollOffset = vec2(0.0f, 0.0f);
+	}
 	View.HSplitTop(6.0f, nullptr, &View);
 
 	if(m_RconLogLines.empty())
 	{
+		s_LogScroll.Reset();
+		s_LogScrollOffset = vec2(0.0f, 0.0f);
 		Ui()->DoLabel(&View, Localize("No log entries yet"), 12.0f, TEXTALIGN_ML);
 		return;
 	}
 
-	static CScrollRegion s_LogScroll;
-	static vec2 s_LogScrollOffset(0.0f, 0.0f);
 	CScrollRegionParams ScrollParams;
 	ScrollParams.m_ScrollUnit = 40.0f;
-	ScrollParams.m_Flags = CScrollRegionParams::FLAG_CONTENT_STATIC_WIDTH;
+	ScrollParams.m_ScrollbarWidth = 14.0f;
+	ScrollParams.m_ScrollbarMargin = 3.0f;
+	ScrollParams.m_ClipBgColor = ColorRGBA(0.0f, 0.0f, 0.0f, 0.18f);
 	s_LogScroll.Begin(&View, &s_LogScrollOffset, &ScrollParams);
+	const float ClipH = View.h;
 	View.y += s_LogScrollOffset.y;
 
+	const float LineHeight = 15.0f;
+	const int NumLines = (int)m_RconLogLines.size();
+	int LineIndex = 0;
 	for(const SLogLine &Entry : m_RconLogLines)
 	{
 		CUIRect Row;
-		View.HSplitTop(14.0f, &Row, &View);
-		if(!s_LogScroll.AddRect(Row))
-			continue;
-		CUIRect TimeRect, TextRect;
-		Row.VSplitLeft(54.0f, &TimeRect, &TextRect);
-		TextRender()->TextColor(ColorRGBA(0.62f, 0.62f, 0.62f, 1.0f));
-		Ui()->DoLabel(&TimeRect, Entry.m_aTime, 11.0f, TEXTALIGN_ML);
-		TextRender()->TextColor(ColorRGBA(0.9f, 0.9f, 0.9f, 1.0f));
-		Ui()->DoLabel(&TextRect, Entry.m_Text.c_str(), 12.0f, TEXTALIGN_ML);
-		TextRender()->TextColor(TextRender()->DefaultTextColor());
+		View.HSplitTop(LineHeight, &Row, &View);
+		const bool IsLast = ++LineIndex == NumLines;
+		if(s_LogScroll.AddRect(Row))
+		{
+			CUIRect TimeRect, TextRect;
+			Row.VSplitLeft(54.0f, &TimeRect, &TextRect);
+			TextRender()->TextColor(ColorRGBA(0.62f, 0.62f, 0.62f, 1.0f));
+			Ui()->DoLabel(&TimeRect, Entry.m_aTime, 11.0f, TEXTALIGN_ML);
+			TextRender()->TextColor(ColorRGBA(0.92f, 0.92f, 0.92f, 1.0f));
+			SLabelProperties Props;
+			Props.m_MaxWidth = TextRect.w;
+			Props.m_EllipsisAtEnd = true;
+			Ui()->DoLabel(&TextRect, Entry.m_Text.c_str(), 12.0f, TEXTALIGN_ML, Props);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+		}
+		if(IsLast && m_LogScrollToBottomPending)
+		{
+			s_LogScroll.ScrollHere(CScrollRegion::SCROLLHERE_BOTTOM);
+			m_LogScrollToBottomPending = false;
+		}
 	}
 
-	CUIRect ScrollEnd = {View.x, View.y + 14.0f, View.w, 0.0f};
-	s_LogScroll.AddRect(ScrollEnd);
-	s_LogScroll.ScrollHere(CScrollRegion::SCROLLHERE_BOTTOM);
 	s_LogScroll.End();
+
+	if(!s_LogScroll.ScrollbarShown())
+	{
+		m_LogStickToBottom = true;
+	}
+	else
+	{
+		// Match CScrollRegion::AddRect content height for the last real line (no phantom spacer).
+		const float ContentH = NumLines * LineHeight + CScrollRegion::HEIGHT_MAGIC_FIX;
+		const float MaxScroll = maximum(0.0f, ContentH - ClipH);
+		m_LogStickToBottom = (-s_LogScrollOffset.y) >= MaxScroll - 2.0f;
+	}
 }
 
 void CAdminPanel::RenderActionPopup(const CUIRect &Screen)
@@ -886,55 +1024,80 @@ void CAdminPanel::RenderActionPopup(const CUIRect &Screen)
 	static int s_ActionPopupOverlayId;
 	Ui()->DoButtonLogic(&s_ActionPopupOverlayId, -1, &Overlay, BUTTONFLAG_LEFT);
 
-	CUIRect Popup = Screen;
-	Popup.VMargin(Screen.w * 0.28f, &Popup);
-	Popup.HMargin(Screen.h * 0.28f, &Popup);
-	Popup.Draw(ColorRGBA(0.08f, 0.08f, 0.08f, 0.92f), IGraphics::CORNER_ALL, 8.0f);
+	const bool NeedsPlayer = m_pActionPopupSpec->m_NeedsPlayer && HasPlayer(m_ActionPopupClientId);
+	const bool IsMessage = m_pActionPopupSpec->m_Field == EActionField::MESSAGE;
+	const bool HasReasonOrMessage = m_pActionPopupSpec->m_Field != EActionField::DURATION_SECONDS;
+	const bool HasDuration = m_pActionPopupSpec->m_Field == EActionField::REASON_DURATION_SECONDS ||
+				 m_pActionPopupSpec->m_Field == EActionField::REASON_DURATION_MINUTES ||
+				 m_pActionPopupSpec->m_Field == EActionField::DURATION_SECONDS;
+	const bool HasPresets = HasDuration && m_pActionPopupSpec->m_Field != EActionField::DURATION_SECONDS;
+
+	float ContentH = PANEL_PADDING * 2.0f + HEADER_HEIGHT + 8.0f + LOGIN_ROW_HEIGHT + 4.0f;
+	if(NeedsPlayer)
+		ContentH += INFO_ROW_HEIGHT + 4.0f;
+	if(HasReasonOrMessage)
+		ContentH += LOGIN_ROW_HEIGHT + 8.0f;
+	if(HasDuration)
+		ContentH += LOGIN_ROW_HEIGHT + 8.0f;
+	if(HasPresets)
+		ContentH += LOGIN_ROW_HEIGHT + 8.0f;
+
+	CUIRect Popup;
+	Popup.w = minimum(460.0f, Screen.w * 0.55f);
+	Popup.h = ContentH;
+	Popup.x = Screen.x + (Screen.w - Popup.w) * 0.5f;
+	Popup.y = Screen.y + (Screen.h - Popup.h) * 0.5f;
+	Popup.Draw(ColorRGBA(0.08f, 0.08f, 0.08f, 0.94f), IGraphics::CORNER_ALL, 8.0f);
 	Popup.Margin(PANEL_PADDING, &Popup);
+
+	CUIRect Buttons;
+	Popup.HSplitBottom(LOGIN_ROW_HEIGHT, &Popup, &Buttons);
 
 	CUIRect Header;
 	Popup.HSplitTop(HEADER_HEIGHT, &Header, &Popup);
-	Ui()->DoLabel(&Header, ActionLabel(m_pActionPopupSpec->m_Action), 18.0f, TEXTALIGN_ML);
+	Ui()->DoLabel(&Header, ActionLabel(m_pActionPopupSpec->m_Action), 16.0f, TEXTALIGN_ML);
 
-	if(m_pActionPopupSpec->m_NeedsPlayer && HasPlayer(m_ActionPopupClientId))
+	if(NeedsPlayer)
 	{
 		CUIRect NameRow;
 		Popup.HSplitTop(INFO_ROW_HEIGHT, &NameRow, &Popup);
+		TextRender()->TextColor(ColorRGBA(0.75f, 0.75f, 0.75f, 1.0f));
 		Ui()->DoLabel(&NameRow, GameClient()->m_aClients[m_ActionPopupClientId].m_aName, 12.0f, TEXTALIGN_ML);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+		Popup.HSplitTop(4.0f, nullptr, &Popup);
 	}
 	Popup.HSplitTop(8.0f, nullptr, &Popup);
 
-	const bool IsMessage = m_pActionPopupSpec->m_Field == EActionField::MESSAGE;
-	if(m_pActionPopupSpec->m_Field != EActionField::DURATION_SECONDS)
+	if(HasReasonOrMessage)
 	{
 		CUIRect Row, Label, Field;
 		Popup.HSplitTop(LOGIN_ROW_HEIGHT, &Row, &Popup);
-		Row.VSplitLeft(120.0f, &Label, &Field);
+		Row.VSplitLeft(100.0f, &Label, &Field);
 		Ui()->DoLabel(&Label, IsMessage ? Localize("Message") : Localize("Reason"), 12.0f, TEXTALIGN_ML);
 		Ui()->DoEditBox(&m_ActionReasonInput, &Field, 12.0f);
-		Popup.HSplitTop(6.0f, nullptr, &Popup);
+		Popup.HSplitTop(8.0f, nullptr, &Popup);
 	}
 
-	if(m_pActionPopupSpec->m_Field == EActionField::REASON_DURATION_SECONDS ||
-		m_pActionPopupSpec->m_Field == EActionField::REASON_DURATION_MINUTES ||
-		m_pActionPopupSpec->m_Field == EActionField::DURATION_SECONDS)
+	if(HasDuration)
 	{
 		CUIRect Row, Label, Field;
 		Popup.HSplitTop(LOGIN_ROW_HEIGHT, &Row, &Popup);
-		Row.VSplitLeft(120.0f, &Label, &Field);
+		Row.VSplitLeft(100.0f, &Label, &Field);
 		Ui()->DoLabel(&Label, m_pActionPopupSpec->m_Field == EActionField::REASON_DURATION_MINUTES ? Localize("Duration (min)") : Localize("Duration (sec)"), 12.0f, TEXTALIGN_ML);
 		Ui()->DoEditBox(&m_ActionDurationInput, &Field, 12.0f);
 		Popup.HSplitTop(8.0f, nullptr, &Popup);
 
-		if(m_pActionPopupSpec->m_Field != EActionField::DURATION_SECONDS)
+		if(HasPresets)
 		{
 			Popup.HSplitTop(LOGIN_ROW_HEIGHT, &Row, &Popup);
 			CUIRect Short, Mid, Long;
-			Row.VSplitLeft(120.0f, &Short, &Row);
-			Row.VSplitLeft(10.0f, nullptr, &Row);
-			Row.VSplitLeft(120.0f, &Mid, &Row);
-			Row.VSplitLeft(10.0f, nullptr, &Row);
-			Row.VSplitLeft(120.0f, &Long, &Row);
+			const float Gap = 8.0f;
+			const float Bw = (Row.w - Gap * 2.0f) / 3.0f;
+			Row.VSplitLeft(Bw, &Short, &Row);
+			Row.VSplitLeft(Gap, nullptr, &Row);
+			Row.VSplitLeft(Bw, &Mid, &Row);
+			Row.VSplitLeft(Gap, nullptr, &Row);
+			Long = Row;
 			const bool Ban = m_pActionPopupSpec->m_Field == EActionField::REASON_DURATION_MINUTES;
 			if(GameClient()->m_Menus.DoButton_Menu(&m_ActionPresetShortButton, Ban ? Localize("5 min") : Localize("30 sec"), 0, &Short))
 				m_ActionDurationInput.Set(Ban ? "5" : "30");
@@ -942,14 +1105,11 @@ void CAdminPanel::RenderActionPopup(const CUIRect &Screen)
 				m_ActionDurationInput.Set(Ban ? "10" : "60");
 			if(GameClient()->m_Menus.DoButton_Menu(&m_ActionPresetLongButton, Ban ? Localize("60 min") : Localize("300 sec"), 0, &Long))
 				m_ActionDurationInput.Set(Ban ? "60" : "300");
-			Popup.HSplitTop(8.0f, nullptr, &Popup);
 		}
 	}
 
-	CUIRect Row, Cancel, Confirm;
-	Popup.HSplitTop(LOGIN_ROW_HEIGHT, &Row, &Popup);
-	Row.VSplitLeft(Row.w * 0.5f - 5.0f, &Cancel, &Row);
-	Row.VSplitLeft(10.0f, nullptr, &Confirm);
+	CUIRect Cancel, Confirm;
+	Buttons.VSplitMid(&Cancel, &Confirm, 8.0f);
 	if(GameClient()->m_Menus.DoButton_Menu(&m_ActionCancelButton, Localize("Cancel"), 0, &Cancel))
 		CloseActionPopup();
 	if(GameClient()->m_Menus.DoButton_Menu(&m_ActionConfirmButton, Localize("Apply"), 0, &Confirm))
@@ -966,23 +1126,23 @@ void CAdminPanel::RenderActionPopup(const CUIRect &Screen)
 
 void CAdminPanel::RenderPanel(const CUIRect &Screen)
 {
-	const float PanelW = Screen.w * 0.76f;
-	const float PanelH = Screen.h * (Client()->RconAuthed() ? 0.72f : 0.58f);
+	const float PanelW = Screen.w * 0.80f;
+	const float PanelH = Screen.h * (Client()->RconAuthed() ? 0.78f : 0.56f);
 	CUIRect Panel = {(Screen.w - PanelW) / 2.0f, (Screen.h - PanelH) / 2.0f, PanelW, PanelH};
 	Panel.Draw(PANEL_COLOR, IGraphics::CORNER_ALL, 8.0f);
 	Panel.Margin(PANEL_PADDING, &Panel);
 
 	CUIRect Header, HeaderLeft, HeaderRight;
 	Panel.HSplitTop(HEADER_HEIGHT, &Header, &Panel);
-	Header.VSplitLeft(Header.w * 0.5f, &HeaderLeft, &HeaderRight);
-	Ui()->DoLabel(&HeaderLeft, Localize("Admin Panel"), 18.0f, TEXTALIGN_ML);
+	Header.VSplitLeft(Header.w * 0.55f, &HeaderLeft, &HeaderRight);
+	Ui()->DoLabel(&HeaderLeft, Localize("Admin Panel"), 17.0f, TEXTALIGN_ML);
 
 	if(Client()->RconAuthed())
 	{
 		const int LocalAuth = LocalAuthLevel();
 		const char *pAuth = LocalAuth == AUTHED_ADMIN ? Localize("Admin") : LocalAuth == AUTHED_MOD ? Localize("Moderator") : LocalAuth == AUTHED_HELPER ? Localize("Helper") : Localize("RCON");
 		CUIRect LogoutButton;
-		HeaderRight.VSplitRight(110.0f, &HeaderRight, &LogoutButton);
+		HeaderRight.VSplitRight(100.0f, &HeaderRight, &LogoutButton);
 		HeaderRight.VSplitRight(8.0f, &HeaderRight, nullptr);
 		Ui()->DoLabel(&HeaderRight, pAuth, 12.0f, TEXTALIGN_MR);
 		if(GameClient()->m_Menus.DoButton_Menu(&m_RconLogoutButton, Localize("Logout"), HasCommand("logout", AUTH_FALLBACK_HELPER) ? 0 : -1, &LogoutButton) && HasCommand("logout", AUTH_FALLBACK_HELPER))
@@ -1057,4 +1217,6 @@ void CAdminPanel::OnRconLine(const char *pLine)
 	else
 		Entry.m_Text = pLine;
 	m_RconLogLines.push_back(std::move(Entry));
+	if(m_LogStickToBottom)
+		m_LogScrollToBottomPending = true;
 }

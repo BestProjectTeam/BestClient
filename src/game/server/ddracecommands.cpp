@@ -474,11 +474,12 @@ void CGameContext::ConTeleport(IConsole::IResult *pResult, void *pUserData)
 
 	CCharacter *pChr = pSelf->GetPlayerChar(Tele);
 	CPlayer *pPlayer = pSelf->m_apPlayers[pResult->m_ClientId];
+	CPlayer *pPlayerTo = TeleTo >= 0 && TeleTo < MAX_CLIENTS ? pSelf->m_apPlayers[TeleTo] : nullptr;
 
-	if(pChr && pPlayer && pSelf->GetPlayerChar(TeleTo))
+	if(pChr && pPlayer && pPlayerTo)
 	{
-		// default to view pos when character is not available
-		vec2 Pos = pPlayer->m_ViewPos;
+		CCharacter *pChrTo = pSelf->GetPlayerChar(TeleTo);
+		vec2 Pos = pChrTo ? pChrTo->GetPos() : pPlayerTo->m_ViewPos;
 		if(pResult->NumArguments() == 0 && !pPlayer->IsPaused() && pChr->IsAlive())
 		{
 			vec2 Target = vec2(pChr->Core()->m_Input.m_TargetX, pChr->Core()->m_Input.m_TargetY);
