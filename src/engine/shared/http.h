@@ -82,7 +82,7 @@ class CHttpRequest : public IHttpRequest
 		dbg_assert_failed("unreachable");
 	}
 
-	char m_aUrl[256] = {0};
+	char m_aUrl[4096] = {0};
 
 	void *m_pHeaders = nullptr;
 	unsigned char *m_pBody = nullptr;

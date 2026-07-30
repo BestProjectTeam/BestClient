@@ -17,29 +17,37 @@
 #include <string>
 #include <string_view>
 
-static void UrlEncode(const char *pText, char *pOut, size_t Length)
+static bool UrlEncode(const char *pText, char *pOut, size_t Length)
 {
-	if(Length == 0)
-		return;
+	if(!pText || Length == 0)
+		return false;
+
 	size_t OutPos = 0;
-	for(const char *p = pText; *p && OutPos < Length - 1; ++p)
+	for(const char *p = pText; *p; ++p)
 	{
-		unsigned char c = *(const unsigned char *)p;
+		const unsigned char c = *(const unsigned char *)p;
 		if(isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~')
 		{
-			if(OutPos >= Length - 1)
-				break;
+			if(OutPos + 1 >= Length)
+			{
+				pOut[OutPos] = '\0';
+				return false;
+			}
 			pOut[OutPos++] = c;
 		}
 		else
 		{
 			if(OutPos + 3 >= Length)
-				break;
+			{
+				pOut[OutPos] = '\0';
+				return false;
+			}
 			snprintf(pOut + OutPos, 4, "%%%02X", c);
 			OutPos += 3;
 		}
 	}
 	pOut[OutPos] = '\0';
+	return true;
 }
 
 namespace
@@ -224,12 +232,8 @@ bool SanitizeOutgoingTranslatedText(const char *pOriginalText, const char *pTran
 	if(!str_utf8_check(aNormalized) || *str_utf8_skip_whitespaces(aNormalized) == '\0' || HasUrlEncodedSequence(aNormalized))
 		return false;
 
-	// If the translated text doesn't fit, fall back to sending the original message to avoid sending incomplete text.
-	if(str_length(aNormalized) > (int)OutSize - 1)
-		return false;
-
 	str_copy(pOut, aNormalized, OutSize);
-	return true;
+	return pOut[0] != '\0';
 }
 
 bool LanguagesEqual(const char *pA, const char *pB)
@@ -395,7 +399,22 @@ bool ExtractOutgoingWhisperPrefix(const CGameClient &GameClient, const char *pTe
 	}
 
 	if(!pBestBodyStart)
-		return false;
+	{
+		// Target not in client list: first token = name, rest = message.
+		const char *pNameEnd = pNameStart;
+		while(*pNameEnd != '\0' && !std::isspace((unsigned char)*pNameEnd))
+			++pNameEnd;
+		if(pNameEnd == pNameStart || *pNameEnd == '\0')
+			return false;
+
+		const char *pMessageStart = pNameEnd;
+		while(*pMessageStart != '\0' && std::isspace((unsigned char)*pMessageStart))
+			++pMessageStart;
+		if(*pMessageStart == '\0')
+			return false;
+
+		pBestBodyStart = pMessageStart;
+	}
 
 	const int PrefixLength = (int)(pBestBodyStart - pText);
 	str_copy(pPrefix, std::string(pText, PrefixLength).c_str(), PrefixSize);
@@ -696,12 +715,16 @@ public:
 	CTranslateBackendFtapi(IHttp &Http, const char *pText, const char *pTargetLanguage)
 	{
 		char aBuf[4096];
-		str_format(aBuf, sizeof(aBuf), "%s/translate?dl=%s&text=",
+		const int PrefixLen = str_format(aBuf, sizeof(aBuf), "%s/translate?dl=%s&text=",
 			g_Config.m_TcTranslateEndpoint[0] != '\0' ? g_Config.m_TcTranslateEndpoint : "https://ftapi.pythonanywhere.com",
 			EncodeTarget(pTargetLanguage));
-
-		UrlEncode(pText, aBuf + strlen(aBuf), sizeof(aBuf) - strlen(aBuf));
-
+		if(PrefixLen < 0 || PrefixLen >= (int)sizeof(aBuf) ||
+			!UrlEncode(pText, aBuf + PrefixLen, sizeof(aBuf) - PrefixLen))
+		{
+			log_error("translate", "FreeTranslateAPI: failed to build request URL");
+			CreateHttpRequest(Http, "https://ftapi.pythonanywhere.com/translate?dl=en&text=");
+			return;
+		}
 		CreateHttpRequest(Http, aBuf);
 	}
 };
@@ -776,9 +799,15 @@ public:
 	CTranslateBackendGoogle(IHttp &Http, const char *pText, const char *pSourceLanguage, const char *pTargetLanguage)
 	{
 		char aBuf[4096];
-		str_format(aBuf, sizeof(aBuf), "https://translate.googleapis.com/translate_a/single?client=gtx&sl=%s&tl=%s&dt=t&q=",
+		const int PrefixLen = str_format(aBuf, sizeof(aBuf), "https://translate.googleapis.com/translate_a/single?client=gtx&sl=%s&tl=%s&dt=t&q=",
 			EncodeSource(pSourceLanguage), EncodeTarget(pTargetLanguage));
-		UrlEncode(pText, aBuf + strlen(aBuf), sizeof(aBuf) - strlen(aBuf));
+		if(PrefixLen < 0 || PrefixLen >= (int)sizeof(aBuf) ||
+			!UrlEncode(pText, aBuf + PrefixLen, sizeof(aBuf) - PrefixLen))
+		{
+			log_error("translate", "Google Translate: failed to build request URL");
+			CreateHttpRequest(Http, "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=");
+			return;
+		}
 		CreateHttpRequest(Http, aBuf);
 	}
 };
@@ -1076,17 +1105,18 @@ void CTranslate::OnRender()
 		{
 			const char *pTextToSend = Job.m_aOriginalText;
 			char aTranslated[MAX_LINE_LENGTH] = "";
+			char aPrefixedTranslated[MAX_LINE_LENGTH] = "";
 			if(*Done && Job.m_pTranslateResponse->m_Text[0] != '\0' && str_comp_nocase(Job.m_aTextToTranslate, Job.m_pTranslateResponse->m_Text) != 0 &&
 				SanitizeOutgoingTranslatedText(Job.m_aTextToTranslate, Job.m_pTranslateResponse->m_Text, aTranslated, sizeof(aTranslated)))
 			{
 				if(Job.m_aOutgoingPrefix[0] != '\0')
 				{
-					char aPrefixedTranslated[MAX_LINE_LENGTH] = "";
-					if(str_length(Job.m_aOutgoingPrefix) + str_length(aTranslated) < (int)sizeof(aPrefixedTranslated))
-					{
-						str_format(aPrefixedTranslated, sizeof(aPrefixedTranslated), "%s%s", Job.m_aOutgoingPrefix, aTranslated);
+					str_copy(aPrefixedTranslated, Job.m_aOutgoingPrefix, sizeof(aPrefixedTranslated));
+					const int PrefixLen = str_length(aPrefixedTranslated);
+					str_append(aPrefixedTranslated, aTranslated, sizeof(aPrefixedTranslated));
+					// Only send if at least some of the translated body fit after the prefix.
+					if(str_length(aPrefixedTranslated) > PrefixLen)
 						pTextToSend = aPrefixedTranslated;
-					}
 				}
 				else
 				{
