@@ -44,6 +44,10 @@
 
 using namespace std::chrono_literals;
 
+// Set by OnRender while the Windows-style aspect confirm bar is visible so
+// cursor/input still reach the overlay when the menu itself is closed.
+static bool s_AspectConfirmWantsInput = false;
+
 ColorRGBA CMenus::ms_GuiColor;
 ColorRGBA CMenus::ms_ColorTabbarInactiveOutgame;
 ColorRGBA CMenus::ms_ColorTabbarActiveOutgame;
@@ -2674,7 +2678,7 @@ void CMenus::OnShutdown()
 
 bool CMenus::OnCursorMove(float x, float y, IInput::ECursorType CursorType)
 {
-	if(!m_MenuActive)
+	if(!m_MenuActive && !s_AspectConfirmWantsInput)
 		return false;
 
 	Ui()->ConvertMouseMove(&x, &y, CursorType);
@@ -2686,7 +2690,7 @@ bool CMenus::OnCursorMove(float x, float y, IInput::ECursorType CursorType)
 bool CMenus::OnInput(const IInput::CEvent &Event)
 {
 	// Escape key is always handled to activate/deactivate menu
-	if((Event.m_Flags & IInput::FLAG_PRESS && Event.m_Key == KEY_ESCAPE) || IsActive())
+	if((Event.m_Flags & IInput::FLAG_PRESS && Event.m_Key == KEY_ESCAPE) || IsActive() || s_AspectConfirmWantsInput)
 	{
 		Ui()->OnInput(Event);
 		return true;
@@ -2754,13 +2758,114 @@ void CMenus::OnRender()
 		PopupMessage(Localize("Disconnected"), Localize("The server is running a non-standard tuning on a pure game type."), Localize("Ok"));
 	}
 
+	// Confirm overlay for Full aspect stretch — Windows display-change style:
+	// apply preview, then keep it only if Apply is pressed within 10 seconds.
+	static bool s_AspectConfirmSeeded = false;
+	static bool s_AspectConfirmActive = false;
+	static int64_t s_AspectConfirmDeadline = 0;
+	static int s_AspectPrevMode = 0;
+	static int s_AspectPrevRatio = 0;
+	static int s_AspectPrevApplyMode = 1;
+	static int s_AspectPrevNum = 0;
+	static int s_AspectPrevDen = 0;
+	static int s_AspectLastMode = -99;
+	static int s_AspectLastRatio = -99;
+	static int s_AspectLastApplyMode = -99;
+	static int s_AspectLastNum = -99;
+	static int s_AspectLastDen = -99;
+	const int CurAspectMode = g_Config.m_BcCustomAspectRatioMode;
+	const int CurAspectRatio = g_Config.m_BcCustomAspectRatio;
+	const int CurAspectApplyMode = g_Config.m_BcCustomAspectRatioApplyMode;
+	const int CurAspectNum = g_Config.m_BcCustomAspectRatioNum;
+	const int CurAspectDen = g_Config.m_BcCustomAspectRatioDen;
+	const bool AspectConfirmNeeded = CurAspectApplyMode == 1 &&
+		(CurAspectMode > 0 || (CurAspectMode < 0 && CurAspectRatio > 0));
+	constexpr int ASPECT_CONFIRM_SECONDS = 10;
+
+	auto ResetAspectToPrevious = [&]() {
+		g_Config.m_BcCustomAspectRatioMode = s_AspectPrevMode;
+		g_Config.m_BcCustomAspectRatio = s_AspectPrevRatio;
+		g_Config.m_BcCustomAspectRatioApplyMode = s_AspectPrevApplyMode;
+		g_Config.m_BcCustomAspectRatioNum = s_AspectPrevNum;
+		g_Config.m_BcCustomAspectRatioDen = s_AspectPrevDen;
+		s_AspectLastMode = s_AspectPrevMode;
+		s_AspectLastRatio = s_AspectPrevRatio;
+		s_AspectLastApplyMode = s_AspectPrevApplyMode;
+		s_AspectLastNum = s_AspectPrevNum;
+		s_AspectLastDen = s_AspectPrevDen;
+		s_AspectConfirmActive = false;
+		GameClient()->m_TClient.SetForcedAspect();
+	};
+
+	if(!s_AspectConfirmSeeded)
+	{
+		s_AspectConfirmSeeded = true;
+		s_AspectConfirmActive = false;
+		s_AspectLastMode = CurAspectMode;
+		s_AspectLastRatio = CurAspectRatio;
+		s_AspectLastApplyMode = CurAspectApplyMode;
+		s_AspectLastNum = CurAspectNum;
+		s_AspectLastDen = CurAspectDen;
+		s_AspectPrevMode = CurAspectMode;
+		s_AspectPrevRatio = CurAspectRatio;
+		s_AspectPrevApplyMode = CurAspectApplyMode;
+		s_AspectPrevNum = CurAspectNum;
+		s_AspectPrevDen = CurAspectDen;
+	}
+	else if(s_AspectLastMode != CurAspectMode || s_AspectLastRatio != CurAspectRatio || s_AspectLastApplyMode != CurAspectApplyMode ||
+		s_AspectLastNum != CurAspectNum || s_AspectLastDen != CurAspectDen)
+	{
+		const bool WasConfirmActive = s_AspectConfirmActive;
+		const bool DiffersFromPrev = CurAspectMode != s_AspectPrevMode || CurAspectRatio != s_AspectPrevRatio ||
+			CurAspectApplyMode != s_AspectPrevApplyMode || CurAspectNum != s_AspectPrevNum || CurAspectDen != s_AspectPrevDen;
+		if(AspectConfirmNeeded && DiffersFromPrev)
+		{
+			if(!WasConfirmActive)
+			{
+				s_AspectPrevMode = s_AspectLastMode;
+				s_AspectPrevRatio = s_AspectLastRatio;
+				s_AspectPrevApplyMode = s_AspectLastApplyMode;
+				s_AspectPrevNum = s_AspectLastNum;
+				s_AspectPrevDen = s_AspectLastDen;
+			}
+			s_AspectConfirmActive = true;
+			s_AspectConfirmDeadline = time_get() + time_freq() * ASPECT_CONFIRM_SECONDS;
+		}
+		else
+		{
+			// Left Full mode, or manually restored previous values during the confirm window.
+			s_AspectConfirmActive = false;
+			s_AspectPrevMode = CurAspectMode;
+			s_AspectPrevRatio = CurAspectRatio;
+			s_AspectPrevApplyMode = CurAspectApplyMode;
+			s_AspectPrevNum = CurAspectNum;
+			s_AspectPrevDen = CurAspectDen;
+		}
+
+		s_AspectLastMode = CurAspectMode;
+		s_AspectLastRatio = CurAspectRatio;
+		s_AspectLastApplyMode = CurAspectApplyMode;
+		s_AspectLastNum = CurAspectNum;
+		s_AspectLastDen = CurAspectDen;
+	}
+
+	// FNG servers disable custom aspect — drop a pending confirm so it cannot stick around.
+	if(s_AspectConfirmActive && GameClient()->IsAspectRatioBlockedByFng())
+		s_AspectConfirmActive = false;
+
+	if(s_AspectConfirmActive && time_get() >= s_AspectConfirmDeadline)
+		ResetAspectToPrevious();
+
+	const bool ShowAspectConfirmOverlay = s_AspectConfirmActive && AspectConfirmNeeded;
+	s_AspectConfirmWantsInput = ShowAspectConfirmOverlay;
+
 	if(!IsActive())
 	{
 		if(Ui()->ConsumeHotkey(CUi::HOTKEY_ESCAPE))
 		{
 			SetActive(true);
 		}
-		else if(Client()->State() != IClient::STATE_DEMOPLAYBACK)
+		else if(Client()->State() != IClient::STATE_DEMOPLAYBACK && !ShowAspectConfirmOverlay)
 		{
 			Ui()->ClearHotkeys();
 			return;
@@ -2771,7 +2876,7 @@ void CMenus::OnRender()
 	UpdateColors();
 
 	const bool IngameMenu = IsActive() && (Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK);
-	const bool UseWindowAspectForUi = IngameMenu && g_Config.m_BcCustomAspectRatioApplyMode != 1;
+	const bool UseWindowAspectForUi = IngameMenu && (GameClient()->IsAspectRatioBlockedByFng() || g_Config.m_BcCustomAspectRatioApplyMode != 1);
 	Ui()->SetUseGraphicsScreenAspect(!UseWindowAspectForUi);
 	// Console disables UI while open; don't re-enable every frame or Android soft keyboard thrash.
 	if(!GameClient()->m_GameConsole.IsActive())
@@ -2779,42 +2884,15 @@ void CMenus::OnRender()
 
 	Ui()->Update();
 
-	// Safety overlay for Full aspect stretch. Seed from saved config on first frame so
-	// re-entering the client does not reset stretch or re-prompt; only mid-session changes do.
-	static bool s_StuckOverlaySeeded = false;
-	static bool s_StuckOverlayDismissed = true;
-	static int s_StuckLastMode = -99;
-	static int s_StuckLastRatio = -99;
-	static int s_StuckLastApplyMode = -99;
-	const int CurAspectMode = g_Config.m_BcCustomAspectRatioMode;
-	const int CurAspectRatio = g_Config.m_BcCustomAspectRatio;
-	const int CurAspectApplyMode = g_Config.m_BcCustomAspectRatioApplyMode;
-	const bool AspectOverlayActive = CurAspectApplyMode == 1 &&
-		(CurAspectMode > 0 || (CurAspectMode < 0 && CurAspectRatio > 0));
-	if(!s_StuckOverlaySeeded)
-	{
-		s_StuckOverlaySeeded = true;
-		s_StuckOverlayDismissed = true;
-		s_StuckLastMode = CurAspectMode;
-		s_StuckLastRatio = CurAspectRatio;
-		s_StuckLastApplyMode = CurAspectApplyMode;
-	}
-	else if(s_StuckLastMode != CurAspectMode || s_StuckLastRatio != CurAspectRatio || s_StuckLastApplyMode != CurAspectApplyMode)
-	{
-		s_StuckLastMode = CurAspectMode;
-		s_StuckLastRatio = CurAspectRatio;
-		s_StuckLastApplyMode = CurAspectApplyMode;
-		s_StuckOverlayDismissed = !AspectOverlayActive;
-	}
-	const bool ShowStuckOverlay = IsActive() && AspectOverlayActive && !s_StuckOverlayDismissed;
-	// Block menu button fires: clear active item so no DoButtonLogic fires this frame
-	if(ShowStuckOverlay)
+	// Block menu button fires while the confirm bar is up
+	if(ShowAspectConfirmOverlay && IsActive())
 		Ui()->SetActiveItem(nullptr);
 
-	Render();
+	if(IsActive())
+		Render();
 
 	// After Render: discard buttons that became active, and suppress hot item next frame
-	if(ShowStuckOverlay)
+	if(ShowAspectConfirmOverlay && IsActive())
 	{
 		Ui()->SetActiveItem(nullptr);
 		Ui()->SetHotItem(nullptr);
@@ -2824,17 +2902,17 @@ void CMenus::OnRender()
 	if(g_Config.m_Debug)
 		Ui()->DebugRender(2.0f, Ui()->Screen()->h - 12.0f);
 
-	if(Ui()->ConsumeHotkey(CUi::HOTKEY_ESCAPE))
+	if(IsActive() && Ui()->ConsumeHotkey(CUi::HOTKEY_ESCAPE))
 	{
 		Ui()->SetHotItem(nullptr);
 		Ui()->SetActiveItem(nullptr);
 		SetActive(false);
 	}
 
-	// Safety overlay: shown in menu when aspect ratio "Full" mode is active.
+	// Confirm overlay: Windows-style keep/revert bar for Full aspect changes.
 	// Renders in real window coordinates so it stays readable regardless of distortion.
 	// Uses UpdatedMousePos (raw pixels) → real virtual coords to avoid the distorted m_MousePos.
-	if(ShowStuckOverlay)
+	if(ShowAspectConfirmOverlay)
 	{
 		Ui()->SetUseGraphicsScreenAspect(false);
 		Ui()->MapScreen();
@@ -2846,7 +2924,11 @@ void CMenus::OnRender()
 		const vec2 RawMouse = Ui()->UpdatedMousePos();
 		const vec2 RealMouse = vec2(RawMouse.x * pReal->w / WinW, RawMouse.y * pReal->h / WinH);
 
-		const float PanelW = minimum(360.0f, pReal->w - 12.0f);
+		const int SecondsLeft = maximum(0, (int)((s_AspectConfirmDeadline - time_get() + time_freq() - 1) / time_freq()));
+		char aConfirmText[128];
+		str_format(aConfirmText, sizeof(aConfirmText), Localize("Keep this aspect ratio? Reverting in %d..."), SecondsLeft);
+
+		const float PanelW = minimum(420.0f, pReal->w - 12.0f);
 		CUIRect Panel;
 		Panel.x = pReal->x + (pReal->w - PanelW) * 0.5f;
 		Panel.y = pReal->y + 6.0f;
@@ -2855,14 +2937,14 @@ void CMenus::OnRender()
 		Graphics()->DrawRect(Panel.x, Panel.y, Panel.w, Panel.h, ColorRGBA(0.0f, 0.0f, 0.0f, 0.82f), IGraphics::CORNER_ALL, 5.0f);
 		Panel.Margin(2.0f, &Panel);
 
-		CUIRect StuckBtn, CloseBtn;
-		Panel.VSplitRight(80.0f, &Panel, &CloseBtn);
-		CloseBtn.VMargin(2.0f, &CloseBtn);
+		CUIRect ApplyBtn, RevertBtn;
+		Panel.VSplitRight(80.0f, &Panel, &RevertBtn);
+		RevertBtn.VMargin(2.0f, &RevertBtn);
 		Panel.VSplitRight(4.0f, &Panel, nullptr);
-		Panel.VSplitRight(88.0f, &Panel, &StuckBtn);
-		StuckBtn.VMargin(2.0f, &StuckBtn);
+		Panel.VSplitRight(88.0f, &Panel, &ApplyBtn);
+		ApplyBtn.VMargin(2.0f, &ApplyBtn);
 		Panel.VSplitRight(4.0f, &Panel, nullptr);
-		Ui()->DoLabel(&Panel, "Aspect ratio: Full", 10.0f, TEXTALIGN_ML);
+		Ui()->DoLabel(&Panel, aConfirmText, 10.0f, TEXTALIGN_ML);
 
 		auto RenderOverlayBtn = [&](const CUIRect &Rect, const char *pText, ColorRGBA Normal, ColorRGBA Hovered) -> bool {
 			const bool Hover = RealMouse.x >= Rect.x && RealMouse.x < Rect.x + Rect.w &&
@@ -2872,23 +2954,33 @@ void CMenus::OnRender()
 			return Hover && Ui()->MouseButtonClicked(0);
 		};
 
-		if(RenderOverlayBtn(StuckBtn, "I'm stuck", ColorRGBA(0.45f, 0.18f, 0.18f, 1.0f), ColorRGBA(0.7f, 0.28f, 0.28f, 1.0f)))
+		if(RenderOverlayBtn(ApplyBtn, Localize("Apply"), ColorRGBA(0.18f, 0.36f, 0.18f, 1.0f), ColorRGBA(0.28f, 0.55f, 0.28f, 1.0f)))
 		{
-			g_Config.m_BcCustomAspectRatioMode = 0;
-			g_Config.m_BcCustomAspectRatio = 0;
-			GameClient()->m_TClient.SetForcedAspect();
+			s_AspectConfirmActive = false;
+			s_AspectPrevMode = CurAspectMode;
+			s_AspectPrevRatio = CurAspectRatio;
+			s_AspectPrevApplyMode = CurAspectApplyMode;
+			s_AspectPrevNum = CurAspectNum;
+			s_AspectPrevDen = CurAspectDen;
 		}
-		if(RenderOverlayBtn(CloseBtn, "Looks fine", ColorRGBA(0.18f, 0.36f, 0.18f, 1.0f), ColorRGBA(0.28f, 0.55f, 0.28f, 1.0f)))
-			s_StuckOverlayDismissed = true;
+		if(RenderOverlayBtn(RevertBtn, Localize("Revert"), ColorRGBA(0.45f, 0.18f, 0.18f, 1.0f), ColorRGBA(0.7f, 0.28f, 0.28f, 1.0f)))
+			ResetAspectToPrevious();
 
 		// Restore original coordinate system before cursor render
 		Ui()->SetUseGraphicsScreenAspect(!UseWindowAspectForUi);
 		Ui()->MapScreen();
 	}
 
-	if(IsActive())
+	if(IsActive() || ShowAspectConfirmOverlay)
 	{
-		RenderTools()->RenderCursor(Ui()->MousePos(), 24.0f);
+		vec2 CursorPos = Ui()->MousePos();
+		if(ShowAspectConfirmOverlay && !IsActive())
+		{
+			const CUIRect *pScreen = Ui()->Screen();
+			const vec2 RawMouse = Ui()->UpdatedMousePos();
+			CursorPos = vec2(RawMouse.x * pScreen->w / (float)Graphics()->ScreenWidth(), RawMouse.y * pScreen->h / (float)Graphics()->ScreenHeight());
+		}
+		RenderTools()->RenderCursor(CursorPos, 24.0f);
 	}
 
 	Ui()->FinishCheck();

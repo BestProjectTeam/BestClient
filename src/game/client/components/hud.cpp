@@ -1911,7 +1911,7 @@ void CHud::RenderCursor()
 
 	// In "game no HUD" mode the HUD itself uses window aspect, but cursor world mapping
 	// must still use gameplay aspect, otherwise the cursor drifts away from the real aim.
-	const bool UseGameNoHudAspect = (Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK) && g_Config.m_BcCustomAspectRatioApplyMode == 2;
+	const bool UseGameNoHudAspect = (Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK) && !GameClient()->IsAspectRatioBlockedByFng() && g_Config.m_BcCustomAspectRatioApplyMode == 2;
 	if(UseGameNoHudAspect)
 		Graphics()->SetScreenAspectOverrideEnabled(true);
 

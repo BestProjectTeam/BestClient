@@ -1564,11 +1564,13 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 	// Aspect ratio (right column block)
 	RightColumn.HSplitTop(MarginBetweenViews, nullptr, &RightColumn);
 
+	const bool AspectBlocked = GameClient()->IsAspectRatioBlockedByFng();
 	const int AspectMode = g_Config.m_BcCustomAspectRatioMode >= 0 ? g_Config.m_BcCustomAspectRatioMode : (g_Config.m_BcCustomAspectRatio > 0 ? 1 : 0);
 	const bool AspectCustomMode = AspectMode == 2;
 	const float AspectHeaderHeight = LineSize + MarginSmall + LineSize + MarginSmall + LineSize;
 	const float AspectExpandedHeight = AspectCustomMode ? (MarginSmall + LineSize + MarginSmall + LineSize) : 0.0f;
-	const float AspectBlockHeight = AspectHeaderHeight + AspectExpandedHeight;
+	const float AspectBlockedHintHeight = AspectBlocked ? (MarginSmall + LineSize) : 0.0f;
+	const float AspectBlockHeight = AspectHeaderHeight + AspectExpandedHeight + AspectBlockedHintHeight;
 
 	CUIRect AspectBlock;
 	RightColumn.HSplitTop(AspectBlockHeight, &AspectBlock, &RightColumn);
@@ -1752,6 +1754,15 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		s_CustomAspectInitialized = false;
 		s_LastSyncedNum = -1;
 		s_LastSyncedDen = -1;
+	}
+
+	if(AspectBlocked)
+	{
+		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+		MainView.HSplitTop(LineSize, &Label, &MainView);
+		TextRender()->TextColor(1.0f, 0.4f, 0.4f, 1.0f);
+		Ui()->DoLabel(&Label, Localize("Looks like you're on a server where this feature is forbidden"), 14.0f, TEXTALIGN_ML);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
 	}
 
 	const float RightColumnEndY = RightColumn.y;
