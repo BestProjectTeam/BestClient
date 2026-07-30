@@ -3664,6 +3664,12 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	CUIRect ArtistRect = LayoutTextArea;
 	ArtistRect.h = ArtistFont + 1.6f * Scale;
 	ArtistRect.y = TitleRect.y + TitleRect.h - 0.9f * Scale;
+	if(ShowGameTimer)
+	{
+		const float PixelHeight = Height / WindowSize.y;
+		TitleRect.x += 2.0f * PixelWidth;
+		TitleRect.y -= 1.0f * PixelHeight;
+	}
 
 	if(RenderVisualizer && (!RenderMiniLayout || !MiniControlsVisible))
 	{
