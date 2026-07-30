@@ -1103,15 +1103,15 @@ void CPlayers::RenderPlayer(
 	}
 
 	// BestClient: in fast practice override emote from snap with practice world state
-	if(ClientId >= 0 && GameClient()->m_FastPractice.Enabled() && GameClient()->m_FastPractice.IsPracticeParticipant(ClientId))
+	if(ClientId >= 0 && GameClient()->m_FastPractice.Active() && GameClient()->m_FastPractice.IsPracticeParticipant(ClientId))
 	{
 		const CGameClient::CClientData &CD = GameClient()->m_aClients[ClientId];
-		const bool PracticeFrozen = CD.m_Predicted.m_FreezeEnd != 0 || CD.m_Predicted.m_LiveFrozen;
+		const bool PracticeFrozen = CD.m_Predicted.m_FreezeEnd != 0 || CD.m_Predicted.m_LiveFrozen || CD.m_Predicted.m_DeepFrozen;
 		Player.m_Emote = PracticeFrozen ? EMOTE_PAIN : EMOTE_NORMAL;
 	}
 
 	// render the "shadow" tee — skip for practice participants, their snap position is meaningless
-	const bool IsPracticeParticipant = ClientId >= 0 && GameClient()->m_FastPractice.Enabled() && GameClient()->m_FastPractice.IsPracticeParticipant(ClientId); // BestClient
+	const bool IsPracticeParticipant = ClientId >= 0 && GameClient()->m_FastPractice.Active() && GameClient()->m_FastPractice.IsPracticeParticipant(ClientId); // BestClient
 	if(!IsPracticeParticipant && (g_Config.m_ClUnpredictedShadow == 3 || (Local && g_Config.m_ClUnpredictedShadow == 1) || (!Local && g_Config.m_ClUnpredictedShadow == 2)))
 	{
 		vec2 ShadowPosition = Position;
@@ -1659,9 +1659,10 @@ void CPlayers::OnRender()
 		aRenderInfo[i] = GameClient()->m_aClients[i].m_RenderInfo;
 		aRenderInfo[i].m_TeeRenderFlags = 0;
 
-		// predict freeze skin only for local players
+		// predict freeze skin for local / practice participants
 		bool Frozen = false;
-		if(i == GameClient()->m_aLocalIds[0] || i == GameClient()->m_aLocalIds[1])
+		const bool PracticeParticipant = GameClient()->m_FastPractice.Active() && GameClient()->m_FastPractice.IsPracticeParticipant(i);
+		if(i == GameClient()->m_aLocalIds[0] || i == GameClient()->m_aLocalIds[1] || PracticeParticipant)
 		{
 			if(GameClient()->m_aClients[i].m_Predicted.m_FreezeEnd != 0)
 				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_FROZEN | TEE_NO_WEAPON;
@@ -1673,7 +1674,7 @@ void CPlayers::OnRender()
 			Frozen = GameClient()->m_aClients[i].m_Predicted.m_FreezeEnd != 0;
 			// TClient: fast input uses RegularPredicted for freeze, but in fast practice
 			// the practice world state must take priority over the real server state.
-			if(g_Config.m_BcInputs != BC_INPUTS_OFF && !GameClient()->m_FastPractice.IsPracticeParticipant(i))
+			if(g_Config.m_BcInputs != BC_INPUTS_OFF && !PracticeParticipant)
 				Frozen = GameClient()->m_aClients[i].m_RegularPredicted.m_FreezeEnd != 0;
 		}
 		else

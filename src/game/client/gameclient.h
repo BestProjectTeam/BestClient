@@ -806,7 +806,7 @@ public:
 	bool PredictDummy() const
 	{
 		// BestClient: in fast practice the predicted dummy is a fixed practice participant
-		if(m_FastPractice.Enabled())
+		if(m_FastPractice.Active())
 		{
 			const int FastPracticeDummyId = m_FastPractice.CurrentPracticeDummyId();
 			return FastPracticeDummyId >= 0 && m_Snap.m_LocalClientId >= 0 && !m_aClients[FastPracticeDummyId].m_Paused;

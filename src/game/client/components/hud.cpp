@@ -3742,7 +3742,7 @@ bool CHud::GetFinishPredictionState(SFinishPredictionState &State, bool ForcePre
 		return false;
 	}
 
-	const bool UsingFastPractice = GameClient()->m_FastPractice.Enabled();
+	const bool UsingFastPractice = GameClient()->m_FastPractice.Active();
 	if(m_FinishPredictionUsingFastPractice != UsingFastPractice)
 	{
 		ResetFinishPredictionState();
