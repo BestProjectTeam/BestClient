@@ -1226,7 +1226,12 @@ void CVoiceChat::RenderMenuSettingsBlock(const CUIRect &View, float RevealPhase)
 		MeterBar.Draw(ColorRGBA(0.02f, 0.02f, 0.03f, 0.28f), IGraphics::CORNER_ALL, 3.0f);
 		CUIRect Fill = MeterBar;
 		Fill.w *= std::clamp(m_MicLevel, 0.0f, 1.0f);
-		Fill.Draw(ColorRGBA(0.30f, 0.70f, 0.42f, 0.78f), IGraphics::CORNER_ALL, 3.0f);
+		if(Fill.w > 0.0f)
+		{
+			const float Rounding = minimum(3.0f, minimum(Fill.w * 0.5f, Fill.h * 0.5f));
+			const int Corners = Fill.w >= MeterBar.w ? IGraphics::CORNER_ALL : IGraphics::CORNER_L;
+			Fill.Draw(ColorRGBA(0.30f, 0.70f, 0.42f, 0.78f), Corners, Rounding);
+		}
 	}
 
 	AddExpandedSpacing(3.0f);
