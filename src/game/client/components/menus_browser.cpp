@@ -27,6 +27,8 @@
 
 #include <map>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 static constexpr ColorRGBA HIGHLIGHTED_TEXT_COLOR = ColorRGBA(0.4f, 0.4f, 1.0f, 1.0f);
 
@@ -2182,8 +2184,55 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 			const CServerInfo::CClient *m_pClientInfo;
 		};
 
+		struct SWarNameHash
+		{
+			size_t operator()(const char *pName) const
+			{
+				return str_quickhash(pName);
+			}
+		};
+		struct SWarNameEquals
+		{
+			bool operator()(const char *pLeft, const char *pRight) const
+			{
+				return str_comp(pLeft, pRight) == 0;
+			}
+		};
+
 		// expanded state keyed by war type name
 		static std::map<std::string, bool> s_WarTypeExtended;
+
+		// Index by name, then one server-browser pass instead of nested war*server*client loops.
+		std::unordered_map<const char *, std::vector<const CWarEntry *>, SWarNameHash, SWarNameEquals> WarEntriesByName;
+		WarEntriesByName.reserve(GameClient()->m_WarList.m_vWarEntries.size());
+		for(const CWarEntry &WarEntry : GameClient()->m_WarList.m_vWarEntries)
+		{
+			if(WarEntry.m_aName[0] == '\0' || WarEntry.m_pWarType == nullptr)
+				continue;
+			// "none" is a placeholder type and is not rendered below
+			if(str_comp(WarEntry.m_pWarType->m_aWarName, "none") == 0)
+				continue;
+			WarEntriesByName[WarEntry.m_aName].push_back(&WarEntry);
+		}
+
+		std::unordered_map<const CWarType *, std::vector<SWarBrowserEntry>> EntriesByType;
+		EntriesByType.reserve(GameClient()->m_WarList.m_WarTypes.size());
+		if(!WarEntriesByName.empty())
+		{
+			for(int ServerIndex = 0; ServerIndex < ServerBrowser()->NumServers(); ++ServerIndex)
+			{
+				const CServerInfo *pServerEntry = ServerBrowser()->Get(ServerIndex);
+				for(int ClientIndex = 0; ClientIndex < pServerEntry->m_NumClients; ++ClientIndex)
+				{
+					const CServerInfo::CClient &CurrentClient = pServerEntry->m_aClients[ClientIndex];
+					const auto NameIt = WarEntriesByName.find(CurrentClient.m_aName);
+					if(NameIt == WarEntriesByName.end())
+						continue;
+					for(const CWarEntry *pWarEntry : NameIt->second)
+						EntriesByType[pWarEntry->m_pWarType].push_back({pWarEntry, pServerEntry, &CurrentClient});
+				}
+			}
+		}
 
 		for(const CWarType *pWarType : GameClient()->m_WarList.m_WarTypes)
 		{
@@ -2191,33 +2240,9 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 			if(str_comp(pWarType->m_aWarName, "none") == 0)
 				continue;
 
-			// collect online players for this type
-			std::vector<SWarBrowserEntry> vEntries;
-			for(const CWarEntry &WarEntry : GameClient()->m_WarList.m_vWarEntries)
-			{
-				if(WarEntry.m_aName[0] == '\0')
-					continue;
-				if(WarEntry.m_pWarType != pWarType)
-					continue;
-
-				for(int ServerIndex = 0; ServerIndex < ServerBrowser()->NumServers(); ++ServerIndex)
-				{
-					const CServerInfo *pServerEntry = ServerBrowser()->Get(ServerIndex);
-					for(int ClientIndex = 0; ClientIndex < pServerEntry->m_NumClients; ++ClientIndex)
-					{
-						const CServerInfo::CClient &CurrentClient = pServerEntry->m_aClients[ClientIndex];
-						if(str_comp(CurrentClient.m_aName, WarEntry.m_aName) != 0)
-							continue;
-						vEntries.push_back({&WarEntry, pServerEntry, &CurrentClient});
-					}
-				}
-			}
-
-			std::sort(vEntries.begin(), vEntries.end(), [](const SWarBrowserEntry &Left, const SWarBrowserEntry &Right) {
-				const char *pLeftName = Left.m_pWarEntry->m_aName[0] != '\0' ? Left.m_pWarEntry->m_aName : Left.m_pWarEntry->m_aClan;
-				const char *pRightName = Right.m_pWarEntry->m_aName[0] != '\0' ? Right.m_pWarEntry->m_aName : Right.m_pWarEntry->m_aClan;
-				return str_comp_nocase(pLeftName, pRightName) < 0;
-			});
+			const auto EntriesIt = EntriesByType.find(pWarType);
+			std::vector<SWarBrowserEntry> *pEntries = EntriesIt != EntriesByType.end() ? &EntriesIt->second : nullptr;
+			const int EntryCount = pEntries != nullptr ? (int)pEntries->size() : 0;
 
 			// ensure expanded state exists for this type
 			auto &Extended = s_WarTypeExtended.emplace(pWarType->m_aWarName, true).first->second;
@@ -2233,7 +2258,7 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 			Ui()->DoLabel(&GroupIcon, Extended ? FontIcon::SQUARE_MINUS : FontIcon::SQUARE_PLUS, GroupIcon.h * CUi::ms_FontmodHeight, TEXTALIGN_MC);
 			TextRender()->TextColor(TextRender()->DefaultTextColor());
 			TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
-			str_format(aBuf, sizeof(aBuf), "%s entries (%d)", pWarType->m_aWarName, (int)vEntries.size());
+			str_format(aBuf, sizeof(aBuf), "%s entries (%d)", pWarType->m_aWarName, EntryCount);
 			// capitalize first letter of the header label
 			aBuf[0] = (char)str_uppercase(aBuf[0]);
 			TextRender()->TextColor(pWarType->m_Color);
@@ -2244,8 +2269,17 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 				Extended = !Extended;
 			}
 
-			if(Extended)
+			if(Extended && pEntries != nullptr)
 			{
+				std::vector<SWarBrowserEntry> &vEntries = *pEntries;
+				if(vEntries.size() > 1)
+				{
+					std::sort(vEntries.begin(), vEntries.end(), [](const SWarBrowserEntry &Left, const SWarBrowserEntry &Right) {
+						const char *pLeftName = Left.m_pWarEntry->m_aName[0] != '\0' ? Left.m_pWarEntry->m_aName : Left.m_pWarEntry->m_aClan;
+						const char *pRightName = Right.m_pWarEntry->m_aName[0] != '\0' ? Right.m_pWarEntry->m_aName : Right.m_pWarEntry->m_aClan;
+						return str_comp_nocase(pLeftName, pRightName) < 0;
+					});
+				}
 				for(size_t EntryIndex = 0; EntryIndex < vEntries.size(); ++EntryIndex)
 				{
 					{
