@@ -722,6 +722,7 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 	const float TeeOffset = ScoreOffset + ScoreLength + 20.0f;
 	const float TeeLength = 60.0f * TeeSizeMod;
 	const float NameOffset = TeeOffset + TeeLength;
+	const bool ShowPoints = GameClient()->m_ShowPoints.ActiveOnCurrentServer();
 	const float NameLength = (LowScoreboardWidth ? 90.0f : 150.0f) - TeeLength;
 	const float CountryLength = (LineHeight - Spacing - TeeSizeMod * 5.0f) * 2.0f;
 	const float PingLength = 27.5f;
@@ -737,7 +738,14 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 	const float HeadlineY = Headline.y + Headline.h / 2.0f - HeadlineFontsize / 2.0f;
 	const char *pScore = UseTime ? Localize("Time") : Localize("Score");
 	TextRender()->Text(ScoreOffset + ScoreLength - TextRender()->TextWidth(HeadlineFontsize, pScore), HeadlineY, HeadlineFontsize, pScore);
-	TextRender()->Text(NameOffset, HeadlineY, HeadlineFontsize, Localize("Name"));
+	const char *pNameLabel = Localize("Name");
+	TextRender()->Text(NameOffset, HeadlineY, HeadlineFontsize, pNameLabel);
+	if(ShowPoints)
+	{
+		const char *pPointsLabel = Localize("Points");
+		const float NameLabelWidth = TextRender()->TextWidth(HeadlineFontsize, pNameLabel);
+		TextRender()->Text(NameOffset + NameLabelWidth + 8.0f, HeadlineY, HeadlineFontsize, pPointsLabel);
+	}
 	const char *pClanLabel = Localize("Clan");
 	TextRender()->Text(ClanOffset + (ClanLength - TextRender()->TextWidth(HeadlineFontsize, pClanLabel)) / 2.0f, HeadlineY, HeadlineFontsize, pClanLabel);
 	const char *pPingLabel = Localize("Ping");
@@ -1022,6 +1030,19 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 
 				TextRender()->TextEx(&Cursor, ClientData.m_aName);
 				Cursor.m_vColorSplits.clear();
+
+				if(ShowPoints)
+				{
+					GameClient()->m_ShowPoints.RequestPoints(ClientData.m_aName);
+					int Points = 0;
+					if(GameClient()->m_ShowPoints.TryGetPoints(ClientData.m_aName, &Points))
+					{
+						str_format(aBuf, sizeof(aBuf), " %d", Points);
+						TextRender()->TextColor(TextColor.r, TextColor.g, TextColor.b, TextColor.a * 0.75f);
+						TextRender()->TextEx(&Cursor, aBuf);
+						TextRender()->TextColor(TextColor);
+					}
+				}
 
 				// ready / watching
 				if(Client()->IsSixup() && Client()->m_TranslationContext.m_aClients[pInfo->m_ClientId].m_PlayerFlags7 & protocol7::PLAYERFLAG_READY)

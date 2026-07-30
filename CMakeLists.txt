@@ -2872,6 +2872,8 @@ if(CLIENT)
     components/bestclient/rollback_demo.h
     components/bestclient/self_time_cp.cpp
     components/bestclient/self_time_cp.h
+    components/bestclient/show_points.cpp
+    components/bestclient/show_points.h
     components/bestclient/subsystem_runtime.h
     components/bestclient/translate.cpp
     components/bestclient/translate.h

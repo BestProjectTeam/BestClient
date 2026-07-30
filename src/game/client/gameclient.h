@@ -99,6 +99,7 @@
 #include "components/bestclient/quick_binds.h"
 #include "components/bestclient/rollback_demo.h"
 #include "components/bestclient/self_time_cp.h"
+#include "components/bestclient/show_points.h"
 #include "components/bestclient/translate.h"
 #include "components/bestclient/voice/voice.h"
 #include "components/bestclient/clans/clans.h"
@@ -257,6 +258,7 @@ public:
 	CRollbackDemo m_RollbackDemo; // BestClient
 	CQuickBinds m_QuickBinds; // BestClient
 	CSelfTimeCp m_SelfTimeCp; // BestClient
+	CShowPoints m_ShowPoints; // BestClient
 	CClientIndicator m_ClientIndicator; // BestClient
 	CMusicPlayer m_MusicPlayer; // BestClient
 	CAdminPanel m_AdminPanel; // BestClient
