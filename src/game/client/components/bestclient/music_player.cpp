@@ -1528,7 +1528,7 @@ namespace
 		return g_Config.m_BcMusicPlayerVisualizerRounding >= 100;
 	}
 
-	static bool IsTranslucentColorMode()
+	[[maybe_unused]] static bool IsTranslucentColorMode()
 	{
 		return g_Config.m_BcMusicPlayerColorMode == 2;
 	}

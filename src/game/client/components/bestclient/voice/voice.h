@@ -235,6 +235,8 @@ private:
 	bool m_PushToTalkPressed = false;
 	int64_t m_AutoActivationUntilTick = 0;
 	float m_MicLevel = 0.0f;
+	float m_MicLevelTarget = 0.0f;
+	bool m_MicLevelVisible = false;
 	float m_MicLimiterGain = 1.0f;
 	float m_AutoNsNoiseFloor = 0.0f;
 	float m_AutoNsGate = 1.0f;

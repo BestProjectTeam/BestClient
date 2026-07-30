@@ -2212,7 +2212,7 @@ void CMenus::RenderClansPreview(CUIRect MainView)
 void CMenus::RenderClansApplications(CUIRect MainView)
 {
 	CClans &Clans = GameClient()->m_Clans;
-	CUIRect Top, Label, Button, BackBtn, RefreshBtn;
+	CUIRect Top, Label, BackBtn, RefreshBtn;
 	MainView.HSplitTop(28.0f, &Top, &MainView);
 	Top.VSplitRight(28.0f, &Top, &RefreshBtn);
 	Top.VSplitRight(4.0f, &Top, nullptr);

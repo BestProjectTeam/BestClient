@@ -870,8 +870,8 @@ void CHud::RenderScoreHud(bool ForcePreview)
 			const std::vector<STextColorSplit> vGradientSplits = CBcGradient::BuildAnimatedTextSplits(pName, Id, GameClient(), Phase);
 			if(!vGradientSplits.empty())
 			{
-				for(const STextColorSplit &Split : vGradientSplits)
-					Cursor.m_vColorSplits.emplace_back(Cursor.m_CharCount + Split.m_CharIndex, Split.m_Length, Split.m_Color);
+				for(const STextColorSplit &GradientSplit : vGradientSplits)
+					Cursor.m_vColorSplits.emplace_back(Cursor.m_CharCount + GradientSplit.m_CharIndex, GradientSplit.m_Length, GradientSplit.m_Color);
 				TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
 			}
 		}
