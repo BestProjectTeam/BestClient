@@ -728,7 +728,11 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 	const float PingLength = 27.5f;
 	const float PingOffset = Scoreboard.x + Scoreboard.w - PingLength - 10.0f;
 	const float CountryOffset = PingOffset - CountryLength;
-	const float ClanOffset = NameOffset + NameLength + 2.5f;
+	// Keep Name/Clan spacing; points sit in their own padded column between them.
+	// Extra board width for this column is added in OnRender only when ShowPoints is on.
+	const float PointsLength = ShowPoints ? 50.0f : 0.0f;
+	const float PointsOffset = NameOffset + NameLength + (ShowPoints ? 7.5f : 0.0f);
+	const float ClanOffset = ShowPoints ? (PointsOffset + PointsLength + 7.5f) : (NameOffset + NameLength + 2.5f);
 	const float ClanLength = CountryOffset - ClanOffset - 2.5f;
 
 	// render headlines
@@ -738,13 +742,11 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 	const float HeadlineY = Headline.y + Headline.h / 2.0f - HeadlineFontsize / 2.0f;
 	const char *pScore = UseTime ? Localize("Time") : Localize("Score");
 	TextRender()->Text(ScoreOffset + ScoreLength - TextRender()->TextWidth(HeadlineFontsize, pScore), HeadlineY, HeadlineFontsize, pScore);
-	const char *pNameLabel = Localize("Name");
-	TextRender()->Text(NameOffset, HeadlineY, HeadlineFontsize, pNameLabel);
+	TextRender()->Text(NameOffset, HeadlineY, HeadlineFontsize, Localize("Name"));
 	if(ShowPoints)
 	{
 		const char *pPointsLabel = Localize("Points");
-		const float NameLabelWidth = TextRender()->TextWidth(HeadlineFontsize, pNameLabel);
-		TextRender()->Text(NameOffset + NameLabelWidth + 8.0f, HeadlineY, HeadlineFontsize, pPointsLabel);
+		TextRender()->Text(PointsOffset + (PointsLength - TextRender()->TextWidth(HeadlineFontsize, pPointsLabel)) / 2.0f, HeadlineY, HeadlineFontsize, pPointsLabel);
 	}
 	const char *pClanLabel = Localize("Clan");
 	TextRender()->Text(ClanOffset + (ClanLength - TextRender()->TextWidth(HeadlineFontsize, pClanLabel)) / 2.0f, HeadlineY, HeadlineFontsize, pClanLabel);
@@ -1031,24 +1033,25 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 				TextRender()->TextEx(&Cursor, ClientData.m_aName);
 				Cursor.m_vColorSplits.clear();
 
-				if(ShowPoints)
-				{
-					GameClient()->m_ShowPoints.RequestPoints(ClientData.m_aName);
-					int Points = 0;
-					if(GameClient()->m_ShowPoints.TryGetPoints(ClientData.m_aName, &Points))
-					{
-						str_format(aBuf, sizeof(aBuf), " %d", Points);
-						TextRender()->TextColor(TextColor.r, TextColor.g, TextColor.b, TextColor.a * 0.75f);
-						TextRender()->TextEx(&Cursor, aBuf);
-						TextRender()->TextColor(TextColor);
-					}
-				}
-
 				// ready / watching
 				if(Client()->IsSixup() && Client()->m_TranslationContext.m_aClients[pInfo->m_ClientId].m_PlayerFlags7 & protocol7::PLAYERFLAG_READY)
 				{
 					TextRender()->TextColor(0.1f, 1.0f, 0.1f, TextColor.a);
 					TextRender()->TextEx(&Cursor, "✓");
+				}
+			}
+
+			// points
+			if(ShowPoints)
+			{
+				GameClient()->m_ShowPoints.RequestPoints(ClientData.m_aName);
+				int Points = 0;
+				if(GameClient()->m_ShowPoints.TryGetPoints(ClientData.m_aName, &Points))
+				{
+					str_format(aBuf, sizeof(aBuf), "%d", Points);
+					TextRender()->TextColor(TextColor.r, TextColor.g, TextColor.b, TextColor.a * 0.75f);
+					TextRender()->Text(PointsOffset + (PointsLength - minimum(TextRender()->TextWidth(FontSize, aBuf), PointsLength)) / 2.0f, Row.y + (Row.h - FontSize) / 2.0f, FontSize, aBuf);
+					TextRender()->TextColor(TextColor);
 				}
 			}
 
@@ -1212,7 +1215,16 @@ void CScoreboard::OnRender()
 		str_format(aPlayerCount, sizeof(aPlayerCount), "%d", GameClient()->m_Snap.m_NumPlayers);
 
 	const float ScoreboardSmallWidth = 375.0f + 10.0f;
-	const float ScoreboardWidth = !Teams && NumPlayers <= 16 ? ScoreboardSmallWidth : 750.0f;
+	const bool ShowPoints = GameClient()->m_ShowPoints.ActiveOnCurrentServer();
+	int NumScoreboardColumns = 1;
+	if(Teams || (!Teams && NumPlayers > 16 && NumPlayers <= 64))
+		NumScoreboardColumns = 2;
+	else if(!Teams && NumPlayers > 64)
+		NumScoreboardColumns = 3;
+	// Must match PointsLength + gaps in RenderScoreboard: 7.5 + 50 + 7.5 - 2.5 = 62.5
+	const float PointsColumnExtra = 62.5f;
+	const float ScoreboardWidthBase = !Teams && NumPlayers <= 16 ? ScoreboardSmallWidth : 750.0f;
+	const float ScoreboardWidth = ScoreboardWidthBase + (ShowPoints ? NumScoreboardColumns * PointsColumnExtra : 0.0f);
 	const float TitleHeight = 30.0f;
 
 	CUIRect Scoreboard = {(Screen.w - ScoreboardWidth) / 2.0f, 75.0f, ScoreboardWidth, 355.0f + TitleHeight};
