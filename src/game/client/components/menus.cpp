@@ -200,7 +200,7 @@ int CMenus::DoButton_MenuEx(CButtonContainer *pButtonContainer, const char *pTex
 	return Ui()->DoButtonLogic(pButtonContainer, Checked, pRect, Flags);
 }
 
-int CMenus::DoButton_MenuTab(CButtonContainer *pButtonContainer, const char *pText, int Checked, const CUIRect *pRect, int Corners, SUIAnimator *pAnimator, const ColorRGBA *pDefaultColor, const ColorRGBA *pActiveColor, const ColorRGBA *pHoverColor, float EdgeRounding, const CCommunityIcon *pCommunityIcon)
+int CMenus::DoButton_MenuTab(CButtonContainer *pButtonContainer, const char *pText, int Checked, const CUIRect *pRect, int Corners, SUIAnimator *pAnimator, const ColorRGBA *pDefaultColor, const ColorRGBA *pActiveColor, const ColorRGBA *pHoverColor, float EdgeRounding, const CCommunityIcon *pCommunityIcon, bool AnimateChecked, int HoverCorners, float HoverRounding)
 {
 	const bool MouseInside = Ui()->HotItem() == pButtonContainer;
 	CUIRect Rect = *pRect;
@@ -215,7 +215,7 @@ int CMenus::DoButton_MenuTab(CButtonContainer *pButtonContainer, const char *pTe
 			pAnimator->m_Time = Time;
 		}
 
-		pAnimator->m_Active = Checked || MouseInside;
+		pAnimator->m_Active = MouseInside || (AnimateChecked && Checked);
 
 		if(pAnimator->m_Active)
 			pAnimator->m_Value = std::clamp<float>(pAnimator->m_Value + (Time - pAnimator->m_Time).count() / (double)std::chrono::nanoseconds(100ms).count(), 0, 1);
@@ -230,13 +230,17 @@ int CMenus::DoButton_MenuTab(CButtonContainer *pButtonContainer, const char *pTe
 		pAnimator->m_Time = Time;
 	}
 
+	const bool HoverShapeActive = MouseInside || (pAnimator != nullptr && pAnimator->m_Value > 0.0f);
+	const int DrawCorners = Corners | (HoverShapeActive ? HoverCorners : IGraphics::CORNER_NONE);
+	const float DrawRounding = HoverShapeActive && HoverRounding >= 0.0f ? HoverRounding : EdgeRounding;
+
 	if(Checked)
 	{
 		ColorRGBA ColorMenuTab = ms_ColorTabbarActive;
 		if(pActiveColor)
 			ColorMenuTab = *pActiveColor;
 
-		Rect.Draw(ColorMenuTab, Corners, EdgeRounding);
+		Rect.Draw(ColorMenuTab, DrawCorners, DrawRounding);
 	}
 	else
 	{
@@ -246,7 +250,7 @@ int CMenus::DoButton_MenuTab(CButtonContainer *pButtonContainer, const char *pTe
 			if(pHoverColor)
 				HoverColorMenuTab = *pHoverColor;
 
-			Rect.Draw(HoverColorMenuTab, Corners, EdgeRounding);
+			Rect.Draw(HoverColorMenuTab, DrawCorners, DrawRounding);
 		}
 		else
 		{
@@ -254,7 +258,7 @@ int CMenus::DoButton_MenuTab(CButtonContainer *pButtonContainer, const char *pTe
 			if(pDefaultColor)
 				ColorMenuTab = *pDefaultColor;
 
-			Rect.Draw(ColorMenuTab, Corners, EdgeRounding);
+			Rect.Draw(ColorMenuTab, DrawCorners, DrawRounding);
 		}
 	}
 
@@ -665,10 +669,12 @@ void CMenus::RenderMenubar(CUIRect Box, IClient::EClientState ClientState)
 		GameClient()->m_Tooltips.DoToolTip(&s_StartButton, &Button, Localize("Main menu"));
 
 		const float BrowserButtonWidth = 75.0f;
+		const float BrowserTabRounding = 10.0f;
+		const float BrowserTabHoverRounding = 5.0f;
 		Box.VSplitLeft(10.0f, nullptr, &Box);
 		Box.VSplitLeft(BrowserButtonWidth, &Button, &Box);
 		static CButtonContainer s_InternetButton;
-		if(DoButton_MenuTab(&s_InternetButton, FontIcon::EARTH_AMERICAS, ActivePage == PAGE_INTERNET, &Button, IGraphics::CORNER_T, &m_aAnimatorsBigPage[BIG_TAB_INTERNET]))
+		if(DoButton_MenuTab(&s_InternetButton, FontIcon::EARTH_AMERICAS, ActivePage == PAGE_INTERNET, &Button, IGraphics::CORNER_TL, &m_aAnimatorsBigPage[BIG_TAB_INTERNET], nullptr, nullptr, nullptr, BrowserTabRounding, nullptr, false, IGraphics::CORNER_T, BrowserTabHoverRounding))
 		{
 			NewPage = PAGE_INTERNET;
 		}
@@ -676,7 +682,7 @@ void CMenus::RenderMenubar(CUIRect Box, IClient::EClientState ClientState)
 
 		Box.VSplitLeft(BrowserButtonWidth, &Button, &Box);
 		static CButtonContainer s_LanButton;
-		if(DoButton_MenuTab(&s_LanButton, FontIcon::NETWORK_WIRED, ActivePage == PAGE_LAN, &Button, IGraphics::CORNER_T, &m_aAnimatorsBigPage[BIG_TAB_LAN]))
+		if(DoButton_MenuTab(&s_LanButton, FontIcon::NETWORK_WIRED, ActivePage == PAGE_LAN, &Button, IGraphics::CORNER_NONE, &m_aAnimatorsBigPage[BIG_TAB_LAN], nullptr, nullptr, nullptr, BrowserTabRounding, nullptr, false, IGraphics::CORNER_T, BrowserTabHoverRounding))
 		{
 			NewPage = PAGE_LAN;
 		}
@@ -684,7 +690,9 @@ void CMenus::RenderMenubar(CUIRect Box, IClient::EClientState ClientState)
 
 		Box.VSplitLeft(BrowserButtonWidth, &Button, &Box);
 		static CButtonContainer s_FavoritesButton;
-		if(DoButton_MenuTab(&s_FavoritesButton, FontIcon::STAR, ActivePage == PAGE_FAVORITES, &Button, IGraphics::CORNER_T, &m_aAnimatorsBigPage[BIG_TAB_FAVORITES]))
+		const bool HasFavoriteCommunityTab = !ServerBrowser()->FavoriteCommunities().empty() && Box.w >= BrowserButtonWidth;
+		const int FavoritesCorners = HasFavoriteCommunityTab ? IGraphics::CORNER_NONE : IGraphics::CORNER_TR;
+		if(DoButton_MenuTab(&s_FavoritesButton, FontIcon::STAR, ActivePage == PAGE_FAVORITES, &Button, FavoritesCorners, &m_aAnimatorsBigPage[BIG_TAB_FAVORITES], nullptr, nullptr, nullptr, BrowserTabRounding, nullptr, false, IGraphics::CORNER_T, BrowserTabHoverRounding))
 		{
 			NewPage = PAGE_FAVORITES;
 		}
@@ -722,7 +730,11 @@ void CMenus::RenderMenubar(CUIRect Box, IClient::EClientState ClientState)
 				break;
 			Box.VSplitLeft(BrowserButtonWidth, &Button, &Box);
 			const int Page = PAGE_FAVORITE_COMMUNITY_1 + FavoriteCommunityIndex;
-			if(DoButton_MenuTab(&s_aFavoriteCommunityButtons[FavoriteCommunityIndex], FontIcon::ELLIPSIS, ActivePage == Page, &Button, IGraphics::CORNER_T, &m_aAnimatorsBigPage[BIT_TAB_FAVORITE_COMMUNITY_1 + FavoriteCommunityIndex], nullptr, nullptr, nullptr, 10.0f, m_CommunityIcons.Find(pCommunity->Id())))
+			const bool IsLastVisibleCommunity = FavoriteCommunityIndex + 1 >= ServerBrowser()->FavoriteCommunities().size() ||
+				FavoriteCommunityIndex + 1 >= std::size(s_aFavoriteCommunityButtons) ||
+				Box.w < BrowserButtonWidth;
+			const int CommunityCorners = IsLastVisibleCommunity ? IGraphics::CORNER_TR : IGraphics::CORNER_NONE;
+			if(DoButton_MenuTab(&s_aFavoriteCommunityButtons[FavoriteCommunityIndex], FontIcon::ELLIPSIS, ActivePage == Page, &Button, CommunityCorners, &m_aAnimatorsBigPage[BIT_TAB_FAVORITE_COMMUNITY_1 + FavoriteCommunityIndex], nullptr, nullptr, nullptr, BrowserTabRounding, m_CommunityIcons.Find(pCommunity->Id()), false, IGraphics::CORNER_T, BrowserTabHoverRounding))
 			{
 				NewPage = Page;
 			}
