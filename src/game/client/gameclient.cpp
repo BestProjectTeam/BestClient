@@ -3482,7 +3482,7 @@ void CGameClient::OnPredict()
 		RealPredTick && m_PredictedTick >= MIN_TICK)
 	{
 		int PredTime = std::clamp(Client()->GetPredictionTime(), 0, 8000); // Milliseconds for some reason?? TODO: Use more precision
-		const int PredEndTick = CloudInputMode || g_Config.m_BcInputs == BC_INPUTS_SAIKO ? FinalTickRegular + FastInputTicksOthers : FinalTickRegular;
+		const int PredEndTick = CloudInputMode ? FinalTickRegular + FastInputTicksOthers : FinalTickRegular;
 		const int SmoothTick = PredEndTick;
 
 		// Nightmare: in order to get 100% accurate comparison to detect mispredictions we must
@@ -4720,7 +4720,7 @@ void CGameClient::UpdateRenderedCharacters()
 				Client()->PredIntraGameTick(g_Config.m_ClDummy));
 			if(HasFastInput)
 				Pos = GetFastInputPos(i);
-			if(CloudInputMode || g_Config.m_BcInputs == BC_INPUTS_SAIKO)
+			if(CloudInputMode)
 				Pos = GetSmoothPos(i);
 
 			m_aClients[i].m_RenderPos = Pos;
@@ -4749,7 +4749,7 @@ void CGameClient::UpdateRenderedCharacters()
 			if(i == m_Snap.m_LocalClientId || (PredictDummy() && i == m_aLocalIds[!g_Config.m_ClDummy]))
 			{
 				m_aClients[i].m_IsPredictedLocal = true;
-				if((CloudInputMode || g_Config.m_BcInputs == BC_INPUTS_SAIKO) && !g_Config.m_TcRemoveAnti)
+				if(CloudInputMode && !g_Config.m_TcRemoveAnti)
 					Pos = GetSmoothPos(i);
 				if(AntiPingGunfire() && ((pChar->m_NinjaJetpack && pChar->m_FreezeTime == 0) || m_Snap.m_aCharacters[i].m_Cur.m_Weapon != WEAPON_NINJA || m_Snap.m_aCharacters[i].m_Cur.m_Weapon == m_aClients[i].m_Predicted.m_ActiveWeapon))
 				{
@@ -4770,7 +4770,7 @@ void CGameClient::UpdateRenderedCharacters()
 				// Fast-input others should feel immediate: prefer direct fast-input position over smoothing layers.
 				if(HasFastInputOthers && BcInputs::ImmediateOthers())
 					Pos = GetFastInputPos(i);
-				else if(g_Config.m_TcAntiPingImproved && (CloudInputMode || g_Config.m_BcInputs == BC_INPUTS_SAIKO || m_aClients[i].m_ValidAntipingSmooth))
+				else if(g_Config.m_TcAntiPingImproved && (CloudInputMode || m_aClients[i].m_ValidAntipingSmooth))
 					Pos = mix(m_aClients[i].m_PrevImprovedPredPos, m_aClients[i].m_ImprovedPredPos, Client()->PredIntraGameTick(g_Config.m_ClDummy));
 
 				if(g_Config.m_TcRemoveAnti && m_pClient->m_IsLocalFrozen)
