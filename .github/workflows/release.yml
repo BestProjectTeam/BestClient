@@ -1,9 +1,18 @@
 name: Release Assets
 
+# Flow:
+#   1. git tag v1.5 && git push origin v1.5
+#   2. Actions builds and creates a DRAFT release (github-actions[bot])
+#   3. Draft is invisible to the in-game updater (/releases API skips drafts)
+#   4. Edit the draft: rename tag to v2.2, set title/notes, then Publish
+#
+# Retargeting the draft to a new tag on the SAME commit must not rebuild.
+# concurrency + gate skip a second run when this SHA already built successfully.
+# workflow_dispatch always rebuilds (manual force).
 on:
-  release:
-    types:
-      - published
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
     inputs:
       tag_name:
@@ -16,20 +25,64 @@ on:
         description: "Optional release notes for manual publishing"
         required: false
 
+# One release pipeline per commit; a later tag on the same SHA waits, then gate skips it.
+concurrency:
+  group: release-assets-${{ github.sha }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
+  actions: read
 
 env:
   CLIENT_NAME: BestClient
 
 jobs:
+  gate:
+    name: Skip duplicate tag builds
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.decide.outputs.should_build }}
+    steps:
+    - id: decide
+      uses: actions/github-script@v7
+      with:
+        script: |
+          if (context.eventName === 'workflow_dispatch') {
+            core.info('workflow_dispatch: always build');
+            core.setOutput('should_build', 'true');
+            return;
+          }
+
+          const { data } = await github.rest.actions.listWorkflowRuns({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            workflow_id: 'release.yml',
+            head_sha: context.sha,
+            per_page: 30,
+          });
+
+          const priorSuccess = data.workflow_runs.some((run) =>
+            run.id !== context.runId &&
+            run.status === 'completed' &&
+            run.conclusion === 'success'
+          );
+
+          if (priorSuccess) {
+            core.info(`Skipping rebuild: commit ${context.sha} already has a successful Release Assets run (retargeted tag).`);
+            core.setOutput('should_build', 'false');
+          } else {
+            core.setOutput('should_build', 'true');
+          }
+
   build-cmake:
     name: Build Release (${{ matrix.name }})
+    needs: gate
+    if: needs.gate.outputs.should_build == 'true'
     runs-on: ${{ matrix.os }}
     env:
       CARGO_HTTP_MULTIPLEXING: false
-      # Exposed at job level so the signing step's `if:` can test whether a certificate is
-      # configured — `secrets` is not available in step-level `if:` expressions.
+      # Exposed at job level so steps can read the cert without re-resolving secrets.
       WINDOWS_CERT_BASE64: ${{ secrets.WINDOWS_CERT_BASE64 }}
     strategy:
       fail-fast: false
@@ -79,12 +132,24 @@ jobs:
         cmake --build build-release --config Release --target game-client
         cmake --build build-release --config Release --target bestclient-updater
 
-    # An unsigned binary that replaces executables and relaunches the client has no
-    # reputation to stand on, so Defender/SmartScreen fall back to behaviour heuristics and
-    # flag it. Signing is what actually clears those verdicts. Skipped automatically when the
-    # certificate secrets aren't configured, so forks and manual runs still build.
+    # Unsigned Windows binaries that replace executables get flagged by Defender
+    # (Bearfoos / Wacatac / DefenseEvasion). Signing is mandatory for release builds —
+    # do not ship unsigned packages.
+    - name: Require Windows code signing certificate
+      if: contains(matrix.os, 'windows')
+      shell: pwsh
+      run: |
+        if([string]::IsNullOrWhiteSpace($env:WINDOWS_CERT_BASE64)) {
+          throw "WINDOWS_CERT_BASE64 secret is required for Windows release builds. Refusing to package unsigned binaries."
+        }
+        if([string]::IsNullOrWhiteSpace($env:WINDOWS_CERT_PASSWORD)) {
+          throw "WINDOWS_CERT_PASSWORD secret is required for Windows release builds."
+        }
+      env:
+        WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+
     - name: Sign Windows binaries
-      if: contains(matrix.os, 'windows') && env.WINDOWS_CERT_BASE64 != ''
+      if: contains(matrix.os, 'windows')
       env:
         WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
       shell: pwsh
@@ -122,6 +187,8 @@ jobs:
 
   build-android:
     name: Build Release (android)
+    needs: gate
+    if: needs.gate.outputs.should_build == 'true'
     runs-on: ubuntu-24.04
     env:
       CARGO_HTTP_MULTIPLEXING: false
@@ -167,8 +234,8 @@ jobs:
         RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
       run: |
         TW_KEY_NAME=/home/runner/DDNet.jks
-        # Release events use tag refs, while manual release builds must run from main.
-        if [ -n "$RELEASE_KEYSTORE_BASE64" ] && { [ "$GITHUB_EVENT_NAME" = "release" ] || [ "$GITHUB_REF" = "refs/heads/main" ]; }; then
+        # Tag pushes and manual dispatch use the persistent release keystore.
+        if [ -n "$RELEASE_KEYSTORE_BASE64" ] && { [[ "$GITHUB_REF" == refs/tags/* ]] || [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; }; then
           echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > "$TW_KEY_NAME"
           TW_KEY_ALIAS="$RELEASE_KEY_ALIAS"
           TW_KEY_PW="$RELEASE_KEYSTORE_PASSWORD"
@@ -204,8 +271,10 @@ jobs:
   publish:
     name: Publish Release Assets
     needs:
+      - gate
       - build-cmake
       - build-android
+    if: needs.gate.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     steps:
     - name: Download release packages
@@ -218,11 +287,16 @@ jobs:
     - name: List downloaded release packages
       run: ls -R artifacts
 
-    - name: Attach assets to published GitHub release
-      if: github.event_name == 'release'
+    # Draft so the in-game updater ignores it until you Publish in the GitHub UI.
+    # Creating via GITHUB_TOKEN attributes the release to github-actions[bot].
+    - name: Create draft GitHub release from tag
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ github.event.release.tag_name }}
+        tag_name: ${{ github.ref_name }}
+        name: ${{ github.ref_name }}
+        draft: true
+        generate_release_notes: true
         files: |
           artifacts/${{ env.CLIENT_NAME }}-linux.tar.xz
           artifacts/${{ env.CLIENT_NAME }}-windows.zip
@@ -235,6 +309,7 @@ jobs:
         tag_name: ${{ github.event.inputs.tag_name }}
         name: ${{ github.event.inputs.release_name }}
         body: ${{ github.event.inputs.body }}
+        draft: true
         files: |
           artifacts/${{ env.CLIENT_NAME }}-linux.tar.xz
           artifacts/${{ env.CLIENT_NAME }}-windows.zip

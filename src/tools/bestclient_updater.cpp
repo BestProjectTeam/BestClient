@@ -400,6 +400,9 @@ static bool Extract(const wchar_t *pArchive, const wchar_t *pDestDir, const std:
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// Staging leftovers from a previous update attempt. Cleared after a successful install.
+static const wchar_t *k_OldSuffix = L".bc-update-old";
+
 // Recursively count files (not dirs) under pDir.
 static int CountFiles(const wchar_t *pDir)
 {
@@ -423,8 +426,7 @@ static int CountFiles(const wchar_t *pDir)
 	return N > 0 ? N : 1;
 }
 
-// Recursively copy pSrc into pDst (pDst is created if missing).
-// pPerFile is called after each file copy (for progress tracking).
+// Plain recursive copy — used for user-asset backup/restore (must leave source intact).
 static void CopyTree(const wchar_t *pSrc, const wchar_t *pDst, std::function<void()> PerFile = nullptr)
 {
 	CreateDirectoryW(pDst, NULL);
@@ -444,6 +446,104 @@ static void CopyTree(const wchar_t *pSrc, const wchar_t *pDst, std::function<voi
 		{
 			CopyFileW(Src.c_str(), Dst.c_str(), FALSE);
 			if(PerFile) PerFile();
+		}
+	} while(FindNextFileW(h, &Fd));
+	FindClose(h);
+}
+
+// Install one file without overwriting an existing executable in place.
+// In-place CopyFileW of DDNet.exe is a textbook dropper signature for Defender's
+// Behavior:...DefenseEvasion ML. Rename the destination aside, then MoveFile the
+// staged file into place (same volume — extract lives under install_dir\update).
+static bool InstallFile(const wchar_t *pSrc, const wchar_t *pDst)
+{
+	const DWORD Attr = GetFileAttributesW(pDst);
+	wchar_t aOld[MAX_PATH] = L"";
+	if(Attr != INVALID_FILE_ATTRIBUTES && !(Attr & FILE_ATTRIBUTE_DIRECTORY))
+	{
+		_snwprintf_s(aOld, _TRUNCATE, L"%ls%ls", pDst, k_OldSuffix);
+		DeleteFileW(aOld);
+		// Clear read-only so rename/delete can succeed on packaged files.
+		SetFileAttributesW(pDst, FILE_ATTRIBUTE_NORMAL);
+		if(!MoveFileExW(pDst, aOld, MOVEFILE_REPLACE_EXISTING))
+		{
+			// Destination locked — last resort copy (may still fail for our own image).
+			if(!CopyFileW(pSrc, pDst, FALSE))
+				return false;
+			DeleteFileW(pSrc);
+			return true;
+		}
+	}
+
+	if(MoveFileExW(pSrc, pDst, MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED))
+	{
+		if(aOld[0])
+			DeleteFileW(aOld);
+		return true;
+	}
+
+	// Fall back to copy if move failed (rare on same volume).
+	if(!CopyFileW(pSrc, pDst, FALSE))
+	{
+		// Try to restore the previous file if we renamed it aside.
+		if(aOld[0])
+			MoveFileExW(aOld, pDst, MOVEFILE_REPLACE_EXISTING);
+		return false;
+	}
+	DeleteFileW(pSrc);
+	if(aOld[0])
+		DeleteFileW(aOld);
+	return true;
+}
+
+// Recursively install staged files into the install directory via rename+move.
+static void InstallTree(const wchar_t *pSrc, const wchar_t *pDst, std::function<void()> PerFile = nullptr)
+{
+	CreateDirectoryW(pDst, NULL);
+	std::wstring Search(pSrc);
+	Search += L"\\*";
+	WIN32_FIND_DATAW Fd;
+	HANDLE h = FindFirstFileW(Search.c_str(), &Fd);
+	if(h == INVALID_HANDLE_VALUE) return;
+	do
+	{
+		if(!wcscmp(Fd.cFileName, L".") || !wcscmp(Fd.cFileName, L"..")) continue;
+		std::wstring Src(pSrc); Src += L"\\"; Src += Fd.cFileName;
+		std::wstring Dst(pDst); Dst += L"\\"; Dst += Fd.cFileName;
+		if(Fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+			InstallTree(Src.c_str(), Dst.c_str(), PerFile);
+		else
+		{
+			InstallFile(Src.c_str(), Dst.c_str());
+			if(PerFile) PerFile();
+		}
+	} while(FindNextFileW(h, &Fd));
+	FindClose(h);
+}
+
+// Delete leftover *.bc-update-old files under pDir.
+static void CleanupOldFiles(const wchar_t *pDir)
+{
+	std::wstring Search(pDir);
+	Search += L"\\*";
+	WIN32_FIND_DATAW Fd;
+	HANDLE h = FindFirstFileW(Search.c_str(), &Fd);
+	if(h == INVALID_HANDLE_VALUE) return;
+	const size_t SuffixLen = wcslen(k_OldSuffix);
+	do
+	{
+		if(!wcscmp(Fd.cFileName, L".") || !wcscmp(Fd.cFileName, L"..")) continue;
+		std::wstring Full(pDir); Full += L"\\"; Full += Fd.cFileName;
+		if(Fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+			CleanupOldFiles(Full.c_str());
+		else
+		{
+			const size_t NameLen = wcslen(Fd.cFileName);
+			if(NameLen > SuffixLen && !_wcsicmp(Fd.cFileName + NameLen - SuffixLen, k_OldSuffix))
+			{
+				SetFileAttributesW(Full.c_str(), FILE_ATTRIBUTE_NORMAL);
+				DeleteFileW(Full.c_str());
+			}
 		}
 	} while(FindNextFileW(h, &Fd));
 	FindClose(h);
@@ -581,12 +681,12 @@ static DWORD WINAPI WorkerThread(LPVOID pParam)
 	}
 	SetPercent(55);
 
-	// ── 6. Copy new files into install directory ──────────────────────────────
+	// ── 6. Install new files into install directory ───────────────────────────
 	SetStatus(L"Installing files...");
 	{
 		int Total = CountFiles(aCopyRoot);
 		int Done  = 0;
-		CopyTree(aCopyRoot, pA->aInstallDir, [&]()
+		InstallTree(aCopyRoot, pA->aInstallDir, [&]()
 		{
 			++Done;
 			int Pct = 55 + Done * 35 / Total;
@@ -612,6 +712,7 @@ static DWORD WINAPI WorkerThread(LPVOID pParam)
 	DeleteFileW(pA->aArchive);
 	DeleteTree(aExtract);
 	DeleteTree(aBackup);
+	CleanupOldFiles(pA->aInstallDir);
 	SetPercent(100);
 
 	// ── 9. Launch client ──────────────────────────────────────────────────────
