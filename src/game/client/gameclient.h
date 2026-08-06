@@ -788,6 +788,7 @@ public:
 	bool m_ReceivedDDNetPlayer;
 	bool m_ReceivedDDNetPlayerFinishTimes;
 	bool m_ReceivedDDNetPlayerFinishTimesMillis;
+	bool m_ReceivedPreInput = false;
 
 	class CTeamsCore m_Teams;
 

@@ -905,6 +905,7 @@ void CGameClient::OnReset()
 	m_ReceivedDDNetPlayer = false;
 	m_ReceivedDDNetPlayerFinishTimes = false;
 	m_ReceivedDDNetPlayerFinishTimesMillis = false;
+	m_ReceivedPreInput = false;
 
 	m_Teams.Reset();
 	m_GameWorld.Clear();
@@ -1512,6 +1513,7 @@ void CGameClient::OnMessage(int MsgId, CUnpacker *pUnpacker, int Conn, bool Dumm
 	{
 		CNetMsg_Sv_PreInput *pMsg = (CNetMsg_Sv_PreInput *)pRawMsg;
 		m_aClients[pMsg->m_Owner].m_aPreInputs[pMsg->m_IntendedTick % 200] = *pMsg;
+		m_ReceivedPreInput = true;
 	}
 	else if(MsgId == NETMSGTYPE_SV_SAVECODE)
 	{
@@ -3190,8 +3192,8 @@ void CGameClient::OnPredict()
 	const bool CloudInputMode = IsCloudInputMode();
 	const float FastInputOffsetTicks = CloudInputMode ? 0.0f : BcInputs::EffectiveOffsetTicks();
 	const int FastInputTicks = CloudInputMode ? m_CloudInput.SelfTickOffset() : BcInputs::PredictionTicks(FastInputOffsetTicks);
-	const bool FastInputOthers = CloudInputMode ? (g_Config.m_BcCloudInputOthers != 0) : BcInputs::AnyOthers();
-	const int FastInputTicksOthers = CloudInputMode ? m_CloudInput.OthersTickOffset() : (FastInputOthers ? BcInputs::PredictionTicksOthers(FastInputOffsetTicks) : 0);
+	const bool FastInputOthers = CloudInputMode ? (g_Config.m_BcCloudInputOthers != 0 && m_ReceivedPreInput) : BcInputs::AnyOthers();
+	const int FastInputTicksOthers = CloudInputMode ? (FastInputOthers ? m_CloudInput.OthersTickOffset() : 0) : (FastInputOthers ? BcInputs::PredictionTicksOthers(FastInputOffsetTicks) : 0);
 
 	int FinalTickRegular = Client()->PredGameTick(g_Config.m_ClDummy); // The vanilla final tick disregarding fast input
 
@@ -4665,10 +4667,10 @@ void CGameClient::UpdateRenderedCharacters()
 	const bool CloudInputMode = IsCloudInputMode();
 	const float FastInputOffsetTicks = CloudInputMode ? 0.0f : BcInputs::EffectiveOffsetTicks();
 	const int FastInputTicks = CloudInputMode ? m_CloudInput.SelfTickOffset() : BcInputs::PredictionTicks(FastInputOffsetTicks);
-	const int FastInputTicksOthers = CloudInputMode ? m_CloudInput.OthersTickOffset() : BcInputs::PredictionTicksOthers(FastInputOffsetTicks);
+	const bool FastInputOthers = CloudInputMode ? (g_Config.m_BcCloudInputOthers != 0 && m_ReceivedPreInput) : BcInputs::AnyOthers();
+	const int FastInputTicksOthers = CloudInputMode ? (FastInputOthers ? m_CloudInput.OthersTickOffset() : 0) : BcInputs::PredictionTicksOthers(FastInputOffsetTicks);
 	const bool HasFastInput = FastInputTicks > 0;
 	const bool HasFastInputOthers = FastInputTicksOthers > 0;
-	const bool FastInputOthers = CloudInputMode ? (g_Config.m_BcCloudInputOthers != 0) : BcInputs::AnyOthers();
 	const bool PracticeActive = m_FastPractice.Active(); // BestClient
 	const int PracticeControlledId = PracticeActive ? m_FastPractice.ControlledPracticeId() : -1; // BestClient
 	const int PracticePartnerId = PracticeActive ? m_FastPractice.PartnerPracticeId() : -1; // BestClient
@@ -4770,12 +4772,12 @@ void CGameClient::UpdateRenderedCharacters()
 				// Fast-input others should feel immediate: prefer direct fast-input position over smoothing layers.
 				if(HasFastInputOthers && BcInputs::ImmediateOthers())
 					Pos = GetFastInputPos(i);
-				else if(g_Config.m_TcAntiPingImproved && (CloudInputMode || m_aClients[i].m_ValidAntipingSmooth))
+				else if(g_Config.m_TcAntiPingImproved && ((CloudInputMode && FastInputOthers) || m_aClients[i].m_ValidAntipingSmooth))
 					Pos = mix(m_aClients[i].m_PrevImprovedPredPos, m_aClients[i].m_ImprovedPredPos, Client()->PredIntraGameTick(g_Config.m_ClDummy));
 
 				if(g_Config.m_TcRemoveAnti && m_pClient->m_IsLocalFrozen)
 					Pos = GetFreezePos(i);
-				else if(CloudInputMode && g_Config.m_BcCloudInputOthers && !g_Config.m_TcAntiPingImproved)
+				else if(CloudInputMode && FastInputOthers && !g_Config.m_TcAntiPingImproved)
 					Pos = GetFastInputPos(i);
 				else if(HasFastInputOthers && FastInputOthers && !g_Config.m_TcAntiPingImproved)
 					Pos = GetFastInputPos(i);

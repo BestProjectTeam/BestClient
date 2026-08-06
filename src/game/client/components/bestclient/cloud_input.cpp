@@ -84,7 +84,7 @@ void CCloudInput::ApplyOffset(const CGameClient &GameClient, int ClientId, int &
 {
 	if(!IsActive())
 		return;
-	if(!GameClient.IsFastInputLocalClient(ClientId) && !g_Config.m_BcCloudInputOthers)
+	if(!GameClient.IsFastInputLocalClient(ClientId) && (!g_Config.m_BcCloudInputOthers || !GameClient.m_ReceivedPreInput))
 		return;
 
 	const float TotalSmoothTick = (Tick - 1) + Intra + Amount();
