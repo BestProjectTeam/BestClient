@@ -779,6 +779,7 @@ public:
 		SETTINGS_ASSETS,
 		SETTINGS_TCLIENT,
 		SETTINGS_BESTCLIENT,
+		SETTINGS_AVOIDA1R,
 		SETTINGS_PROFILES,
 		SETTINGS_CONFIGS,
 
@@ -939,6 +940,7 @@ private:
 	};
 	static CUi::EPopupMenuFunctionResult PopupVoiceModeration(void *pContext, CUIRect View, bool Active);
 	void RenderSettingsBestClient(CUIRect MainView);
+	void RenderSettingsAvoidA1r(CUIRect MainView);
 	void RenderSettingsBestClientInfo(CUIRect MainView);
 	void RenderSettingsBestClientVisuals(CUIRect MainView);
 	void RenderSettingsBestClientGameplay(CUIRect MainView);

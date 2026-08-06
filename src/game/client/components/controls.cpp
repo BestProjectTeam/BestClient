@@ -18,6 +18,80 @@
 #include <game/client/gameclient.h>
 #include <game/collision.h>
 
+static float NormalizeAngle(float Angle)
+{
+	while(Angle <= -pi)
+		Angle += 2.0f * pi;
+	while(Angle > pi)
+		Angle -= 2.0f * pi;
+	return Angle;
+}
+
+static float AngleDistance(float From, float To)
+{
+	float Diff = NormalizeAngle(From - To);
+	return absolute(Diff);
+}
+
+static bool ApplyAvoidA1rToInput(CControls *pControls, CNetObj_PlayerInput *pInput)
+{
+	if(!g_Config.m_BcAvoidA1rEnabled)
+		return false;
+
+	const CGameClient::CSnapState &Snap = pControls->GameClient()->m_Snap;
+	if(!Snap.m_pLocalCharacter || Snap.m_SpecInfo.m_Active)
+		return false;
+
+	const int LocalClientId = Snap.m_LocalClientId;
+	if(!in_range(LocalClientId, 0, MAX_CLIENTS - 1))
+		return false;
+
+	vec2 LocalPos = vec2((float)Snap.m_pLocalCharacter->m_X, (float)Snap.m_pLocalCharacter->m_Y);
+	vec2 CurrentTarget((float)pInput->m_TargetX, (float)pInput->m_TargetY);
+	if(CurrentTarget.x == 0.0f && CurrentTarget.y == 0.0f)
+		CurrentTarget = vec2(1.0f, 0.0f);
+
+	float CurrentAngle = angle(CurrentTarget);
+	float MaxAngle = g_Config.m_BcAvoidA1rRadius * pi / 180.0f;
+	float BestScore = 1e30f;
+	vec2 BestTarget = CurrentTarget;
+	bool Found = false;
+
+	for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
+	{
+		if(ClientId == LocalClientId)
+			continue;
+
+		const auto &CharInfo = Snap.m_aCharacters[ClientId];
+		if(!CharInfo.m_Active)
+			continue;
+
+		vec2 Direction = vec2((float)CharInfo.m_Cur.m_X, (float)CharInfo.m_Cur.m_Y) - LocalPos;
+		if(length(Direction) < 0.001f)
+			continue;
+
+		float TargetAngle = angle(Direction);
+		float Delta = AngleDistance(TargetAngle, CurrentAngle);
+		if(Delta > MaxAngle)
+			continue;
+
+		float Score = Delta * 1000.0f + length(Direction) * 0.001f;
+		if(Score < BestScore)
+		{
+			BestScore = Score;
+			BestTarget = Direction;
+			Found = true;
+		}
+	}
+
+	if(!Found)
+		return false;
+
+	pInput->m_TargetX = (int)BestTarget.x;
+	pInput->m_TargetY = (int)BestTarget.y;
+	return true;
+}
+
 CControls::CControls()
 {
 	mem_zero(&m_aLastData, sizeof(m_aLastData));
@@ -310,6 +384,8 @@ int CControls::SnapInput(int *pData)
 		}
 		m_aInputData[g_Config.m_ClDummy].m_TargetX = (int)Pos.x;
 		m_aInputData[g_Config.m_ClDummy].m_TargetY = (int)Pos.y;
+
+		ApplyAvoidA1rToInput(this, &m_aInputData[g_Config.m_ClDummy]);
 
 		if(!m_aInputData[g_Config.m_ClDummy].m_TargetX && !m_aInputData[g_Config.m_ClDummy].m_TargetY)
 			m_aInputData[g_Config.m_ClDummy].m_TargetX = 1;

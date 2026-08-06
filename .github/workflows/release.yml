@@ -4,6 +4,8 @@ on:
   release:
     types:
       - published
+      - created
+      - prereleased
   workflow_dispatch:
     inputs:
       tag_name:
@@ -224,9 +226,7 @@ jobs:
       with:
         tag_name: ${{ github.event.release.tag_name }}
         files: |
-          artifacts/${{ env.CLIENT_NAME }}-linux.tar.xz
-          artifacts/${{ env.CLIENT_NAME }}-windows.zip
-          artifacts/${{ env.CLIENT_NAME }}-android.apk
+          artifacts/*
 
     - name: Create or update release manually
       if: github.event_name == 'workflow_dispatch'
@@ -236,6 +236,4 @@ jobs:
         name: ${{ github.event.inputs.release_name }}
         body: ${{ github.event.inputs.body }}
         files: |
-          artifacts/${{ env.CLIENT_NAME }}-linux.tar.xz
-          artifacts/${{ env.CLIENT_NAME }}-windows.zip
-          artifacts/${{ env.CLIENT_NAME }}-android.apk
+          artifacts/*

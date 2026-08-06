@@ -1683,6 +1683,11 @@ void CMenus::RenderSettings(CUIRect MainView)
 				GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_RESERVED0);
 				RenderSettingsBestClient(PageView);
 			}
+			else if(g_Config.m_UiSettingsPage == SETTINGS_AVOIDA1R)
+			{
+				GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_RESERVED1);
+				RenderSettingsAvoidA1r(PageView);
+			}
 			else
 			{
 				dbg_assert_failed("ui_settings_page invalid");
@@ -1920,6 +1925,7 @@ void CMenus::RenderSettings(CUIRect MainView)
 		Localize("Assets"),
 		TCLocalize("TClient"),
 		Localize("BestClient"),
+		Localize("AvoidA1r"),
 		Localize("Profiles"),
 		Localize("Configs")};
 
@@ -2012,6 +2018,11 @@ void CMenus::RenderSettings(CUIRect MainView)
 	{
 		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_RESERVED0);
 		RenderSettingsBestClient(MainView);
+	}
+	else if(g_Config.m_UiSettingsPage == SETTINGS_AVOIDA1R)
+	{
+		GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_SETTINGS_RESERVED1);
+		RenderSettingsAvoidA1r(MainView);
 	}
 	else
 	{
@@ -3474,6 +3485,29 @@ void CMenus::RenderSettingsDDNet(CUIRect MainView)
 		Client()->ShellUnregister();
 	}
 #endif
+
+void CMenus::RenderSettingsAvoidA1r(CUIRect MainView)
+{
+	CUIRect Button, Label;
+
+	MainView.HSplitTop(20.0f, &Button, &MainView);
+	if(DoButton_CheckBox(&g_Config.m_BcAvoidA1rEnabled, Localize("Enable AvoidA1r"), g_Config.m_BcAvoidA1rEnabled, &Button))
+	{
+		g_Config.m_BcAvoidA1rEnabled ^= 1;
+	}
+
+	MainView.HSplitTop(10.0f, nullptr, &MainView);
+	MainView.HSplitTop(20.0f, &Button, &MainView);
+	Ui()->DoScrollbarOption(&g_Config.m_BcAvoidA1rRadius, &g_Config.m_BcAvoidA1rRadius, &Button, Localize("Aimbot radius"), 10, 360);
+
+	MainView.HSplitTop(10.0f, nullptr, &MainView);
+	MainView.HSplitTop(40.0f, &Label, &MainView);
+	Ui()->DoLabel_AutoLineSize(Localize("When enabled, aim and hook targets snap toward the nearest player within the selected angle radius."), 14.0f, TEXTALIGN_ML, &Label);
+
+	MainView.HSplitTop(10.0f, nullptr, &MainView);
+	MainView.HSplitTop(20.0f, &Button, &MainView);
+	Ui()->DoLabel(&Button, Localize("Use this only in friendly practice or custom game modes."), 14.0f, TEXTALIGN_ML);
+}
 
 	// Updater
 #if defined(CONF_AUTOUPDATE)
