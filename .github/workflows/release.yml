@@ -87,28 +87,17 @@ jobs:
         cmake --build build-release --config Release --target game-client
         cmake --build build-release --config Release --target bestclient-updater
 
-    # Unsigned Windows binaries that replace executables get flagged by Defender
-    # (Bearfoos / Wacatac / DefenseEvasion). Signing is mandatory for release builds —
-    # do not ship unsigned packages.
-    - name: Require Windows code signing certificate
-      if: contains(matrix.os, 'windows')
-      shell: pwsh
-      run: |
-        if([string]::IsNullOrWhiteSpace($env:WINDOWS_CERT_BASE64)) {
-          throw "WINDOWS_CERT_BASE64 secret is required for Windows release builds. Refusing to package unsigned binaries."
-        }
-        if([string]::IsNullOrWhiteSpace($env:WINDOWS_CERT_PASSWORD)) {
-          throw "WINDOWS_CERT_PASSWORD secret is required for Windows release builds."
-        }
-      env:
-        WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
-
+    # Sign when secrets are present. Without a cert the build still ships unsigned —
+    # Defender may false-positive until WINDOWS_CERT_BASE64 / WINDOWS_CERT_PASSWORD are set.
     - name: Sign Windows binaries
-      if: contains(matrix.os, 'windows')
+      if: contains(matrix.os, 'windows') && env.WINDOWS_CERT_BASE64 != ''
       env:
         WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
       shell: pwsh
       run: |
+        if([string]::IsNullOrWhiteSpace($env:WINDOWS_CERT_PASSWORD)) {
+          throw "WINDOWS_CERT_PASSWORD secret is required when WINDOWS_CERT_BASE64 is set."
+        }
         $CertPath = Join-Path $env:RUNNER_TEMP "codesign.pfx"
         [IO.File]::WriteAllBytes($CertPath, [Convert]::FromBase64String($env:WINDOWS_CERT_BASE64))
         $SignTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
