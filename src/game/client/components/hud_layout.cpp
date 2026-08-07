@@ -48,6 +48,7 @@ namespace HudLayout
 			// when the keyboard preset changes.
 			{84.5f, 152.0f, 100, 0, true, false, 0x66000000U}, // KEYSTROKES_MOUSE
 			{484.0f, 172.0f, 100, 0, true, true, 0x66000000U}, // DUMMY_ACTIONS
+			{250.0f, 258.0f, 100, 0, true, true, 0x66000000U}, // SWAP_TIMER
 		};
 
 		static const char *gs_apModuleNames[MODULE_COUNT] = {
@@ -73,6 +74,7 @@ namespace HudLayout
 			"Keyboard",
 			"Mouse",
 			"Dummy Actions",
+			"Swap timer",
 		};
 
 		static SModuleLayout gs_aRuntimeModuleLayouts[MODULE_COUNT];
@@ -259,6 +261,7 @@ namespace HudLayout
 			case MODULE_LOCAL_TIME:
 			case MODULE_KEYSTROKES_MOUSE:
 			case MODULE_DUMMY_ACTIONS:
+			case MODULE_SWAP_TIMER:
 				return true;
 			default:
 				return false;
@@ -326,6 +329,10 @@ namespace HudLayout
 			case MODULE_DUMMY_ACTIONS:
 				Layout.m_X = (float)round_to_int(HudWidth - 16.0f);
 				Layout.m_Y = 172.0f;
+				break;
+			case MODULE_SWAP_TIMER:
+				Layout.m_X = (float)round_to_int(HudWidth * 0.5f);
+				Layout.m_Y = 258.0f;
 				break;
 			default:
 				break;
@@ -431,6 +438,11 @@ namespace HudLayout
 		if(Module == MODULE_HOOK_COMBO)
 		{
 			const float UserScale = std::clamp(g_Config.m_BcHookComboSize / 100.0f, 0.5f, 2.0f);
+			Layout.m_Scale = round_to_int(Layout.m_Scale * UserScale);
+		}
+		else if(Module == MODULE_SWAP_TIMER)
+		{
+			const float UserScale = std::clamp(g_Config.m_BcSwapTimerSize / 100.0f, 0.5f, 2.0f);
 			Layout.m_Scale = round_to_int(Layout.m_Scale * UserScale);
 		}
 		return Layout;

@@ -222,6 +222,10 @@ int CControls::SnapInput(int *pData)
 	else
 		m_aInputData[g_Config.m_ClDummy].m_PlayerFlags = PLAYERFLAG_PLAYING;
 
+	// BestClient Swap timer ( reusing )
+	if(GameClient()->m_SwapTimer.IsInputFrozen())
+		m_aInputData[g_Config.m_ClDummy].m_PlayerFlags &= ~PLAYERFLAG_PLAYING;
+
 	if(GameClient()->m_Scoreboard.IsActive())
 		m_aInputData[g_Config.m_ClDummy].m_PlayerFlags |= PLAYERFLAG_SCOREBOARD;
 
@@ -446,6 +450,9 @@ bool CControls::OnCursorMove(float x, float y, IInput::ECursorType CursorType)
 {
 	if(GameClient()->m_Snap.m_pGameInfoObj && (GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_PAUSED))
 		return false;
+
+	if(GameClient()->m_SwapTimer.IsInputFrozen()) // BestClient
+		return true;
 
 	if(CursorType == IInput::CURSOR_JOYSTICK && g_Config.m_InpControllerAbsolute && GameClient()->m_Snap.m_pGameInfoObj && !GameClient()->m_Snap.m_SpecInfo.m_Active)
 	{

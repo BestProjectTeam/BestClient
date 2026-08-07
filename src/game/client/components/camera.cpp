@@ -557,6 +557,8 @@ void CCamera::OnRender()
 	if(m_CameraSmoothing)
 		m_Center = m_CameraSmoothingCenter;
 
+	GameClient()->m_SwapTimer.ApplyPeekCamera(); // BestClient
+
 	m_PrevCenter = m_Center;
 	m_PrevSpecId = SpecId;
 

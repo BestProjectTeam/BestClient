@@ -358,6 +358,7 @@ void CGameClient::OnConsoleInit()
 					      &m_MenuBackground,
 					      &m_VoiceChat, // BestClient
 					      &m_Clans, // BestClient
+					      &m_SwapTimer, // BestClient
 					      &m_HudEditor});
 
 	// build the input stack
@@ -1362,6 +1363,12 @@ void CGameClient::OnMessage(int MsgId, CUnpacker *pUnpacker, int Conn, bool Dumm
 		CNetMsg_Sv_ChangeInfoCooldown *pMsg = (CNetMsg_Sv_ChangeInfoCooldown *)pRawMsg;
 		m_aNextChangeInfo[Conn] = pMsg->m_WaitUntil;
 		return;
+	}
+
+	if(MsgId == NETMSGTYPE_SV_CHAT)
+	{
+		const CNetMsg_Sv_Chat *pSwapMsg = (CNetMsg_Sv_Chat *)pRawMsg;
+		m_SwapTimer.OnChatMessage(pSwapMsg->m_ClientId, pSwapMsg->m_pMessage, Conn);
 	}
 
 	if(Dummy)

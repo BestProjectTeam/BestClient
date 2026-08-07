@@ -2651,3 +2651,87 @@ When a Tee is hookable
 [Hook collision line color]
 Hook collision line tip
 == 
+
+Swap timer
+== Таймер свапа
+
+Decline command
+== Команда відхилення
+
+Nameplate
+== Неймплейт
+
+Accept command
+== Команда прийняття
+
+Enable swap timer
+== Увімкнути таймер свапа
+
+Decline swap
+== Відхилити свап
+
+You
+== Ти
+
+Incoming swap
+== Вхідний свап
+
+Wait %ds
+== Зачекайте %dс
+
+Outcoming swap
+== Вихідний свап
+
+Accept swap
+== Прийняти свап
+
+Animation duration
+== Тривалість анімації
+
+Swap timer size
+== Розмір таймера свапа
+
+Show accept/decline hotkeys
+== Показувати клавіші прийняти/відхилити
+
+Animations
+== Анімації
+
+Next swap
+== Наступний свап
+
+Previous swap
+== Попередній свап
+
+Cooldown text
+== Текст очікування
+
+Remaining text
+== Текст залишку
+
+Minimal style
+== Мінімалістичний стиль
+
+%d seconds, %y your name, %n other name
+== %d секунди, %y твоє ім'я, %n ім'я гравця
+
+Show tee icons
+== Показувати іконки тii
+
+Peek duration
+== Тривалість перегляду
+
+Peek animation
+== Анімація перегляду
+
+Peek swap partner
+== Подивитися на гравця
+
+Peek travel time
+== Час перельоту камери
+
+Freeze input while peeking
+== Припинити передачу інпуту
+
+Peek return time
+== Час повернення камери
