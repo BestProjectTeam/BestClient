@@ -2875,6 +2875,8 @@ if(CLIENT)
     components/bestclient/show_points.cpp
     components/bestclient/show_points.h
     components/bestclient/subsystem_runtime.h
+    components/bestclient/swap_timer.cpp
+    components/bestclient/swap_timer.h
     components/bestclient/translate.cpp
     components/bestclient/translate.h
     components/bestclient/visualizer/analyzer.cpp

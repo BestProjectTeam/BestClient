@@ -224,7 +224,8 @@ namespace
 		       Module == HudLayout::MODULE_FINISH_PREDICTION ||
 		       Module == HudLayout::MODULE_VOICE_TALKERS ||
 		       Module == HudLayout::MODULE_VOICE_STATUS ||
-		       Module == HudLayout::MODULE_MUSIC_PLAYER;
+		       Module == HudLayout::MODULE_MUSIC_PLAYER ||
+		       Module == HudLayout::MODULE_SWAP_TIMER;
 	}
 
 	bool PointInRect(vec2 Point, const CUIRect &Rect)
@@ -484,6 +485,14 @@ CUIRect CHudEditor::GetFallbackModuleRect(HudLayout::EModule Module) const
 	case HudLayout::MODULE_KILLFEED:
 		Rect = {Layout.m_X, Layout.m_Y, 155.0f, 70.0f};
 		break;
+	case HudLayout::MODULE_SWAP_TIMER:
+	{
+		const float Scale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+		const float BoxWidth = 150.0f * Scale;
+		const float BoxHeight = 11.0f * Scale;
+		Rect = {Layout.m_X - BoxWidth * 0.5f, Layout.m_Y, BoxWidth, BoxHeight};
+		break;
+	}
 	default:
 		Rect = {Layout.m_X, Layout.m_Y, 78.0f, 18.0f};
 		break;
@@ -572,6 +581,10 @@ CHudEditor::SModuleVisual CHudEditor::GetModuleVisual(HudLayout::EModule Module)
 		Visual.m_Rect = GameClient()->m_VoiceChat.GetHudMuteStatusIndicatorRect(Width, Height, true);
 		Visual.m_Rounding = 2.3f;
 		break;
+	case HudLayout::MODULE_SWAP_TIMER:
+		Visual.m_Rect = GameClient()->m_SwapTimer.GetHudEditorRect();
+		Visual.m_Rounding = 4.0f;
+		break;
 	default:
 		Visual.m_Rect = GetFallbackModuleRect(Module);
 		Visual.m_Rounding = 4.0f;
@@ -619,6 +632,8 @@ void CHudEditor::CollectModuleVisuals(SModuleVisual *pOut, int &Count) const
 	AddModule(HudLayout::MODULE_MUSIC_PLAYER);
 	AddModule(HudLayout::MODULE_VOICE_TALKERS);
 	AddModule(HudLayout::MODULE_VOICE_STATUS);
+	if(g_Config.m_BcSwapTimerStyle == 0)
+		AddModule(HudLayout::MODULE_SWAP_TIMER);
 }
 
 HudLayout::EModule CHudEditor::HitTestModule(vec2 MousePos) const
@@ -714,6 +729,10 @@ void CHudEditor::ApplyDraggedPosition(HudLayout::EModule Module, const CUIRect &
 		else if(g_Config.m_TcFrozenHudExpandDir == 2)
 			AnchorX = Rect.x + Rect.w * 0.5f;
 		HudLayout::SetPosition(Module, AnchorX * CanvasScale, Rect.y);
+	}
+	else if(Module == HudLayout::MODULE_SWAP_TIMER)
+	{
+		HudLayout::SetPosition(Module, (Rect.x + Rect.w * 0.5f) * CanvasScale, Rect.y);
 	}
 	else if(Module == HudLayout::MODULE_MUSIC_PLAYER)
 	{
@@ -1250,6 +1269,7 @@ void CHudEditor::RenderOverlay(vec2 MousePos)
 	GameClient()->m_MusicPlayer.RenderHudEditor(!MusicPlayerHasLiveRect);
 	GameClient()->m_VoiceChat.RenderHudTalkingIndicator(Width, Height, true);
 	GameClient()->m_VoiceChat.RenderHudMuteStatusIndicator(Width, Height, true);
+	GameClient()->m_SwapTimer.RenderPreview();
 
 	SModuleVisual aVisuals[MAX_MODULE_VISUALS];
 	int Count = 0;

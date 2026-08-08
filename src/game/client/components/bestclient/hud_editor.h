@@ -25,7 +25,7 @@ private:
 	// Local Time, Spectator Count, Frozen HUD, Chat, Votes, Finish Prediction, Music
 	// Player, Keystrokes, Voice) so new modules can be added to CollectModuleVisuals
 	// without bumping this constant.
-	static constexpr int MAX_MODULE_VISUALS = 16;
+	static constexpr int MAX_MODULE_VISUALS = 24;
 
 	struct SModuleVisual
 	{

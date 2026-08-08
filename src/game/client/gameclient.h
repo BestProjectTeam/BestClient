@@ -100,6 +100,7 @@
 #include "components/bestclient/rollback_demo.h"
 #include "components/bestclient/self_time_cp.h"
 #include "components/bestclient/show_points.h"
+#include "components/bestclient/swap_timer.h"
 #include "components/bestclient/translate.h"
 #include "components/bestclient/voice/voice.h"
 #include "components/bestclient/clans/clans.h"
@@ -266,6 +267,7 @@ public:
 	CVoiceChat m_VoiceChat; // BestClient
 	CClans m_Clans; // BestClient
 	CHudEditor m_HudEditor; // BestClient
+	CSwapTimer m_SwapTimer; // BestClient
 	CPet m_Pet;
 	CPlayerIndicator m_PlayerIndicator;
 	COutlines m_Outlines;

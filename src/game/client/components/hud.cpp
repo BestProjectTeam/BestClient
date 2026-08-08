@@ -4194,6 +4194,7 @@ void CHud::OnRender()
 		if(g_Config.m_ClShowRecord)
 			RenderRecord();
 		GameClient()->m_HookCombo.Render();
+		GameClient()->m_SwapTimer.Render();
 		GameClient()->RenderSpecMovedNotify();
 	}
 	RenderCursor();
