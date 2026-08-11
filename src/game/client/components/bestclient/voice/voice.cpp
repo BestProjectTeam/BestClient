@@ -556,6 +556,8 @@ void CVoiceChat::OnReset()
 	m_AutoActivationUntilTick = 0;
 	m_SendSequence = 0;
 	m_MicLevel = 0.0f;
+	m_MicLevelTarget = 0.0f;
+	m_MicLevelVisible = false;
 	m_MicLimiterGain = 1.0f;
 	m_AutoNsNoiseFloor = 0.0f;
 	m_AutoNsGate = 1.0f;
@@ -1224,9 +1226,22 @@ void CVoiceChat::RenderMenuSettingsBlock(const CUIRect &View, float RevealPhase)
 		MeterBarWrap.VSplitLeft(6.0f, nullptr, &MeterBarWrap);
 		MeterBarWrap.HMargin(2.0f, &MeterBar);
 		MeterBar.Draw(ColorRGBA(0.02f, 0.02f, 0.03f, 0.28f), IGraphics::CORNER_ALL, 3.0f);
+		const float Delta = std::clamp(Client()->RenderFrameTime(), 0.0f, 0.1f);
+		const float FollowSpeed = m_MicLevelTarget > m_MicLevel ? 32.0f : 6.0f;
+		m_MicLevel = mix(m_MicLevel, m_MicLevelTarget, 1.0f - std::exp(-FollowSpeed * Delta));
+		if(m_MicLevel >= 0.015f)
+			m_MicLevelVisible = true;
+		else if(m_MicLevel <= 0.006f)
+			m_MicLevelVisible = false;
+		const float DisplayLevel = m_MicLevelVisible ? std::clamp((m_MicLevel - 0.006f) / 0.994f, 0.0f, 1.0f) : 0.0f;
 		CUIRect Fill = MeterBar;
-		Fill.w *= std::clamp(m_MicLevel, 0.0f, 1.0f);
-		Fill.Draw(ColorRGBA(0.30f, 0.70f, 0.42f, 0.78f), IGraphics::CORNER_ALL, 3.0f);
+		Fill.w *= DisplayLevel;
+		if(Fill.w > 0.0f)
+		{
+			const float Rounding = minimum(3.0f, minimum(Fill.w * 0.5f, Fill.h * 0.5f));
+			const int Corners = Fill.w >= MeterBar.w ? IGraphics::CORNER_ALL : IGraphics::CORNER_L;
+			Fill.Draw(ColorRGBA(0.30f, 0.70f, 0.42f, 0.78f), Corners, Rounding);
+		}
 	}
 
 	AddExpandedSpacing(3.0f);
@@ -1620,8 +1635,9 @@ CUIRect CVoiceChat::GetHudMuteStatusIndicatorRect(float HudWidth, float HudHeigh
 	const bool MusicPlayerHudActive = !MusicPlayerComponentDisabled && g_Config.m_BcMusicPlayer != 0 && MusicReservation.m_Visible && MusicReservation.m_Active;
 	if(MusicPlayerHudActive)
 	{
-		const float Offset = GameClient()->m_MusicPlayer.GetHudPushOffsetForRect(Rect, HudWidth, 2.0f);
-		Rect.x += Offset;
+		const vec2 Offset = GameClient()->m_MusicPlayer.GetHudPushOffsetForRect(Rect, HudWidth, HudHeight, 2.0f);
+		Rect.x += Offset.x;
+		Rect.y += Offset.y;
 	}
 
 	Rect.x = std::clamp(Rect.x, 0.0f, maximum(0.0f, HudWidth - Rect.w));
@@ -3051,7 +3067,7 @@ void CVoiceChat::ProcessCapture()
 		m_AutoHpfPrevIn = 0.0f;
 		m_AutoHpfPrevOut = 0.0f;
 		m_AutoCompEnv = 0.0f;
-		m_MicLevel = mix(m_MicLevel, 0.0f, 0.25f);
+		m_MicLevelTarget = mix(m_MicLevelTarget, 0.0f, 0.25f);
 		m_CapturePcm.Clear();
 		m_MicMonitorPcm.Clear();
 		if(SDL_GetQueuedAudioSize(m_CaptureDevice) > 0)
@@ -3068,7 +3084,7 @@ void CVoiceChat::ProcessCapture()
 		m_AutoHpfPrevIn = 0.0f;
 		m_AutoHpfPrevOut = 0.0f;
 		m_AutoCompEnv = 0.0f;
-		m_MicLevel = mix(m_MicLevel, 0.0f, 0.25f);
+		m_MicLevelTarget = mix(m_MicLevelTarget, 0.0f, 0.25f);
 		if(SDL_GetQueuedAudioSize(m_CaptureDevice) > 0)
 			SDL_ClearQueuedAudio(m_CaptureDevice);
 		return;
@@ -3125,7 +3141,7 @@ void CVoiceChat::ProcessCapture()
 			m_LastProcessCaptureTick = Now;
 		}
 
-		m_MicLevel = mix(m_MicLevel, 0.0f, 0.08f);
+		m_MicLevelTarget = mix(m_MicLevelTarget, 0.0f, 0.08f);
 	}
 
 	while(m_CapturePcm.Size() >= (size_t)BestClientVoice::FRAME_SIZE)
@@ -3183,9 +3199,9 @@ void CVoiceChat::ProcessCapture()
 		AvgLevel /= BestClientVoice::FRAME_SIZE;
 		const float LevelLinear = std::clamp((float)AvgLevel / 32767.0f, 0.0f, 1.0f);
 		const float PeakLinear = std::clamp((float)Peak / 32767.0f, 0.0f, 1.0f);
-		const float MicLevelScale = 2.0f;
+		const float MicLevelScale = 4.0f;
 		const float LevelLinearScaled = std::clamp(LevelLinear * MicLevelScale, 0.0f, 1.0f);
-		m_MicLevel = mix(m_MicLevel, LevelLinearScaled, 0.2f);
+		m_MicLevelTarget = LevelLinearScaled;
 
 		if(g_Config.m_BcVoiceChatMicCheck)
 			m_MicMonitorPcm.PushBack(aFrame, BestClientVoice::FRAME_SIZE);

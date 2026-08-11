@@ -516,8 +516,8 @@ void CBgDraw::OnRender()
 				if(Item.m_Killed)
 					continue;
 				// Don't erase items that are currently being drawn
-				if(std::any_of(std::begin(m_apActiveItems), std::end(m_apActiveItems), [&](const std::optional<CBgDrawItem *> &ActiveItem) {
-					   return ActiveItem.value_or(nullptr) == &Item;
+				if(std::any_of(std::begin(m_apActiveItems), std::end(m_apActiveItems), [&](const std::optional<CBgDrawItem *> &ActiveDrawItem) {
+					   return ActiveDrawItem.value_or(nullptr) == &Item;
 				   }))
 					continue;
 				// Erase only the covered part, keeping the surviving pieces

@@ -391,7 +391,9 @@ if(NOT MSVC AND NOT HAIKU)
     add_cxx_compiler_flag_if_supported(OUR_FLAGS_OWN -Wno-format) # Don't warn about format strings in release mode since our `str_format` optimization is incompatible with it.
   endif()
   add_c_compiler_flag_if_supported(OUR_FLAGS_DEP -Wno-implicit-function-declaration)
-  add_cxx_compiler_flag_if_supported(OUR_FLAGS_OWN -Wno-nullability-completeness) # Mac OS build on github
+	if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+		add_cxx_compiler_flag_if_supported(OUR_FLAGS_OWN -Wno-nullability-completeness)
+	endif()
   add_cxx_compiler_flag_if_supported(OUR_FLAGS_OWN -Wduplicated-cond)
   add_cxx_compiler_flag_if_supported(OUR_FLAGS_OWN -Wduplicated-branches)
   add_cxx_compiler_flag_if_supported(OUR_FLAGS_OWN -Wlogical-op)
@@ -429,10 +431,12 @@ function(set_glob VAR GLOBBING EXTS DIRECTORY) # ...
     list(APPEND FILES "${PROJECT_SOURCE_DIR}/${DIRECTORY}/${file}")
   endforeach()
 
-  if(NOT FILES STREQUAL GLOB_RESULT)
+  set(SORTED_FILES ${FILES})
+  list(SORT SORTED_FILES)
+  if(NOT SORTED_FILES STREQUAL GLOB_RESULT)
     message(AUTHOR_WARNING "${VAR} does not contain every file from directory ${DIRECTORY}")
     set(LIST_BUT_NOT_GLOB)
-    foreach(file ${FILES})
+    foreach(file ${SORTED_FILES})
       if(NOT file IN_LIST GLOB_RESULT)
         list(APPEND LIST_BUT_NOT_GLOB ${file})
       endif()
@@ -442,15 +446,12 @@ function(set_glob VAR GLOBBING EXTS DIRECTORY) # ...
     endif()
     set(GLOB_BUT_NOT_LIST)
     foreach(file ${GLOB_RESULT})
-      if(NOT file IN_LIST FILES)
+      if(NOT file IN_LIST SORTED_FILES)
         list(APPEND GLOB_BUT_NOT_LIST ${file})
       endif()
     endforeach()
     if(GLOB_BUT_NOT_LIST)
       message(AUTHOR_WARNING "Entries only present in ${DIRECTORY}: ${GLOB_BUT_NOT_LIST}")
-    endif()
-    if(NOT LIST_BUT_NOT_GLOB AND NOT GLOB_BUT_NOT_LIST)
-      message(AUTHOR_WARNING "${VAR} is not alphabetically sorted")
     endif()
   endif()
 
@@ -2680,6 +2681,7 @@ if(CLIENT)
   set_src(GAME_CLIENT GLOB_RECURSE src/game/client
     animstate.cpp
     animstate.h
+    bc_ui_animations.h
     component.cpp
     component.h
     components/background.cpp
@@ -2879,6 +2881,7 @@ if(CLIENT)
     components/bestclient/swap_timer.h
     components/bestclient/translate.cpp
     components/bestclient/translate.h
+    components/bestclient/version.h
     components/bestclient/visualizer/analyzer.cpp
     components/bestclient/visualizer/analyzer.h
     components/bestclient/visualizer/service.cpp
@@ -3491,6 +3494,10 @@ endif()
 if(TOOLS)
   set(TARGETS_TOOLS)
   set_src(TOOLS_SRC GLOB src/tools
+    bestclient_updater.cpp
+    bestclient_updater_linux.cpp
+    bestclient_updater_linux_font.h
+    bestclient_updater_linux_fs.h
     config_common.h
     config_retrieve.cpp
     config_store.cpp
@@ -3517,6 +3524,9 @@ if(TOOLS)
     file(RELATIVE_PATH T "${PROJECT_SOURCE_DIR}/src/tools/" ${ABS_T})
     if(T MATCHES "\\.cpp$")
       string(REGEX REPLACE "\\.cpp$" "" TOOL "${T}")
+      if(TOOL MATCHES "^bestclient_updater(_linux)?$")
+        continue()
+      endif()
       set(TOOL_DEPS ${DEPS})
       set(TOOL_LIBS ${LIBS})
       unset(EXTRA_TOOL_SRC)

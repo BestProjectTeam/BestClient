@@ -352,6 +352,12 @@ CUIRect CVoting::GetHudRect(float HudWidth, float HudHeight, bool ForcePreview) 
 	CUIRect Rect = {HasOverride ? Layout.m_X : 0.0f, HasOverride ? Layout.m_Y : 60.0f, 120.0f * Scale, 38.0f * Scale};
 	Rect.x = std::clamp(Rect.x, 0.0f, std::max(0.0f, HudWidth - Rect.w));
 	Rect.y = std::clamp(Rect.y, 0.0f, std::max(0.0f, HudHeight - Rect.h));
+	if(!ForcePreview)
+	{
+		const vec2 Offset = GameClient()->m_MusicPlayer.GetHudPushOffsetForRect(Rect, HudWidth, HudHeight, 2.0f);
+		Rect.x += Offset.x;
+		Rect.y += Offset.y;
+	}
 	return Rect;
 }
 

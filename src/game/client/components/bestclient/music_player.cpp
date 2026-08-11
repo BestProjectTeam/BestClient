@@ -25,6 +25,7 @@
 #include <game/client/components/hud_layout.h>
 #include <game/client/components/media_decoder.h>
 #include <game/client/components/scoreboard.h>
+#include <game/client/bc_ui_animations.h>
 #include <game/client/gameclient.h>
 #include <game/client/ui.h>
 #include <game/localization.h>
@@ -83,6 +84,7 @@ namespace
 	static constexpr float VISUALIZER_ATTACK_RATE = 46.0f;
 	static constexpr float VISUALIZER_RELEASE_RATE = 19.0f;
 	static constexpr int COVER_BAR_TINT_CELLS = MUSIC_PLAYER_MAX_VISUALIZER_BARS * COVER_BAR_SEGMENTS;
+	static constexpr int HUD_PUSH_ANIMATION_DURATION_MS = 420;
 
 	static CUIRect HudToUiRect(const CUIRect &HudRect, const CUIRect &UiScreen, float HudWidth, float HudHeight)
 	{
@@ -1526,7 +1528,7 @@ namespace
 		return g_Config.m_BcMusicPlayerVisualizerRounding >= 100;
 	}
 
-	static bool IsTranslucentColorMode()
+	[[maybe_unused]] static bool IsTranslucentColorMode()
 	{
 		return g_Config.m_BcMusicPlayerColorMode == 2;
 	}
@@ -2435,6 +2437,7 @@ public:
 	int64_t m_LastVisualizerPollTick = 0;
 	float m_ExpandAnim = 0.0f;
 	float m_HoverAnim = 0.0f;
+	float m_HudPushAnim = 0.0f;
 	float m_VisualPositionMs = 0.0f;
 	std::string m_VisualTrackKey;
 	std::string m_PlaybackTrackKey;
@@ -2502,6 +2505,7 @@ public:
 	{
 		m_ExpandAnim = 0.0f;
 		m_HoverAnim = 0.0f;
+		m_HudPushAnim = 0.0f;
 		m_VisualPositionMs = 0.0f;
 		m_VisualTrackKey.clear();
 		m_aVisualizerLevels.fill(0.18f);
@@ -3258,10 +3262,14 @@ public:
 
 		const float SizeT = EaseInOutCubic(m_ExpandAnim);
 		const SMusicPlayerMetrics Metrics = ComputeMusicPlayerMetrics(Layout, Width, Height, SizeT, CompactTextSlotWidth, m_CompactTextSlotWidthAnim, MiniMode, ShowCover, TextScale);
+		if(BCUiAnimations::Enabled())
+			BCUiAnimations::UpdatePhase(m_HudPushAnim, m_ExpandAnim, Delta, BCUiAnimations::MsToSeconds(HUD_PUSH_ANIMATION_DURATION_MS));
+		else
+			m_HudPushAnim = m_ExpandAnim;
 		m_HudReservation.m_Rect = Metrics.m_ViewRect;
 		m_HudReservation.m_Visible = true;
 		m_HudReservation.m_Active = true;
-		m_HudReservation.m_PushAmount = 1.0f;
+		m_HudReservation.m_PushAmount = BCUiAnimations::EaseOutCubic(m_HudPushAnim);
 	}
 };
 
@@ -3307,36 +3315,59 @@ CMusicPlayer::SHudReservation CMusicPlayer::HudReservation() const
 	return m_pImpl->m_HudReservation;
 }
 
-float CMusicPlayer::GetHudPushOffsetForRect(const CUIRect &Rect, float CanvasWidth, float Padding) const
+vec2 CMusicPlayer::GetHudPushOffsetForRect(const CUIRect &Rect, float CanvasWidth, float CanvasHeight, float Padding) const
 {
 	const SHudReservation Reservation = HudReservation();
-	if(!Reservation.m_Visible || !Reservation.m_Active || Reservation.m_PushAmount <= 0.0f || Rect.w <= 0.0f || Rect.h <= 0.0f)
-		return 0.0f;
+	if(!Reservation.m_Visible || !Reservation.m_Active || Reservation.m_PushAmount <= 0.0f || Rect.w <= 0.0f || Rect.h <= 0.0f || CanvasWidth <= 0.0f || CanvasHeight <= 0.0f)
+		return vec2(0.0f, 0.0f);
 
 	const float Gap = maximum(Padding, 2.0f);
 	if(!RectsOverlap(Reservation.m_Rect, Rect, Gap))
-		return 0.0f;
+		return vec2(0.0f, 0.0f);
 
-	const float LeftX = std::clamp(Reservation.m_Rect.x - Gap - Rect.w, 0.0f, maximum(0.0f, CanvasWidth - Rect.w));
-	const float RightX = std::clamp(Reservation.m_Rect.x + Reservation.m_Rect.w + Gap, 0.0f, maximum(0.0f, CanvasWidth - Rect.w));
-	const float LeftOffset = LeftX - Rect.x;
-	const float RightOffset = RightX - Rect.x;
-	const float ChosenOffset = absolute(LeftOffset) <= absolute(RightOffset) ? LeftOffset : RightOffset;
-	return ChosenOffset * Reservation.m_PushAmount;
-}
+	struct SPushCandidate
+	{
+		vec2 m_Offset;
+		float m_Alignment;
+		float m_Distance;
+	};
+	std::array<SPushCandidate, 4> aCandidates{};
+	int CandidateCount = 0;
+	const vec2 RectCenter(Rect.x + Rect.w * 0.5f, Rect.y + Rect.h * 0.5f);
+	const vec2 PlayerCenter(Reservation.m_Rect.x + Reservation.m_Rect.w * 0.5f, Reservation.m_Rect.y + Reservation.m_Rect.h * 0.5f);
+	const vec2 Away = RectCenter - PlayerCenter;
+	const float AwayLength = length(Away);
 
-float CMusicPlayer::GetHudPushDownOffsetForRect(const CUIRect &Rect, float CanvasHeight, float Padding) const
-{
-	const SHudReservation Reservation = HudReservation();
-	if(!Reservation.m_Visible || !Reservation.m_Active || Reservation.m_PushAmount <= 0.0f || Rect.w <= 0.0f || Rect.h <= 0.0f)
-		return 0.0f;
+	auto AddCandidate = [&](vec2 Offset) {
+		const float TargetX = Rect.x + Offset.x;
+		const float TargetY = Rect.y + Offset.y;
+		if(TargetX < -0.001f || TargetY < -0.001f || TargetX + Rect.w > CanvasWidth + 0.001f || TargetY + Rect.h > CanvasHeight + 0.001f)
+			return;
 
-	const float Gap = maximum(Padding, 2.0f);
-	if(!RectsOverlap(Reservation.m_Rect, Rect, Gap))
-		return 0.0f;
+		const float Distance = length(Offset);
+		if(Distance <= 0.001f)
+			return;
 
-	const float TargetY = std::clamp(Reservation.m_Rect.y + Reservation.m_Rect.h + Gap, 0.0f, maximum(0.0f, CanvasHeight - Rect.h));
-	return maximum(0.0f, (TargetY - Rect.y) * Reservation.m_PushAmount);
+		const float Alignment = AwayLength > 0.001f ? dot(Offset / Distance, Away / AwayLength) : 0.0f;
+		aCandidates[CandidateCount++] = {Offset, Alignment, Distance};
+	};
+
+	AddCandidate(vec2(Reservation.m_Rect.x - Gap - Rect.w - Rect.x, 0.0f));
+	AddCandidate(vec2(Reservation.m_Rect.x + Reservation.m_Rect.w + Gap - Rect.x, 0.0f));
+	AddCandidate(vec2(0.0f, Reservation.m_Rect.y - Gap - Rect.h - Rect.y));
+	AddCandidate(vec2(0.0f, Reservation.m_Rect.y + Reservation.m_Rect.h + Gap - Rect.y));
+	if(CandidateCount == 0)
+		return vec2(0.0f, 0.0f);
+
+	const SPushCandidate *pBest = &aCandidates[0];
+	for(int i = 1; i < CandidateCount; ++i)
+	{
+		const SPushCandidate &Candidate = aCandidates[i];
+		if(Candidate.m_Distance < pBest->m_Distance - 0.001f ||
+			(Candidate.m_Distance <= pBest->m_Distance + 0.001f && Candidate.m_Alignment > pBest->m_Alignment))
+			pBest = &Candidate;
+	}
+	return pBest->m_Offset * Reservation.m_PushAmount;
 }
 
 bool CMusicPlayer::GetNowPlayingInfo(SNowPlayingInfo &Out) const
