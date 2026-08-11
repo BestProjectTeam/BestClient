@@ -51,6 +51,11 @@ public:
 	static float LyricsTextSlotWidth(float Scale, float WidthScale);
 	static bool ParseSyncedLyrics(const char *pSyncedLyrics, std::vector<SLine> &vOut);
 
+	// Advance display timers (not-found hold). Call once per frame before PreferredTextSlotWidth.
+	void TickDisplay(float Delta);
+	// HUD text-slot width for the current lyrics/status/title content, clamped to MaxWidth.
+	float PreferredTextSlotWidth(ITextRender *pTextRender, float FontSize, float MaxWidth, float Scale, float WidthScale) const;
+
 	void Render(ITextRender *pTextRender, CUi *pUi, const CUIRect &Area, float FontSize, float Delta);
 
 private:
@@ -80,6 +85,7 @@ private:
 	static bool IsFallbackIndex(int Index) { return Index == FALLBACK_NOT_FOUND || Index == FALLBACK_TITLE; }
 	static int CountdownDigit(int Index) { return -Index; }
 	const char *FallbackText(int Index) const;
+	int ResolveDisplayLineIndex() const;
 	void ApplyCacheEntry(const SCacheEntry &Entry);
 	void StartRequest(IHttp *pHttp, const char *pTitle, const char *pArtist, const char *pAlbum, int64_t DurationMs);
 	void ProcessRequest();

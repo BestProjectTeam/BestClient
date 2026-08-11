@@ -3499,12 +3499,12 @@ public:
 		const float CompactTitleFont = 6.6f * CompactScale * TextScale;
 		const float MiniTitleFont = 6.0f * CompactScale * TextScale;
 		const bool LyricsEnabled = g_Config.m_BcMusicPlayerShowLyrics != 0;
-		const float CompactTextSlotWidth = ComputeCompactTextSlotWidth(pOwner->TextRender(), GameTimer, CompactTitleFont, CompactScale, CompactWidthScale, LyricsEnabled);
-		const float MiniTextSlotWidth = ComputeMiniTextSlotWidth(pOwner->TextRender(), m_Snapshot, GameTimer, MiniTitleFont, CompactScale, CompactWidthScale, LyricsEnabled);
 		const float CompactTextSlotWidthBase = ComputeCompactTextSlotWidth(pOwner->TextRender(), GameTimer, CompactTitleFont, CompactScale, CompactWidthScale, false);
 		const float MiniTextSlotWidthBase = ComputeMiniTextSlotWidth(pOwner->TextRender(), m_Snapshot, GameTimer, MiniTitleFont, CompactScale, CompactWidthScale, false);
-		const float CompactTextSlotWidthLyrics = ComputeCompactTextSlotWidth(pOwner->TextRender(), GameTimer, CompactTitleFont, CompactScale, CompactWidthScale, true);
-		const float MiniTextSlotWidthLyrics = ComputeMiniTextSlotWidth(pOwner->TextRender(), m_Snapshot, GameTimer, MiniTitleFont, CompactScale, CompactWidthScale, true);
+		const float CompactTextSlotWidthLyrics = CMusicPlayerLyrics::LyricsTextSlotWidth(CompactScale, CompactWidthScale);
+		const float MiniTextSlotWidthLyrics = CMusicPlayerLyrics::LyricsTextSlotWidth(CompactScale, CompactWidthScale);
+		float CompactTextSlotWidth = CompactTextSlotWidthBase;
+		float MiniTextSlotWidth = MiniTextSlotWidthBase;
 		const CUIRect UiScreen = *pOwner->Ui()->Screen();
 		if(UiScreen.w <= 0.0f || UiScreen.h <= 0.0f)
 		{
@@ -3522,6 +3522,16 @@ public:
 		const bool AllowInteraction = ChatActive || ScoreboardCursorActive;
 		const bool FreezeNonChatLayout = !ChatActive && !HudEditorActive &&
 						 (pOwner->GameClient()->m_GameConsole.IsActive() || pOwner->GameClient()->m_Menus.IsActive());
+
+		const float Delta = std::clamp(pOwner->Client()->RenderFrameTime(), 0.0f, 0.1f);
+		if(LyricsEnabled)
+		{
+			m_Lyrics.TickDisplay(Delta);
+			// Compact (non-mini) lyrics title uses 5.25f scale — match RenderMusicPlayer TitleFont.
+			const float CompactLyricsMeasureFont = 5.25f * CompactScale * TextScale;
+			CompactTextSlotWidth = m_Lyrics.PreferredTextSlotWidth(pOwner->TextRender(), CompactLyricsMeasureFont, CompactTextSlotWidthLyrics, CompactScale, CompactWidthScale);
+			MiniTextSlotWidth = m_Lyrics.PreferredTextSlotWidth(pOwner->TextRender(), MiniTitleFont, MiniTextSlotWidthLyrics, CompactScale, CompactWidthScale);
+		}
 
 		const float ProbeT = EaseInOutCubic(m_ExpandAnim);
 		const float ProbeTextSlotWidth = m_CompactTextSlotWidthAnim > 0.0f ? m_CompactTextSlotWidthAnim : (MiniMode ? MiniTextSlotWidth : CompactTextSlotWidth);
@@ -3544,7 +3554,6 @@ public:
 			}
 		}
 
-		const float Delta = std::clamp(pOwner->Client()->RenderFrameTime(), 0.0f, 0.1f);
 		if(m_CompactTextSlotWidthAnim <= 0.0f)
 			m_CompactTextSlotWidthAnim = MiniMode ? MiniTextSlotWidth : CompactTextSlotWidth;
 		if(!FreezeNonChatLayout)

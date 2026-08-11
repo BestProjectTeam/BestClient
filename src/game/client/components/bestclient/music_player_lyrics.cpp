@@ -46,6 +46,57 @@ float CMusicPlayerLyrics::LyricsTextSlotWidth(float Scale, float WidthScale)
 	return LYRICS_SLOT_WIDTH * Scale * WidthScale;
 }
 
+void CMusicPlayerLyrics::TickDisplay(float Delta)
+{
+	if(m_DisplayState == EDisplayState::NotFound)
+		m_NotFoundDisplayMs += maximum(0.0f, Delta) * 1000.0f;
+}
+
+int CMusicPlayerLyrics::ResolveDisplayLineIndex() const
+{
+	if(m_DisplayState == EDisplayState::NotFound)
+		return (m_NotFoundDisplayMs < (float)NOT_FOUND_HOLD_MS) ? FALLBACK_NOT_FOUND : FALLBACK_TITLE;
+
+	if(m_DisplayState != EDisplayState::Ready)
+		return LINE_NONE;
+
+	const int64_t PositionMs = CurrentPositionMs();
+	int LineIndex = FindLineIndex(PositionMs);
+	if(LineIndex < 0 && !m_vLines.empty())
+	{
+		const int64_t CountdownRemainingMs = m_vLines.front().m_StartMs - PositionMs;
+		if(CountdownRemainingMs > 2000)
+			return -3;
+		if(CountdownRemainingMs > 1000)
+			return -2;
+		if(CountdownRemainingMs > 0)
+			return -1;
+		return 0;
+	}
+	if(m_ClockPlaying && m_CurrentLineIndex >= 0 && LineIndex >= 0 && LineIndex < m_CurrentLineIndex)
+		return m_CurrentLineIndex;
+	return LineIndex;
+}
+
+float CMusicPlayerLyrics::PreferredTextSlotWidth(ITextRender *pTextRender, float FontSize, float MaxWidth, float Scale, float WidthScale) const
+{
+	const float ClampedMax = maximum(0.0f, MaxWidth);
+	if(ClampedMax <= 0.0f)
+		return 0.0f;
+
+	// Only the track title shrinks to content; lyrics, errors, and countdown keep full width.
+	if(m_DisplayState != EDisplayState::NotFound || ResolveDisplayLineIndex() != FALLBACK_TITLE)
+		return ClampedMax;
+
+	const char *pTitle = FallbackText(FALLBACK_TITLE);
+	if(pTextRender == nullptr || pTitle == nullptr || pTitle[0] == '\0')
+		return ClampedMax;
+
+	const float Pad = 1.2f * Scale * WidthScale;
+	const float TextW = pTextRender->TextWidth(FontSize, pTitle, -1, -1.0f);
+	return std::clamp(TextW + Pad * 2.0f, 0.0f, ClampedMax);
+}
+
 void CMusicPlayerLyrics::Reset()
 {
 	AbortRequest();
@@ -721,37 +772,10 @@ void CMusicPlayerLyrics::Render(ITextRender *pTextRender, CUi *pUi, const CUIRec
 	}
 
 	const int64_t PositionMs = CurrentPositionMs();
-	int LineIndex = LINE_NONE;
+	int LineIndex = ResolveDisplayLineIndex();
 	int64_t CountdownRemainingMs = 0;
-
-	if(m_DisplayState == EDisplayState::NotFound)
-	{
-		m_NotFoundDisplayMs += Delta * 1000.0f;
-		LineIndex = (m_NotFoundDisplayMs < (float)NOT_FOUND_HOLD_MS) ? FALLBACK_NOT_FOUND : FALLBACK_TITLE;
-	}
-	else
-	{
-		LineIndex = FindLineIndex(PositionMs);
-		if(LineIndex < 0 && !m_vLines.empty())
-		{
-			CountdownRemainingMs = m_vLines.front().m_StartMs - PositionMs;
-			// Hold "3" until the last 3 seconds, then 3 → 2 → 1, then lyrics.
-			// Indices -3/-2/-1 so -1→0 is a sequential slide into the first line.
-			if(CountdownRemainingMs > 2000)
-				LineIndex = -3;
-			else if(CountdownRemainingMs > 1000)
-				LineIndex = -2;
-			else if(CountdownRemainingMs > 0)
-				LineIndex = -1;
-			else
-				LineIndex = 0;
-		}
-		// While playing forward, never step back to a previous lyric line (stale boundary jitter).
-		else if(m_ClockPlaying && m_CurrentLineIndex >= 0 && LineIndex >= 0 && LineIndex < m_CurrentLineIndex)
-		{
-			LineIndex = m_CurrentLineIndex;
-		}
-	}
+	if(IsCountdownIndex(LineIndex) && !m_vLines.empty())
+		CountdownRemainingMs = m_vLines.front().m_StartMs - PositionMs;
 
 	if(LineIndex != m_CurrentLineIndex)
 	{
