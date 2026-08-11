@@ -178,10 +178,8 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 	vec2 VisualsScrollOffset(0.0f, 0.0f);
 	CScrollRegionParams VisualsScrollParams;
 	VisualsScrollParams.m_ScrollUnit = 60.0f;
-	VisualsScrollParams.m_Flags = CScrollRegionParams::FLAG_CONTENT_STATIC_WIDTH;
 	VisualsScrollParams.m_ScrollbarMargin = 5.0f;
-	s_VisualsScrollRegion.Begin(&MainView, &VisualsScrollOffset, &VisualsScrollParams);
-	MainView.y += VisualsScrollOffset.y;
+	s_VisualsScrollRegion.Begin(&MainView, &VisualsScrollParams);
 	MainView.VSplitRight(5.0f, &MainView, nullptr);
 	MainView.VSplitLeft(5.0f, nullptr, &MainView);
 
@@ -1831,10 +1829,8 @@ void CMenus::RenderSettingsBestClientGameplay(CUIRect MainView)
 	vec2 GameplayScrollOffset(0.0f, 0.0f);
 	CScrollRegionParams GameplayScrollParams;
 	GameplayScrollParams.m_ScrollUnit = 60.0f;
-	GameplayScrollParams.m_Flags = CScrollRegionParams::FLAG_CONTENT_STATIC_WIDTH;
 	GameplayScrollParams.m_ScrollbarMargin = 5.0f;
-	s_GameplayScrollRegion.Begin(&MainView, &GameplayScrollOffset, &GameplayScrollParams);
-	MainView.y += GameplayScrollOffset.y;
+	s_GameplayScrollRegion.Begin(&MainView, &GameplayScrollParams);
 	MainView.VSplitRight(5.0f, &MainView, nullptr);
 	MainView.VSplitLeft(5.0f, nullptr, &MainView);
 
@@ -2753,10 +2749,8 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	vec2 OthersScrollOffset(0.0f, 0.0f);
 	CScrollRegionParams OthersScrollParams;
 	OthersScrollParams.m_ScrollUnit = 60.0f;
-	OthersScrollParams.m_Flags = CScrollRegionParams::FLAG_CONTENT_STATIC_WIDTH;
 	OthersScrollParams.m_ScrollbarMargin = 5.0f;
-	s_OthersScrollRegion.Begin(&MainView, &OthersScrollOffset, &OthersScrollParams);
-	MainView.y += OthersScrollOffset.y;
+	s_OthersScrollRegion.Begin(&MainView, &OthersScrollParams);
 	MainView.VSplitRight(5.0f, &MainView, nullptr);
 	MainView.VSplitLeft(5.0f, nullptr, &MainView);
 
@@ -3357,11 +3351,8 @@ CUi::EPopupMenuFunctionResult CMenus::PopupVoiceModeration(void *pContext, CUIRe
 	static vec2 s_VoiceModScrollOffset(0.0f, 0.0f);
 	CScrollRegionParams ScrollParams;
 	ScrollParams.m_ScrollUnit = RowH + 4.0f;
-	ScrollParams.m_Flags = CScrollRegionParams::FLAG_CONTENT_STATIC_WIDTH;
 	ScrollParams.m_ScrollbarMargin = 4.0f;
-	s_VoiceModScroll.Begin(&View, &s_VoiceModScrollOffset, &ScrollParams);
-	View.y += s_VoiceModScrollOffset.y;
-
+	s_VoiceModScroll.Begin(&View, &ScrollParams);
 	for(size_t i = 0; i < Players.size(); ++i)
 	{
 		const CVoiceChat::SModPlayer &Player = Players[i];

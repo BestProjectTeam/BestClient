@@ -1,13 +1,16 @@
+#!/usr/bin/env python3
+
 # Needs UnicodeData.txt in the current directory.
 #
 # It can be obtained from unicode.org:
-# - http://www.unicode.org/Public/<VERSION>/ucd/UnicodeData.txt
+# - https://www.unicode.org/Public/<VERSION>/ucd/UnicodeData.txt
 #
 # If executed as a script, it will generate the contents of the file
 # python3 scripts/generate_unicode_tolower.py header > `src/base/unicode/tolower_data.h`,
 # python3 scripts/generate_unicode_tolower.py data > `src/base/unicode/tolower_data.cpp`.
 
 import sys
+
 import unicode
 
 

@@ -55,7 +55,11 @@ void CPlayerIndicator::OnRender()
 
 				// Hide tees on our screen if the config is set to do so
 				float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
-				Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
+				const CScreenRect ScreenRect = Graphics()->GetScreen();
+				ScreenX0 = ScreenRect.m_TopLeft.x;
+				ScreenY0 = ScreenRect.m_TopLeft.y;
+				ScreenX1 = ScreenRect.m_BottomRight.x;
+				ScreenY1 = ScreenRect.m_BottomRight.y;
 				if(g_Config.m_TcIndicatorHideVisible && in_range(GameClient()->m_aClients[i].m_RenderPos.x, ScreenX0, ScreenX1) && in_range(GameClient()->m_aClients[i].m_RenderPos.y, ScreenY0, ScreenY1))
 					continue;
 

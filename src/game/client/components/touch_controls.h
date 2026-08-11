@@ -31,6 +31,7 @@ public:
 		DISABLED,
 		ACTION,
 		AIM,
+		AIM_RELATIVE,
 		FIRE,
 		HOOK,
 		NUM_STATES
@@ -143,7 +144,7 @@ public:
 	};
 
 private:
-	static constexpr const char *const DIRECT_TOUCH_INGAME_MODE_NAMES[(int)EDirectTouchIngameMode::NUM_STATES] = {"disabled", "action", "aim", "fire", "hook"};
+	static constexpr const char *const DIRECT_TOUCH_INGAME_MODE_NAMES[(int)EDirectTouchIngameMode::NUM_STATES] = {"disabled", "action", "aim", "aim-relative", "fire", "hook"};
 	static constexpr const char *const DIRECT_TOUCH_SPECTATE_MODE_NAMES[(int)EDirectTouchSpectateMode::NUM_STATES] = {"disabled", "aim"};
 	static constexpr const char *const SHAPE_NAMES[(int)EButtonShape::NUM_SHAPES] = {"rect", "circle"};
 
@@ -368,6 +369,7 @@ public:
 		void OnUpdate() override;
 		int ActiveAction() const { return m_ActiveAction; }
 		virtual int SelectedAction() const = 0;
+		virtual bool IsRelative() const { return false; }
 
 	private:
 		int m_ActiveAction = NUM_ACTIONS;
@@ -381,7 +383,6 @@ public:
 		CJoystickActionTouchButtonBehavior() :
 			CJoystickTouchButtonBehavior(BEHAVIOR_ID) {}
 
-		void Init(CTouchButton *pTouchButton) override;
 		int SelectedAction() const override;
 	};
 
@@ -394,6 +395,18 @@ public:
 			CJoystickTouchButtonBehavior(BEHAVIOR_ID) {}
 
 		int SelectedAction() const override;
+	};
+
+	class CJoystickAimRelativeTouchButtonBehavior : public CJoystickTouchButtonBehavior
+	{
+	public:
+		static constexpr const char *const BEHAVIOR_ID = "joystick-aim-relative";
+
+		CJoystickAimRelativeTouchButtonBehavior() :
+			CJoystickTouchButtonBehavior(BEHAVIOR_ID) {}
+
+		int SelectedAction() const override;
+		bool IsRelative() const override { return true; }
 	};
 
 	class CJoystickFireTouchButtonBehavior : public CJoystickTouchButtonBehavior
@@ -600,6 +613,7 @@ private:
 	int m_LastHeight = -10;
 	void BuildPositionXY(std::vector<CUnitRect> vVisibleButtonRects, CUnitRect MyRect);
 	std::optional<CUnitRect> FindPositionXY(std::vector<CUnitRect> &vVisibleButtonRects, CUnitRect MyRect);
+	CUnitRect FindSizeWH(std::vector<CUnitRect> vVisibleButtonRects, CUnitRect MyRect);
 
 	// This is how editor render buttons.
 	void RenderButtonsEditor();

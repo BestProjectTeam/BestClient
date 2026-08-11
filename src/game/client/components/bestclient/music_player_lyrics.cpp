@@ -4,7 +4,7 @@
 #include <base/math.h>
 #include <base/system.h>
 
-#include <engine/shared/http.h>
+#include <engine/http.h>
 #include <engine/shared/json.h>
 #include <engine/textrender.h>
 
@@ -372,7 +372,7 @@ void CMusicPlayerLyrics::ProcessRequest()
 	if(!m_pRequest || !m_pRequest->Done())
 		return;
 
-	std::shared_ptr<CHttpRequest> pFinished = m_pRequest;
+	std::shared_ptr<IHttpRequest> pFinished = m_pRequest;
 	m_pRequest.reset();
 	const std::string FinishedKey = m_RequestKey;
 	m_RequestKey.clear();

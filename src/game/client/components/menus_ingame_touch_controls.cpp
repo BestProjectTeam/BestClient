@@ -1,12 +1,13 @@
 #include "menus_ingame_touch_controls.h"
 
 #include <base/color.h>
-#include <base/math.h>
-#include <base/system.h>
+#include <base/dbg.h>
+#include <base/str.h>
 
 #include <engine/external/json-parser/json.h>
 #include <engine/font_icons.h>
 #include <engine/graphics.h>
+#include <engine/shared/json.h>
 #include <engine/shared/jsonwriter.h>
 #include <engine/shared/localization.h>
 #include <engine/textrender.h>
@@ -40,6 +41,7 @@ const CMenusIngameTouchControls::CBehaviorFactoryEditor CMenusIngameTouchControl
 	{CTouchControls::CUseActionTouchButtonBehavior::BEHAVIOR_ID, []() { return std::make_unique<CTouchControls::CUseActionTouchButtonBehavior>(); }},
 	{CTouchControls::CJoystickActionTouchButtonBehavior::BEHAVIOR_ID, []() { return std::make_unique<CTouchControls::CJoystickActionTouchButtonBehavior>(); }},
 	{CTouchControls::CJoystickAimTouchButtonBehavior::BEHAVIOR_ID, []() { return std::make_unique<CTouchControls::CJoystickAimTouchButtonBehavior>(); }},
+	{CTouchControls::CJoystickAimRelativeTouchButtonBehavior::BEHAVIOR_ID, []() { return std::make_unique<CTouchControls::CJoystickAimRelativeTouchButtonBehavior>(); }},
 	{CTouchControls::CJoystickFireTouchButtonBehavior::BEHAVIOR_ID, []() { return std::make_unique<CTouchControls::CJoystickFireTouchButtonBehavior>(); }},
 	{CTouchControls::CJoystickHookTouchButtonBehavior::BEHAVIOR_ID, []() { return std::make_unique<CTouchControls::CJoystickHookTouchButtonBehavior>(); }}};
 
@@ -421,9 +423,7 @@ bool CMenusIngameTouchControls::RenderBehaviorSettingBlock(CUIRect Block)
 		static CScrollRegion s_BindToggleScrollRegion;
 		CScrollRegionParams ScrollParam;
 		ScrollParam.m_ScrollUnit = 90.0f;
-		vec2 ScrollOffset(0.0f, 0.0f);
-		s_BindToggleScrollRegion.Begin(&Block, &ScrollOffset, &ScrollParam);
-		Block.y += ScrollOffset.y;
+		s_BindToggleScrollRegion.Begin(&Block, &ScrollParam);
 		for(unsigned CommandIndex = 0; CommandIndex < m_vBehaviorElements.size(); CommandIndex++)
 		{
 			Block.HSplitTop(ROWSIZE, &EditBox, &Block);
@@ -431,7 +431,7 @@ bool CMenusIngameTouchControls::RenderBehaviorSettingBlock(CUIRect Block)
 			{
 				EditBox.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.15f), IGraphics::CORNER_T, 5.0f);
 				EditBox.VSplitMid(&EditBox, &RightButton);
-				RightButton.VSplitLeft(ScrollParam.m_ScrollbarWidth / 2.0f, nullptr, &RightButton);
+				RightButton.VSplitLeft(ScrollParam.m_ScrollbarThickness / 2.0f, nullptr, &RightButton);
 				EditBox.VSplitLeft(ROWSIZE, &MiddleButton, &EditBox);
 				EditBox.VSplitLeft(SUBMARGIN, nullptr, &LeftButton);
 				Ui()->DoLabel(&LeftButton, Localize("Add command"), FONTSIZE, TEXTALIGN_ML);
@@ -472,7 +472,7 @@ bool CMenusIngameTouchControls::RenderBehaviorSettingBlock(CUIRect Block)
 			{
 				EditBox.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.15f), IGraphics::CORNER_NONE, 0.0f);
 				EditBox.VSplitMid(&LeftButton, &MiddleButton);
-				MiddleButton.VSplitLeft(ScrollParam.m_ScrollbarWidth / 2.0f, nullptr, &MiddleButton);
+				MiddleButton.VSplitLeft(ScrollParam.m_ScrollbarThickness / 2.0f, nullptr, &MiddleButton);
 				str_format(aBuf, sizeof(aBuf), "%s:", Localize("Command"));
 				Ui()->DoLabel(&LeftButton, aBuf, FONTSIZE, TEXTALIGN_ML);
 				if(Ui()->DoClearableEditBox(&m_vBehaviorElements[CommandIndex]->m_InputCommand, &MiddleButton, 10.0f))
@@ -492,7 +492,7 @@ bool CMenusIngameTouchControls::RenderBehaviorSettingBlock(CUIRect Block)
 			{
 				EditBox.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.15f), IGraphics::CORNER_NONE, 0.0f);
 				EditBox.VSplitMid(&LeftButton, &MiddleButton);
-				MiddleButton.VSplitLeft(ScrollParam.m_ScrollbarWidth / 2.0f, nullptr, &MiddleButton);
+				MiddleButton.VSplitLeft(ScrollParam.m_ScrollbarThickness / 2.0f, nullptr, &MiddleButton);
 				str_format(aBuf, sizeof(aBuf), "%s:", Localize("Label"));
 				Ui()->DoLabel(&LeftButton, aBuf, FONTSIZE, TEXTALIGN_ML);
 				if(Ui()->DoClearableEditBox(&m_vBehaviorElements[CommandIndex]->m_InputLabel, &MiddleButton, 10.0f))
@@ -512,7 +512,7 @@ bool CMenusIngameTouchControls::RenderBehaviorSettingBlock(CUIRect Block)
 			{
 				EditBox.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.15f), IGraphics::CORNER_B, 5.0f);
 				EditBox.VSplitMid(&LeftButton, &MiddleButton);
-				MiddleButton.VSplitLeft(ScrollParam.m_ScrollbarWidth / 2.0f, nullptr, &MiddleButton);
+				MiddleButton.VSplitLeft(ScrollParam.m_ScrollbarThickness / 2.0f, nullptr, &MiddleButton);
 				str_format(aBuf, sizeof(aBuf), "%s:", Localize("Label type"));
 				Ui()->DoLabel(&LeftButton, aBuf, FONTSIZE, TEXTALIGN_ML);
 				CTouchControls::CButtonLabel::EType NewButtonLabelType = m_vBehaviorElements[CommandIndex]->m_CachedCommands.m_LabelType;
@@ -566,9 +566,7 @@ bool CMenusIngameTouchControls::RenderVisibilitySettingBlock(CUIRect Block)
 	static CScrollRegion s_VisibilityScrollRegion;
 	CScrollRegionParams ScrollParam;
 	ScrollParam.m_ScrollUnit = 90.0f;
-	vec2 ScrollOffset(0.0f, 0.0f);
-	s_VisibilityScrollRegion.Begin(&Block, &ScrollOffset, &ScrollParam);
-	Block.y += ScrollOffset.y;
+	s_VisibilityScrollRegion.Begin(&Block, &ScrollParam);
 
 	static CButtonContainer s_aHelpButtons[(int)CTouchControls::EButtonVisibility::NUM_VISIBILITIES];
 	static std::vector<CButtonContainer> s_avVisibilitySelector[(int)CTouchControls::EButtonVisibility::NUM_VISIBILITIES];
@@ -584,7 +582,7 @@ bool CMenusIngameTouchControls::RenderVisibilitySettingBlock(CUIRect Block)
 		if(s_VisibilityScrollRegion.AddRect(EditBox))
 		{
 			EditBox.VSplitRight(EditBox.w / 2.0f + ROWGAP + ROWSIZE, &Label, &MiddleButton);
-			MiddleButton.VSplitLeft(ScrollParam.m_ScrollbarWidth / 2.0f, nullptr, &MiddleButton);
+			MiddleButton.VSplitLeft(ScrollParam.m_ScrollbarThickness / 2.0f, nullptr, &MiddleButton);
 			MiddleButton.VSplitLeft(ROWSIZE, &HelpButton, &MiddleButton);
 			MiddleButton.VSplitLeft(ROWGAP, nullptr, &MiddleButton);
 			// We'll only do help button for the first extra menu visibility.
@@ -947,7 +945,14 @@ void CMenusIngameTouchControls::RenderConfigSettings(CUIRect MainView)
 	Row.VSplitMid(&Label, &Button);
 	Ui()->DoLabel(&Label, Localize("Direct touch input while ingame"), FONTSIZE, TEXTALIGN_ML);
 
-	const char *apIngameTouchModes[(int)CTouchControls::EDirectTouchIngameMode::NUM_STATES] = {Localize("Disabled", "Direct touch input"), Localize("Active action", "Direct touch input"), Localize("Aim", "Direct touch input"), Localize("Fire", "Direct touch input"), Localize("Hook", "Direct touch input")};
+	const char *apIngameTouchModes[(int)CTouchControls::EDirectTouchIngameMode::NUM_STATES] = {
+		Localize("Disabled", "Direct touch input"),
+		Localize("Active action", "Direct touch input"),
+		Localize("Aim", "Direct touch input"),
+		Localize("Relative aim", "Direct touch input"),
+		Localize("Fire", "Direct touch input"),
+		Localize("Hook", "Direct touch input"),
+	};
 	const CTouchControls::EDirectTouchIngameMode OldDirectTouchIngame = GameClient()->m_TouchControls.DirectTouchIngame();
 	static CUi::SDropDownState s_DirectTouchIngameDropDownState;
 	static CScrollRegion s_DirectTouchIngameDropDownScrollRegion;
@@ -1008,9 +1013,7 @@ void CMenusIngameTouchControls::RenderPreviewSettings(CUIRect MainView)
 	static CScrollRegion s_VirtualVisibilityScrollRegion;
 	CScrollRegionParams ScrollParam;
 	ScrollParam.m_ScrollUnit = 90.0f;
-	vec2 ScrollOffset(0.0f, 0.0f);
-	s_VirtualVisibilityScrollRegion.Begin(&MainView, &ScrollOffset, &ScrollParam);
-	MainView.y += ScrollOffset.y;
+	s_VirtualVisibilityScrollRegion.Begin(&MainView, &ScrollParam);
 	std::array<bool, (size_t)CTouchControls::EButtonVisibility::NUM_VISIBILITIES> aVirtualVisibilities = GameClient()->m_TouchControls.VirtualVisibilities();
 	const char **ppVisibilities = VisibilityNames();
 	for(unsigned Current = 0; Current < (unsigned)CTouchControls::EButtonVisibility::NUM_VISIBILITIES; ++Current)
@@ -1265,9 +1268,9 @@ void CMenusIngameTouchControls::CacheAllSettingsFromTarget(CTouchControls::CTouc
 			auto *pTargetBehavior = static_cast<CTouchControls::CBindToggleTouchButtonBehavior *>(pTargetButton->m_pBehavior.get());
 			auto TargetCommands = pTargetBehavior->GetCommand();
 			// Can't use resize here :(
-			while(m_vBehaviorElements.size() > maximum<size_t>(TargetCommands.size(), 2))
+			while(m_vBehaviorElements.size() > std::max(TargetCommands.size(), (size_t)2))
 				m_vBehaviorElements.pop_back();
-			while(m_vBehaviorElements.size() < maximum<size_t>(TargetCommands.size(), 2))
+			while(m_vBehaviorElements.size() < std::max(TargetCommands.size(), (size_t)2))
 				m_vBehaviorElements.emplace_back(std::make_unique<CBehaviorElements>());
 			for(unsigned CommandIndex = 0; CommandIndex < TargetCommands.size(); CommandIndex++)
 			{
@@ -1475,11 +1478,12 @@ std::string CMenusIngameTouchControls::CBehaviorElements::ParseLabel(const char 
 	char aError[256];
 	char aJsonString[1048];
 	str_format(aJsonString, sizeof(aJsonString), "\"%s\"", pLabel);
-	json_value *pJsonLabel = json_parse_ex(&JsonSettings, aJsonString, str_length(aJsonString), aError);
-	if(pJsonLabel == nullptr || pJsonLabel->type != json_string)
+	json_value *pJsonLabel = JsonParseEx(&JsonSettings, aJsonString, str_length(aJsonString), aError);
+	if(pJsonLabel == nullptr)
 	{
 		return pLabel;
 	}
+	dbg_assert(pJsonLabel->type == json_string, "Parsed label must be string");
 	std::string ParsedString = pJsonLabel->u.string.ptr;
 	json_value_free(pJsonLabel);
 	return ParsedString;
@@ -1543,7 +1547,7 @@ const char **CMenusIngameTouchControls::VisibilityNames() const
 
 const char **CMenusIngameTouchControls::PredefinedNames() const
 {
-	static const char *s_apPredefined[10];
+	static const char *s_apPredefined[11];
 	s_apPredefined[0] = Localize("Ingame Menu", "Predefined touch button behaviors");
 	s_apPredefined[1] = Localize("Extra Menu", "Predefined touch button behaviors");
 	s_apPredefined[2] = Localize("Emoticon", "Predefined touch button behaviors");
@@ -1552,8 +1556,9 @@ const char **CMenusIngameTouchControls::PredefinedNames() const
 	s_apPredefined[5] = Localize("Use Action", "Predefined touch button behaviors");
 	s_apPredefined[6] = Localize("Joystick Action", "Predefined touch button behaviors");
 	s_apPredefined[7] = Localize("Joystick Aim", "Predefined touch button behaviors");
-	s_apPredefined[8] = Localize("Joystick Fire", "Predefined touch button behaviors");
-	s_apPredefined[9] = Localize("Joystick Hook", "Predefined touch button behaviors");
+	s_apPredefined[8] = Localize("Joystick Relative Aim", "Predefined touch button behaviors");
+	s_apPredefined[9] = Localize("Joystick Fire", "Predefined touch button behaviors");
+	s_apPredefined[10] = Localize("Joystick Hook", "Predefined touch button behaviors");
 	static_assert(std::size(s_apPredefined) == std::size(BEHAVIOR_FACTORIES_EDITOR), "Insufficient predefined names");
 	return s_apPredefined;
 }
@@ -1582,11 +1587,12 @@ const char *CMenusIngameTouchControls::HelpMessageForPredefinedType(EPredefinedT
 	case EPredefinedType::USE_ACTION: return Localize("Uses the active action with the current aiming position."); break;
 	case EPredefinedType::JOYSTICK_ACTION: return Localize("Virtual joystick which uses the active action."); break;
 	case EPredefinedType::JOYSTICK_AIM: return Localize("Virtual joystick which only aims without using an action."); break;
+	case EPredefinedType::JOYSTICK_AIM_RELATIVE: return Localize("Virtual joystick which only aims and moves the mouse pointer relatively."); break;
 	case EPredefinedType::JOYSTICK_FIRE: return Localize("Virtual joystick which always uses fire."); break;
 	case EPredefinedType::JOYSTICK_HOOK: return Localize("Virtual joystick which always uses hook."); break;
 	default: dbg_assert_failed("Unknown behavior %d", (int)m_PredefinedBehaviorType);
 	}
-	static_assert((int)EPredefinedType::NUM_PREDEFINEDTYPES == 10, "Insufficient help messages");
+	static_assert((int)EPredefinedType::NUM_PREDEFINEDTYPES == 11, "Insufficient help messages");
 }
 
 const char *CMenusIngameTouchControls::HelpMessageForVisibilityType(CTouchControls::EButtonVisibility Type) const

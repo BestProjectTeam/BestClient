@@ -21,6 +21,8 @@
 #define CONNECTLINK_DOUBLE_SLASH "ddnet://"
 #define CONNECTLINK_NO_SLASH "ddnet:"
 
+class CSnapshot;
+class CSnapshotBuffer;
 class IMap;
 struct SWarning;
 
@@ -150,40 +152,64 @@ public:
 	// There are 50 ticks per second, by default we only send snapshot on
 	// every second tick.
 
-	// Tick of the second to most recently received snapshot (usually 2
-	// less than `GameTick`).
+	/**
+	 * Tick of the second to most recently received snapshot (usually 2
+	 * less than `GameTick`).
+	 */
 	int PrevGameTick(int Conn) const { return m_aPrevGameTick[Conn]; }
-	// Tick of most recently received snapshot.
+	/**
+	 * Tick of most recently received snapshot.
+	 */
 	int GameTick(int Conn) const { return m_aCurGameTick[Conn]; }
-	// The tick we should predict to. Comes from a magic black box called
-	// "smooth time".
+	/**
+	 * The tick we should predict to. Comes from a magic black box called
+	 * "smooth time".
+	 */
 	int PredGameTick(int Conn) const { return m_aPredTick[Conn]; }
-	// Linear interpolation parameter between `PrevGameTick` (0) and
-	// `GameTick` (1). Can be outside the interval [0, 1].
+	/**
+	 * Linear interpolation parameter between `PrevGameTick` (0) and
+	 * `GameTick` (1). Can be outside the interval [0, 1].
+	 */
 	float IntraGameTick(int Conn) const { return m_aGameIntraTick[Conn]; }
-	// Linear interpolation parameter between `PredGameTick - 1` (0) and
-	// `PredGameTick` (1). Can be outside the interval [0, 1].
+	/**
+	 * Linear interpolation parameter between `PredGameTick - 1` (0) and
+	 * `PredGameTick` (1). Can be outside the interval [0, 1].
+	 */
 	float PredIntraGameTick(int Conn) const { return m_aPredIntraTick[Conn]; }
-	// (Fractional) ticks since `PrevGameTick`.
+	/**
+	 * (Fractional) ticks since `PrevGameTick`.
+	 */
 	float IntraGameTickSincePrev(int Conn) const { return m_aGameIntraTickSincePrev[Conn]; }
-	// Time in seconds since the second to most recently received snapshot.
+	/**
+	 * Time in seconds since the second to most recently received snapshot.
+	 */
 	float GameTickTime(int Conn) const { return m_aGameTickTime[Conn]; }
-	// 50
+	/**
+	 * 50
+	 */
 	int GameTickSpeed() const { return SERVER_TICK_SPEED; }
 
 	// Other time.
 
-	// Time in seconds since a map was joined, or `GlobalTime` if that
-	// hasn't happened yet.
+	/**
+	 * Time in seconds since a map was joined, or `GlobalTime` if that
+	 * hasn't happened yet.
+	 */
 	float LocalTime() const { return m_LocalTime; }
-	// Time in seconds since the client was opened.
+	/**
+	 * Time in seconds since the client was opened.
+	 */
 	float GlobalTime() const { return m_GlobalTime; }
 
 	// Render statistics.
 
-	// Duration in seconds of the previous render cycle.
+	/**
+	 * Duration in seconds of the previous render cycle.
+	 */
 	float RenderFrameTime() const { return m_RenderFrameTime; }
-	// Exponentially weighted average of frame times.
+	/**
+	 * Exponentially weighted average of frame times.
+	 */
 	float FrameTimeAverage() const { return m_FrameTimeAverage; }
 
 	// actions
@@ -245,7 +271,7 @@ public:
 	virtual const std::vector<std::string> &MaplistEntries() const = 0;
 
 	// server info
-	virtual void GetServerInfo(class CServerInfo *pServerInfo) const = 0;
+	virtual const class CServerInfo &ServerInfo() const = 0;
 	virtual bool ServerCapAnyPlayerFlag() const = 0;
 
 	virtual int GetPredictionTime() = 0;
@@ -387,7 +413,7 @@ public:
 	virtual void OnRconLine(const char *pLine) = 0;
 	virtual void OnInit() = 0;
 	virtual void InvalidateSnapshot() = 0;
-	virtual void OnNewSnapshot() = 0;
+	virtual void OnNewSnapshot(bool DummySwapped) = 0;
 	virtual void OnEnterGame() = 0;
 	virtual void OnShutdown() = 0;
 	virtual void OnRender() = 0;
@@ -428,9 +454,9 @@ public:
 	virtual int ClientVersion7() const = 0;
 
 	virtual void ApplySkin7InfoFromSnapObj(const protocol7::CNetObj_De_ClientInfo *pObj, int ClientId) = 0;
-	virtual int OnDemoRecSnap7(class CSnapshot *pFrom, class CSnapshot *pTo, int Conn) = 0;
-	virtual int TranslateSnap(class CSnapshot *pSnapDstSix, class CSnapshot *pSnapSrcSeven, int Conn, bool Dummy) = 0;
-	virtual void ProcessDemoSnapshot(class CSnapshot *pSnap) = 0;
+	virtual int OnDemoRecSnap7(CSnapshot *pFrom, CSnapshotBuffer *pTo, int Conn) = 0;
+	virtual int TranslateSnap(CSnapshotBuffer *pSnapDstSix, CSnapshot *pSnapSrcSeven, int Conn, bool Dummy) = 0;
+	virtual void ProcessDemoSnapshot(CSnapshot *pSnap) = 0;
 
 	virtual void InitializeLanguage() = 0;
 

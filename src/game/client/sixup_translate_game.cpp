@@ -1,4 +1,5 @@
-#include <base/system.h>
+#include <base/dbg.h>
+#include <base/str.h>
 
 #include <engine/shared/protocol7.h>
 
@@ -26,7 +27,9 @@ static int GetStrTeam7(int Team, bool Teamplay)
 			return STR_TEAM_BLUE;
 	}
 	else if(Team == 0)
+	{
 		return STR_TEAM_GAME;
+	}
 
 	return STR_TEAM_SPECTATORS;
 }
@@ -221,6 +224,12 @@ void *CGameClient::TranslateGameMsg(int *pMsgId, CUnpacker *pUnpacker, int Conn)
 	else if(*pMsgId == protocol7::NETMSGTYPE_SV_TEAM)
 	{
 		protocol7::CNetMsg_Sv_Team *pMsg7 = (protocol7::CNetMsg_Sv_Team *)pRawMsg;
+
+		if(pMsg7->m_ClientId < 0 || pMsg7->m_ClientId >= MAX_CLIENTS)
+		{
+			dbg_msg("sixup", "Sv_Team got invalid ClientId: %d", pMsg7->m_ClientId);
+			return nullptr;
+		}
 
 		if(Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		{
@@ -538,6 +547,10 @@ void *CGameClient::TranslateGameMsg(int *pMsgId, CUnpacker *pUnpacker, int Conn)
 		str_copy(Client.m_aName, pMsg7->m_pName);
 		str_copy(Client.m_aClan, pMsg7->m_pClan);
 		Client.m_Country = pMsg7->m_Country;
+		if(!in_range(Client.m_Country, CountryCode::MINIMUM, CountryCode::MAXIMUM))
+		{
+			Client.m_Country = CountryCode::DEFAULT;
+		}
 		ApplySkin7InfoFromGameMsg(pMsg7, pMsg7->m_ClientId, Conn);
 		if(m_pClient->m_TranslationContext.m_aLocalClientId[Conn] == -1)
 			return nullptr;
@@ -584,7 +597,8 @@ void *CGameClient::TranslateGameMsg(int *pMsgId, CUnpacker *pUnpacker, int Conn)
 		protocol7::CNetMsg_Sv_KillMsg *pMsg7 = (protocol7::CNetMsg_Sv_KillMsg *)pRawMsg;
 		::CNetMsg_Sv_KillMsg *pMsg = (::CNetMsg_Sv_KillMsg *)s_aRawMsg;
 
-		pMsg->m_Killer = pMsg7->m_Killer;
+		// 0.7 uses -1 and -2 for deaths without a killer, 0.6 uses the victim itself
+		pMsg->m_Killer = pMsg7->m_Killer < 0 ? pMsg7->m_Victim : pMsg7->m_Killer;
 		pMsg->m_Victim = pMsg7->m_Victim;
 		pMsg->m_Weapon = pMsg7->m_Weapon;
 		pMsg->m_ModeSpecial = pMsg7->m_ModeSpecial;

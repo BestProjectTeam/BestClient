@@ -2,8 +2,9 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include "map.h"
 
+#include <base/fs.h>
 #include <base/log.h>
-#include <base/system.h>
+#include <base/str.h>
 
 #include <engine/storage.h>
 
@@ -51,9 +52,9 @@ int CMap::GetItemSize(int Index)
 	return m_DataFile.GetItemSize(Index);
 }
 
-void *CMap::GetItem(int Index, int *pType, int *pId)
+void *CMap::GetItem(int Index, int *pType, int *pId, CUuid *pUuid)
 {
-	return m_DataFile.GetItem(Index, pType, pId);
+	return m_DataFile.GetItem(Index, pType, pId, pUuid);
 }
 
 void CMap::GetType(int Type, int *pStart, int *pNum)
@@ -84,11 +85,8 @@ bool CMap::Load(const char *pFullName, IStorage *pStorage, const char *pPath, in
 	if(!NewDataFile.Open(pFullName, pStorage, pPath, StorageType))
 		return false;
 
-	// Check version
-	const CMapItemVersion *pItem = (CMapItemVersion *)NewDataFile.FindItem(MAPITEMTYPE_VERSION, 0);
-	if(pItem == nullptr || pItem->m_Version != 1)
+	if(!ValidateMapVersion(NewDataFile))
 	{
-		log_error("map/load", "Error: map version not supported.");
 		NewDataFile.Close();
 		return false;
 	}
@@ -195,11 +193,34 @@ void CMap::ExtractTiles(CTile *pDest, size_t DestSize, const CTile *pSrc, size_t
 			pDest[DestIndex].m_Index = pSrc[SrcIndex].m_Index;
 			pDest[DestIndex].m_Flags = pSrc[SrcIndex].m_Flags;
 			pDest[DestIndex].m_Skip = 0;
-			pDest[DestIndex].m_Reserved = 0;
+			pDest[DestIndex].m_MustBe0 = 0;
 			DestIndex++;
 		}
 		SrcIndex++;
 	}
+}
+
+bool CMap::ValidateMapVersion(CDataFileReader &NewDataFile)
+{
+	const int VersionItemIndex = NewDataFile.FindItemIndex(MAPITEMTYPE_VERSION, 0);
+	if(VersionItemIndex < 0)
+	{
+		log_error("map/load", "Map version item is missing.");
+		return false;
+	}
+	const size_t VersionItemSize = NewDataFile.GetItemSize(VersionItemIndex);
+	if(VersionItemSize < sizeof(CMapItemVersion))
+	{
+		log_error("map/load", "Map version item is truncated (size %" PRIzu ").", VersionItemSize);
+		return false;
+	}
+	const CMapItemVersion *pVersionItem = static_cast<CMapItemVersion *>(NewDataFile.GetItem(VersionItemIndex));
+	if(pVersionItem->m_Version != 1)
+	{
+		log_error("map/load", "Map version %d is not supported.", pVersionItem->m_Version);
+		return false;
+	}
+	return true;
 }
 
 extern std::unique_ptr<IMap> CreateMap()

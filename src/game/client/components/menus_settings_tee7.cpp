@@ -1,34 +1,27 @@
 /* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include "menus.h"
-#include "skins7.h"
 
-#include <base/math.h>
-#include <base/system.h>
+#include <base/dbg.h>
+#include <base/str.h>
 
 #include <engine/font_icons.h>
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
-#include <engine/shared/linereader.h>
-#include <engine/shared/localization.h>
-#include <engine/shared/protocol7.h>
 #include <engine/storage.h>
 #include <engine/textrender.h>
-#include <engine/updater.h>
-
-#include <generated/protocol.h>
 
 #include <game/client/animstate.h>
-#include <game/client/components/chat.h>
-#include <game/client/components/menu_background.h>
+#include <game/client/components/console.h>
+#include <game/client/components/skins7.h>
 #include <game/client/components/sounds.h>
+#include <game/client/components/tooltips.h>
 #include <game/client/gameclient.h>
-#include <game/client/skin.h>
 #include <game/client/ui.h>
 #include <game/client/ui_listbox.h>
-#include <game/client/ui_scrollregion.h>
 #include <game/localization.h>
 
+#include <algorithm>
 #include <vector>
 
 void CMenus::RenderSettingsTee7(CUIRect MainView)
@@ -130,7 +123,7 @@ void CMenus::RenderSettingsTee7(CUIRect MainView)
 		const vec2 DeltaPosition = Ui()->MousePos() - TeePosition;
 		const float Distance = length(DeltaPosition);
 		const float InteractionDistance = 20.0f;
-		const vec2 TeeDirection = Distance < InteractionDistance ? normalize(vec2(DeltaPosition.x, maximum(DeltaPosition.y, 0.5f))) : normalize(DeltaPosition);
+		const vec2 TeeDirection = Distance < InteractionDistance ? normalize(vec2(DeltaPosition.x, std::max(DeltaPosition.y, 0.5f))) : normalize(DeltaPosition);
 		const int TeeEmote = Distance < InteractionDistance ? EMOTE_HAPPY : EMOTE_NORMAL;
 		RenderTools()->RenderTee(CAnimState::GetIdle(), &OwnSkinInfo, TeeEmote, TeeDirection, TeePosition);
 		static char s_InteractiveTeeButtonId;

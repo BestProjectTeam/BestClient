@@ -169,6 +169,8 @@ enum
 	TILE_THROUGH_ALL = 66,
 	TILE_THROUGH_DIR = 67,
 	TILE_TUNE = 68,
+	TILE_TUNELOCK = 69,
+	TILE_TUNELOCK_RESET = 70,
 	TILE_OLDLASER = 71,
 	TILE_NPC = 72,
 	TILE_EHOOK = 73,
@@ -353,7 +355,7 @@ public:
 	unsigned char m_Index;
 	unsigned char m_Flags;
 	unsigned char m_Skip;
-	unsigned char m_Reserved;
+	unsigned char m_MustBe0;
 };
 
 class CMapItemInfo
@@ -661,7 +663,7 @@ class CDoorTile
 public:
 	unsigned char m_Index;
 	unsigned char m_Flags;
-	int m_Number;
+	unsigned char m_Number;
 };
 
 class CTuneTile

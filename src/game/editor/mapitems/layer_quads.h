@@ -10,7 +10,7 @@ public:
 	CLayerQuads(const CLayerQuads &Other);
 	~CLayerQuads() override;
 
-	void Render(bool QuadPicker = false) override;
+	void Render(const CEditorMap *pRenderMap) override;
 	CQuad *NewQuad(int x, int y, int Width, int Height);
 	int SwapQuads(int Index0, int Index1);
 
@@ -22,6 +22,9 @@ public:
 	void BrushRotate(float Amount) override;
 
 	CUi::EPopupMenuFunctionResult RenderProperties(CUIRect *pToolbox) override;
+
+	bool IsEnvelopeUsed(int EnvelopeIndex) const override;
+	bool IsImageUsed(int ImageIndex) const override;
 
 	void ModifyImageIndex(const FIndexModifyFunction &IndexModifyFunction) override;
 	void ModifyEnvelopeIndex(const FIndexModifyFunction &IndexModifyFunction) override;

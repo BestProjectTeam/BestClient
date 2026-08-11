@@ -49,7 +49,7 @@ protected:
 		switch(Direction)
 		{
 		case EShiftDirection::LEFT:
-			ShiftBy = minimum(ShiftBy, m_Width);
+			ShiftBy = std::min(ShiftBy, m_Width);
 			for(int y = 0; y < m_Height; ++y)
 			{
 				if(ShiftBy < m_Width)
@@ -58,7 +58,7 @@ protected:
 			}
 			break;
 		case EShiftDirection::RIGHT:
-			ShiftBy = minimum(ShiftBy, m_Width);
+			ShiftBy = std::min(ShiftBy, m_Width);
 			for(int y = 0; y < m_Height; ++y)
 			{
 				if(ShiftBy < m_Width)
@@ -67,7 +67,7 @@ protected:
 			}
 			break;
 		case EShiftDirection::UP:
-			ShiftBy = minimum(ShiftBy, m_Height);
+			ShiftBy = std::min(ShiftBy, m_Height);
 			for(int y = ShiftBy; y < m_Height; ++y)
 			{
 				mem_copy(&pTiles[(y - ShiftBy) * m_Width], &pTiles[y * m_Width], m_Width * sizeof(T));
@@ -78,7 +78,7 @@ protected:
 			}
 			break;
 		case EShiftDirection::DOWN:
-			ShiftBy = minimum(ShiftBy, m_Height);
+			ShiftBy = std::min(ShiftBy, m_Height);
 			for(int y = m_Height - ShiftBy - 1; y >= 0; --y)
 			{
 				mem_copy(&pTiles[(y + ShiftBy) * m_Width], &pTiles[y * m_Width], m_Width * sizeof(T));
@@ -120,7 +120,7 @@ public:
 	virtual void Shift(EShiftDirection Direction);
 
 	void MakePalette() const;
-	void Render(bool Tileset = false) override;
+	void Render(const CEditorMap *pRenderMap) override;
 
 	int ConvertX(float x) const;
 	int ConvertY(float y) const;
@@ -161,6 +161,9 @@ public:
 	};
 	static CUi::EPopupMenuFunctionResult RenderCommonProperties(SCommonPropState &State, CEditorMap *pEditorMap, CUIRect *pToolbox, std::vector<std::shared_ptr<CLayerTiles>> &vpLayers, std::vector<int> &vLayerIndices);
 
+	bool IsEnvelopeUsed(int EnvelopeIndex) const override;
+	bool IsImageUsed(int ImageIndex) const override;
+
 	void ModifyImageIndex(const FIndexModifyFunction &IndexModifyFunction) override;
 	void ModifyEnvelopeIndex(const FIndexModifyFunction &IndexModifyFunction) override;
 
@@ -188,10 +191,10 @@ public:
 
 	int m_FillGameTile = -1;
 	bool m_LiveGameTiles = false;
-	int m_AutoMapperConfig;
-	int m_AutoMapperReference;
+	int m_AutomapperConfig;
+	int m_AutomapperReference;
 	int m_Seed;
-	bool m_AutoAutoMap;
+	bool m_AutoAutomapper;
 	bool m_HasTele;
 	bool m_HasSpeedup;
 	bool m_HasFront;
@@ -199,6 +202,7 @@ public:
 	bool m_HasTune;
 	char m_aFilename[IO_MAX_PATH_LENGTH];
 	bool m_KnownTextModeLayer = false;
+	bool m_RenderOverlays = true;
 
 	EditorTileStateChangeHistory<STileStateChange> m_TilesHistory;
 	virtual void ClearHistory() { m_TilesHistory.clear(); }
@@ -210,7 +214,7 @@ protected:
 
 	void ShowPreventUnusedTilesWarning();
 
-	friend class CAutoMapper;
+	friend class CAutomapper;
 };
 
 #endif

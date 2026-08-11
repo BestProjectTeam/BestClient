@@ -46,6 +46,7 @@ class CGraphicsBackend_Threaded : public IGraphicsBackend
 {
 private:
 	TTranslateFunc m_TranslateFunc;
+	std::string m_FatalError;
 	SGfxWarningContainer m_Warning;
 
 public:
@@ -94,6 +95,7 @@ private:
 #endif
 
 public:
+	const char *GetFatalError() const override;
 	bool GetWarning(std::vector<std::string> &WarningStrings) override;
 };
 
@@ -248,8 +250,8 @@ public:
 
 	void Minimize() override;
 	void SetWindowParams(int FullscreenMode, bool IsBorderless) override;
-	bool SetWindowScreen(int Index, bool MoveToCenter) override;
-	bool UpdateDisplayMode(int Index) override;
+	bool SetWindowScreen(int Index, bool MoveToCenter, ivec2 *pDesktopSize) override;
+	bool UpdateDisplayMode(int Index, ivec2 *pDesktopSize) override;
 	int GetWindowScreen() override;
 	int WindowActive() override;
 	int WindowOpen() override;

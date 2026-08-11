@@ -1,6 +1,9 @@
 #include "teehistorian.h"
 
-#include <base/system.h>
+#include <base/dbg.h>
+#include <base/mem.h>
+#include <base/str.h>
+#include <base/time.h>
 
 #include <engine/shared/config.h>
 #include <engine/shared/json.h>
@@ -24,7 +27,7 @@ private:
 static const char TEEHISTORIAN_NAME[] = "teehistorian@ddnet.tw";
 static const CUuid TEEHISTORIAN_UUID = CalculateUuid(TEEHISTORIAN_NAME);
 static const char TEEHISTORIAN_VERSION[] = "2";
-static const char TEEHISTORIAN_VERSION_MINOR[] = "19";
+static const char TEEHISTORIAN_VERSION_MINOR[] = "22";
 
 #define UUID(id, name) static const CUuid UUID_##id = CalculateUuid(name);
 #include <engine/shared/teehistorian_ex_chunks.h>
@@ -206,7 +209,7 @@ void CTeeHistorian::WriteHeader(const CGameInfo *pGameInfo)
 		Write(aJson, str_length(aJson)); \
 		First = false; \
 	}
-#include <game/tuning.h>
+#include <game/tuning_params.h>
 #undef MACRO_TUNING_PARAM
 
 	str_copy(aJson, "},\"uuids\":[");

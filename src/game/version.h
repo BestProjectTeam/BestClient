@@ -7,16 +7,18 @@
 
 // ddnet
 #define GAME_NAME "DDNet"
-#define DDNET_VERSION_NUMBER 19080
+#define DDNET_VERSION_NUMBER 20000
 extern const char *GIT_SHORTREV_HASH;
 #ifndef GAME_RELEASE_VERSION_INTERNAL
-#define GAME_RELEASE_VERSION_INTERNAL 19.8
+#define GAME_RELEASE_VERSION_INTERNAL 20.0
 #endif
 #define GAME_RELEASE_VERSION STRINGIFY(GAME_RELEASE_VERSION_INTERNAL)
 
 // teeworlds
 #define CLIENT_VERSION7 0x0705
-#define GAME_VERSION "0.6.4, " GAME_RELEASE_VERSION
+// For compatibility with DDNet client 15.8 and older we need to include the prefix `0.6` in the version string
+// because this was used for a "Compatible version" filter in the server browser.
+#define GAME_VERSION "0.6, " GAME_RELEASE_VERSION
 #define GAME_NETVERSION "0.6 626fce9a778df4d4"
 #define GAME_NETVERSION7 "0.7 802f1be60a05665f"
 

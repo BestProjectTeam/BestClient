@@ -376,7 +376,7 @@ MACRO_CONFIG_INT(ClFocusModeHideChat, p_focus_mode_hide_chat, 0, 0, 1, CFGFLAG_C
 MACRO_CONFIG_INT(ClFocusModeHideScoreboard, p_focus_mode_hide_scoreboard, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide scoreboard in focus mode")
 
 // Client Indicator
-MACRO_CONFIG_INT(BcClientIndicator, bc_client_indicator, 1, 1, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Client indicator is always enabled")
+MACRO_CONFIG_INT(BcClientIndicator, bc_client_indicator, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Client indicator is always enabled")
 MACRO_CONFIG_INT(BcClientIndicatorVersions, bc_client_indicator_versions, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show versions tab in BestClient server browser panel")
 MACRO_CONFIG_INT(DbgClientIndicator, dbg_client_indicator, 0, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Debug logging for BestClient indicator (1=verbose, 2=dump all UDP packet bytes sent/received)")
 MACRO_CONFIG_INT(BcNameplateClientIndicatorOffsetX, bc_nameplate_client_indicator_offset_x, 0, -400, 400, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Horizontal offset for the client indicator in nameplates")

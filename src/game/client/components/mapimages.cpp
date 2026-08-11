@@ -2,8 +2,12 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include "mapimages.h"
 
+#include <base/dbg.h>
 #include <base/log.h>
+#include <base/math.h>
+#include <base/mem.h>
 
+#include <engine/gfx/image_manipulation.h>
 #include <engine/graphics.h>
 #include <engine/map.h>
 #include <engine/storage.h>
@@ -21,6 +25,7 @@ CMapImages::CMapImages()
 	m_Count = 0;
 	std::fill(std::begin(m_aEntitiesIsLoaded), std::end(m_aEntitiesIsLoaded), false);
 	m_SpeedupArrowIsLoaded = false;
+	m_TuneColorsIsLoaded = false;
 
 	str_copy(m_aEntitiesPath, "editor/entities_clear");
 
@@ -95,8 +100,6 @@ void CMapImages::OnMapLoadImpl(class CLayers *pLayers, IMap *pMap)
 		}
 	}
 
-	const int TextureLoadFlag = Graphics()->Uses2DTextureArrays() ? IGraphics::TEXLOAD_TO_2D_ARRAY_TEXTURE : IGraphics::TEXLOAD_TO_3D_TEXTURE;
-
 	// load new textures
 	bool ShowWarning = false;
 	for(int i = 0; i < m_Count; i++)
@@ -107,7 +110,7 @@ void CMapImages::OnMapLoadImpl(class CLayers *pLayers, IMap *pMap)
 			continue;
 		}
 
-		const int LoadFlag = (((aTextureUsedByTileOrQuadLayerFlag[i] & 1) != 0) ? TextureLoadFlag : 0) | (((aTextureUsedByTileOrQuadLayerFlag[i] & 2) != 0) ? 0 : (Graphics()->HasTextureArraysSupport() ? IGraphics::TEXLOAD_NO_2D_TEXTURE : 0));
+		const int LoadFlag = (((aTextureUsedByTileOrQuadLayerFlag[i] & 1) != 0) ? Graphics()->TextureLoadFlags() : 0) | (((aTextureUsedByTileOrQuadLayerFlag[i] & 2) != 0) ? 0 : (Graphics()->HasTextureArraysSupport() ? IGraphics::TEXLOAD_NO_2D_TEXTURE : 0));
 		const CMapItemImage_v2 *pImg = static_cast<const CMapItemImage_v2 *>(pMap->GetItem(Start + i));
 
 		const char *pName = pMap->GetDataString(pImg->m_ImageName);
@@ -148,6 +151,13 @@ void CMapImages::OnMapLoadImpl(class CLayers *pLayers, IMap *pMap)
 		}
 		else
 		{
+			if(pImg->m_Width <= 0 || pImg->m_Height <= 0)
+			{
+				log_error("mapimages", "Failed to load map image %d '%s': invalid image dimensions.", i, pName);
+				ShowWarning = true;
+				continue;
+			}
+
 			CImageInfo ImageInfo;
 			ImageInfo.m_Width = pImg->m_Width;
 			ImageInfo.m_Height = pImg->m_Height;
@@ -260,7 +270,7 @@ IGraphics::CTextureHandle CMapImages::GetEntities(EMapImageEntityLayerType Entit
 
 		int TextureLoadFlag = 0;
 		if(Graphics()->HasTextureArraysSupport())
-			TextureLoadFlag = (Graphics()->Uses2DTextureArrays() ? IGraphics::TEXLOAD_TO_2D_ARRAY_TEXTURE : IGraphics::TEXLOAD_TO_3D_TEXTURE) | IGraphics::TEXLOAD_NO_2D_TEXTURE;
+			TextureLoadFlag = Graphics()->TextureLoadFlags() | IGraphics::TEXLOAD_NO_2D_TEXTURE;
 
 		CImageInfo ImgInfo;
 		char aPath[IO_MAX_PATH_LENGTH];
@@ -287,7 +297,15 @@ IGraphics::CTextureHandle CMapImages::GetEntities(EMapImageEntityLayerType Entit
 			BuildImageInfo.m_Width = ImgInfo.m_Width;
 			BuildImageInfo.m_Height = ImgInfo.m_Height;
 			BuildImageInfo.m_Format = ImgInfo.m_Format;
-			BuildImageInfo.m_pData = static_cast<uint8_t *>(malloc(BuildImageInfo.DataSize()));
+			BuildImageInfo.Allocate(); // allocate already transparent image
+
+			// convert tune tile to gray
+			const size_t CopyWidth = ImgInfo.m_Width / 16;
+			const size_t CopyHeight = ImgInfo.m_Height / 16;
+			const size_t TuneTileX = static_cast<size_t>(TILE_TUNE % 16) * CopyWidth;
+			const size_t TuneTileY = static_cast<size_t>(TILE_TUNE / 16) * CopyHeight;
+
+			ConvertToGrayscaleRect(ImgInfo, TuneTileX, TuneTileY, CopyWidth, CopyHeight);
 
 			// build game layer
 			for(int LayerType = 0; LayerType < MAP_IMAGE_ENTITY_LAYER_TYPE_COUNT; ++LayerType)
@@ -307,8 +325,6 @@ IGraphics::CTextureHandle CMapImages::GetEntities(EMapImageEntityLayerType Entit
 							TileIndex = 8;
 						}
 
-						const size_t CopyWidth = ImgInfo.m_Width / 16;
-						const size_t CopyHeight = ImgInfo.m_Height / 16;
 						const size_t OffsetX = (size_t)(TileIndex % 16) * CopyWidth;
 						const size_t OffsetY = (size_t)(TileIndex / 16) * CopyHeight;
 						BuildImageInfo.CopyRectFrom(ImgInfo, OffsetX, OffsetY, CopyWidth, CopyHeight, OffsetX, OffsetY);
@@ -319,6 +335,28 @@ IGraphics::CTextureHandle CMapImages::GetEntities(EMapImageEntityLayerType Entit
 			}
 
 			BuildImageInfo.Free();
+
+			// build tune map from the tune tile
+			if(Graphics()->HasTextureArraysSupport())
+			{
+				CImageInfo TuneMapInfo;
+				TuneMapInfo.m_Width = ImgInfo.m_Width;
+				TuneMapInfo.m_Height = ImgInfo.m_Height;
+				TuneMapInfo.m_Format = ImgInfo.m_Format;
+				TuneMapInfo.AllocateFillZero();
+
+				for(int TileIndex = 1; TileIndex < 256; ++TileIndex)
+				{
+					size_t StartX = CopyWidth * (TileIndex % 16);
+					size_t StartY = CopyHeight * (TileIndex / 16);
+					TuneMapInfo.CopyRectFrom(ImgInfo, TuneTileX, TuneTileY, CopyWidth, CopyHeight, StartX, StartY);
+					float Hue = std::fmod((TileIndex - 1) * normalized_golden_angle, 1.0f);
+					ColorizeWithHueRect(TuneMapInfo, Hue, 0.75f, StartX, StartY, CopyWidth, CopyHeight);
+				}
+				m_TuneColorMapTexture = Graphics()->LoadTextureRawMove(TuneMapInfo, TextureLoadFlag);
+				m_TuneColorsIsLoaded = true;
+			}
+
 			ImgInfo.Free();
 		}
 	}
@@ -330,11 +368,29 @@ IGraphics::CTextureHandle CMapImages::GetSpeedupArrow()
 {
 	if(!m_SpeedupArrowIsLoaded)
 	{
-		int TextureLoadFlag = (Graphics()->Uses2DTextureArrays() ? IGraphics::TEXLOAD_TO_2D_ARRAY_TEXTURE : IGraphics::TEXLOAD_TO_3D_TEXTURE) | IGraphics::TEXLOAD_NO_2D_TEXTURE;
+		int TextureLoadFlag = Graphics()->TextureLoadFlags() | IGraphics::TEXLOAD_NO_2D_TEXTURE;
 		m_SpeedupArrowTexture = Graphics()->LoadTexture("editor/speed_arrow_array.png", IStorage::TYPE_ALL, TextureLoadFlag);
 		m_SpeedupArrowIsLoaded = true;
 	}
 	return m_SpeedupArrowTexture;
+}
+
+IGraphics::CTextureHandle CMapImages::GetTuneColors()
+{
+	if(Graphics()->HasTextureArraysSupport())
+	{
+		if(!m_TuneColorsIsLoaded)
+		{
+			// load entities, this also loads the tune map
+			GetEntities(EMapImageEntityLayerType::MAP_IMAGE_ENTITY_LAYER_TYPE_ALL_EXCEPT_SWITCH);
+			dbg_assert(m_TuneColorsIsLoaded, "Entities did not load the tune color map");
+		}
+		return m_TuneColorMapTexture;
+	}
+	else
+	{
+		return GetEntities(MAP_IMAGE_ENTITY_LAYER_TYPE_ALL_EXCEPT_SWITCH);
+	}
 }
 
 IGraphics::CTextureHandle CMapImages::GetOverlayBottom()
@@ -413,13 +469,13 @@ IGraphics::CTextureHandle CMapImages::UploadEntityLayerText(int TextureSize, int
 	TextImage.m_Width = 1024;
 	TextImage.m_Height = 1024;
 	TextImage.m_Format = CImageInfo::FORMAT_RGBA;
-	TextImage.m_pData = static_cast<uint8_t *>(calloc(TextImage.DataSize(), sizeof(uint8_t)));
+	TextImage.AllocateFillZero();
 
 	UpdateEntityLayerText(TextImage, TextureSize, MaxWidth, YOffset, 0);
 	UpdateEntityLayerText(TextImage, TextureSize, MaxWidth, YOffset, 1);
 	UpdateEntityLayerText(TextImage, TextureSize, MaxWidth, YOffset, 2, 255);
 
-	const int TextureLoadFlag = (Graphics()->Uses2DTextureArrays() ? IGraphics::TEXLOAD_TO_2D_ARRAY_TEXTURE : IGraphics::TEXLOAD_TO_3D_TEXTURE) | IGraphics::TEXLOAD_NO_2D_TEXTURE;
+	const int TextureLoadFlag = Graphics()->TextureLoadFlags() | IGraphics::TEXLOAD_NO_2D_TEXTURE;
 	return Graphics()->LoadTextureRawMove(TextImage, TextureLoadFlag);
 }
 

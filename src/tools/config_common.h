@@ -1,6 +1,8 @@
 #include <base/dbg.h>
+#include <base/fs.h>
 #include <base/logger.h>
 #include <base/os.h>
+#include <base/str.h>
 
 #include <engine/storage.h>
 
@@ -27,7 +29,7 @@ inline void ProcessItem(const char *pItemName, IStorage *pStorage)
 		return;
 	}
 
-	str_copy(aConfig, pItemName, sizeof(aConfig));
+	str_copy(aConfig, pItemName);
 	aConfig[Len - sizeof(".map")] = 0;
 	str_append(aConfig, ".cfg");
 	dbg_msg("config_common", "processing '%s'", pItemName);

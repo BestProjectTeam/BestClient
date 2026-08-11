@@ -16,7 +16,7 @@
 #include <engine/graphics.h>
 #include <engine/shared/bestclient_indicator_protocol.h>
 #include <engine/shared/config.h>
-#include <engine/shared/http.h>
+#include <engine/http.h>
 #include <engine/shared/json.h>
 #include <engine/storage.h>
 #include <engine/textrender.h>

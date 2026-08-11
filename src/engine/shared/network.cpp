@@ -6,7 +6,12 @@
 #include "huffman.h"
 
 #include <base/bytes.h>
-#include <base/system.h>
+#include <base/dbg.h>
+#include <base/io.h>
+#include <base/mem.h>
+#include <base/net.h>
+#include <base/secure.h>
+#include <base/time.h>
 #include <base/types.h>
 
 #include <engine/shared/protocolglue.h>
@@ -260,6 +265,11 @@ std::optional<int> CNetBase::UnpackPacketFlags(unsigned char *pBuffer, int Size)
 // TODO: rename this function
 int CNetBase::UnpackPacket(unsigned char *pBuffer, int Size, CNetPacketConstruct *pPacket, bool &Sixup, SECURITY_TOKEN *pSecurityToken, SECURITY_TOKEN *pResponseToken)
 {
+	if(pResponseToken != nullptr)
+	{
+		*pResponseToken = NET_SECURITY_TOKEN_UNKNOWN;
+	}
+
 	std::optional<int> Flags = UnpackPacketFlags(pBuffer, Size);
 	if(!Flags)
 	{
@@ -341,6 +351,10 @@ int CNetBase::UnpackPacket(unsigned char *pBuffer, int Size, CNetPacketConstruct
 		}
 		else
 		{
+			if(pPacket->m_DataSize > (int)sizeof(pPacket->m_aChunkData))
+			{
+				return -1;
+			}
 			mem_copy(pPacket->m_aChunkData, &pBuffer[DataStart], pPacket->m_DataSize);
 		}
 	}
@@ -458,7 +472,9 @@ void CNetBase::OpenLog(IOHANDLE DataLogSent, IOHANDLE DataLogRecv)
 		dbg_msg("network", "logging sent packages");
 	}
 	else
+	{
 		dbg_msg("network", "failed to start logging sent packages");
+	}
 
 	if(DataLogRecv)
 	{
@@ -466,7 +482,9 @@ void CNetBase::OpenLog(IOHANDLE DataLogSent, IOHANDLE DataLogRecv)
 		dbg_msg("network", "logging recv packages");
 	}
 	else
+	{
 		dbg_msg("network", "failed to start logging recv packages");
+	}
 }
 
 void CNetBase::CloseLog()

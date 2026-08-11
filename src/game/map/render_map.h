@@ -6,7 +6,9 @@
 #include <game/map/render_interfaces.h>
 #include <game/mapitems.h>
 
+#include <array>
 #include <chrono>
+#include <memory>
 
 enum
 {
@@ -51,6 +53,19 @@ public:
 class IGraphics;
 class ITextRender;
 
+class CTuneColorMapper
+{
+public:
+	CTuneColorMapper();
+	uint8_t TuneNumberToColorIndex(uint8_t TuneNumber);
+	ColorRGBA TuneColorIndexToColor(uint8_t TuneColorIndex) const;
+	void Reset();
+
+private:
+	std::array<uint8_t, 255> m_aTuneNumberToColorIndex;
+	uint8_t m_NextTuneNumberIndex = 0;
+};
+
 class CRenderMap
 {
 	IGraphics *m_pGraphics;
@@ -63,7 +78,7 @@ public:
 
 	// map render methods (render_map.cpp)
 	static void RenderEvalEnvelope(const IEnvelopePointAccess *pPoints, std::chrono::nanoseconds TimeNanos, ColorRGBA &Result, size_t Channels);
-	void ForceRenderQuads(CQuad *pQuads, int NumQuads, int Flags, IEnvelopeEval *pEnvEval, float Alpha = 1.0f);
+	void ForceRenderQuads(CQuad *pQuads, int NumQuads, int Flags, const IEnvelopeEval *pEnvEval, float Alpha = 1.0f);
 	void RenderTile(int x, int y, unsigned char Index, float Scale, ColorRGBA Color);
 	void RenderTilemap(CTile *pTiles, int w, int h, float Scale, ColorRGBA Color, int RenderFlags);
 
@@ -78,7 +93,7 @@ public:
 	void RenderTuneOverlay(CTuneTile *pTune, int w, int h, float Scale, int OverlayRenderFlags, float Alpha = 1.0f);
 	void RenderTelemap(CTeleTile *pTele, int w, int h, float Scale, ColorRGBA Color, int RenderFlags);
 	void RenderSwitchmap(CSwitchTile *pSwitch, int w, int h, float Scale, ColorRGBA Color, int RenderFlags);
-	void RenderTunemap(CTuneTile *pTune, int w, int h, float Scale, ColorRGBA Color, int RenderFlags);
+	void RenderTunemap(CTuneTile *pTune, int w, int h, float Scale, ColorRGBA Color, int RenderFlags, CTuneColorMapper *pTuneColorMapper);
 
 	void RenderDebugClip(float ClipX, float ClipY, float ClipW, float ClipH, ColorRGBA Color, float Zoom, const char *pLabel);
 };

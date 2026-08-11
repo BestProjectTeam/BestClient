@@ -1,16 +1,20 @@
 #include "base/rust.h"
 #include "engine/console.h"
 
-extern "C" {
-void cxxbridge1$RustVersionPrint(::IConsole const &console) noexcept;
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wdollar-in-identifier-extension"
+#endif // __clang__
 
-void cxxbridge1$RustVersionRegister(::IConsole &console) noexcept;
+extern "C" {
+void cxxbridge1$194$RustVersionPrint(::IConsole const &console) noexcept;
+
+void cxxbridge1$194$RustVersionRegister(::IConsole &console) noexcept;
 } // extern "C"
 
 void RustVersionPrint(::IConsole const &console) noexcept {
-  cxxbridge1$RustVersionPrint(console);
+  cxxbridge1$194$RustVersionPrint(console);
 }
 
 void RustVersionRegister(::IConsole &console) noexcept {
-  cxxbridge1$RustVersionRegister(console);
+  cxxbridge1$194$RustVersionRegister(console);
 }

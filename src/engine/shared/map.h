@@ -25,7 +25,7 @@ public:
 	int NumData() const override;
 
 	int GetItemSize(int Index) override;
-	void *GetItem(int Index, int *pType = nullptr, int *pId = nullptr) override;
+	void *GetItem(int Index, int *pType = nullptr, int *pId = nullptr, CUuid *pUuid = nullptr) override;
 	void GetType(int Type, int *pStart, int *pNum) override;
 	int FindItemIndex(int Type, int Id) override;
 	void *FindItem(int Type, int Id) override;
@@ -45,6 +45,9 @@ public:
 	int Size() const override;
 
 	static void ExtractTiles(class CTile *pDest, size_t DestSize, const class CTile *pSrc, size_t SrcSize);
+
+private:
+	static bool ValidateMapVersion(CDataFileReader &NewDataFile);
 };
 
 #endif

@@ -1247,7 +1247,7 @@ void CHudEditor::RenderOverlay(vec2 MousePos)
 {
 	const float Width = HudWidth();
 	const float Height = HudHeight();
-	Graphics()->MapScreen(0.0f, 0.0f, Width, Height);
+	Graphics()->MapScreen(CScreenRect(vec2(0.0f, 0.0f), vec2(Width, Height)));
 	Graphics()->TextureClear();
 	Graphics()->DrawRect(0.0f, 0.0f, Width, Height, ColorRGBA(0.0f, 0.0f, 0.0f, 0.38f), IGraphics::CORNER_ALL, 0.0f);
 
@@ -1321,7 +1321,7 @@ void CHudEditor::RenderOverlay(vec2 MousePos)
 		if(m_PopupClosePhase <= 0.001f)
 			m_PopupClosing = false;
 	}
-	Graphics()->MapScreen(0.0f, 0.0f, Width, Height);
+	Graphics()->MapScreen(CScreenRect(vec2(0.0f, 0.0f), vec2(Width, Height)));
 	RenderTools()->RenderCursor(MousePos, 12.0f);
 }
 

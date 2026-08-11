@@ -18,7 +18,7 @@ public:
 	void OnInit(CEditor *pEditor) override;
 	void OnReset() override;
 	void OnUpdate() override;
-	void OnRender(CUIRect View) override;
+	void OnRender(CUIRect View);
 
 	void NotifyTileEdit(int GroupIdx, int LayerIdx, int TileX, int TileY, uint8_t Index, uint8_t Flags);
 	// Tele layer

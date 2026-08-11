@@ -4,7 +4,7 @@
 #include <base/log.h>
 #include <base/mem.h>
 
-#include <engine/shared/http.h>
+#include <engine/http.h>
 #include <engine/shared/json.h>
 
 #include <game/client/components/media_decoder.h>
@@ -210,7 +210,7 @@ void CCherryGifs::StartListRequest(bool Reset)
 	char aAuthHeader[64];
 	str_format(aAuthHeader, sizeof(aAuthHeader), "Bearer %s", CHERRYGIFS_API_KEY);
 
-	std::shared_ptr<CHttpRequest> pGet = HttpGet(aUrl);
+	std::shared_ptr<IHttpRequest> pGet = HttpGet(aUrl);
 	pGet->HeaderString("Authorization", aAuthHeader);
 	pGet->Timeout(CTimeout{8000, 0, 500, 10});
 	pGet->MaxResponseSize(CHERRYGIFS_LIST_MAX_RESPONSE_BYTES);
@@ -373,7 +373,7 @@ void CCherryGifs::RequestThumbnail(int Index)
 	SThumbnailJob Job;
 	str_copy(Job.m_aGifId, Gif.m_aId, sizeof(Job.m_aGifId));
 
-	std::shared_ptr<CHttpRequest> pGet = HttpGet(Gif.m_aPreviewUrl);
+	std::shared_ptr<IHttpRequest> pGet = HttpGet(Gif.m_aPreviewUrl);
 	pGet->Timeout(CTimeout{8000, 0, 4096, 8});
 	pGet->MaxResponseSize(8 * 1024 * 1024);
 	pGet->FailOnErrorStatus(false);

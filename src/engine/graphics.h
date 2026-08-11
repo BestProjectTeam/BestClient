@@ -77,8 +77,6 @@ public:
 	int m_CanvasWidth, m_CanvasHeight;
 	int m_WindowWidth, m_WindowHeight;
 	int m_RefreshRate;
-	int m_Red, m_Green, m_Blue;
-	uint32_t m_Format;
 };
 
 typedef vec2 GL_SPoint;
@@ -184,6 +182,60 @@ typedef std::function<bool(uint32_t &Width, uint32_t &Height, CImageInfo::EImage
 
 struct CDataSprite;
 
+class CScreenRect
+{
+public:
+	CScreenRect(float Left, float Top, float Width, float Height) :
+		m_TopLeft(Left, Top), m_BottomRight(Left + Width, Top + Height) {}
+
+	CScreenRect(const vec2 &TopLeft, const vec2 &BottomRight) :
+		m_TopLeft(TopLeft), m_BottomRight(BottomRight) {}
+
+	CScreenRect Move(const vec2 &Position) const
+	{
+		CScreenRect Rect(*this);
+		Rect.m_TopLeft += Position;
+		Rect.m_BottomRight += Position;
+		return Rect;
+	}
+
+	constexpr vec2 Size() const
+	{
+		return m_BottomRight - m_TopLeft;
+	}
+
+	constexpr float Width() const
+	{
+		return m_BottomRight.x - m_TopLeft.x;
+	}
+
+	constexpr float Height() const
+	{
+		return m_BottomRight.y - m_TopLeft.y;
+	}
+
+	constexpr bool Inside(const vec2 &Position) const
+	{
+		return !(!in_range(Position.x, m_TopLeft.x, m_BottomRight.x) || !in_range(Position.y, m_TopLeft.y, m_BottomRight.y));
+	}
+
+	void Expand(float Width, float Height)
+	{
+		m_TopLeft.x -= Width;
+		m_BottomRight.x += Width;
+		m_TopLeft.y -= Height;
+		m_BottomRight.y += Height;
+	}
+
+	void Expand(float Size)
+	{
+		Expand(Size, Size);
+	}
+
+	vec2 m_TopLeft;
+	vec2 m_BottomRight;
+};
+
 class IGraphics : public IInterface
 {
 	MACRO_INTERFACE("graphics")
@@ -194,6 +246,7 @@ protected:
 	float m_ScreenHiDPIScale;
 	float m_ScreenAspectOverride = 0.0f;
 	bool m_ScreenAspectOverrideEnabled = true;
+	ivec2 m_DesktopSize;
 
 public:
 	enum
@@ -222,6 +275,7 @@ public:
 
 	int ScreenWidth() const { return m_ScreenWidth; }
 	int ScreenHeight() const { return m_ScreenHeight; }
+	vec2 ScreenSize() const { return vec2(m_ScreenWidth, m_ScreenHeight); }
 	float ScreenAspect() const { return m_ScreenAspectOverrideEnabled && m_ScreenAspectOverride > 0.0f ? m_ScreenAspectOverride : (float)ScreenWidth() / (float)ScreenHeight(); }
 	float ScreenHiDPIScale() const { return m_ScreenHiDPIScale; }
 	int WindowWidth() const { return m_ScreenWidth / m_ScreenHiDPIScale; }
@@ -260,15 +314,16 @@ public:
 	virtual void ClipEnable(int x, int y, int w, int h) = 0;
 	virtual void ClipDisable() = 0;
 
-	virtual void MapScreen(float TopLeftX, float TopLeftY, float BottomRightX, float BottomRightY) = 0;
+	virtual void MapScreen(const CScreenRect &ScreenRect) = 0;
 
 	// helper functions
 	void CalcScreenParams(float Aspect, float Zoom, float *pWidth, float *pHeight) const;
-	void MapScreenToWorld(float CenterX, float CenterY, float ParallaxX, float ParallaxY,
-		float ParallaxZoom, float OffsetX, float OffsetY, float Aspect, float Zoom, float *pPoints) const;
+	CScreenRect MapScreenToWorld(float CenterX, float CenterY, float ParallaxX, float ParallaxY,
+		float ParallaxZoom, float OffsetX, float OffsetY, float Aspect, float Zoom) const;
 	void MapScreenToInterface(float CenterX, float CenterY, float Zoom = 1.0f);
+	void MapScreenToSize(float Width, float Height);
 
-	virtual void GetScreen(float *pTopLeftX, float *pTopLeftY, float *pBottomRightX, float *pBottomRightY) const = 0;
+	virtual CScreenRect GetScreen() const = 0;
 
 	// TODO: These should perhaps not be virtuals
 	virtual void BlendNone() = 0;
@@ -302,7 +357,7 @@ public:
 	virtual bool UnloadTextTextures(CTextureHandle &TextTexture, CTextureHandle &TextOutlineTexture) = 0;
 	virtual bool UpdateTextTexture(CTextureHandle TextureId, int x, int y, size_t Width, size_t Height, uint8_t *pData, bool IsMovedPointer) = 0;
 
-	virtual CTextureHandle LoadSpriteTexture(const CImageInfo &FromImageInfo, const struct CDataSprite *pSprite) = 0;
+	virtual CTextureHandle LoadSpriteTexture(const CImageInfo &FromImageInfo, const std::optional<CImageInfo> &FallbackImageInfo, const struct CDataSprite *pSprite) = 0;
 
 	virtual bool IsImageSubFullyTransparent(const CImageInfo &FromImageInfo, int x, int y, int w, int h) = 0;
 	virtual bool IsSpriteTextureFullyTransparent(const CImageInfo &FromImageInfo, const struct CDataSprite *pSprite) = 0;
@@ -342,11 +397,13 @@ public:
 	virtual bool IsTextBufferingEnabled() = 0;
 	virtual bool IsQuadContainerBufferingEnabled() = 0;
 	virtual bool Uses2DTextureArrays() = 0;
+	virtual int TextureLoadFlags() = 0;
 	virtual bool HasTextureArraysSupport() = 0;
 
 	virtual const char *GetVendorString() = 0;
 	virtual const char *GetVersionString() = 0;
 	virtual const char *GetRendererString() = 0;
+	virtual const char *GetFatalError() const = 0;
 
 	class CLineItem
 	{

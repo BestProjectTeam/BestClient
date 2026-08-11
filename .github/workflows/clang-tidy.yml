@@ -4,9 +4,12 @@ on:
   push:
     branches-ignore:
       - gh-readonly-queue/**
-      - master
   pull_request:
   merge_group:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' && !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   check-clang-tidy:
@@ -23,7 +26,25 @@ jobs:
     - name: Prepare Linux
       run: |
         sudo apt-get update -y
-        sudo apt-get install pkg-config cmake ninja-build libfreetype6-dev libnotify-dev libsdl2-dev libsqlite3-dev libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev libx264-dev libglew-dev -y
+        sudo apt-get install \
+          cmake \
+          libavcodec-dev \
+          libavformat-dev \
+          libavutil-dev \
+          libfreetype6-dev \
+          libglew-dev \
+          libmariadb-dev \
+          libminiupnpc-dev \
+          libnotify-dev \
+          libsdl2-dev \
+          libsqlite3-dev \
+          libswresample-dev \
+          libswscale-dev \
+          libwebsockets-dev \
+          libx264-dev \
+          ninja-build \
+          pkg-config \
+          -y
 
     - name: Install Vulkan SDK
       uses: humbletim/install-vulkan-sdk@v1.2
@@ -33,6 +54,12 @@ jobs:
 
     - name: Cache Rust dependencies
       uses: Swatinem/rust-cache@v2
+      with:
+          cache-bin: false # WORKAROUND(https://github.com/Swatinem/rust-cache/issues/341)
+          workspaces: |
+              src/mastersrv
+              src/masterping
+              ./
 
     - name: Determine changed C/C++ source files
       id: changed-cpp
@@ -76,6 +103,16 @@ jobs:
           -DCMAKE_C_COMPILER=clang-20 \
           -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
           -DCMAKE_BUILD_TYPE=Debug \
+          -DANTIBOT=ON \
+          -DAUTOUPDATE=ON \
+          -DDISCORD=ON \
+          -DDOWNLOAD_GTEST=ON \
+          -DMYSQL=ON \
+          -DSTEAM=ON \
+          -DUPNP=ON \
+          -DVIDEORECORDER=ON \
+          -DVULKAN=ON \
+          -DWEBSOCKETS=ON \
           -Werror=dev
         mkdir -p clang-tidy/src/generated
         python3 datasrc/compile.py client_content_header > clang-tidy/src/generated/client_data.h
@@ -85,4 +122,5 @@ jobs:
         python3 -m datasrc.seven.compile client_content_header > clang-tidy/src/generated/client_data7.h
         python3 datasrc/crosscompile.py map_header > clang-tidy/src/generated/protocolglue.h
         cmake --build clang-tidy --target generate_protocol
-        xargs -a changed_cpp_files.txt -d '\n' clang-tidy-20 -p clang-tidy -warnings-as-errors='*' -header-filter='^$' -checks='-bugprone-exception-escape,-misc-redundant-expression,-misc-use-internal-linkage,-modernize-loop-convert,-readability-avoid-unconditional-preprocessor-if,-readability-container-contains,-readability-make-member-function-const,-readability-redundant-casting,-readability-static-definition-in-anonymous-namespace,-readability-use-anyofallof'
+        xargs -a changed_cpp_files.txt -d '\n' clang-tidy-20 -p clang-tidy -warnings-as-errors='*' -header-filter='^
+ -checks='-bugprone-exception-escape,-misc-redundant-expression,-misc-use-internal-linkage,-modernize-loop-convert,-readability-avoid-unconditional-preprocessor-if,-readability-container-contains,-readability-make-member-function-const,-readability-redundant-casting,-readability-static-definition-in-anonymous-namespace,-readability-use-anyofallof'

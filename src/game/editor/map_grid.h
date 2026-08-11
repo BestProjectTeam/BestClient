@@ -8,8 +8,16 @@
 class CMapGrid : public CEditorComponent
 {
 public:
-	void OnReset() override;
-	void OnRender(CUIRect View) override;
+	class CState
+	{
+	public:
+		bool m_GridActive;
+		int m_GridFactor;
+
+		void Reset();
+	};
+
+	void Render();
 
 	void SnapToGrid(vec2 &Position) const;
 	int GridLineDistance() const;
@@ -27,9 +35,6 @@ public:
 	void DoSettingsPopup(vec2 Position);
 
 private:
-	bool m_GridActive;
-	int m_GridFactor;
-
 	SPopupMenuId m_PopupGridSettingsId;
 	static CUi::EPopupMenuFunctionResult PopupGridSettings(void *pContext, CUIRect View, bool Active);
 };

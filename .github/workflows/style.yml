@@ -4,9 +4,12 @@ on:
   push:
     branches-ignore:
       - gh-readonly-queue/**
-      - master
   pull_request:
   merge_group:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' && !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   check-style:
@@ -25,7 +28,7 @@ jobs:
         sudo apt-get update -y
         sudo apt-get install ddnet-tools shellcheck tidy pkg-config cmake graphviz ninja-build python3-clang -y
         rustup default stable
-        pip3 install ruff
+        pip3 install "ruff>=0.16,<0.17"
 
     - name: Cache dependencies
       id: cache-dependencies
@@ -53,6 +56,12 @@ jobs:
 
     - name: Cache Rust dependencies
       uses: Swatinem/rust-cache@v2
+      with:
+          cache-bin: false # WORKAROUND(https://github.com/Swatinem/rust-cache/issues/341)
+          workspaces: |
+              src/mastersrv
+              src/masterping
+              ./
 
     - name: Determine changed C/C++ files
       id: changed-cpp
@@ -114,12 +123,16 @@ jobs:
     - name: Check Python code style (ruff format)
       run: |
         ruff --version
-        ruff format
+        ruff format --check
 
     - name: Check Python code style (ruff check)
       run: |
         ruff --version
         ruff check
+
+    - name: Check Emscripten HTML style
+      run: |
+        tidy -errors other/emscripten/index.html
 
     - name: Check header guards
       run: scripts/check_header_guards.py
@@ -129,6 +142,9 @@ jobs:
 
     - name: Check standard header includes
       run: scripts/check_standard_headers.py
+
+    - name: Check alphabetical ordering
+      run: scripts/tidy_alphabetical.py --dry-run
 
     - name: Check absolute includes
       run: "! grep --exclude-dir rust-bridge -rE '^#include \"(antibot|base|engine|game|steam|test)/' src/"

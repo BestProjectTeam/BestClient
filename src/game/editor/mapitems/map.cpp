@@ -1,6 +1,6 @@
 #include "map.h"
 
-#include <base/system.h>
+#include <base/str.h>
 
 #include <game/editor/editor.h>
 #include <game/editor/editor_actions.h>
@@ -30,25 +30,29 @@ void CEditorMap::CMapInfo::Copy(const CMapInfo &Source)
 	str_copy(m_aLicense, Source.m_aLicense);
 }
 
-void CEditorMap::OnModify()
-{
-	m_Modified = true;
-	m_ModifiedAuto = true;
-	m_LastModifiedTime = Editor()->Client()->GlobalTime();
-}
-
-void CEditorMap::ResetModifiedState()
-{
-	m_Modified = false;
-	m_ModifiedAuto = false;
-	m_LastModifiedTime = -1.0f;
-	m_LastSaveTime = Editor()->Client()->GlobalTime();
-}
-
-void CEditorMap::Clean()
+CEditorMap::CEditorMap(CEditor *pEditor) :
+	m_EditorHistory(this),
+	m_ServerSettingsHistory(this),
+	m_EnvelopeEditorHistory(this),
+	m_QuadTracker(this),
+	m_EnvOpTracker(this),
+	m_LayerGroupPropTracker(this),
+	m_LayerPropTracker(this),
+	m_LayerTilesCommonPropTracker(this),
+	m_LayerTilesPropTracker(this),
+	m_LayerQuadPropTracker(this),
+	m_LayerSoundsPropTracker(this),
+	m_SoundSourceOperationTracker(this),
+	m_SoundSourcePropTracker(this),
+	m_SoundSourceRectShapePropTracker(this),
+	m_SoundSourceCircleShapePropTracker(this),
+	m_EnvelopeEvaluator(this),
+	m_MapSettingsCommandContext(pEditor->m_MapSettingsBackend.NewContextWithInput()),
+	m_pEditor(pEditor)
 {
 	m_aFilename[0] = '\0';
 	m_ValidSaveFilename = false;
+	m_CloseOnSave = false;
 	ResetModifiedState();
 
 	m_vpGroups.clear();
@@ -89,11 +93,33 @@ void CEditorMap::Clean()
 	m_SelectedSoundSource = -1;
 
 	m_ShiftBy = 1;
+	m_ShowDetail = true;
+	m_PreviewZoom = false;
 
-	m_QuadKnife.m_Active = false;
-	m_QuadKnife.m_Count = 0;
-	m_QuadKnife.m_SelectedQuadIndex = -1;
-	std::fill(std::begin(m_QuadKnife.m_aPoints), std::end(m_QuadKnife.m_aPoints), vec2(0.0f, 0.0f));
+	m_MapViewState.Reset(Editor());
+	m_MapGridState.Reset();
+	m_ProofModeState.Reset();
+	m_QuadKnifeState.Reset();
+	m_EnvelopeEditorState.Reset(Editor());
+	m_MapSettingsCommandContext.Reset();
+	m_FontTyperState.Reset();
+}
+
+void CEditorMap::OnModify()
+{
+	m_Modified = true;
+	m_ModifiedAuto = true;
+	m_LastModifiedTime = Editor()->Client()->GlobalTime();
+	// Stop scheduled map closing if the map was modified
+	m_CloseOnSave = false;
+}
+
+void CEditorMap::ResetModifiedState()
+{
+	m_Modified = false;
+	m_ModifiedAuto = false;
+	m_LastModifiedTime = -1.0f;
+	m_LastSaveTime = Editor()->Client()->GlobalTime();
 }
 
 void CEditorMap::CreateDefault()
@@ -335,14 +361,14 @@ void CEditorMap::SelectLayer(int LayerIndex, int GroupIndex)
 void CEditorMap::AddSelectedLayer(int LayerIndex)
 {
 	m_vSelectedLayers.push_back(LayerIndex);
-	m_QuadKnife.m_Active = false;
+	m_QuadKnifeState.Reset();
 }
 
 void CEditorMap::SelectNextLayer()
 {
 	int CurrentLayer = 0;
 	for(const auto &Selected : m_vSelectedLayers)
-		CurrentLayer = maximum(Selected, CurrentLayer);
+		CurrentLayer = std::max(Selected, CurrentLayer);
 	SelectLayer(CurrentLayer);
 
 	if(m_vSelectedLayers[0] < (int)m_vpGroups[m_SelectedGroup]->m_vpLayers.size() - 1)
@@ -366,7 +392,7 @@ void CEditorMap::SelectPreviousLayer()
 {
 	int CurrentLayer = std::numeric_limits<int>::max();
 	for(const auto &Selected : m_vSelectedLayers)
-		CurrentLayer = minimum(Selected, CurrentLayer);
+		CurrentLayer = std::min(Selected, CurrentLayer);
 	SelectLayer(CurrentLayer);
 
 	if(m_vSelectedLayers[0] > 0)
@@ -524,27 +550,10 @@ void CEditorMap::DeselectQuadPoints()
 void CEditorMap::DeleteSelectedQuads()
 {
 	std::shared_ptr<CLayerQuads> pLayer = std::static_pointer_cast<CLayerQuads>(SelectedLayerType(0, LAYERTYPE_QUADS));
-	if(!pLayer)
+	if(!pLayer || m_vSelectedQuads.empty() || m_vSelectedLayers.size() != 1)
 		return;
 
-	std::vector<int> vSelectedQuads(m_vSelectedQuads);
-	std::vector<CQuad> vDeletedQuads;
-	vDeletedQuads.reserve(m_vSelectedQuads.size());
-	for(int i = 0; i < (int)m_vSelectedQuads.size(); ++i)
-	{
-		auto const &Quad = pLayer->m_vQuads[m_vSelectedQuads[i]];
-		vDeletedQuads.push_back(Quad);
-
-		pLayer->m_vQuads.erase(pLayer->m_vQuads.begin() + m_vSelectedQuads[i]);
-		for(int j = i + 1; j < (int)m_vSelectedQuads.size(); ++j)
-			if(m_vSelectedQuads[j] > m_vSelectedQuads[i])
-				m_vSelectedQuads[j]--;
-
-		m_vSelectedQuads.erase(m_vSelectedQuads.begin() + i);
-		i--;
-	}
-
-	m_EditorHistory.RecordAction(std::make_shared<CEditorActionDeleteQuad>(this, m_SelectedGroup, m_vSelectedLayers[0], vSelectedQuads, vDeletedQuads));
+	m_EditorHistory.Execute(std::make_shared<CEditorActionDeleteQuad>(this, m_SelectedGroup, m_vSelectedLayers[0]));
 }
 
 std::shared_ptr<CEnvelope> CEditorMap::NewEnvelope(CEnvelope::EType Type)
@@ -687,35 +696,9 @@ bool CEditorMap::IsEnvelopeUsed(int EnvelopeIndex) const
 	{
 		for(const auto &pLayer : pGroup->m_vpLayers)
 		{
-			if(pLayer->m_Type == LAYERTYPE_QUADS)
+			if(pLayer->IsEnvelopeUsed(EnvelopeIndex))
 			{
-				std::shared_ptr<CLayerQuads> pLayerQuads = std::static_pointer_cast<CLayerQuads>(pLayer);
-				for(const auto &Quad : pLayerQuads->m_vQuads)
-				{
-					if(Quad.m_PosEnv == EnvelopeIndex || Quad.m_ColorEnv == EnvelopeIndex)
-					{
-						return true;
-					}
-				}
-			}
-			else if(pLayer->m_Type == LAYERTYPE_SOUNDS)
-			{
-				std::shared_ptr<CLayerSounds> pLayerSounds = std::static_pointer_cast<CLayerSounds>(pLayer);
-				for(const auto &Source : pLayerSounds->m_vSources)
-				{
-					if(Source.m_PosEnv == EnvelopeIndex || Source.m_SoundEnv == EnvelopeIndex)
-					{
-						return true;
-					}
-				}
-			}
-			else if(pLayer->m_Type == LAYERTYPE_TILES)
-			{
-				std::shared_ptr<CLayerTiles> pLayerTiles = std::static_pointer_cast<CLayerTiles>(pLayer);
-				if(pLayerTiles->m_ColorEnv == EnvelopeIndex)
-				{
-					return true;
-				}
+				return true;
 			}
 		}
 	}
@@ -956,21 +939,9 @@ bool CEditorMap::IsImageUsed(int ImageIndex) const
 	{
 		for(const auto &pLayer : pGroup->m_vpLayers)
 		{
-			if(pLayer->m_Type == LAYERTYPE_TILES)
+			if(pLayer->IsImageUsed(ImageIndex))
 			{
-				const std::shared_ptr<CLayerTiles> pTiles = std::static_pointer_cast<CLayerTiles>(pLayer);
-				if(pTiles->m_Image == ImageIndex)
-				{
-					return true;
-				}
-			}
-			else if(pLayer->m_Type == LAYERTYPE_QUADS)
-			{
-				const std::shared_ptr<CLayerQuads> pQuads = std::static_pointer_cast<CLayerQuads>(pLayer);
-				if(pQuads->m_Image == ImageIndex)
-				{
-					return true;
-				}
+				return true;
 			}
 		}
 	}
@@ -1050,13 +1021,9 @@ bool CEditorMap::IsSoundUsed(int SoundIndex) const
 	{
 		for(const auto &pLayer : pGroup->m_vpLayers)
 		{
-			if(pLayer->m_Type == LAYERTYPE_SOUNDS)
+			if(pLayer->IsSoundUsed(SoundIndex))
 			{
-				std::shared_ptr<CLayerSounds> pSounds = std::static_pointer_cast<CLayerSounds>(pLayer);
-				if(pSounds->m_Sound == SoundIndex)
-				{
-					return true;
-				}
+				return true;
 			}
 		}
 	}
@@ -1090,8 +1057,7 @@ void CEditorMap::PlaceBorderTiles()
 		}
 	}
 
-	int GameGroupIndex = std::find(m_vpGroups.begin(), m_vpGroups.end(), m_pGameGroup) - m_vpGroups.begin();
-	m_EditorHistory.RecordAction(std::make_shared<CEditorBrushDrawAction>(this, GameGroupIndex), "Tool 'Make borders'");
+	m_EditorHistory.RecordAction(std::make_shared<CEditorBrushDrawAction>(this, m_SelectedGroup), "Tool 'Make borders'");
 
 	OnModify();
 }

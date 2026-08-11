@@ -459,11 +459,9 @@ void CAdminPanel::RenderPlayerActions(CUIRect View)
 	static vec2 s_ActionScrollOffset(0.0f, 0.0f);
 	CScrollRegionParams ScrollParams;
 	ScrollParams.m_ScrollUnit = 30.0f;
-	ScrollParams.m_ScrollbarWidth = 14.0f;
+	ScrollParams.m_ScrollbarThickness = 14.0f;
 	ScrollParams.m_ScrollbarMargin = 3.0f;
-	s_ActionScroll.Begin(&View, &s_ActionScrollOffset, &ScrollParams);
-	View.y += s_ActionScrollOffset.y;
-
+	s_ActionScroll.Begin(&View, &ScrollParams);
 	auto DoActionPopupButton = [&](CButtonContainer &Button, const SActionSpec &Spec, CUIRect ButtonRect) {
 		const bool Enabled = IsActionEnabled(Spec, m_SelectedClientId);
 		if(s_ActionScroll.AddRect(ButtonRect))
@@ -963,13 +961,11 @@ void CAdminPanel::RenderLogs(CUIRect View)
 
 	CScrollRegionParams ScrollParams;
 	ScrollParams.m_ScrollUnit = 40.0f;
-	ScrollParams.m_ScrollbarWidth = 14.0f;
+	ScrollParams.m_ScrollbarThickness = 14.0f;
 	ScrollParams.m_ScrollbarMargin = 3.0f;
 	ScrollParams.m_ClipBgColor = ColorRGBA(0.0f, 0.0f, 0.0f, 0.18f);
-	s_LogScroll.Begin(&View, &s_LogScrollOffset, &ScrollParams);
+	s_LogScroll.Begin(&View, &ScrollParams);
 	const float ClipH = View.h;
-	View.y += s_LogScrollOffset.y;
-
 	const float LineHeight = 15.0f;
 	const int NumLines = (int)m_RconLogLines.size();
 	int LineIndex = 0;
@@ -1007,7 +1003,7 @@ void CAdminPanel::RenderLogs(CUIRect View)
 	else
 	{
 		// Match CScrollRegion::AddRect content height for the last real line (no phantom spacer).
-		const float ContentH = NumLines * LineHeight + CScrollRegion::HEIGHT_MAGIC_FIX;
+		const float ContentH = NumLines * LineHeight + 1.0f;
 		const float MaxScroll = maximum(0.0f, ContentH - ClipH);
 		m_LogStickToBottom = (-s_LogScrollOffset.y) >= MaxScroll - 2.0f;
 	}

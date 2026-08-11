@@ -1,15 +1,20 @@
 /* (c) DDNet developers. See licence.txt in the root of the distribution for more information. */
 /* If you are missing that file, acquire a complete release at teeworlds.com.  */
 
+#include <base/dbg.h>
+#include <base/fs.h>
+#include <base/io.h>
 #include <base/logger.h>
 #include <base/os.h>
-#include <base/system.h>
+#include <base/str.h>
 
 #include <engine/gfx/image_loader.h>
 #include <engine/shared/datafile.h>
 #include <engine/storage.h>
 
 #include <game/mapitems.h>
+
+#include <utility>
 
 /*
 	Usage: map_replace_image <source map filepath> <dest map filepath> <current image name> <new image filepath>
@@ -23,8 +28,7 @@ static CDataFileReader g_DataReader;
 static int g_NewNameId = -1;
 static char g_aNewName[128];
 static int g_NewDataId = -1;
-static int g_NewDataSize = 0;
-static void *g_pNewData = nullptr;
+static CImageInfo g_NewImageInfo;
 
 static void *ReplaceImageItem(int Index, CMapItemImage *pImgItem, const char *pImgName, const char *pImgFile, CMapItemImage *pNewImgItem)
 {
@@ -42,7 +46,7 @@ static void *ReplaceImageItem(int Index, CMapItemImage *pImgItem, const char *pI
 
 	CImageInfo ImgInfo;
 	int PngliteIncompatible;
-	if(!CImageLoader::LoadPng(io_open(pImgName, IOFLAG_READ), pImgName, ImgInfo, PngliteIncompatible))
+	if(!CImageLoader::LoadPng(io_open(pImgFile, IOFLAG_READ), pImgFile, ImgInfo, PngliteIncompatible))
 		return nullptr;
 
 	if(ImgInfo.m_Format != CImageInfo::FORMAT_RGBA)
@@ -58,10 +62,9 @@ static void *ReplaceImageItem(int Index, CMapItemImage *pImgItem, const char *pI
 	pNewImgItem->m_Height = ImgInfo.m_Height;
 
 	g_NewNameId = pImgItem->m_ImageName;
-	IStorage::StripPathAndExtension(pImgFile, g_aNewName, sizeof(g_aNewName));
+	fs_split_file_extension(fs_filename(pImgFile), g_aNewName, sizeof(g_aNewName));
 	g_NewDataId = pImgItem->m_ImageData;
-	g_pNewData = ImgInfo.m_pData;
-	g_NewDataSize = ImgInfo.DataSize();
+	g_NewImageInfo = std::move(ImgInfo);
 
 	return (void *)pNewImgItem;
 }
@@ -146,8 +149,8 @@ int main(int argc, const char **argv)
 		int Size;
 		if(Index == g_NewDataId)
 		{
-			pData = g_pNewData;
-			Size = g_NewDataSize;
+			pData = g_NewImageInfo.m_pData;
+			Size = g_NewImageInfo.DataSize();
 		}
 		else if(Index == g_NewNameId)
 		{

@@ -422,14 +422,11 @@ void CMenus::RenderSettingsTClientSettings(CUIRect MainView)
 	vec2 ScrollOffset(0.0f, 0.0f);
 	CScrollRegionParams ScrollParams;
 	ScrollParams.m_ScrollUnit = 60.0f;
-	ScrollParams.m_Flags = CScrollRegionParams::FLAG_CONTENT_STATIC_WIDTH;
 	ScrollParams.m_ScrollbarMargin = 5.0f;
-	s_ScrollRegion.Begin(&MainView, &ScrollOffset, &ScrollParams);
+	s_ScrollRegion.Begin(&MainView, &ScrollParams);
 
 	static std::vector<CUIRect> s_SectionBoxes;
 	static vec2 s_PrevScrollOffset(0.0f, 0.0f);
-
-	MainView.y += ScrollOffset.y;
 
 	MainView.VSplitRight(5.0f, &MainView, nullptr); // Padding for scrollbar
 	MainView.VSplitLeft(5.0f, nullptr, &MainView); // Padding for scrollbar
@@ -1325,14 +1322,11 @@ void CMenus::RenderSettingsTClientChatBinds(CUIRect MainView)
 	vec2 ScrollOffset(0.0f, 0.0f);
 	CScrollRegionParams ScrollParams;
 	ScrollParams.m_ScrollUnit = 60.0f;
-	ScrollParams.m_Flags = CScrollRegionParams::FLAG_CONTENT_STATIC_WIDTH;
 	ScrollParams.m_ScrollbarMargin = 5.0f;
-	s_ScrollRegion.Begin(&MainView, &ScrollOffset, &ScrollParams);
+	s_ScrollRegion.Begin(&MainView, &ScrollParams);
 
 	static std::vector<CUIRect> s_SectionBoxes;
 	static vec2 s_PrevScrollOffset(0.0f, 0.0f);
-
-	MainView.y += ScrollOffset.y;
 
 	MainView.HSplitTop(Margin, nullptr, &MainView);
 	MainView.VSplitRight(5.0f, &MainView, nullptr); // Padding for scrollbar
@@ -2848,10 +2842,8 @@ void CMenus::RenderSettingsTClientConfigs(CUIRect MainView)
 	vec2 ScrollOffset(0.0f, 0.0f);
 	CScrollRegionParams ScrollParams;
 	ScrollParams.m_ScrollUnit = 60.0f;
-	ScrollParams.m_Flags = CScrollRegionParams::FLAG_CONTENT_STATIC_WIDTH;
-	s_ScrollRegion.Begin(&ListArea, &ScrollOffset, &ScrollParams);
+	s_ScrollRegion.Begin(&ListArea, &ScrollParams);
 
-	ListArea.y += ScrollOffset.y;
 	ListArea.VSplitRight(5.0f, &ListArea, nullptr);
 	CUIRect Content = ListArea;
 

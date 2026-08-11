@@ -5,6 +5,7 @@
 
 #include "kernel.h"
 
+#include <base/color.h>
 #include <base/hash.h>
 #include <base/str.h>
 
@@ -69,6 +70,9 @@ public:
 	public:
 		char m_aName[MAX_NAME_LENGTH];
 		char m_aClan[MAX_CLAN_LENGTH];
+		/**
+		 * Country code in ISO 3166-1 numeric.
+		 */
 		int m_Country;
 		int m_Score;
 		bool m_Player;
@@ -91,7 +95,6 @@ public:
 
 	int m_Type;
 	uint64_t m_ReceivedPackets;
-	int m_NumReceivedClients;
 
 	int m_NumAddresses;
 	NETADDR m_aAddresses[MAX_SERVER_ADDRESSES];
@@ -116,13 +119,14 @@ public:
 	int m_Latency; // in ms
 	ERankState m_HasRank;
 	char m_aGameType[16];
+	ColorRGBA m_GametypeColor;
 	char m_aName[64];
 	char m_aMap[MAX_MAP_LENGTH];
 	int m_MapCrc;
 	int m_MapSize;
 	char m_aVersion[32];
 	char m_aAddress[MAX_SERVER_ADDRESSES * NETADDR_MAXSTRSIZE];
-	CClient m_aClients[SERVERINFO_MAX_CLIENTS];
+	std::vector<CClient> m_vClients;
 	int m_NumFilteredPlayers;
 	bool m_RequiresLogin;
 	int m_NumBestClientPlayers;
@@ -132,6 +136,7 @@ public:
 
 	static int EstimateLatency(int Loc1, int Loc2);
 	static bool ParseLocation(int *pResult, const char *pString);
+	static ColorRGBA GametypeColor(const char *pGametype);
 };
 
 class CCommunityCountryServer
@@ -155,6 +160,9 @@ class CCommunityCountry
 	friend class CServerBrowser;
 
 	char m_aName[CServerInfo::MAX_COMMUNITY_COUNTRY_LENGTH];
+	/**
+	 * Country code in ISO 3166-1 numeric.
+	 */
 	int m_FlagId;
 	std::vector<CCommunityCountryServer> m_vServers;
 
@@ -281,11 +289,12 @@ public:
 	/* Constants: Server Browser Sorting
 		SORT_NAME - Sort by name.
 		SORT_PING - Sort by ping.
-		SORT_MAP - Sort by map
+		SORT_MAP - Sort by map.
 		SORT_GAMETYPE - Sort by game type. DM, TDM etc.
 		SORT_NUMPLAYERS - Sort after how many players there are on the server.
 		SORT_NUMFRIENDS - Sort after how many friends there are on the server.
 		SORT_NUMBESTCLIENT - Sort after how many BestClient players there are on the server.
+		SORT_FAVORITES - Sort by favorite status, number of players and then ping.
 	*/
 	enum
 	{
@@ -296,6 +305,7 @@ public:
 		SORT_NUMPLAYERS,
 		SORT_NUMFRIENDS,
 		SORT_NUMBESTCLIENT,
+		SORT_FAVORITES,
 	};
 
 	enum

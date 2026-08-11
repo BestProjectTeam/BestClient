@@ -113,8 +113,8 @@ public:
 	int GetAttackTick() const { return m_AttackTick; }
 	int GetStrongWeakId() const { return m_StrongWeakId; }
 
-	CCharacter(CGameWorld *pGameWorld, int Id, CNetObj_Character *pChar, CNetObj_DDNetCharacter *pExtended = nullptr);
-	void Read(CNetObj_Character *pChar, CNetObj_DDNetCharacter *pExtended, bool IsLocal);
+	CCharacter(CGameWorld *pGameWorld, int Id, CNetObj_Character *pChar, CNetObj_DDNetCharacter *pExtended = nullptr, CNetObj_CharacterTuning *pTuning = nullptr);
+	void Read(CNetObj_Character *pChar, CNetObj_DDNetCharacter *pExtended, CNetObj_CharacterTuning *pTuning, bool IsLocal);
 	void SetCoreWorld(CGameWorld *pGameWorld);
 
 	int m_LastSnapWeapon;
@@ -128,6 +128,9 @@ public:
 	int GetOverriddenTuneZone() const;
 	int GetPureTuneZone() const;
 
+	CTuningParams *GetTuning() const;
+	LOCKED_TUNES m_LockedTunings;
+
 	bool HammerHitDisabled() const { return m_Core.m_HammerHitDisabled; }
 	bool ShotgunHitDisabled() const { return m_Core.m_ShotgunHitDisabled; }
 	bool LaserHitDisabled() const { return m_Core.m_LaserHitDisabled; }
@@ -139,6 +142,10 @@ public:
 
 	// TClient
 	CNetObj_PlayerInput *LatestInput() { return &m_LatestInput; }
+
+	// antiping
+	void AntiPingInterference(int ClientId, bool DisallowReset = false, bool HasToBeUnfrozen = false);
+	bool IsInterfering() const { return m_Interfering; }
 
 private:
 	// weapon info
@@ -175,7 +182,7 @@ private:
 
 	// DDRace
 
-	static bool IsSwitchActiveCb(int Number, void *pUser);
+	static bool IsSwitchActiveCb(unsigned char Number, void *pUser);
 	void HandleTiles(int Index);
 	void HandleSkippableTiles(int Index);
 	void DDRaceTick();
@@ -186,6 +193,8 @@ private:
 
 	int m_LastWeaponSwitchTick;
 	int m_LastTuneZoneTick;
+
+	bool m_Interfering;
 };
 
 #endif

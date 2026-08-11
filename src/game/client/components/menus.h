@@ -75,11 +75,9 @@ private:
 	ColorHSLA DoLine_ColorPicker(CButtonContainer *pResetId, float LineSize, float LabelSize, float BottomMargin, CUIRect *pMainRect, const char *pText, unsigned int *pColorValue, ColorRGBA DefaultColor, bool CheckBoxSpacing = true, int *pCheckBoxValue = nullptr, bool Alpha = false, bool ShowReset = true);
 	ColorHSLA DoButton_ColorPicker(const CUIRect *pRect, unsigned int *pHslaColor, bool Alpha);
 
-	void DoLaserPreview(const CUIRect *pRect, ColorHSLA OutlineColor, ColorHSLA InnerColor, int LaserType);
 	int DoButton_GridHeader(const void *pId, const char *pText, int Checked, const CUIRect *pRect, int Align = TEXTALIGN_ML);
 	int DoButton_Favorite(const void *pButtonId, const void *pParentId, bool Checked, const CUIRect *pRect);
 
-	bool m_SkinListScrollToSelected = false;
 	std::optional<std::chrono::nanoseconds> m_SkinList7LastRefreshTime;
 	std::optional<std::chrono::nanoseconds> m_SkinPartsList7LastRefreshTime;
 
@@ -647,12 +645,8 @@ protected:
 	void UpdateCommunityCache(bool Force);
 
 	// found in menus_settings.cpp
-	void RenderLanguageSettings(CUIRect MainView);
-	bool RenderLanguageSelection(CUIRect MainView);
-	void RenderThemeSelection(CUIRect MainView);
-	void RenderSettingsGeneral(CUIRect MainView);
-	void RenderSettingsPlayer(CUIRect MainView);
-	void RenderSettingsTee(CUIRect MainView);
+	void RenderSettings(CUIRect MainView);
+	bool RenderHslaScrollbars(CUIRect *pRect, unsigned int *pColor, bool Alpha, float DarkestLight);
 	struct SPopupSettingsCountrySelectionContext
 	{
 		CMenus *m_pMenus;
@@ -661,22 +655,55 @@ protected:
 		bool m_New;
 	};
 	static CUi::EPopupMenuFunctionResult PopupSettingsCountrySelection(void *pContext, CUIRect View, bool Active);
-	void RenderSettingsTee7(CUIRect MainView);
-	void RenderSettingsTeeCustom7(CUIRect MainView);
-	void RenderSkinSelection7(CUIRect MainView);
-	void RenderSkinPartSelection7(CUIRect MainView);
-	void RenderSettingsGraphics(CUIRect MainView);
-	void RenderSettingsSound(CUIRect MainView);
-	void RenderSettings(CUIRect MainView);
-	void RenderSettingsCustom(CUIRect MainView);
+
+	// found in menus_settings_assets.cpp
+	void RenderSettingsAssets(CUIRect MainView);
+
+	// found in menus_settings_appearance.cpp
+	void RenderSettingsAppearance(CUIRect MainView);
+	void DoLaserPreview(const CUIRect *pRect, ColorHSLA OutlineColor, ColorHSLA InnerColor, int LaserType);
 
 	// found in menus_settings_controls.cpp
 	// TODO: Change PopupConfirm to avoid using a function pointer to a CMenus
 	//       member function, to move this function to CMenusSettingsControls
 	void ResetSettingsControls();
 
+	// found in menus_settings_credits.cpp
+	void RenderSettingsCredits(CUIRect MainView);
+
+	// found in menus_settings_ddnet.cpp
+	void RenderSettingsDDNet(CUIRect MainView);
+
+	// found in menus_settings_general.cpp
+	void RenderSettingsGeneral(CUIRect MainView);
+	void RenderThemeSelection(CUIRect MainView);
+
+	// found in menus_settings_graphics.cpp
+	void RenderSettingsGraphics(CUIRect MainView);
+
+	// found in menus_settings_language.cpp
+	void RenderLanguageSettings(CUIRect MainView);
+	bool RenderLanguageSelection(CUIRect MainView);
+
+	// found in menus_settings_player.cpp
+	void RenderSettingsPlayer(CUIRect MainView);
+
+	// found in menus_settings_sound.cpp
+	void RenderSettingsSound(CUIRect MainView);
+
+	// found in menus_settings_tee.cpp
+	void RenderSettingsTee(CUIRect MainView);
+	void RenderSettingsTee7(CUIRect MainView);
+	bool m_SkinListScrollToSelected = false;
+
+	// found in menus_settings_tee7.cpp
+	void RenderSettingsTeeCustom7(CUIRect MainView);
+	void RenderSkinSelection7(CUIRect MainView);
+	void RenderSkinPartSelection7(CUIRect MainView);
+
 	std::vector<CButtonContainer> m_vButtonContainersNamePlateShow = {{}, {}, {}, {}};
 	std::vector<CButtonContainer> m_vButtonContainersNamePlateKeyPresses = {{}, {}, {}, {}};
+	std::vector<CButtonContainer> m_vButtonContainersAntiPingPlayers = {{}, {}, {}};
 
 	class CMapListItem
 	{
@@ -781,6 +808,7 @@ public:
 		SETTINGS_BESTCLIENT,
 		SETTINGS_PROFILES,
 		SETTINGS_CONFIGS,
+		SETTINGS_CREDITS,
 
 		SETTINGS_LENGTH,
 	};
@@ -927,10 +955,6 @@ private:
 	// found in menus_ingame.cpp
 	void RenderInGameNetwork(CUIRect MainView);
 	void RenderGhost(CUIRect MainView);
-
-	// found in menus_settings.cpp
-	void RenderSettingsDDNet(CUIRect MainView);
-	void RenderSettingsAppearance(CUIRect MainView);
 
 	// found in menus_bestclient.cpp
 	struct SPopupVoiceModerationContext
@@ -1081,7 +1105,6 @@ private:
 	int DoButtonNoRect_FontIcon(CButtonContainer *pButtonContainer, const char *pText, int Checked, const CUIRect *pRect, int Corners = IGraphics::CORNER_ALL);
 
 	ColorHSLA RenderHSLColorPicker(const CUIRect *pRect, unsigned int *pColor, bool Alpha);
-	bool RenderHslaScrollbars(CUIRect *pRect, unsigned int *pColor, bool Alpha, float DarkestLight);
 	int DoButtonLineSize_Menu(CButtonContainer *pButtonContainer, const char *pText, int Checked, const CUIRect *pRect, float ButtonLineSize, bool Fake = false, const char *pImageName = nullptr, int Corners = IGraphics::CORNER_ALL, float Rounding = 5.0f, float FontFactor = 0.0f, ColorRGBA Color = ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f));
 };
 #endif

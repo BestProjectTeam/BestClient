@@ -6,14 +6,13 @@
 #include <engine/shared/protocol.h>
 
 #include <memory>
+#include <optional>
 
 enum
 {
 	// MAX_NAME_LENGTH includes the size with \0, which is not necessary in SQL
 	MAX_NAME_LENGTH_SQL = MAX_NAME_LENGTH - 1,
 };
-
-class IConsole;
 
 // can hold one PreparedStatement with Results
 class IDbConnection
@@ -22,7 +21,7 @@ public:
 	IDbConnection(const char *pPrefix);
 	virtual ~IDbConnection() = default;
 	IDbConnection &operator=(const IDbConnection &) = delete;
-	virtual void Print(IConsole *pConsole, const char *pMode) = 0;
+	virtual void Print(const char *pMode) = 0;
 
 	// returns the database prefix
 	const char *GetPrefix() const { return m_aPrefix; }
@@ -39,8 +38,6 @@ public:
 	virtual const char *InsertIgnore() const = 0;
 	// ORDER BY RANDOM()/RAND()
 	virtual const char *Random() const = 0;
-	// Get Median Map Time from l.Map
-	virtual const char *MedianMapTime(char *pBuffer, int BufferSize) const = 0;
 	virtual const char *False() const = 0;
 	virtual const char *True() const = 0;
 
@@ -85,6 +82,9 @@ public:
 	virtual void GetString(int Col, char *pBuffer, int BufferSize) = 0;
 	// returns number of bytes read into the buffer
 	virtual int GetBlob(int Col, unsigned char *pBuffer, int BufferSize) = 0;
+	std::optional<float> GetOptionalFloat(int Col);
+	std::optional<int> GetOptionalInt(int Col);
+	std::optional<int64_t> GetOptionalInt64(int Col);
 
 	// SQL statements, that can't be abstracted, has side effects to the result
 	virtual bool AddPoints(const char *pPlayer, int Points, char *pError, int ErrorSize) = 0;

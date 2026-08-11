@@ -27,7 +27,7 @@ void CDebugHud::RenderNetCorrections()
 
 	const float Height = 300.0f;
 	const float Width = Height * Graphics()->ScreenAspect();
-	Graphics()->MapScreen(0.0f, 0.0f, Width, Height);
+	Graphics()->MapScreenToSize(Width, Height);
 
 	const float Velspeed = length(vec2(GameClient()->m_Snap.m_pLocalCharacter->m_VelX / 256.0f, GameClient()->m_Snap.m_pLocalCharacter->m_VelY / 256.0f)) * Client()->GameTickSpeed();
 	const float VelspeedX = GameClient()->m_Snap.m_pLocalCharacter->m_VelX / 256.0f * Client()->GameTickSpeed();
@@ -96,11 +96,12 @@ void CDebugHud::RenderTuning()
 
 	const CTuningParams *pGlobalTuning = GameClient()->GetTuning(0);
 	const CTuningParams *pZoneTuning = !GameClient()->m_GameWorld.m_WorldConfig.m_UseTuneZones || pCharacter == nullptr ? nullptr : GameClient()->GetTuning(pCharacter->GetOverriddenTuneZone());
+	const CTuningParams *pCharacterTuning = pCharacter == nullptr ? nullptr : pCharacter->GetTuning();
 	const CTuningParams *pActiveTuning = pZoneTuning == nullptr ? pGlobalTuning : pZoneTuning;
 
 	const float Height = 300.0f;
 	const float Width = Height * Graphics()->ScreenAspect();
-	Graphics()->MapScreen(0.0f, 0.0f, Width, Height);
+	Graphics()->MapScreenToSize(Width, Height);
 
 	const float FontSize = 5.0f;
 
@@ -128,15 +129,22 @@ void CDebugHud::RenderTuning()
 
 	for(int i = 0; i < CTuningParams::Num(); i++)
 	{
-		float CurrentGlobal, CurrentZone, Standard;
+		float CurrentGlobal, CurrentZone, Standard, LockedTune;
 		pGlobalTuning->Get(i, &CurrentGlobal);
 		if(pZoneTuning == nullptr)
 			CurrentZone = 0.0f;
 		else
 			pZoneTuning->Get(i, &CurrentZone);
+		if(pCharacterTuning == nullptr)
+			LockedTune = 0.0f;
+		else
+			pCharacterTuning->Get(i, &LockedTune);
 		CTuningParams::DEFAULT.Get(i, &Standard);
 
-		if(g_Config.m_DbgTuning == DBG_TUNING_SHOW_CHANGED && Standard == CurrentGlobal && (pZoneTuning == nullptr || Standard == CurrentZone))
+		const bool GlobalStandard = Standard == CurrentGlobal;
+		const bool ZoneStandard = pZoneTuning == nullptr || Standard == CurrentZone;
+		const bool LockStandard = pCharacterTuning == nullptr || !IsTuneInList(&pCharacter->m_LockedTunings, i);
+		if(g_Config.m_DbgTuning == DBG_TUNING_SHOW_CHANGED && GlobalStandard && ZoneStandard && LockStandard)
 			continue; // skip unchanged params
 
 		if(y == StartY)
@@ -146,11 +154,13 @@ void CDebugHud::RenderTuning()
 		}
 
 		ColorRGBA TextColor;
-		if(g_Config.m_DbgTuning == DBG_TUNING_SHOW_ALL && Standard == CurrentGlobal && (pZoneTuning == nullptr || Standard == CurrentZone))
+		if(g_Config.m_DbgTuning == DBG_TUNING_SHOW_ALL && GlobalStandard && ZoneStandard && LockStandard)
 			TextColor = ColorRGBA(0.75f, 0.75f, 0.75f, 1.0f); // grey: value unchanged globally and in current zone
-		else if(Standard == CurrentGlobal && pZoneTuning != nullptr && Standard != CurrentZone)
+		else if(GlobalStandard && !LockStandard)
+			TextColor = ColorRGBA(1.0f, 1.0f, 0.0f, 1.0f); // yellow: value changed by tunelock
+		else if(GlobalStandard && !ZoneStandard)
 			TextColor = ColorRGBA(0.6f, 0.6f, 1.0f, 1.0f); // blue: value changed only in current zone
-		else if(Standard != CurrentGlobal && pZoneTuning != nullptr && Standard == CurrentZone)
+		else if(!GlobalStandard && pZoneTuning != nullptr && Standard == CurrentZone)
 			TextColor = ColorRGBA(0.4f, 1.0f, 0.4f, 1.0f); // green: value changed globally but reset to default by tune zone
 		else
 			TextColor = ColorRGBA(1.0f, 0.5f, 0.5f, 1.0f); // red: value changed globally
@@ -158,8 +168,10 @@ void CDebugHud::RenderTuning()
 
 		char aBufStandard[32];
 		str_format(aBufStandard, sizeof(aBufStandard), "%.2f", Standard);
+
+		const float CurrentVal = !LockStandard ? LockedTune : (!ZoneStandard ? CurrentZone : CurrentGlobal);
 		char aBufCurrent[32];
-		str_format(aBufCurrent, sizeof(aBufCurrent), "%.2f", pZoneTuning == nullptr ? CurrentGlobal : CurrentZone);
+		str_format(aBufCurrent, sizeof(aBufCurrent), "%.2f", CurrentVal);
 		RenderRow(aBufStandard, aBufCurrent, CTuningParams::Name(i));
 	}
 
@@ -168,7 +180,7 @@ void CDebugHud::RenderTuning()
 		return;
 
 	// Render Velspeed.X * Ramp Graphs
-	Graphics()->MapScreen(0.0f, 0.0f, Graphics()->ScreenWidth(), Graphics()->ScreenHeight());
+	Graphics()->MapScreenToSize(Graphics()->ScreenWidth(), Graphics()->ScreenHeight());
 	// Make sure graph positions and sizes are aligned with pixels to avoid lines overlapping graph edges
 	const float GraphSpacing = std::round(Graphics()->ScreenWidth() / 100.0f);
 	const float GraphW = std::round(Graphics()->ScreenWidth() / 4.0f);
@@ -250,7 +262,7 @@ void CDebugHud::RenderHint()
 
 	const float Height = 300.0f;
 	const float Width = Height * Graphics()->ScreenAspect();
-	Graphics()->MapScreen(0.0f, 0.0f, Width, Height);
+	Graphics()->MapScreenToSize(Width, Height);
 
 	const float FontSize = 5.0f;
 	const float Spacing = 5.0f;

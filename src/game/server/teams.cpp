@@ -6,13 +6,17 @@
 #include "score.h"
 #include "teehistorian.h"
 
-#include <base/system.h>
+#include <base/dbg.h>
+#include <base/str.h>
+#include <base/time.h>
 
 #include <engine/shared/config.h>
+#include <engine/shared/protocol.h>
 
 #include <game/mapitems.h>
 #include <game/server/entities/character.h>
 #include <game/server/gamecontext.h>
+#include <game/server/interactions.h>
 #include <game/team_state.h>
 
 CGameTeams::CGameTeams(CGameContext *pGameContext) :
@@ -24,6 +28,7 @@ CGameTeams::CGameTeams(CGameContext *pGameContext) :
 void CGameTeams::Reset()
 {
 	m_Core.Reset();
+	UpdateLegacyTeamMap();
 	for(int i = 0; i < MAX_CLIENTS; ++i)
 	{
 		m_aTeeStarted[i] = false;
@@ -145,7 +150,7 @@ void CGameTeams::OnCharacterStart(int ClientId)
 		m_aTeamSentStartWarning[m_Core.Team(ClientId)] = false;
 		m_aTeamUnfinishableKillTick[m_Core.Team(ClientId)] = -1;
 
-		int NumPlayers = Count(m_Core.Team(ClientId));
+		int NumPlayers = TeamSize(m_Core.Team(ClientId));
 
 		char aBuf[512];
 		str_format(
@@ -281,7 +286,7 @@ void CGameTeams::Tick()
 		{
 			continue;
 		}
-		if(Count(i) <= 1)
+		if(TeamSize(i) <= 1)
 		{
 			continue;
 		}
@@ -460,7 +465,7 @@ void CGameTeams::SetForceCharacterTeam(int ClientId, int Team)
 
 	if(Team != OldTeam && (OldTeam != TEAM_FLOCK || g_Config.m_SvTeam == SV_TEAM_FORCED_SOLO) && OldTeam != TEAM_SUPER && m_aTeamState[OldTeam] != ETeamState::EMPTY)
 	{
-		bool NoElseInOldTeam = Count(OldTeam) <= 1;
+		bool NoElseInOldTeam = TeamSize(OldTeam) <= 1;
 		if(NoElseInOldTeam)
 		{
 			m_aTeamState[OldTeam] = ETeamState::EMPTY;
@@ -474,6 +479,7 @@ void CGameTeams::SetForceCharacterTeam(int ClientId, int Team)
 	}
 
 	m_Core.Team(ClientId, Team);
+	UpdateLegacyTeamMap();
 
 	if(OldTeam != Team)
 	{
@@ -498,7 +504,7 @@ void CGameTeams::SetForceCharacterTeam(int ClientId, int Team)
 	}
 }
 
-int CGameTeams::Count(int Team) const
+int CGameTeams::TeamSize(int Team) const
 {
 	if(Team == TEAM_SUPER)
 		return -1;
@@ -535,11 +541,23 @@ void CGameTeams::KillTeam(int Team, int NewStrongId, int ExceptId)
 		}
 	}
 
-	// send the team kill message
+	// send the team kill message, the team number can differ per client
 	CNetMsg_Sv_KillMsgTeam Msg;
 	Msg.m_Team = Team;
 	Msg.m_First = NewStrongId;
-	Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, -1);
+
+	// pack one with the real team and id for the recording only, the per client messages are not recorded
+	CMsgPacker Packer(&Msg);
+	Msg.Pack(&Packer);
+	Server()->SendMsg(&Packer, MSGFLAG_NOSEND, SERVER_DEMO_CLIENT);
+
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(!Server()->ClientIngame(i))
+			continue;
+		Msg.m_Team = TeamForClient(Team, i);
+		Server()->SendPackMsg(&Msg, MSGFLAG_VITAL | MSGFLAG_NORECORD, i);
+	}
 }
 
 bool CGameTeams::TeamFinished(int Team)
@@ -563,6 +581,16 @@ CClientMask CGameTeams::TeamMask(int Team, int ExceptId, int Asker, int VersionF
 		return CClientMask().set().reset(ExceptId);
 	}
 
+	CPlayer *pAsker = GetPlayer(Asker);
+	CInteractions Interact;
+	Interact.Init(Asker, pAsker ? pAsker->GetUniqueCid() : 0);
+	Interact.FillOwnerConnected(
+		pAsker && pAsker->GetCharacter() && pAsker->GetCharacter()->IsAlive(),
+		m_Core.Team(Asker),
+		m_Core.GetSolo(Asker),
+		false,
+		false); // TODO: these false values make little sense
+
 	CClientMask Mask;
 	for(int i = 0; i < MAX_CLIENTS; ++i)
 	{
@@ -573,59 +601,8 @@ CClientMask CGameTeams::TeamMask(int Team, int ExceptId, int Asker, int VersionF
 		if(!((Server()->IsSixup(i) && (VersionFlags & CGameContext::FLAG_SIXUP)) ||
 			   (!Server()->IsSixup(i) && (VersionFlags & CGameContext::FLAG_SIX))))
 			continue;
-
-		if(!(GetPlayer(i)->GetTeam() == TEAM_SPECTATORS || GetPlayer(i)->IsPaused()))
-		{ // Not spectator
-			if(i != Asker)
-			{ // Actions of other players
-				if(!Character(i))
-					continue; // Player is currently dead
-				if(GetPlayer(i)->m_ShowOthers == SHOW_OTHERS_ONLY_TEAM)
-				{
-					if(m_Core.Team(i) != Team && m_Core.Team(i) != TEAM_SUPER)
-						continue; // In different teams
-				}
-				else if(GetPlayer(i)->m_ShowOthers == SHOW_OTHERS_OFF)
-				{
-					if(m_Core.GetSolo(Asker))
-						continue; // When in solo part don't show others
-					if(m_Core.GetSolo(i))
-						continue; // When in solo part don't show others
-					if(m_Core.Team(i) != Team && m_Core.Team(i) != TEAM_SUPER)
-						continue; // In different teams
-				}
-			} // See everything of yourself
-		}
-		else if(GetPlayer(i)->SpectatorId() != SPEC_FREEVIEW)
-		{ // Spectating specific player
-			if(GetPlayer(i)->SpectatorId() != Asker)
-			{ // Actions of other players
-				if(!Character(GetPlayer(i)->SpectatorId()))
-					continue; // Player is currently dead
-				if(GetPlayer(i)->m_ShowOthers == SHOW_OTHERS_ONLY_TEAM)
-				{
-					if(m_Core.Team(GetPlayer(i)->SpectatorId()) != Team && m_Core.Team(GetPlayer(i)->SpectatorId()) != TEAM_SUPER)
-						continue; // In different teams
-				}
-				else if(GetPlayer(i)->m_ShowOthers == SHOW_OTHERS_OFF)
-				{
-					if(m_Core.GetSolo(Asker))
-						continue; // When in solo part don't show others
-					if(m_Core.GetSolo(GetPlayer(i)->SpectatorId()))
-						continue; // When in solo part don't show others
-					if(m_Core.Team(GetPlayer(i)->SpectatorId()) != Team && m_Core.Team(GetPlayer(i)->SpectatorId()) != TEAM_SUPER)
-						continue; // In different teams
-				}
-			} // See everything of player you're spectating
-		}
-		else
-		{ // Freeview
-			if(GetPlayer(i)->m_SpecTeam)
-			{ // Show only players in own team when spectating
-				if(m_Core.Team(i) != Team && m_Core.Team(i) != TEAM_SUPER)
-					continue; // in different teams
-			}
-		}
+		if(!Interact.CanSee(GameServer(), i))
+			continue;
 
 		Mask.set(i);
 	}
@@ -643,18 +620,97 @@ void CGameTeams::SendTeamsState(int ClientId)
 	CMsgPacker Msg(NETMSGTYPE_SV_TEAMSSTATE);
 	CMsgPacker MsgLegacy(NETMSGTYPE_SV_TEAMSSTATELEGACY);
 
+	int ClientVersion = GameServer()->GetClientVersion(ClientId);
+	bool PlayerMappingRequired = ClientVersion < VERSION_DDNET_128_PLAYERS;
+
 	for(unsigned i = 0; i < MAX_CLIENTS; i++)
 	{
-		Msg.AddInt(m_Core.Team(i));
-		MsgLegacy.AddInt(m_Core.Team(i));
+		if(PlayerMappingRequired)
+		{
+			if(i >= LEGACY_MAX_CLIENTS)
+				break;
+
+			// see others selector
+			CPlayerMapping::ESeeOthersInd Indicator = GameServer()->m_PlayerMapping.SeeOthersInd(ClientId, i);
+			if(Indicator != CPlayerMapping::ESeeOthersInd::NONE)
+			{
+				// Team colors (49 and 28) are random and used for see-others feature (+spectate) to cycle the player map
+				int Team = -1;
+				if(Indicator == CPlayerMapping::ESeeOthersInd::BUTTON)
+					Team = 49;
+				else if(Indicator == CPlayerMapping::ESeeOthersInd::PLAYER)
+					Team = 28;
+
+				if(Team != -1)
+				{
+					Msg.AddInt(Team);
+					MsgLegacy.AddInt(Team);
+					continue;
+				}
+			}
+		}
+
+		int Team = 0;
+		int TranslatedId = i;
+		if(Server()->ReverseTranslate(TranslatedId, ClientId))
+		{
+			// TeamForClient is also used for the switch state snap and Sv_KillMsgTeam, which have to agree with the teams state
+			Team = TeamForClient(m_Core.Team(TranslatedId), ClientId);
+		}
+		Msg.AddInt(Team);
+		MsgLegacy.AddInt(Team);
 	}
 
 	Server()->SendMsg(&Msg, MSGFLAG_VITAL, ClientId);
-	int ClientVersion = m_pGameContext->m_apPlayers[ClientId]->GetClientVersion();
 	if(!Server()->IsSixup(ClientId) && VERSION_DDRACE < ClientVersion && ClientVersion < VERSION_DDNET_MSG_LEGACY)
 	{
 		Server()->SendMsg(&MsgLegacy, MSGFLAG_VITAL, ClientId);
 	}
+}
+
+void CGameTeams::UpdateLegacyTeamMap()
+{
+	// Clients before VERSION_DDNET_128_TEAMS only know team numbers up to LEGACY_TEAM_SUPER. Only whether
+	// two team numbers are equal matters to a client, so the teams that such a client cannot represent are
+	// renumbered into the team numbers that are currently unused. This keeps collision and hook prediction
+	// correct, at the cost of showing a different team number than the one the player joined.
+	bool aTeamOccupied[NUM_DDRACE_TEAMS] = {};
+	for(int i = 0; i < MAX_CLIENTS; i++)
+		aTeamOccupied[m_Core.Team(i)] = true;
+
+	// teams that the client can represent keep their own number
+	for(int Team = TEAM_FLOCK; Team < LEGACY_TEAM_SUPER; Team++)
+		m_aLegacyTeamMap[Team] = Team;
+	for(int Team = LEGACY_TEAM_SUPER; Team < TEAM_SUPER; Team++)
+		m_aLegacyTeamMap[Team] = TEAM_FLOCK;
+	m_aLegacyTeamMap[TEAM_SUPER] = LEGACY_TEAM_SUPER;
+
+	// the teams that are left get the numbers that no team is currently using
+	int NextNumber = TEAM_FLOCK + 1;
+	for(int Team = LEGACY_TEAM_SUPER; Team < TEAM_SUPER; Team++)
+	{
+		if(!aTeamOccupied[Team])
+			continue;
+
+		while(NextNumber < LEGACY_TEAM_SUPER && aTeamOccupied[NextNumber])
+			NextNumber++;
+		if(NextNumber == LEGACY_TEAM_SUPER)
+			break; // more teams than the client can represent, the rest stays TEAM_FLOCK
+
+		m_aLegacyTeamMap[Team] = NextNumber;
+		NextNumber++;
+	}
+}
+
+int CGameTeams::TeamForClient(int Team, int ClientId) const
+{
+	int ClientVersion = GameServer()->GetClientVersion(ClientId);
+	if(ClientVersion >= VERSION_DDNET_128_TEAMS)
+		return Team;
+	// If the team's slots are not reserved, dont highlight it. Causes mismatch between dummy and main when playermapping is active.
+	if(ClientVersion < VERSION_DDNET_128_PLAYERS && !GameServer()->m_PlayerMapping.ReserveTeamSlots(Team))
+		return TEAM_FLOCK;
+	return m_aLegacyTeamMap[Team];
 }
 
 ERaceState CGameTeams::GetDDRaceState(const CPlayer *Player) const
@@ -1064,7 +1120,7 @@ void CGameTeams::ProcessSaveTeam()
 		if(m_apSaveTeamResult[Team] == nullptr || !m_apSaveTeamResult[Team]->m_Completed)
 			continue;
 
-		int TeamSize = m_apSaveTeamResult[Team]->m_SavedTeam.GetMembersCount();
+		int Size = m_apSaveTeamResult[Team]->m_SavedTeam.GetMembersCount();
 		int State = -1;
 
 		switch(m_apSaveTeamResult[Team]->m_Status)
@@ -1091,7 +1147,7 @@ void CGameTeams::ProcessSaveTeam()
 		{
 			GameServer()->SendSaveCode(
 				Team,
-				TeamSize,
+				Size,
 				State,
 				(State == SAVESTATE_DONE) ? "" : m_apSaveTeamResult[Team]->m_aMessage,
 				m_apSaveTeamResult[Team]->m_aRequestingPlayer,
@@ -1116,7 +1172,7 @@ void CGameTeams::ProcessSaveTeam()
 					m_apSaveTeamResult[Team]->m_SaveId,
 					m_apSaveTeamResult[Team]->m_SavedTeam.GetString());
 			}
-			for(int i = 0; i < TeamSize; i++)
+			for(int i = 0; i < Size; i++)
 			{
 				if(m_apSaveTeamResult[Team]->m_SavedTeam.m_pSavedTees->IsHooking())
 				{
@@ -1134,7 +1190,7 @@ void CGameTeams::ProcessSaveTeam()
 		case CScoreSaveResult::SAVE_FAILED:
 			if(GameServer()->TeeHistorianActive())
 				GameServer()->TeeHistorian()->RecordTeamSaveFailure(Team);
-			if(Count(Team) > 0)
+			if(TeamSize(Team) > 0)
 			{
 				// load weak/strong order to prevent switching weak/strong while saving
 				m_apSaveTeamResult[Team]->m_SavedTeam.Load(GameServer(), Team, false);
@@ -1151,7 +1207,7 @@ void CGameTeams::ProcessSaveTeam()
 			}
 
 			bool TeamValid = false;
-			if(Count(Team) > 0)
+			if(TeamSize(Team) > 0)
 			{
 				// keep current weak/strong order as on some maps there is no other way of switching
 				TeamValid = m_apSaveTeamResult[Team]->m_SavedTeam.Load(GameServer(), Team, true);
@@ -1160,7 +1216,7 @@ void CGameTeams::ProcessSaveTeam()
 			if(!TeamValid)
 			{
 				GameServer()->SendChatTeam(Team, "Your team has been killed because it contains an invalid tee state");
-				KillTeam(Team, -1, -1);
+				KillTeam(Team, -1);
 			}
 
 			char aSaveId[UUID_MAXSTRSIZE];
@@ -1251,10 +1307,10 @@ void CGameTeams::OnCharacterDeath(int ClientId, int Weapon)
 				m_aPractice[Team] = false;
 			}
 
-			if(Count(Team) > 1)
+			if(TeamSize(Team) > 1)
 			{
 				// Disband team if the team has more players than allowed.
-				if(Count(Team) > g_Config.m_SvMaxTeamSize)
+				if(TeamSize(Team) > g_Config.m_SvMaxTeamSize)
 				{
 					GameServer()->SendChatTeam(Team, "This team was disbanded because there are more players than allowed in the team.");
 					SetTeamLock(Team, false);

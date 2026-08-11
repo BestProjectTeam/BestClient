@@ -1036,16 +1036,19 @@ void CSwapTimer::RenderNameplateMode()
 	const float Now = Client()->LocalTime();
 
 	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
-	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
+	const CScreenRect ScreenRect = Graphics()->GetScreen();
+	ScreenX0 = ScreenRect.m_TopLeft.x;
+	ScreenY0 = ScreenRect.m_TopLeft.y;
+	ScreenX1 = ScreenRect.m_BottomRight.x;
+	ScreenY1 = ScreenRect.m_BottomRight.y;
 
-	float aPoints[4];
-	Graphics()->MapScreenToWorld(
+	CScreenRect WorldScreen = Graphics()->MapScreenToWorld(
 		GameClient()->m_Camera.m_Center.x, GameClient()->m_Camera.m_Center.y,
 		100.0f, 100.0f, 100.0f, 0, 0,
-		Graphics()->ScreenAspect(), GameClient()->m_Camera.m_Zoom, aPoints);
-	Graphics()->MapScreen(aPoints[0], aPoints[1], aPoints[2], aPoints[3]);
+		Graphics()->ScreenAspect(), GameClient()->m_Camera.m_Zoom);
+	Graphics()->MapScreen(WorldScreen);
 
 	RenderNameplateCard(m_aEntries[Conn], ClientId, Now);
 
-	Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
+	Graphics()->MapScreen(CScreenRect(vec2(ScreenX0, ScreenY0), vec2(ScreenX1, ScreenY1)));
 }

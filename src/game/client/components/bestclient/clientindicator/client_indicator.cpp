@@ -55,6 +55,7 @@ namespace
 
 	void NormalizeBestClientIndicatorConfig()
 	{
+		g_Config.m_BcClientIndicator = 1;
 		TrimConfigString(g_Config.m_BcClientIndicatorServerAddress, sizeof(g_Config.m_BcClientIndicatorServerAddress));
 		TrimConfigString(g_Config.m_BcClientIndicatorBrowserUrl, sizeof(g_Config.m_BcClientIndicatorBrowserUrl));
 		TrimConfigString(g_Config.m_BcClientIndicatorTokenUrl, sizeof(g_Config.m_BcClientIndicatorTokenUrl));
@@ -205,9 +206,9 @@ bool CClientIndicator::IsPlayerBestClient(int ClientId) const
 		return false;
 
 	const CServerInfo &Info = pCurrentServer->m_Info;
-	for(int Index = 0; Index < minimum(Info.m_NumReceivedClients, (int)MAX_CLIENTS); ++Index)
+	for(int Index = 0; Index < minimum((int)Info.m_vClients.size(), (int)MAX_CLIENTS); ++Index)
 	{
-		const CServerInfo::CClient &Client = Info.m_aClients[Index];
+		const CServerInfo::CClient &Client = Info.m_vClients[Index];
 		if(Client.m_BestClient && str_comp(Client.m_aName, pPlayerName) == 0)
 			return true;
 	}
@@ -236,9 +237,9 @@ bool CClientIndicator::IsPlayerDeveloper(int ClientId) const
 		return false;
 
 	const CServerInfo &Info = pCurrentServer->m_Info;
-	for(int Index = 0; Index < minimum(Info.m_NumReceivedClients, (int)MAX_CLIENTS); ++Index)
+	for(int Index = 0; Index < minimum((int)Info.m_vClients.size(), (int)MAX_CLIENTS); ++Index)
 	{
-		const CServerInfo::CClient &Client = Info.m_aClients[Index];
+		const CServerInfo::CClient &Client = Info.m_vClients[Index];
 		if(Client.m_BestClientDeveloper && str_comp(Client.m_aName, pPlayerName) == 0)
 			return true;
 	}

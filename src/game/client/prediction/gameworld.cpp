@@ -50,11 +50,21 @@ CGameWorld::~CGameWorld()
 		m_pParent->m_pChild = nullptr;
 }
 
-void CGameWorld::Init(CCollision *pCollision, CTuningParams *pTuningList, const CMapBugs *pMapBugs)
+void CGameWorld::Init(CCollision *pCollision, CTuningParams *pTuningList, LOCKED_TUNES *pLockedTuningList, const CMapBugs *pMapBugs)
 {
 	m_pCollision = pCollision;
 	m_pTuningList = pTuningList;
+	m_vpLockedTuning = pLockedTuningList;
 	m_pMapBugs = pMapBugs;
+}
+
+CTuningParams *CGameWorld::TuningFromChrOrZone(int ClientId, int Zone)
+{
+	if(GetCharacterById(ClientId))
+		return GetCharacterById(ClientId)->GetTuning();
+	if(Zone > 0)
+		return GetTuning(Zone);
+	return GlobalTuning();
 }
 
 CEntity *CGameWorld::FindFirst(int Type)
@@ -118,7 +128,9 @@ void CGameWorld::InsertEntity(CEntity *pEnt, bool Last)
 			pLast->m_pNextTypeEntity = pEnt;
 		}
 		else
+		{
 			m_apFirstEntityTypes[pEnt->m_ObjType] = pEnt;
+		}
 		pEnt->m_pPrevTypeEntity = pLast;
 		pEnt->m_pNextTypeEntity = nullptr;
 	}
@@ -367,21 +379,26 @@ void CGameWorld::CreateExplosion(vec2 Pos, int Owner, int Weapon, bool NoDamage,
 			ForceDir = normalize(Diff);
 		l = 1 - std::clamp((l - InnerRadius) / (Radius - InnerRadius), 0.0f, 1.0f);
 		float Strength;
-		if(Owner == -1 || !GetCharacterById(Owner))
+		CCharacter *pOwnerChar = GetCharacterById(Owner);
+		if(Owner == -1 || !pOwnerChar)
 			Strength = GlobalTuning()->m_ExplosionStrength;
 		else
-			Strength = GetCharacterById(Owner)->GetTuning(GetCharacterById(Owner)->GetOverriddenTuneZone())->m_ExplosionStrength;
+			Strength = pOwnerChar->GetTuning()->m_ExplosionStrength;
 
 		float Dmg = Strength * l;
 		if((int)Dmg)
-			if((GetCharacterById(Owner) ? !GetCharacterById(Owner)->GrenadeHitDisabled() : g_Config.m_SvHit || NoDamage) || Owner == pChar->GetCid())
+			if((pOwnerChar ? !pOwnerChar->GrenadeHitDisabled() : g_Config.m_SvHit || NoDamage) || Owner == pChar->GetCid())
 			{
 				if(Owner != -1 && !pChar->CanCollide(Owner))
 					continue;
 				if(Owner == -1 && ActivatedTeam != -1 && pChar->Team() != ActivatedTeam)
 					continue;
 				pChar->TakeDamage(ForceDir * Dmg * 2, (int)Dmg, Owner, Weapon);
-				if(GetCharacterById(Owner) ? GetCharacterById(Owner)->GrenadeHitDisabled() : !g_Config.m_SvHit || NoDamage)
+				if(pOwnerChar)
+				{
+					pOwnerChar->AntiPingInterference(pChar->GetCid());
+				}
+				if(pOwnerChar ? pOwnerChar->GrenadeHitDisabled() : !g_Config.m_SvHit || NoDamage)
 					break;
 			}
 	}
@@ -407,19 +424,19 @@ void CGameWorld::NetObjBegin(CTeamsCore Teams, int LocalClientId)
 	OnModified();
 }
 
-void CGameWorld::NetCharAdd(int ObjId, CNetObj_Character *pCharObj, CNetObj_DDNetCharacter *pExtended, int GameTeam, bool IsLocal)
+void CGameWorld::NetCharAdd(int ObjId, CNetObj_Character *pCharObj, CNetObj_DDNetCharacter *pExtended, CNetObj_CharacterTuning *pTuning, int GameTeam, bool IsLocal)
 {
 	if(IsLocalTeam(ObjId))
 	{
 		CCharacter *pChar;
 		if((pChar = (CCharacter *)GetEntity(ObjId, ENTTYPE_CHARACTER)))
 		{
-			pChar->Read(pCharObj, pExtended, IsLocal);
+			pChar->Read(pCharObj, pExtended, pTuning, IsLocal);
 			pChar->Keep();
 		}
 		else
 		{
-			pChar = new CCharacter(this, ObjId, pCharObj, pExtended);
+			pChar = new CCharacter(this, ObjId, pCharObj, pExtended, pTuning);
 			InsertEntity(pChar);
 		}
 
@@ -479,9 +496,11 @@ void CGameWorld::NetObjAdd(int ObjId, int ObjType, const void *pObjData, const C
 						First = Dist;
 					}
 					else if(Dist < Second)
+					{
 						Second = Dist;
+					}
 				}
-				if(pClosest && maximum(First, 2.f) * 1.2f < Second)
+				if(pClosest && std::max(First, 2.0f) * 1.2f < Second)
 					NetProj.m_Owner = pClosest->m_Id;
 			}
 		}
@@ -689,6 +708,7 @@ void CGameWorld::CopyWorld(CGameWorld *pFrom)
 	m_pCollision = pFrom->m_pCollision;
 	m_WorldConfig = pFrom->m_WorldConfig;
 	m_pTuningList = pFrom->m_pTuningList;
+	m_vpLockedTuning = pFrom->m_vpLockedTuning;
 	m_pMapBugs = pFrom->m_pMapBugs;
 	m_Teams = pFrom->m_Teams;
 	m_Core.m_vSwitchers = pFrom->m_Core.m_vSwitchers;

@@ -7,9 +7,13 @@
 #include "linereader.h"
 
 #include <base/color.h>
+#include <base/dbg.h>
+#include <base/io.h>
 #include <base/log.h>
+#include <base/log_color.h>
 #include <base/math.h>
-#include <base/system.h>
+#include <base/mem.h>
+#include <base/str.h>
 
 #include <engine/client/checksum.h>
 #include <engine/console.h>
@@ -208,7 +212,7 @@ int CConsole::ParseArgs(CResult *pResult, const char *pFormat)
 			{
 				if(Command == 'v')
 				{
-					pResult->SetVictim(CResult::VICTIM_ME);
+					pResult->SetVictim("me");
 					break;
 				}
 				Command = NextParam(pFormat);
@@ -351,26 +355,24 @@ int IConsole::ToLogLevelFilter(int Level)
 	return Level + 2;
 }
 
-static LOG_COLOR ColorToLogColor(ColorRGBA Color)
-{
-	return LOG_COLOR{
-		(uint8_t)(Color.r * 255.0),
-		(uint8_t)(Color.g * 255.0),
-		(uint8_t)(Color.b * 255.0)};
-}
-
 void CConsole::Print(int Level, const char *pFrom, const char *pStr, ColorRGBA PrintColor) const
 {
 	LEVEL LogLevel = IConsole::ToLogLevel(Level);
 	// if console colors are not enabled or if the color is pure white, use default terminal color
 	if(g_Config.m_ConsoleEnableColors && PrintColor != CONSOLE_DEFAULT_COLOR)
 	{
-		log_log_color(LogLevel, ColorToLogColor(PrintColor), pFrom, "%s", pStr);
+		log_log_color(LogLevel, color_cast<LOG_COLOR>(PrintColor), pFrom, "%s", pStr);
 	}
 	else
 	{
 		log_log(LogLevel, pFrom, "%s", pStr);
 	}
+}
+
+void CConsole::SetGetVictimsCommandCallback(FGetVictimsCommandCallback pfnCallback, void *pUser)
+{
+	m_pfnGetVictimsCommandCallback = pfnCallback;
+	m_pGetVictimsCommandUserData = pUser;
 }
 
 void CConsole::SetTeeHistorianCommandCallback(FTeeHistorianCommandCallback pfnCallback, void *pUser)
@@ -419,18 +421,25 @@ bool CConsole::LineIsValid(const char *pStr)
 		CResult Result(IConsole::CLIENT_ID_UNSPECIFIED);
 		const char *pEnd = pStr;
 		const char *pNextPart = nullptr;
-		int InString = 0;
+		bool InString = false;
+		bool IsEscaping = false;
 
 		while(*pEnd)
 		{
-			if(*pEnd == '"')
-				InString ^= 1;
-			else if(*pEnd == '\\') // escape sequences
+			if(IsEscaping)
 			{
-				if(pEnd[1] == '"')
-					pEnd++;
+				IsEscaping = false;
 			}
-			else if(!InString)
+			else if(*pEnd == '"')
+			{
+				InString = !InString;
+			}
+			else if(InString && *pEnd == '\\') // escape sequences
+			{
+				IsEscaping = true;
+			}
+
+			if(!InString)
 			{
 				if(*pEnd == ';') // command separator
 				{
@@ -438,7 +447,9 @@ bool CConsole::LineIsValid(const char *pStr)
 					break;
 				}
 				else if(*pEnd == '#') // comment, no need to do anything more
+				{
 					break;
+				}
 			}
 
 			pEnd++;
@@ -470,18 +481,25 @@ void CConsole::ExecuteLineStroked(int Stroke, const char *pStr, int ClientId, bo
 		CResult Result(ClientId);
 		const char *pEnd = pStr;
 		const char *pNextPart = nullptr;
-		int InString = 0;
+		bool InString = false;
+		bool IsEscaping = false;
 
 		while(*pEnd)
 		{
-			if(*pEnd == '"')
-				InString ^= 1;
-			else if(*pEnd == '\\') // escape sequences
+			if(IsEscaping)
 			{
-				if(pEnd[1] == '"')
-					pEnd++;
+				IsEscaping = false;
 			}
-			else if(!InString && InterpretSemicolons)
+			else if(*pEnd == '"')
+			{
+				InString = !InString;
+			}
+			else if(InString && *pEnd == '\\') // escape sequences
+			{
+				IsEscaping = true;
+			}
+
+			if(!InString && InterpretSemicolons)
 			{
 				if(*pEnd == ';') // command separator
 				{
@@ -489,7 +507,9 @@ void CConsole::ExecuteLineStroked(int Stroke, const char *pStr, int ClientId, bo
 					break;
 				}
 				else if(*pEnd == '#') // comment, no need to do anything more
+				{
 					break;
+				}
 			}
 
 			pEnd++;
@@ -578,14 +598,26 @@ void CConsole::ExecuteLineStroked(int Stroke, const char *pStr, int ClientId, bo
 							m_pfnTeeHistorianCommandCallback(ClientId, m_FlagMask, pCommand->m_pName, &Result, m_pTeeHistorianCommandUserdata);
 						}
 
-						if(Result.GetVictim() == CResult::VICTIM_ME)
-							Result.SetVictim(ClientId);
-
-						if(Result.HasVictim() && Result.GetVictim() == CResult::VICTIM_ALL)
+						if(Result.m_aSpecialVictim[0])
 						{
-							for(int i = 0; i < MAX_CLIENTS; i++)
+							std::optional<std::vector<int>> Victims;
+							if(m_pfnGetVictimsCommandCallback)
 							{
-								Result.SetVictim(i);
+								Victims = m_pfnGetVictimsCommandCallback(ClientId, Result.m_aSpecialVictim, m_pGetVictimsCommandUserData);
+							}
+							else
+							{
+								Victims = std::nullopt;
+							}
+
+							if(!Victims.has_value())
+							{
+								log_error("console", "Invalid victim '%s'", Result.m_aSpecialVictim);
+								return;
+							}
+							for(const int VictimId : Victims.value())
+							{
+								Result.SetVictim(VictimId);
 								pCommand->m_pfnCallback(&Result, pCommand->m_pUserData);
 							}
 						}
@@ -702,11 +734,9 @@ bool CConsole::ExecuteFile(const char *pFilename, int ClientId, bool LogFailure,
 	// exec the file
 	CLineReader LineReader;
 	bool Success = false;
-	char aBuf[32 + IO_MAX_PATH_LENGTH];
 	if(LineReader.OpenFile(m_pStorage->OpenFile(pFilename, IOFLAG_READ, StorageType)))
 	{
-		str_format(aBuf, sizeof(aBuf), "executing '%s'", pFilename);
-		Print(IConsole::OUTPUT_LEVEL_STANDARD, "console", aBuf);
+		log_info("console", "executing '%s'", pFilename);
 
 		while(const char *pLine = LineReader.Get())
 		{
@@ -717,8 +747,7 @@ bool CConsole::ExecuteFile(const char *pFilename, int ClientId, bool LogFailure,
 	}
 	else if(LogFailure)
 	{
-		str_format(aBuf, sizeof(aBuf), "failed to open '%s'", pFilename);
-		Print(IConsole::OUTPUT_LEVEL_STANDARD, "console", aBuf);
+		log_error("console", "failed to open '%s'", pFilename);
 	}
 
 	m_pFirstExec = pPrev;
@@ -727,7 +756,7 @@ bool CConsole::ExecuteFile(const char *pFilename, int ClientId, bool LogFailure,
 
 void CConsole::Con_Echo(IResult *pResult, void *pUserData)
 {
-	((CConsole *)pUserData)->Print(IConsole::OUTPUT_LEVEL_STANDARD, "console", pResult->GetString(0));
+	log_info("console", "%s", pResult->GetString(0));
 }
 
 void CConsole::Con_Exec(IResult *pResult, void *pUserData)
@@ -767,7 +796,9 @@ void CConsole::ConCommandAccess(IResult *pResult, void *pUser)
 		}
 	}
 	else
+	{
 		str_format(aBuf, sizeof(aBuf), "No such command: '%s'.", pResult->GetString(0));
+	}
 
 	pConsole->Print(OUTPUT_LEVEL_STANDARD, "console", aBuf);
 }
@@ -846,6 +877,8 @@ CConsole::CConsole(int FlagMask)
 	m_pFirstExec = nullptr;
 	m_pfnTeeHistorianCommandCallback = nullptr;
 	m_pTeeHistorianCommandUserdata = nullptr;
+	m_pfnGetVictimsCommandCallback = nullptr;
+	m_pGetVictimsCommandUserData = nullptr;
 
 	m_pStorage = nullptr;
 
@@ -1064,18 +1097,10 @@ void CConsole::Con_Chain(IResult *pResult, void *pUserData)
 void CConsole::Chain(const char *pName, FChainCommandCallback pfnChainFunc, void *pUser)
 {
 	CCommand *pCommand = FindCommand(pName, m_FlagMask);
-
-	if(!pCommand)
-	{
-		char aBuf[256];
-		str_format(aBuf, sizeof(aBuf), "failed to chain '%s'", pName);
-		Print(IConsole::OUTPUT_LEVEL_DEBUG, "console", aBuf);
-		return;
-	}
-
-	CChain *pChainInfo = new CChain();
+	dbg_assert(pCommand != nullptr, "Invalid command to chain: '%s'", pName);
 
 	// store info
+	CChain *pChainInfo = new CChain();
 	pChainInfo->m_pfnChainCallback = pfnChainFunc;
 	pChainInfo->m_pUserData = pUser;
 	pChainInfo->m_pfnCallback = pCommand->m_pfnCallback;
@@ -1117,32 +1142,32 @@ std::unique_ptr<IConsole> CreateConsole(int FlagMask) { return std::make_unique<
 
 int CConsole::CResult::GetVictim() const
 {
-	return m_Victim;
+	dbg_assert(m_VictimId.has_value(), "m_VictimId has no value");
+	return m_VictimId.value();
 }
 
 void CConsole::CResult::ResetVictim()
 {
-	m_Victim = VICTIM_NONE;
-}
-
-bool CConsole::CResult::HasVictim() const
-{
-	return m_Victim != VICTIM_NONE;
+	m_VictimId = std::nullopt;
+	m_aSpecialVictim[0] = '\0';
 }
 
 void CConsole::CResult::SetVictim(int Victim)
 {
-	m_Victim = std::clamp<int>(Victim, VICTIM_NONE, MAX_CLIENTS - 1);
+	dbg_assert(in_range(Victim, 0, MAX_CLIENTS - 1), "Victim ID %d out of range [0, %d]", Victim, MAX_CLIENTS - 1);
+	m_VictimId = Victim;
 }
 
 void CConsole::CResult::SetVictim(const char *pVictim)
 {
-	if(!str_comp(pVictim, "me"))
-		m_Victim = VICTIM_ME;
-	else if(!str_comp(pVictim, "all"))
-		m_Victim = VICTIM_ALL;
-	else
-		m_Victim = std::clamp<int>(str_toint(pVictim), 0, MAX_CLIENTS - 1);
+	int Value;
+	if(!str_toint(pVictim, &Value) || !in_range(Value, 0, MAX_CLIENTS - 1))
+	{
+		str_copy(m_aSpecialVictim, pVictim);
+		return;
+	}
+
+	SetVictim(Value);
 }
 
 std::optional<ColorHSLA> CConsole::ColorParse(const char *pStr, float DarkestLighting)

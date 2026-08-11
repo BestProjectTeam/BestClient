@@ -1,15 +1,16 @@
+#include <base/mem.h>
+
 #include <engine/shared/masterserver.h>
 
 #include <game/client/gameclient.h>
 
-void CClient::PreprocessConnlessPacket7(CNetChunk *pPacket)
+bool CClient::PreprocessConnlessPacket7(CNetChunk *pPacket)
 {
 	if(mem_comp(pPacket->m_pData, SERVERBROWSE_INFO, sizeof(SERVERBROWSE_INFO)) == 0)
 	{
 		CUnpacker Up;
 		Up.Reset((unsigned char *)pPacket->m_pData + sizeof(SERVERBROWSE_INFO), pPacket->m_DataSize - sizeof(SERVERBROWSE_INFO));
-		CServerInfo Info;
-		mem_zero(&Info, sizeof(CServerInfo));
+		CServerInfo Info = {};
 
 		auto GetString = [&Up](auto &Buf) {
 			str_copy(Buf, Up.GetString(CUnpacker::SANITIZE_CC | CUnpacker::SKIP_START_WHITESPACES));
@@ -30,13 +31,18 @@ void CClient::PreprocessConnlessPacket7(CNetChunk *pPacket)
 		Info.m_NumClients = Up.GetInt();
 		Info.m_MaxClients = Up.GetInt();
 
-		for(int i = 0; i < Info.m_NumClients; i++)
+		Info.m_vClients.resize(std::clamp(Info.m_NumClients, 0, (int)SERVERINFO_MAX_CLIENTS));
+		for(auto &Client : Info.m_vClients)
 		{
-			GetString(Info.m_aClients[i].m_aName);
-			GetString(Info.m_aClients[i].m_aClan);
-			Info.m_aClients[i].m_Country = Up.GetInt();
-			Info.m_aClients[i].m_Score = Up.GetInt();
-			Info.m_aClients[i].m_Player = !(Up.GetInt() & 1);
+			GetString(Client.m_aName);
+			GetString(Client.m_aClan);
+			Client.m_Country = Up.GetInt();
+			if(!in_range(Client.m_Country, CountryCode::MINIMUM, CountryCode::MAXIMUM))
+			{
+				Client.m_Country = CountryCode::DEFAULT;
+			}
+			Client.m_Score = Up.GetInt();
+			Client.m_Player = !(Up.GetInt() & 1);
 		}
 
 		const bool IsNotVanilla = Info.m_MaxPlayers > VANILLA_MAX_CLIENTS || Info.m_MaxClients > VANILLA_MAX_CLIENTS;
@@ -77,19 +83,24 @@ void CClient::PreprocessConnlessPacket7(CNetChunk *pPacket)
 			Packer.AddString(""); // extra info, reserved
 		}
 
-		for(int i = 0; i < Info.m_NumClients; i++)
+		for(const auto &Client : Info.m_vClients)
 		{
-			Packer.AddString(Info.m_aClients[i].m_aName);
-			Packer.AddString(Info.m_aClients[i].m_aClan);
+			Packer.AddString(Client.m_aName);
+			Packer.AddString(Client.m_aClan);
 
-			PutInt(Info.m_aClients[i].m_Country);
-			PutInt(Info.m_aClients[i].m_Score);
-			PutInt(Info.m_aClients[i].m_Player);
+			PutInt(Client.m_Country);
+			PutInt(Client.m_Score);
+			PutInt(Client.m_Player);
 
 			if(IsNotVanilla)
 			{
 				Packer.AddString(""); // extra info, reserved
 			}
+		}
+
+		if(Packer.Error() || SERVERBROWSE_SIZE + Packer.Size() > NET_MAX_PAYLOAD)
+		{
+			return false;
 		}
 
 		if(IsNotVanilla)
@@ -99,4 +110,5 @@ void CClient::PreprocessConnlessPacket7(CNetChunk *pPacket)
 		mem_copy((unsigned char *)pPacket->m_pData + SERVERBROWSE_SIZE, Packer.Data(), Packer.Size());
 		pPacket->m_DataSize = SERVERBROWSE_SIZE + Packer.Size();
 	}
+	return true;
 }

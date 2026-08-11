@@ -691,8 +691,8 @@ public:
 
 	virtual void Minimize() = 0;
 	virtual void SetWindowParams(int FullscreenMode, bool IsBorderless) = 0;
-	virtual bool SetWindowScreen(int Index, bool MoveToCenter) = 0;
-	virtual bool UpdateDisplayMode(int Index) = 0;
+	virtual bool SetWindowScreen(int Index, bool MoveToCenter, ivec2 *pDesktopSize) = 0;
+	virtual bool UpdateDisplayMode(int Index, ivec2 *pDesktopSize) = 0;
 	virtual int GetWindowScreen() = 0;
 	virtual int WindowActive() = 0;
 	virtual int WindowOpen() = 0;
@@ -730,6 +730,7 @@ public:
 	// be aware that this function should only be called from the graphics thread, and even then you should really know what you are doing
 	virtual TGLBackendReadPresentedImageData &GetReadPresentedImageDataFuncUnsafe() = 0;
 
+	virtual const char *GetFatalError() const = 0;
 	virtual bool GetWarning(std::vector<std::string> &WarningStrings) = 0;
 
 	/**
@@ -915,8 +916,8 @@ public:
 
 	const TTwGraphicsGpuList &GetGpus() const override;
 
-	void MapScreen(float TopLeftX, float TopLeftY, float BottomRightX, float BottomRightY) override;
-	void GetScreen(float *pTopLeftX, float *pTopLeftY, float *pBottomRightX, float *pBottomRightY) const override;
+	void MapScreen(const CScreenRect &ScreenRect) override;
+	CScreenRect GetScreen() const override;
 
 	void LinesBegin() override;
 	void LinesEnd() override;
@@ -937,7 +938,7 @@ public:
 	bool UnloadTextTextures(CTextureHandle &TextTexture, CTextureHandle &TextOutlineTexture) override;
 	bool UpdateTextTexture(CTextureHandle TextureId, int x, int y, size_t Width, size_t Height, uint8_t *pData, bool IsMovedPointer) override;
 
-	CTextureHandle LoadSpriteTexture(const CImageInfo &FromImageInfo, const struct CDataSprite *pSprite) override;
+	CTextureHandle LoadSpriteTexture(const CImageInfo &FromImageInfo, const std::optional<CImageInfo> &FallbackImageInfo, const struct CDataSprite *pSprite) override;
 
 	bool IsImageSubFullyTransparent(const CImageInfo &FromImageInfo, int x, int y, int w, int h) override;
 	bool IsSpriteTextureFullyTransparent(const CImageInfo &FromImageInfo, const struct CDataSprite *pSprite) override;
@@ -1164,7 +1165,9 @@ public:
 			PrimCount = NumVerts / 3;
 		}
 		else
+		{
 			return;
+		}
 
 		Command.m_pVertices = (decltype(Command.m_pVertices))AllocCommandBufferData(VertSize * NumVerts);
 		Command.m_State = m_State;
@@ -1242,9 +1245,6 @@ public:
 	int GetVideoModes(CVideoMode *pModes, int MaxModes, int Screen) override;
 	void GetCurrentVideoMode(CVideoMode &CurMode, int Screen) override;
 
-	virtual int GetDesktopScreenWidth() const { return g_Config.m_GfxDesktopWidth; }
-	virtual int GetDesktopScreenHeight() const { return g_Config.m_GfxDesktopHeight; }
-
 	// synchronization
 	void InsertSignal(CSemaphore *pSemaphore) override;
 	bool IsIdle() const override;
@@ -1264,11 +1264,13 @@ public:
 	bool IsTextBufferingEnabled() override { return m_GLTextBufferingEnabled; }
 	bool IsQuadContainerBufferingEnabled() override { return m_GLQuadContainerBufferingEnabled; }
 	bool Uses2DTextureArrays() override { return m_GLUses2DTextureArrays; }
+	int TextureLoadFlags() override { return Uses2DTextureArrays() ? IGraphics::TEXLOAD_TO_2D_ARRAY_TEXTURE : IGraphics::TEXLOAD_TO_3D_TEXTURE; }
 	bool HasTextureArraysSupport() override { return m_GLHasTextureArraysSupport; }
 
 	const char *GetVendorString() override;
 	const char *GetVersionString() override;
 	const char *GetRendererString() override;
+	const char *GetFatalError() const override;
 
 	TGLBackendReadPresentedImageData &GetReadPresentedImageDataFuncUnsafe() override;
 

@@ -23,7 +23,7 @@ class IEnvelopeEval
 {
 public:
 	virtual ~IEnvelopeEval() = default;
-	virtual void EnvelopeEval(int TimeOffsetMillis, int EnvelopeIndex, ColorRGBA &Result, size_t Channels) = 0;
+	virtual void EnvelopeEval(int TimeOffsetMillis, int EnvelopeIndex, ColorRGBA &Result, size_t Channels) const = 0;
 };
 
 class IMapImages
@@ -35,6 +35,7 @@ public:
 	// DDRace
 	virtual IGraphics::CTextureHandle GetEntities(EMapImageEntityLayerType EntityLayerType) = 0;
 	virtual IGraphics::CTextureHandle GetSpeedupArrow() = 0;
+	virtual IGraphics::CTextureHandle GetTuneColors() = 0;
 
 	virtual IGraphics::CTextureHandle GetOverlayBottom() = 0;
 	virtual IGraphics::CTextureHandle GetOverlayTop() = 0;

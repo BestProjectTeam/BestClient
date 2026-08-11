@@ -1,8 +1,10 @@
 #include "menus.h"
 
+#include <base/dbg.h>
 #include <base/log.h>
 #include <base/str.h>
 #include <base/system.h>
+#include <base/time.h>
 
 #include <game/mapitems.h>
 
@@ -1067,7 +1069,7 @@ static int InitSearchList(std::vector<const TName *> &vpSearchList, std::vector<
 	return vAssetList.size();
 }
 
-void CMenus::RenderSettingsCustom(CUIRect MainView)
+void CMenus::RenderSettingsAssets(CUIRect MainView)
 {
 	CUIRect TabBar, CustomList, QuickSearch, DirectoryButton, ReloadButton;
 	static bool s_EntityGamePreview = true;

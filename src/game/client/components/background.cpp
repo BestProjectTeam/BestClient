@@ -1,6 +1,6 @@
 #include "background.h"
 
-#include <base/system.h>
+#include <base/str.h>
 
 #include <engine/map.h>
 #include <engine/shared/config.h>
@@ -73,7 +73,7 @@ void CBackground::LoadBackground()
 		}
 		else if(m_pMap->Load(g_Config.m_ClBackgroundEntities, Storage(), aBuf, IStorage::TYPE_ALL))
 		{
-			m_pLayers->Init(m_pMap, true);
+			m_pLayers->Init(m_pMap, true, true);
 			NeedImageLoading = true;
 			m_Loaded = true;
 		}

@@ -1,9 +1,13 @@
+#include <base/dbg.h>
+#include <base/mem.h>
 #include <base/net.h>
-#include <base/system.h>
+#include <base/secure.h>
+#include <base/str.h>
+#include <base/time.h>
 
 #include <engine/client.h>
 #include <engine/discord.h>
-#include <engine/shared/http.h>
+#include <engine/http.h>
 
 #if defined(CONF_DISCORD)
 #include <discord_game_sdk.h>
@@ -12,7 +16,7 @@ typedef enum EDiscordResult(DISCORD_API *FDiscordCreate)(DiscordVersion, struct 
 
 #if defined(CONF_DISCORD_DYNAMIC)
 #include <dlfcn.h>
-FDiscordCreate GetDiscordCreate()
+static FDiscordCreate GetDiscordCreate()
 {
 	void *pSdk = dlopen("discord_game_sdk.so", RTLD_NOW);
 	if(!pSdk)
@@ -22,7 +26,7 @@ FDiscordCreate GetDiscordCreate()
 	return (FDiscordCreate)dlsym(pSdk, "DiscordCreate");
 }
 #else
-FDiscordCreate GetDiscordCreate()
+static FDiscordCreate GetDiscordCreate()
 {
 	return DiscordCreate;
 }
@@ -144,7 +148,7 @@ public:
 				m_UpdateActivity = false;
 				m_LastActivityUpdate = time_get();
 
-				m_pActivityManager->update_activity(m_pActivityManager, &m_Activity, 0, 0);
+				m_pActivityManager->update_activity(m_pActivityManager, &m_Activity, nullptr, nullptr);
 			}
 
 			m_pCore->run_callbacks(m_pCore);
@@ -171,6 +175,7 @@ public:
 		str_copy(m_Activity.assets.large_image, "bestclientlogo", sizeof(m_Activity.assets.large_image));
 		str_copy(m_Activity.assets.large_text, "discord.gg/bestclient", sizeof(m_Activity.assets.large_text));
 		m_Activity.timestamps.start = time_timestamp();
+		str_copy(m_Activity.name, "Online");
 		m_Activity.instance = true;
 		m_ShowMap = ShowMap;
 
@@ -298,13 +303,13 @@ static IDiscord *CreateDiscordImpl()
 	FDiscordCreate pfnDiscordCreate = GetDiscordCreate();
 	if(!pfnDiscordCreate)
 	{
-		return 0;
+		return nullptr;
 	}
 	CDiscord *pDiscord = new CDiscord();
 	if(pDiscord->Init(pfnDiscordCreate))
 	{
 		delete pDiscord;
-		return 0;
+		return nullptr;
 	}
 	return pDiscord;
 }

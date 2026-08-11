@@ -15,7 +15,7 @@
 #include <vector>
 
 class IConfigManager;
-class CHttpRequest;
+class IHttpRequest;
 
 enum
 {
@@ -37,7 +37,7 @@ public:
 		IGraphics::CTextureHandle m_Thumbnail; // lazily loaded on first render of the wheel
 		bool m_ThumbnailRequested = false;
 		bool m_ThumbnailFailed = false;
-		std::shared_ptr<CHttpRequest> m_pThumbnailRequest;
+		std::shared_ptr<IHttpRequest> m_pThumbnailRequest;
 
 		bool operator==(const CSlot &Other) const
 		{

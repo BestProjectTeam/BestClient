@@ -1,10 +1,15 @@
 /* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 
+#include "graphics_threaded.h"
+
+#include <base/dbg.h>
 #include <base/detect.h>
+#include <base/io.h>
 #include <base/log.h>
-#include <base/math.h>
-#include <base/system.h>
+#include <base/mem.h>
+#include <base/str.h>
+#include <base/time.h>
 
 #include <engine/engine.h>
 #include <engine/gfx/image_loader.h>
@@ -22,36 +27,23 @@
 #include <engine/shared/video.h>
 #endif
 
-#include "graphics_threaded.h"
+#include <algorithm>
 
 class CSemaphore;
 
 static CVideoMode g_aFakeModes[] = {
-	{8192, 4320, 8192, 4320, 0, 8, 8, 8, 0}, {7680, 4320, 7680, 4320, 0, 8, 8, 8, 0}, {5120, 2880, 5120, 2880, 0, 8, 8, 8, 0},
-	{4096, 2160, 4096, 2160, 0, 8, 8, 8, 0}, {3840, 2160, 3840, 2160, 0, 8, 8, 8, 0}, {2560, 1440, 2560, 1440, 0, 8, 8, 8, 0},
-	{2048, 1536, 2048, 1536, 0, 8, 8, 8, 0}, {1920, 2400, 1920, 2400, 0, 8, 8, 8, 0}, {1920, 1440, 1920, 1440, 0, 8, 8, 8, 0},
-	{1920, 1200, 1920, 1200, 0, 8, 8, 8, 0}, {1920, 1080, 1920, 1080, 0, 8, 8, 8, 0}, {1856, 1392, 1856, 1392, 0, 8, 8, 8, 0},
-	{1800, 1440, 1800, 1440, 0, 8, 8, 8, 0}, {1792, 1344, 1792, 1344, 0, 8, 8, 8, 0}, {1680, 1050, 1680, 1050, 0, 8, 8, 8, 0},
-	{1600, 1200, 1600, 1200, 0, 8, 8, 8, 0}, {1600, 1000, 1600, 1000, 0, 8, 8, 8, 0}, {1440, 1050, 1440, 1050, 0, 8, 8, 8, 0},
-	{1440, 900, 1440, 900, 0, 8, 8, 8, 0}, {1400, 1050, 1400, 1050, 0, 8, 8, 8, 0}, {1368, 768, 1368, 768, 0, 8, 8, 8, 0},
-	{1280, 1024, 1280, 1024, 0, 8, 8, 8, 0}, {1280, 960, 1280, 960, 0, 8, 8, 8, 0}, {1280, 800, 1280, 800, 0, 8, 8, 8, 0},
-	{1280, 768, 1280, 768, 0, 8, 8, 8, 0}, {1152, 864, 1152, 864, 0, 8, 8, 8, 0}, {1024, 768, 1024, 768, 0, 8, 8, 8, 0},
-	{1024, 600, 1024, 600, 0, 8, 8, 8, 0}, {800, 600, 800, 600, 0, 8, 8, 8, 0}, {768, 576, 768, 576, 0, 8, 8, 8, 0},
-	{720, 400, 720, 400, 0, 8, 8, 8, 0}, {640, 480, 640, 480, 0, 8, 8, 8, 0}, {400, 300, 400, 300, 0, 8, 8, 8, 0},
-	{320, 240, 320, 240, 0, 8, 8, 8, 0},
-
-	{8192, 4320, 8192, 4320, 0, 5, 6, 5, 0}, {7680, 4320, 7680, 4320, 0, 5, 6, 5, 0}, {5120, 2880, 5120, 2880, 0, 5, 6, 5, 0},
-	{4096, 2160, 4096, 2160, 0, 5, 6, 5, 0}, {3840, 2160, 3840, 2160, 0, 5, 6, 5, 0}, {2560, 1440, 2560, 1440, 0, 5, 6, 5, 0},
-	{2048, 1536, 2048, 1536, 0, 5, 6, 5, 0}, {1920, 2400, 1920, 2400, 0, 5, 6, 5, 0}, {1920, 1440, 1920, 1440, 0, 5, 6, 5, 0},
-	{1920, 1200, 1920, 1200, 0, 5, 6, 5, 0}, {1920, 1080, 1920, 1080, 0, 5, 6, 5, 0}, {1856, 1392, 1856, 1392, 0, 5, 6, 5, 0},
-	{1800, 1440, 1800, 1440, 0, 5, 6, 5, 0}, {1792, 1344, 1792, 1344, 0, 5, 6, 5, 0}, {1680, 1050, 1680, 1050, 0, 5, 6, 5, 0},
-	{1600, 1200, 1600, 1200, 0, 5, 6, 5, 0}, {1600, 1000, 1600, 1000, 0, 5, 6, 5, 0}, {1440, 1050, 1440, 1050, 0, 5, 6, 5, 0},
-	{1440, 900, 1440, 900, 0, 5, 6, 5, 0}, {1400, 1050, 1400, 1050, 0, 5, 6, 5, 0}, {1368, 768, 1368, 768, 0, 5, 6, 5, 0},
-	{1280, 1024, 1280, 1024, 0, 5, 6, 5, 0}, {1280, 960, 1280, 960, 0, 5, 6, 5, 0}, {1280, 800, 1280, 800, 0, 5, 6, 5, 0},
-	{1280, 768, 1280, 768, 0, 5, 6, 5, 0}, {1152, 864, 1152, 864, 0, 5, 6, 5, 0}, {1024, 768, 1024, 768, 0, 5, 6, 5, 0},
-	{1024, 600, 1024, 600, 0, 5, 6, 5, 0}, {800, 600, 800, 600, 0, 5, 6, 5, 0}, {768, 576, 768, 576, 0, 5, 6, 5, 0},
-	{720, 400, 720, 400, 0, 5, 6, 5, 0}, {640, 480, 640, 480, 0, 5, 6, 5, 0}, {400, 300, 400, 300, 0, 5, 6, 5, 0},
-	{320, 240, 320, 240, 0, 5, 6, 5, 0}};
+	{8192, 4320, 8192, 4320, 0}, {7680, 4320, 7680, 4320, 0}, {5120, 2880, 5120, 2880, 0},
+	{4096, 2160, 4096, 2160, 0}, {3840, 2160, 3840, 2160, 0}, {2560, 1440, 2560, 1440, 0},
+	{2048, 1536, 2048, 1536, 0}, {1920, 2400, 1920, 2400, 0}, {1920, 1440, 1920, 1440, 0},
+	{1920, 1200, 1920, 1200, 0}, {1920, 1080, 1920, 1080, 0}, {1856, 1392, 1856, 1392, 0},
+	{1800, 1440, 1800, 1440, 0}, {1792, 1344, 1792, 1344, 0}, {1680, 1050, 1680, 1050, 0},
+	{1600, 1200, 1600, 1200, 0}, {1600, 1000, 1600, 1000, 0}, {1440, 1050, 1440, 1050, 0},
+	{1440, 900, 1440, 900, 0}, {1400, 1050, 1400, 1050, 0}, {1368, 768, 1368, 768, 0},
+	{1280, 1024, 1280, 1024, 0}, {1280, 960, 1280, 960, 0}, {1280, 800, 1280, 800, 0},
+	{1280, 768, 1280, 768, 0}, {1152, 864, 1152, 864, 0}, {1024, 768, 1024, 768, 0},
+	{1024, 600, 1024, 600, 0}, {800, 600, 800, 600, 0}, {768, 576, 768, 576, 0},
+	{720, 400, 720, 400, 0}, {640, 480, 640, 480, 0}, {400, 300, 400, 300, 0},
+	{320, 240, 320, 240, 0}};
 
 void CGraphics_Threaded::FlushVertices(bool KeepVertices)
 {
@@ -110,7 +102,7 @@ CGraphics_Threaded::CGraphics_Threaded()
 	m_State.m_ClipW = 0;
 	m_State.m_ClipH = 0;
 	m_State.m_Texture = -1;
-	m_State.m_BlendMode = EBlendMode::NONE;
+	m_State.m_BlendMode = EBlendMode::ALPHA;
 	m_State.m_WrapMode = EWrapMode::REPEAT;
 
 	m_CurrentCommandBuffer = 0;
@@ -207,20 +199,15 @@ const TTwGraphicsGpuList &CGraphics_Threaded::GetGpus() const
 	return m_pBackend->GetGpus();
 }
 
-void CGraphics_Threaded::MapScreen(float TopLeftX, float TopLeftY, float BottomRightX, float BottomRightY)
+void CGraphics_Threaded::MapScreen(const CScreenRect &ScreenRect)
 {
-	m_State.m_ScreenTL.x = TopLeftX;
-	m_State.m_ScreenTL.y = TopLeftY;
-	m_State.m_ScreenBR.x = BottomRightX;
-	m_State.m_ScreenBR.y = BottomRightY;
+	m_State.m_ScreenTL = ScreenRect.m_TopLeft;
+	m_State.m_ScreenBR = ScreenRect.m_BottomRight;
 }
 
-void CGraphics_Threaded::GetScreen(float *pTopLeftX, float *pTopLeftY, float *pBottomRightX, float *pBottomRightY) const
+CScreenRect CGraphics_Threaded::GetScreen() const
 {
-	*pTopLeftX = m_State.m_ScreenTL.x;
-	*pTopLeftY = m_State.m_ScreenTL.y;
-	*pBottomRightX = m_State.m_ScreenBR.x;
-	*pBottomRightY = m_State.m_ScreenBR.y;
+	return CScreenRect(m_State.m_ScreenTL, m_State.m_ScreenBR);
 }
 
 void CGraphics_Threaded::LinesBegin()
@@ -329,7 +316,7 @@ void CGraphics_Threaded::UnloadTexture(CTextureHandle *pIndex)
 	FreeTextureIndex(pIndex);
 }
 
-IGraphics::CTextureHandle CGraphics_Threaded::LoadSpriteTexture(const CImageInfo &FromImageInfo, const CDataSprite *pSprite)
+IGraphics::CTextureHandle CGraphics_Threaded::LoadSpriteTexture(const CImageInfo &FromImageInfo, const std::optional<CImageInfo> &FallbackImageInfo, const CDataSprite *pSprite)
 {
 	int ImageGridX = FromImageInfo.m_Width / pSprite->m_pSet->m_Gridx;
 	int ImageGridY = FromImageInfo.m_Height / pSprite->m_pSet->m_Gridy;
@@ -338,11 +325,18 @@ IGraphics::CTextureHandle CGraphics_Threaded::LoadSpriteTexture(const CImageInfo
 	int w = pSprite->m_W * ImageGridX;
 	int h = pSprite->m_H * ImageGridY;
 
+	// check for invisible texture, maybe due to outdated game assets
+	if(FallbackImageInfo.has_value() && IsImageSubFullyTransparent(FromImageInfo, x, y, w, h))
+	{
+		log_warn("graphics", "Asset '%s' appears to be invisible, falling back to default", pSprite->m_pName);
+		return LoadSpriteTexture(FallbackImageInfo.value(), std::nullopt, pSprite);
+	}
+
 	CImageInfo SpriteInfo;
 	SpriteInfo.m_Width = w;
 	SpriteInfo.m_Height = h;
 	SpriteInfo.m_Format = FromImageInfo.m_Format;
-	SpriteInfo.m_pData = static_cast<uint8_t *>(malloc(SpriteInfo.DataSize()));
+	SpriteInfo.Allocate();
 	SpriteInfo.CopyRectFrom(FromImageInfo, x, y, w, h, 0, 0);
 	return LoadTextureRawMove(SpriteInfo, 0, pSprite->m_pName);
 }
@@ -617,12 +611,12 @@ bool CGraphics_Threaded::CheckImageDivisibility(const char *pContextName, CImage
 		int NewHeight = DivY;
 		if(WidthBroken)
 		{
-			NewWidth = maximum<int>(HighestBit(Image.m_Width), DivX);
+			NewWidth = std::max(HighestBit(Image.m_Width), DivX);
 			NewHeight = (NewWidth / DivX) * DivY;
 		}
 		else
 		{
-			NewHeight = maximum<int>(HighestBit(Image.m_Height), DivY);
+			NewHeight = std::max(HighestBit(Image.m_Height), DivY);
 			NewWidth = (NewHeight / DivY) * DivX;
 		}
 		ResizeImage(Image, NewWidth, NewHeight);
@@ -723,6 +717,10 @@ void CGraphics_Threaded::ScreenshotDirect(bool *pSwapped)
 	if(Image.m_pData)
 	{
 		m_pEngine->AddJob(std::make_shared<CScreenshotSaveJob>(m_pStorage, m_aScreenshotName, std::move(Image)));
+	}
+	else
+	{
+		log_error("graphics", "Failed to create screenshot");
 	}
 }
 
@@ -1747,11 +1745,13 @@ void CGraphics_Threaded::RenderQuadContainerEx(int ContainerIndex, int QuadOffse
 
 		WrapClamp();
 
-		float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
-		GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
-		MapScreen((ScreenX0 - X) / ScaleX, (ScreenY0 - Y) / ScaleY, (ScreenX1 - X) / ScaleX, (ScreenY1 - Y) / ScaleY);
+		CScreenRect ScreenRect = GetScreen();
+		CScreenRect CommandScreenRect = ScreenRect.Move({-X, -Y});
+		CommandScreenRect.m_TopLeft /= vec2(ScaleX, ScaleY);
+		CommandScreenRect.m_BottomRight /= vec2(ScaleX, ScaleY);
 		Cmd.m_State = m_State;
-		MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
+		Cmd.m_State.m_ScreenTL = CommandScreenRect.m_TopLeft;
+		Cmd.m_State.m_ScreenBR = CommandScreenRect.m_BottomRight;
 
 		Cmd.m_DrawNum = QuadDrawNum * 6;
 		Cmd.m_pOffset = (void *)(QuadOffset * 6 * sizeof(unsigned int));
@@ -1948,7 +1948,7 @@ int CGraphics_Threaded::CreateBufferObject(size_t UploadDataSize, void *pUploadD
 		m_vBufferObjectIndices[Index] = Index;
 	}
 
-	dbg_assert((CreateFlags & EBufferObjectCreateFlags::BUFFER_OBJECT_CREATE_FLAGS_ONE_TIME_USE_BIT) == 0 || (UploadDataSize <= CCommandBuffer::MAX_VERTICES * maximum(sizeof(CCommandBuffer::SVertexTex3DStream), sizeof(CCommandBuffer::SVertexTex3D))),
+	dbg_assert((CreateFlags & EBufferObjectCreateFlags::BUFFER_OBJECT_CREATE_FLAGS_ONE_TIME_USE_BIT) == 0 || (UploadDataSize <= CCommandBuffer::MAX_VERTICES * std::max(sizeof(CCommandBuffer::SVertexTex3DStream), sizeof(CCommandBuffer::SVertexTex3D))),
 		"If BUFFER_OBJECT_CREATE_FLAGS_ONE_TIME_USE_BIT is used, then the buffer size must not exceed max(sizeof(CCommandBuffer::SVertexTex3DStream), sizeof(CCommandBuffer::SVertexTex3D)) * CCommandBuffer::MAX_VERTICES");
 
 	CCommandBuffer::SCommand_CreateBufferObject Cmd;
@@ -2004,7 +2004,7 @@ void CGraphics_Threaded::RecreateBufferObject(int BufferIndex, size_t UploadData
 	Cmd.m_DeletePointer = IsMovedPointer;
 	Cmd.m_Flags = CreateFlags;
 
-	dbg_assert((CreateFlags & EBufferObjectCreateFlags::BUFFER_OBJECT_CREATE_FLAGS_ONE_TIME_USE_BIT) == 0 || (UploadDataSize <= CCommandBuffer::MAX_VERTICES * maximum(sizeof(CCommandBuffer::SVertexTex3DStream), sizeof(CCommandBuffer::SVertexTex3D))),
+	dbg_assert((CreateFlags & EBufferObjectCreateFlags::BUFFER_OBJECT_CREATE_FLAGS_ONE_TIME_USE_BIT) == 0 || (UploadDataSize <= CCommandBuffer::MAX_VERTICES * std::max(sizeof(CCommandBuffer::SVertexTex3DStream), sizeof(CCommandBuffer::SVertexTex3D))),
 		"If BUFFER_OBJECT_CREATE_FLAGS_ONE_TIME_USE_BIT is used, then the buffer size must not exceed max(sizeof(CCommandBuffer::SVertexTex3DStream), sizeof(CCommandBuffer::SVertexTex3D)) * CCommandBuffer::MAX_VERTICES");
 
 	if(IsMovedPointer)
@@ -2219,7 +2219,7 @@ int CGraphics_Threaded::IssueInit()
 		Flags |= IGraphicsBackend::INITFLAG_VSYNC;
 	}
 
-	const int Result = m_pBackend->Init("DDNet Client", &g_Config.m_GfxScreen, &g_Config.m_GfxScreenWidth, &g_Config.m_GfxScreenHeight, &g_Config.m_GfxScreenRefreshRate, &g_Config.m_GfxFsaaSamples, Flags, &g_Config.m_GfxDesktopWidth, &g_Config.m_GfxDesktopHeight, &m_ScreenWidth, &m_ScreenHeight, m_pStorage);
+	const int Result = m_pBackend->Init("DDNet Client", &g_Config.m_GfxScreen, &g_Config.m_GfxScreenWidth, &g_Config.m_GfxScreenHeight, &g_Config.m_GfxScreenRefreshRate, &g_Config.m_GfxFsaaSamples, Flags, &m_DesktopSize.x, &m_DesktopSize.y, &m_ScreenWidth, &m_ScreenHeight, m_pStorage);
 	AddBackEndWarningIfExists();
 	if(Result == 0)
 	{
@@ -2530,9 +2530,8 @@ int CGraphics_Threaded::Init()
 		NullTextureInfo.m_Height = NullTextureDimension;
 		NullTextureInfo.m_Format = CImageInfo::FORMAT_RGBA;
 		NullTextureInfo.m_pData = aNullTextureData;
-		const int TextureLoadFlags = Uses2DTextureArrays() ? IGraphics::TEXLOAD_TO_2D_ARRAY_TEXTURE : IGraphics::TEXLOAD_TO_3D_TEXTURE;
 		m_NullTexture.Invalidate();
-		m_NullTexture = LoadTextureRaw(NullTextureInfo, TextureLoadFlags, "null-texture");
+		m_NullTexture = LoadTextureRaw(NullTextureInfo, TextureLoadFlags(), "null-texture");
 		dbg_assert(m_NullTexture.IsNullTexture(), "Null texture invalid");
 	}
 
@@ -2588,7 +2587,7 @@ void CGraphics_Threaded::SetWindowParams(int FullscreenMode, bool IsBorderless)
 
 	m_pBackend->SetWindowParams(g_Config.m_GfxFullscreen, g_Config.m_GfxBorderless);
 	CVideoMode CurMode;
-	m_pBackend->GetCurrentVideoMode(CurMode, m_ScreenHiDPIScale, g_Config.m_GfxDesktopWidth, g_Config.m_GfxDesktopHeight, g_Config.m_GfxScreen);
+	m_pBackend->GetCurrentVideoMode(CurMode, m_ScreenHiDPIScale, m_DesktopSize.x, m_DesktopSize.y, g_Config.m_GfxScreen);
 	GotResized(CurMode.m_WindowWidth, CurMode.m_WindowHeight, CurMode.m_RefreshRate);
 
 	for(auto &PropChangedListener : m_vPropChangeListeners)
@@ -2597,7 +2596,7 @@ void CGraphics_Threaded::SetWindowParams(int FullscreenMode, bool IsBorderless)
 
 bool CGraphics_Threaded::SetWindowScreen(int Index, bool MoveToCenter)
 {
-	if(!m_pBackend->SetWindowScreen(Index, MoveToCenter))
+	if(!m_pBackend->SetWindowScreen(Index, MoveToCenter, &m_DesktopSize))
 	{
 		return false;
 	}
@@ -2635,7 +2634,6 @@ bool CGraphics_Threaded::SwitchWindowScreen(int Index, bool MoveToCenter)
 		CVideoMode CurMode;
 		GetCurrentVideoMode(CurMode, Index);
 
-		g_Config.m_GfxColorDepth = CurMode.m_Red + CurMode.m_Green + CurMode.m_Blue > 16 ? 24 : 16;
 		g_Config.m_GfxScreenWidth = CurMode.m_WindowWidth;
 		g_Config.m_GfxScreenHeight = CurMode.m_WindowHeight;
 		g_Config.m_GfxScreenRefreshRate = CurMode.m_RefreshRate;
@@ -2656,7 +2654,8 @@ void CGraphics_Threaded::Move(int x, int y)
 
 	// Only handling CurScreen != m_GfxScreen doesn't work reliably
 	const int CurScreen = m_pBackend->GetWindowScreen();
-	m_pBackend->UpdateDisplayMode(CurScreen);
+	if(!m_pBackend->UpdateDisplayMode(CurScreen, &m_DesktopSize))
+		return;
 
 	// send a got resized event so that the current canvas size is requested
 	GotResized(g_Config.m_GfxScreenWidth, g_Config.m_GfxScreenHeight, g_Config.m_GfxScreenRefreshRate);
@@ -2679,7 +2678,7 @@ bool CGraphics_Threaded::Resize(int w, int h, int RefreshRate)
 	if(m_pBackend->ResizeWindow(w, h, RefreshRate))
 	{
 		CVideoMode CurMode;
-		m_pBackend->GetCurrentVideoMode(CurMode, m_ScreenHiDPIScale, g_Config.m_GfxDesktopWidth, g_Config.m_GfxDesktopHeight, g_Config.m_GfxScreen);
+		m_pBackend->GetCurrentVideoMode(CurMode, m_ScreenHiDPIScale, m_DesktopSize.x, m_DesktopSize.y, g_Config.m_GfxScreen);
 		GotResized(w, h, RefreshRate);
 		return true;
 	}
@@ -2877,8 +2876,6 @@ bool CGraphics_Threaded::SetVSync(bool State)
 	if(!m_pCommandBuffer)
 		return true;
 
-	const bool OldState = State;
-
 	// add vsync command
 	bool RetOk = false;
 	CCommandBuffer::SCommand_VSync Cmd;
@@ -2890,7 +2887,10 @@ bool CGraphics_Threaded::SetVSync(bool State)
 	KickCommandBuffer();
 	WaitForIdle();
 
-	g_Config.m_GfxVsync = RetOk ? State : OldState;
+	if(RetOk)
+	{
+		g_Config.m_GfxVsync = State;
+	}
 	return RetOk;
 }
 
@@ -2982,6 +2982,11 @@ const char *CGraphics_Threaded::GetRendererString()
 	return m_pBackend->GetRendererString();
 }
 
+const char *CGraphics_Threaded::GetFatalError() const
+{
+	return m_pBackend == nullptr ? "" : m_pBackend->GetFatalError();
+}
+
 TGLBackendReadPresentedImageData &CGraphics_Threaded::GetReadPresentedImageDataFuncUnsafe()
 {
 	return m_pBackend->GetReadPresentedImageDataFuncUnsafe();
@@ -2991,19 +2996,19 @@ int CGraphics_Threaded::GetVideoModes(CVideoMode *pModes, int MaxModes, int Scre
 {
 	if(g_Config.m_GfxDisplayAllVideoModes)
 	{
-		const int Count = minimum<size_t>(std::size(g_aFakeModes), MaxModes);
+		const int Count = std::min(std::size(g_aFakeModes), (size_t)MaxModes);
 		mem_copy(pModes, g_aFakeModes, Count * sizeof(CVideoMode));
 		return Count;
 	}
 
 	int NumModes = 0;
-	m_pBackend->GetVideoModes(pModes, MaxModes, &NumModes, m_ScreenHiDPIScale, g_Config.m_GfxDesktopWidth, g_Config.m_GfxDesktopHeight, Screen);
+	m_pBackend->GetVideoModes(pModes, MaxModes, &NumModes, m_ScreenHiDPIScale, m_DesktopSize.x, m_DesktopSize.y, Screen);
 	return NumModes;
 }
 
 void CGraphics_Threaded::GetCurrentVideoMode(CVideoMode &CurMode, int Screen)
 {
-	m_pBackend->GetCurrentVideoMode(CurMode, m_ScreenHiDPIScale, g_Config.m_GfxDesktopWidth, g_Config.m_GfxDesktopHeight, Screen);
+	m_pBackend->GetCurrentVideoMode(CurMode, m_ScreenHiDPIScale, m_DesktopSize.x, m_DesktopSize.y, Screen);
 }
 
 extern IEngineGraphics *CreateEngineGraphicsThreaded()

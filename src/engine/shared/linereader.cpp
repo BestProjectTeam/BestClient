@@ -2,7 +2,31 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include "linereader.h"
 
-#include <base/system.h>
+#include <base/dbg.h>
+#include <base/io.h>
+#include <base/str.h>
+
+#include <cstdlib>
+
+static bool IsValidLine(const char *pLine)
+{
+	if(!str_utf8_check(pLine))
+	{
+		// Skip lines containing invalid UTF-8
+		return false;
+	}
+
+	// Skip lines containing any control character except `\t`
+	for(size_t Index = 0; pLine[Index] != '\0'; ++Index)
+	{
+		if((unsigned char)pLine[Index] < ' ' && pLine[Index] != '\t')
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
 
 CLineReader::CLineReader()
 {
@@ -73,9 +97,8 @@ const char *CLineReader::Get()
 				++m_BufferPos;
 			}
 
-			if(!str_utf8_check(&m_pBuffer[LineStart]))
+			if(!IsValidLine(&m_pBuffer[LineStart]))
 			{
-				// Skip lines containing invalid UTF-8
 				if(m_ReadLastLine)
 				{
 					return nullptr;

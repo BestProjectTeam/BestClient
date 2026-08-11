@@ -6,65 +6,13 @@
 #include "mapitems.h"
 #include "teamscore.h"
 
-#include <base/system.h>
+#include <base/dbg.h>
+#include <base/str.h>
 
 #include <engine/shared/config.h>
 
 #include <limits>
 
-const char *CTuningParams::ms_apNames[] =
-	{
-#define MACRO_TUNING_PARAM(Name, ScriptName, Value, Description) #ScriptName,
-#include "tuning.h"
-#undef MACRO_TUNING_PARAM
-};
-
-bool CTuningParams::Set(int Index, float Value)
-{
-	if(Index < 0 || Index >= Num())
-		return false;
-	((CTuneParam *)this)[Index] = Value;
-	return true;
-}
-
-bool CTuningParams::Get(int Index, float *pValue) const
-{
-	if(Index < 0 || Index >= Num())
-		return false;
-	*pValue = (float)((CTuneParam *)this)[Index];
-	return true;
-}
-
-bool CTuningParams::Set(const char *pName, float Value)
-{
-	for(int i = 0; i < Num(); i++)
-		if(str_comp_nocase(pName, Name(i)) == 0)
-			return Set(i, Value);
-	return false;
-}
-
-bool CTuningParams::Get(const char *pName, float *pValue) const
-{
-	for(int i = 0; i < Num(); i++)
-		if(str_comp_nocase(pName, Name(i)) == 0)
-			return Get(i, pValue);
-
-	return false;
-}
-
-float CTuningParams::GetWeaponFireDelay(int Weapon) const
-{
-	switch(Weapon)
-	{
-	case WEAPON_HAMMER: return (float)m_HammerFireDelay / 1000.0f;
-	case WEAPON_GUN: return (float)m_GunFireDelay / 1000.0f;
-	case WEAPON_SHOTGUN: return (float)m_ShotgunFireDelay / 1000.0f;
-	case WEAPON_GRENADE: return (float)m_GrenadeFireDelay / 1000.0f;
-	case WEAPON_LASER: return (float)m_LaserFireDelay / 1000.0f;
-	case WEAPON_NINJA: return (float)m_NinjaFireDelay / 1000.0f;
-	default: return 0.0f;
-	}
-}
 
 static_assert(std::numeric_limits<char>::is_signed, "char must be signed for StrToInts to work correctly");
 
@@ -142,6 +90,11 @@ void CCharacterCore::SetCoreWorld(CWorldCore *pWorld, CCollision *pCollision, CT
 	m_pTeams = pTeams;
 }
 
+void CCharacterCore::SetAntiPingInterfereCallback(FAntiPingInterfereCallback Callback)
+{
+	m_AntiPingInterfereCallback = std::move(Callback);
+}
+
 void CCharacterCore::Reset()
 {
 	m_Pos = vec2(0, 0);
@@ -192,7 +145,7 @@ void CCharacterCore::Tick(bool UseInput, bool DoDeferredTick)
 	m_TriggeredEvents = 0;
 
 	// get ground state
-	const bool Grounded = m_pCollision->CheckPoint(m_Pos.x + PhysicalSize() / 2, m_Pos.y + PhysicalSize() / 2 + 5) || m_pCollision->CheckPoint(m_Pos.x - PhysicalSize() / 2, m_Pos.y + PhysicalSize() / 2 + 5);
+	const bool Grounded = m_pCollision->IsOnGround(m_Pos, PhysicalSize());
 	vec2 TargetDirection = normalize(vec2(m_Input.m_TargetX, m_Input.m_TargetY));
 
 	m_Vel.y += m_Tuning.m_Gravity;
@@ -363,6 +316,7 @@ void CCharacterCore::Tick(bool UseInput, bool DoDeferredTick)
 							m_HookState = HOOK_GRABBED;
 							SetHookedPlayer(i);
 							Distance = distance(m_HookPos, pCharCore->m_Pos);
+							m_AntiPingInterfereCallback(i, false);
 						}
 					}
 				}
@@ -491,6 +445,8 @@ void CCharacterCore::TickDeferred()
 
 					m_Vel += Dir * a * (Velocity * 0.75f);
 					m_Vel *= 0.85f;
+
+					m_AntiPingInterfereCallback(i, true);
 				}
 
 				// handle hook influence
@@ -690,6 +646,11 @@ void CCharacterCore::ReadDDNet(const CNetObj_DDNetCharacter *pObjDDNet)
 	}
 }
 
+void CCharacterCore::ReadTuning(const CNetObj_CharacterTuning *pObjTuning)
+{
+	m_Tuning = *pObjTuning->m_Values_AsTuning();
+}
+
 void CCharacterCore::Quantize()
 {
 	CNetObj_CharacterCore Core;
@@ -728,11 +689,11 @@ void CCharacterCore::SetTeamsCore(CTeamsCore *pTeams)
 	m_pTeams = pTeams;
 }
 
-bool CCharacterCore::IsSwitchActiveCb(int Number, void *pUser)
+bool CCharacterCore::IsSwitchActiveCb(unsigned char Number, void *pUser)
 {
 	CCharacterCore *pThis = (CCharacterCore *)pUser;
 	if(pThis->m_pWorld && !pThis->m_pWorld->m_vSwitchers.empty())
-		if(pThis->m_Id != -1 && pThis->m_pTeams->Team(pThis->m_Id) != (pThis->m_pTeams->m_IsDDRace16 ? VANILLA_TEAM_SUPER : TEAM_SUPER))
+		if(pThis->m_Id != -1 && pThis->m_pTeams->Team(pThis->m_Id) != pThis->m_pTeams->TeamSuper())
 			return pThis->m_pWorld->m_vSwitchers[Number].m_aStatus[pThis->m_pTeams->Team(pThis->m_Id)];
 	return false;
 }

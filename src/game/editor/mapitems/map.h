@@ -11,8 +11,17 @@
 #include <game/editor/editor_history.h>
 #include <game/editor/editor_server_settings.h>
 #include <game/editor/editor_trackers.h>
+#include <game/editor/editor_ui.h>
+#include <game/editor/envelope_editor.h>
+#include <game/editor/font_typer.h>
+#include <game/editor/map_grid.h>
+#include <game/editor/map_view.h>
 #include <game/editor/mapitems/envelope.h>
+#include <game/editor/mapitems/envelope_evaluator.h>
 #include <game/editor/mapitems/layer.h>
+#include <game/editor/proof_mode.h>
+#include <game/editor/quad_art.h>
+#include <game/editor/quad_knife.h>
 
 #include <functional>
 #include <memory>
@@ -54,31 +63,25 @@ using FErrorHandler = std::function<void(const char *pErrorMessage)>;
 class CEditorMap
 {
 public:
-	explicit CEditorMap(CEditor *pEditor) :
-		m_EditorHistory(this),
-		m_ServerSettingsHistory(this),
-		m_EnvelopeEditorHistory(this),
-		m_QuadTracker(this),
-		m_EnvOpTracker(this),
-		m_LayerGroupPropTracker(this),
-		m_LayerPropTracker(this),
-		m_LayerTilesCommonPropTracker(this),
-		m_LayerTilesPropTracker(this),
-		m_LayerQuadPropTracker(this),
-		m_LayerSoundsPropTracker(this),
-		m_SoundSourceOperationTracker(this),
-		m_SoundSourcePropTracker(this),
-		m_SoundSourceRectShapePropTracker(this),
-		m_SoundSourceCircleShapePropTracker(this),
-		m_pEditor(pEditor)
-	{
-	}
+	explicit CEditorMap(CEditor *pEditor);
 
 	const CEditor *Editor() const { return m_pEditor; }
 	CEditor *Editor() { return m_pEditor; }
 
+	/**
+	 * Path and filename including extension within the storage system.
+	 */
 	char m_aFilename[IO_MAX_PATH_LENGTH];
+	/**
+	 * Unique name for displaying. Updated by the editor when open maps are changed to ensure it is unique.
+	 */
+	char m_aDisplayName[IO_MAX_PATH_LENGTH];
+	/**
+	 * Unique name for autosaving. Updated by the editor when open maps are changed to ensure it is unique.
+	 */
+	char m_aAutosaveName[IO_MAX_PATH_LENGTH];
 	bool m_ValidSaveFilename;
+	bool m_CloseOnSave;
 	/**
 	 * Map has unsaved changes for manual save.
 	 */
@@ -91,6 +94,10 @@ public:
 	float m_LastSaveTime;
 	void OnModify();
 	void ResetModifiedState();
+
+	// UI elements
+	char m_TabSelectButtonId;
+	char m_TabCloseButtonId;
 
 	std::vector<std::shared_ptr<CLayerGroup>> m_vpGroups;
 	std::vector<std::shared_ptr<CEditorImage>> m_vpImages;
@@ -154,20 +161,22 @@ public:
 	int m_SelectedSoundSource;
 
 	int m_ShiftBy;
+	bool m_ShowDetail;
+	bool m_PreviewZoom;
 
-	// Quad knife
-	class CQuadKnife
-	{
-	public:
-		bool m_Active;
-		int m_SelectedQuadIndex;
-		int m_Count;
-		vec2 m_aPoints[4];
-	};
-	CQuadKnife m_QuadKnife;
+	// Component states
+	CMapView::CState m_MapViewState;
+	CMapGrid::CState m_MapGridState;
+	CProofMode::CState m_ProofModeState;
+	CQuadKnife::CState m_QuadKnifeState;
+	CMapEnvelopeEvaluator m_EnvelopeEvaluator;
+	CEnvelopeEditor::CState m_EnvelopeEditorState;
+	CMapSettingsBackend::CContextWithInput m_MapSettingsCommandContext;
+	CFontTyper::CState m_FontTyperState;
+	CEditorUiElements m_EditorUiElements;
+	CEditorHistoryUiState m_EditorHistoryUiState;
 
 	// Housekeeping
-	void Clean();
 	void CreateDefault();
 	void CheckIntegrity();
 
@@ -265,6 +274,10 @@ public:
 	CSoundSource *SelectedSoundSource() const;
 
 	void PlaceBorderTiles();
+
+	void AddTileArt(CImageInfo &&Image, const char *pFilename, bool IgnoreHistory);
+
+	void AddQuadArt(CImageInfo &&Image, const CQuadArtParameters &Parameters, bool IgnoreHistory);
 
 private:
 	CEditor *m_pEditor;

@@ -2,7 +2,7 @@
 #ifndef GAME_CLIENT_COMPONENTS_BESTCLIENT_CLANS_CLANS_H
 #define GAME_CLIENT_COMPONENTS_BESTCLIENT_CLANS_CLANS_H
 
-#include <engine/shared/http.h>
+#include <engine/http.h>
 #include <engine/shared/protocol.h>
 
 #include <game/client/component.h>
@@ -233,9 +233,9 @@ private:
 	bool ResolveBaseUrl(char *pOut, int OutSize) const;
 	void SetError(const char *pErrorCode, const char *pFallback);
 	void SetStatus(const char *pMsg);
-	void BeginRequest(std::shared_ptr<CHttpRequest> pReq, int Kind);
-	void BeginBackground(std::shared_ptr<CHttpRequest> pReq, int Kind);
-	void AuthHeader(CHttpRequest *pReq) const;
+	void BeginRequest(std::shared_ptr<IHttpRequest> pReq, int Kind);
+	void BeginBackground(std::shared_ptr<IHttpRequest> pReq, int Kind);
+	void AuthHeader(IHttpRequest *pReq) const;
 	void BuildSkinJson(char *pBuf, int BufSize) const;
 	void SaveSession() const;
 	void LoadSession();
@@ -325,9 +325,9 @@ private:
 	std::vector<SNotification> m_vNotifications;
 	std::deque<SToast> m_Toasts;
 
-	std::shared_ptr<CHttpRequest> m_pPending;
+	std::shared_ptr<IHttpRequest> m_pPending;
 	int m_PendingKind = REQ_NONE;
-	std::shared_ptr<CHttpRequest> m_pBgPending;
+	std::shared_ptr<IHttpRequest> m_pBgPending;
 	int m_BgKind = REQ_NONE;
 	int64_t m_LastPresenceTick = 0;
 	int m_LastPresenceClientState = -1;

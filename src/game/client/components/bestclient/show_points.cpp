@@ -6,7 +6,7 @@
 #include <engine/client.h>
 #include <engine/serverbrowser.h>
 #include <engine/shared/config.h>
-#include <engine/shared/http.h>
+#include <engine/http.h>
 #include <engine/shared/json.h>
 
 #include <game/client/gameclient.h>
@@ -76,9 +76,7 @@ const char *CShowPoints::CurrentCommunityId() const
 {
 	m_aCommunityIdBuf[0] = '\0';
 
-	CServerInfo ServerInfo;
-	mem_zero(&ServerInfo, sizeof(ServerInfo));
-	Client()->GetServerInfo(&ServerInfo);
+	const CServerInfo &ServerInfo = Client()->ServerInfo();
 
 	if(ServerInfo.m_aCommunityId[0] != '\0')
 	{
@@ -116,9 +114,7 @@ CShowPoints::EProvider CShowPoints::CurrentProvider() const
 			return EProvider::Ego;
 	}
 
-	CServerInfo ServerInfo;
-	mem_zero(&ServerInfo, sizeof(ServerInfo));
-	Client()->GetServerInfo(&ServerInfo);
+	const CServerInfo &ServerInfo = Client()->ServerInfo();
 	// Avoid matching unrelated names that merely contain "ego" (e.g. "Diego").
 	if(str_find_nocase(ServerInfo.m_aName, "EGO |") ||
 		str_find_nocase(ServerInfo.m_aName, "eternal-gores") ||
@@ -262,7 +258,7 @@ void CShowPoints::StartRequest(const std::string &Name, EProvider Provider)
 		str_format(aUrl, sizeof(aUrl), "https://ru.ddnet.org/players/?json2=%s", aEscaped);
 	}
 
-	std::shared_ptr<CHttpRequest> pReq = HttpGet(aUrl);
+	std::shared_ptr<IHttpRequest> pReq = HttpGet(aUrl);
 	pReq->Timeout(CTimeout{8000, 0, 500, 5});
 	pReq->LogProgress(HTTPLOG::FAILURE);
 	pReq->FailOnErrorStatus(false);

@@ -1,7 +1,9 @@
 #include "image_loader.h"
 
+#include <base/dbg.h>
+#include <base/io.h>
 #include <base/log.h>
-#include <base/system.h>
+#include <base/mem.h>
 
 #include <png.h>
 
@@ -39,7 +41,6 @@ void CByteBufferWriter::Write(const void *pData, size_t Size)
 class CUserErrorStruct
 {
 public:
-	CByteBufferReader *m_pReader;
 	const char *m_pContextName;
 	std::jmp_buf m_JmpBuf;
 };
@@ -135,7 +136,7 @@ static int PngliteIncompatibility(png_structp pPngStruct, png_infop pPngInfo)
 
 bool CImageLoader::LoadPng(CByteBufferReader &Reader, const char *pContextName, CImageInfo &Image, int &PngliteIncompatible)
 {
-	CUserErrorStruct UserErrorStruct = {&Reader, pContextName, {}};
+	CUserErrorStruct UserErrorStruct = {pContextName, {}};
 
 	if(setjmp(UserErrorStruct.m_JmpBuf))
 	{
@@ -258,7 +259,7 @@ bool CImageLoader::LoadPng(CByteBufferReader &Reader, const char *pContextName, 
 		Image.m_Width = Width;
 		Image.m_Height = Height;
 		Image.m_Format = ImageFormatFromChannelCount(ColorChannelCount);
-		Image.m_pData = static_cast<uint8_t *>(malloc(Image.DataSize()));
+		Image.Allocate();
 		for(int y = 0; y < Height; ++y)
 		{
 			mem_copy(&Image.m_pData[y * BytesInRow], pRowPointers[y], BytesInRow);

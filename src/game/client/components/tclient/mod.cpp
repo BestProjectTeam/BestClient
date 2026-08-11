@@ -25,7 +25,11 @@ void CMod::OnRender()
 		return;
 
 	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
-	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
+	const CScreenRect ScreenRect = Graphics()->GetScreen();
+	ScreenX0 = ScreenRect.m_TopLeft.x;
+	ScreenY0 = ScreenRect.m_TopLeft.y;
+	ScreenX1 = ScreenRect.m_BottomRight.x;
+	ScreenY1 = ScreenRect.m_BottomRight.y;
 
 	Graphics()->TextureClear();
 

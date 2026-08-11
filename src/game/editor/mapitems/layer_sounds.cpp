@@ -23,11 +23,10 @@ CLayerSounds::CLayerSounds(const CLayerSounds &Other) :
 
 CLayerSounds::~CLayerSounds() = default;
 
-void CLayerSounds::Render(bool Tileset)
+void CLayerSounds::Render(const CEditorMap *pRenderMap)
 {
 	// TODO: nice texture
 	Graphics()->TextureClear();
-	Graphics()->BlendNormal();
 	Graphics()->QuadsBegin();
 
 	// draw falloff distance
@@ -35,7 +34,7 @@ void CLayerSounds::Render(bool Tileset)
 	for(const auto &Source : m_vSources)
 	{
 		ColorRGBA Offset = ColorRGBA(0.0f, 0.0f, 0.0f, 0.0f);
-		Editor()->EnvelopeEval(Source.m_PosEnvOffset, Source.m_PosEnv, Offset, 2);
+		pRenderMap->m_EnvelopeEvaluator.EnvelopeEval(Source.m_PosEnvOffset, Source.m_PosEnv, Offset, 2);
 		const vec2 Position = vec2(fx2f(Source.m_Position.x) + Offset.r, fx2f(Source.m_Position.y) + Offset.g);
 		const float Falloff = Source.m_Falloff / 255.0f;
 
@@ -75,7 +74,7 @@ void CLayerSounds::Render(bool Tileset)
 	for(const auto &Source : m_vSources)
 	{
 		ColorRGBA Offset = ColorRGBA(0.0f, 0.0f, 0.0f, 0.0f);
-		Editor()->EnvelopeEval(Source.m_PosEnvOffset, Source.m_PosEnv, Offset, 2);
+		pRenderMap->m_EnvelopeEvaluator.EnvelopeEval(Source.m_PosEnvOffset, Source.m_PosEnv, Offset, 2);
 		const vec2 Position = vec2(fx2f(Source.m_Position.x) + Offset.r, fx2f(Source.m_Position.y) + Offset.g);
 		Graphics()->DrawSprite(Position.x, Position.y, Editor()->MapView()->ScaleLength(s_SourceVisualSize));
 	}
@@ -189,6 +188,18 @@ CUi::EPopupMenuFunctionResult CLayerSounds::RenderProperties(CUIRect *pToolBox)
 	Map()->m_LayerSoundsPropTracker.End(Prop, State);
 
 	return CUi::POPUP_KEEP_OPEN;
+}
+
+bool CLayerSounds::IsEnvelopeUsed(int EnvelopeIndex) const
+{
+	return std::any_of(m_vSources.begin(), m_vSources.end(), [&](const auto &Source) {
+		return Source.m_PosEnv == EnvelopeIndex || Source.m_SoundEnv == EnvelopeIndex;
+	});
+}
+
+bool CLayerSounds::IsSoundUsed(int SoundIndex) const
+{
+	return m_Sound == SoundIndex;
 }
 
 void CLayerSounds::ModifySoundIndex(const FIndexModifyFunction &IndexModifyFunction)

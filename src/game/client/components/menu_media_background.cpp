@@ -742,7 +742,11 @@ bool CMenuMediaBackground::Render(float ScreenWidth, float ScreenHeight, const S
 		return false;
 
 	float PrevScreenX0, PrevScreenY0, PrevScreenX1, PrevScreenY1;
-	m_pGraphics->GetScreen(&PrevScreenX0, &PrevScreenY0, &PrevScreenX1, &PrevScreenY1);
+	const CScreenRect ScreenRect = m_pGraphics->GetScreen();
+	PrevScreenX0 = ScreenRect.m_TopLeft.x;
+	PrevScreenY0 = ScreenRect.m_TopLeft.y;
+	PrevScreenX1 = ScreenRect.m_BottomRight.x;
+	PrevScreenY1 = ScreenRect.m_BottomRight.y;
 	m_pGraphics->BlendNormal();
 
 	const bool UseWorldOffset = pRenderContext != nullptr &&
@@ -763,20 +767,16 @@ bool CMenuMediaBackground::Render(float ScreenWidth, float ScreenHeight, const S
 		const float TargetWidth = ViewWidth + (MapWidth - ViewWidth) * WorldOffset;
 		const float TargetHeight = ViewHeight + (MapHeight - ViewHeight) * WorldOffset;
 
-		m_pGraphics->MapScreen(
-			pRenderContext->m_CameraCenterX - ViewWidth * 0.5f,
-			pRenderContext->m_CameraCenterY - ViewHeight * 0.5f,
-			pRenderContext->m_CameraCenterX + ViewWidth * 0.5f,
-			pRenderContext->m_CameraCenterY + ViewHeight * 0.5f);
+		m_pGraphics->MapScreen(CScreenRect(vec2(pRenderContext->m_CameraCenterX - ViewWidth * 0.5f, pRenderContext->m_CameraCenterY - ViewHeight * 0.5f), vec2(pRenderContext->m_CameraCenterX + ViewWidth * 0.5f, pRenderContext->m_CameraCenterY + ViewHeight * 0.5f)));
 		RenderTextureCover(Texture, m_Width, m_Height, TargetCenterX, TargetCenterY, TargetWidth, TargetHeight);
 	}
 	else
 	{
-		m_pGraphics->MapScreen(0.0f, 0.0f, ScreenWidth, ScreenHeight);
+		m_pGraphics->MapScreen(CScreenRect(vec2(0.0f, 0.0f), vec2(ScreenWidth, ScreenHeight)));
 		RenderTextureCover(Texture, m_Width, m_Height, ScreenWidth * 0.5f, ScreenHeight * 0.5f, ScreenWidth, ScreenHeight);
 	}
 
 	m_pGraphics->TextureClear();
-	m_pGraphics->MapScreen(PrevScreenX0, PrevScreenY0, PrevScreenX1, PrevScreenY1);
+	m_pGraphics->MapScreen(CScreenRect(vec2(PrevScreenX0, PrevScreenY0), vec2(PrevScreenX1, PrevScreenY1)));
 	return true;
 }

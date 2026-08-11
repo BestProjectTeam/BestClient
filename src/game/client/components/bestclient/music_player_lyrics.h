@@ -12,7 +12,7 @@
 #include <unordered_map>
 #include <vector>
 
-class CHttpRequest;
+class IHttpRequest;
 class CUi;
 class IHttp;
 class ITextRender;
@@ -103,7 +103,7 @@ private:
 	std::string m_TrackTitle;
 	EDisplayState m_DisplayState = EDisplayState::Idle;
 	std::vector<SLine> m_vLines;
-	std::shared_ptr<CHttpRequest> m_pRequest;
+	std::shared_ptr<IHttpRequest> m_pRequest;
 	std::unordered_map<std::string, SCacheEntry> m_Cache;
 	int64_t m_OfflineRetryAt = 0;
 	float m_NotFoundDisplayMs = 0.0f;

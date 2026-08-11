@@ -12,7 +12,7 @@
 #include <unordered_map>
 #include <vector>
 
-class CHttpRequest;
+class IHttpRequest;
 
 struct SCherryGif
 {
@@ -51,12 +51,12 @@ class CCherryGifs : public CComponent
 	bool m_PendingIncludeNsfw = false;
 	float m_PendingChangeTimer = -1.0f;
 
-	std::shared_ptr<CHttpRequest> m_pListRequest;
+	std::shared_ptr<IHttpRequest> m_pListRequest;
 	float m_ListRequestCooldown = 0.0f;
 
 	struct SThumbnailJob
 	{
-		std::shared_ptr<CHttpRequest> m_pRequest;
+		std::shared_ptr<IHttpRequest> m_pRequest;
 		char m_aGifId[32] = "";
 	};
 	std::vector<SThumbnailJob> m_vThumbnailJobs;

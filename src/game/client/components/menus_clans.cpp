@@ -992,7 +992,7 @@ void CMenus::RenderClansLanding(CUIRect MainView)
 			static CScrollRegion s_RecentScroll;
 			vec2 RecentOffset(0.0f, 0.0f);
 			CScrollRegionParams RecentParams;
-			s_RecentScroll.Begin(&ListBox, &RecentOffset, &RecentParams);
+			s_RecentScroll.Begin(&ListBox, &RecentParams);
 			ListBox.y += RecentOffset.y;
 
 			static std::vector<CButtonContainer> s_vLandingRejoin;
@@ -1133,9 +1133,7 @@ void CMenus::RenderClansLanding(CUIRect MainView)
 	static CScrollRegion s_Scroll;
 	vec2 ScrollOffset(0.0f, 0.0f);
 	CScrollRegionParams Params;
-	s_Scroll.Begin(&Right, &ScrollOffset, &Params);
-	Right.y += ScrollOffset.y;
-
+	s_Scroll.Begin(&Right, &Params);
 	for(size_t Index = 0; Index < Clans.Catalog().size(); Index++)
 	{
 		const auto &Entry = Clans.Catalog()[Index];
@@ -1652,9 +1650,7 @@ void CMenus::RenderClansPage(CUIRect MainView)
 	vec2 MainScrollOffset(0.0f, 0.0f);
 	CScrollRegionParams MainParams;
 	MainParams.m_ClipBgColor = ColorRGBA(0, 0, 0, 0.0f);
-	s_MainScroll.Begin(&MainSection, &MainScrollOffset, &MainParams);
-	MainSection.y += MainScrollOffset.y;
-
+	s_MainScroll.Begin(&MainSection, &MainParams);
 	size_t MemberIndex = 0;
 	static int s_aMemberIds[128];
 	static int s_aMemberJoinIds[128];
@@ -1743,8 +1739,7 @@ void CMenus::RenderClansPage(CUIRect MainView)
 	vec2 UnleashedScrollOffset(0.0f, 0.0f);
 	CScrollRegionParams UnleashedParams;
 	UnleashedParams.m_ClipBgColor = ColorRGBA(0, 0, 0, 0.0f);
-	s_UnleashedScroll.Begin(&UnleashedSection, &UnleashedScrollOffset, &UnleashedParams);
-	UnleashedSection.y += UnleashedScrollOffset.y;
+	s_UnleashedScroll.Begin(&UnleashedSection, &UnleashedParams);
 	static int s_aUnleashedJoinIds[128];
 	size_t UnleashedIndex = 0;
 	for(const auto &U : vUnleashed)
@@ -2119,8 +2114,7 @@ void CMenus::RenderClansPreview(CUIRect MainView)
 	vec2 MainScrollOffset(0.0f, 0.0f);
 	CScrollRegionParams MainParams;
 	MainParams.m_ClipBgColor = ColorRGBA(0, 0, 0, 0.0f);
-	s_MainScroll.Begin(&MainSection, &MainScrollOffset, &MainParams);
-	MainSection.y += MainScrollOffset.y;
+	s_MainScroll.Begin(&MainSection, &MainParams);
 	static int s_aPreviewJoinIds[128];
 	size_t MemberIndex = 0;
 	for(const auto &M : Clan.m_vMembers)
@@ -2178,8 +2172,7 @@ void CMenus::RenderClansPreview(CUIRect MainView)
 	vec2 UnleashedScrollOffset(0.0f, 0.0f);
 	CScrollRegionParams UnleashedParams;
 	UnleashedParams.m_ClipBgColor = ColorRGBA(0, 0, 0, 0.0f);
-	s_UnleashedScroll.Begin(&UnleashedSection, &UnleashedScrollOffset, &UnleashedParams);
-	UnleashedSection.y += UnleashedScrollOffset.y;
+	s_UnleashedScroll.Begin(&UnleashedSection, &UnleashedParams);
 	static int s_aPreviewUnlJoinIds[128];
 	size_t UnleashedIndex = 0;
 	for(const auto &U : Clan.m_vUnleashed)
@@ -2227,8 +2220,7 @@ void CMenus::RenderClansApplications(CUIRect MainView)
 	static CScrollRegion s_Scroll;
 	vec2 ScrollOffset(0.0f, 0.0f);
 	CScrollRegionParams Params;
-	s_Scroll.Begin(&MainView, &ScrollOffset, &Params);
-	MainView.y += ScrollOffset.y;
+	s_Scroll.Begin(&MainView, &Params);
 	static std::vector<CButtonContainer> s_vAccept;
 	static std::vector<CButtonContainer> s_vReject;
 	if(s_vAccept.size() < Clans.Applications().size())
@@ -2347,9 +2339,7 @@ void CMenus::RenderClansAnnouncements(CUIRect MainView)
 	static CScrollRegion s_Scroll;
 	vec2 ScrollOffset(0.0f, 0.0f);
 	CScrollRegionParams Params;
-	s_Scroll.Begin(&MainView, &ScrollOffset, &Params);
-	MainView.y += ScrollOffset.y;
-
+	s_Scroll.Begin(&MainView, &Params);
 	const auto &vAnns = Clans.Announcements();
 	// API stores newest-first; chat shows oldest → newest (composer at bottom).
 	for(int i = (int)vAnns.size() - 1; i >= 0; i--)

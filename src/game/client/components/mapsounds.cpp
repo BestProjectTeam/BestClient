@@ -117,7 +117,7 @@ void CMapSounds::OnMapLoad()
 			if(!pSources)
 				continue;
 
-			const size_t NumSources = minimum<size_t>(pSoundLayer->m_NumSources, Layers()->Map()->GetDataSize(pSoundLayer->m_Data) / sizeof(CSoundSource));
+			const size_t NumSources = std::min((size_t)pSoundLayer->m_NumSources, (size_t)Layers()->Map()->GetDataSize(pSoundLayer->m_Data) / sizeof(CSoundSource));
 			for(size_t SourceIndex = 0; SourceIndex < NumSources; SourceIndex++)
 			{
 				CSourceQueueEntry Source;
@@ -136,7 +136,7 @@ void CMapSounds::OnRender()
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return;
 
-	bool DemoPlayerPaused = Client()->State() == IClient::STATE_DEMOPLAYBACK && DemoPlayer()->BaseInfo()->m_Paused;
+	const bool DemoPlayerPaused = GameClient()->IsDemoPlaybackPaused();
 
 	// enqueue sounds
 	for(auto &Source : m_vSourceQueue)

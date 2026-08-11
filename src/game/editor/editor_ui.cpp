@@ -21,9 +21,9 @@ ColorRGBA CEditor::GetButtonColor(const void *pId, int Checked)
 	switch(Checked)
 	{
 	case EditorButtonChecked::DANGEROUS_ACTION:
-		if(Ui()->HotItem() == pId)
-			return ColorRGBA(1.0f, 0.0f, 0.0f, 0.75f);
-		return ColorRGBA(1.0f, 0.0f, 0.0f, 0.5f);
+		return ColorRGBA(1.0f, 0.0f, 0.0f, Ui()->HotItem() == pId ? 0.75f : 0.5f);
+	case EditorButtonChecked::POSITIVE_ACTION:
+		return ColorRGBA(0.0f, 1.0f, 0.0f, Ui()->HotItem() == pId ? 0.75f : 0.5f);
 	case 8: // invisible
 		return ColorRGBA(0, 0, 0, 0);
 	case 7: // selected + game layers
@@ -324,7 +324,6 @@ SEditResult<int> CEditor::UiDoValueSelector(const void *pId, CUIRect *pRect, con
 void CEditor::RenderBackground(CUIRect View, IGraphics::CTextureHandle Texture, float Size, float Brightness) const
 {
 	Graphics()->TextureSet(Texture);
-	Graphics()->BlendNormal();
 	Graphics()->QuadsBegin();
 	Graphics()->SetColor(Brightness, Brightness, Brightness, 1.0f);
 	Graphics()->QuadsSetSubset(0, 0, View.w / Size, View.h / Size);

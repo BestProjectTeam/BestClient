@@ -28,7 +28,7 @@ enum
 
 vec2 ClampVel(int MoveRestriction, vec2 Vel);
 
-typedef bool (*CALLBACK_SWITCHACTIVE)(int Number, void *pUser);
+typedef bool (*CALLBACK_SWITCHACTIVE)(unsigned char Number, void *pUser);
 struct CAntibotMapData;
 
 class CCollision
@@ -52,10 +52,11 @@ public:
 	void MovePoint(vec2 *pInoutPos, vec2 *pInoutVel, float Elasticity, int *pBounces) const;
 	void MoveBox(vec2 *pInoutPos, vec2 *pInoutVel, vec2 Size, vec2 Elasticity, bool *pGrounded = nullptr) const;
 	bool TestBox(vec2 Pos, vec2 Size) const;
+	bool IsOnGround(vec2 Pos, float Size) const;
 
 	// DDRace
 	void SetCollisionAt(float x, float y, int Index);
-	void SetDoorCollisionAt(float x, float y, int Type, int Flags, int Number);
+	void SetDoorCollisionAt(float x, float y, unsigned char Type, unsigned char Flags, unsigned char Number);
 	void GetDoorTile(int Index, CDoorTile *pDoorTile) const;
 	int GetFrontCollisionAt(float x, float y) const { return GetFrontTile(round_to_int(x), round_to_int(y)); }
 	int IntersectNoLaser(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2 *pOutBeforeCollision) const;
@@ -92,8 +93,9 @@ public:
 	int IsTeleportWeapon(int Index) const;
 	int IsTeleportHook(int Index) const;
 	int IsTeleCheckpoint(int Index) const;
-	int IsSpeedup(int Index) const;
+	bool IsSpeedup(int Index) const;
 	int IsTune(int Index) const;
+	int IsTuneLock(int Index) const;
 	void GetSpeedup(int Index, vec2 *pDir, int *pForce, int *pMaxSpeed, int *pType) const;
 	int GetSwitchType(int Index) const;
 	int GetSwitchNumber(int Index) const;
@@ -110,6 +112,7 @@ public:
 	int IsFrontTimeCheckpoint(int Index) const;
 
 	int MoverSpeed(int x, int y, vec2 *pSpeed) const;
+	bool HasHookTeleIns() const;
 
 	const CLayers *Layers() const { return m_pLayers; }
 	const CTile *GameLayer() const { return m_pTiles; }
@@ -164,8 +167,9 @@ private:
 	std::map<int, std::vector<vec2>> m_TeleOuts;
 	// TILE_TELECHECKOUT
 	std::map<int, std::vector<vec2>> m_TeleCheckOuts;
-	// TILE_TELEINEVIL, TILE_TELECHECK, TILE_TELECHECKIN, TILE_TELECHECKINEVIL
+	// TILE_TELEINEVIL, TILE_TELECHECK, TILE_TELECHECKIN, TILE_TELECHECKINEVIL, TILE_TELEINHOOK
 	std::map<int, std::vector<vec2>> m_TeleOthers;
+	bool m_HasHookTeleIns;
 };
 
 void ThroughOffset(vec2 Pos0, vec2 Pos1, int *pOffsetX, int *pOffsetY);

@@ -5,6 +5,7 @@
 
 #include "eventhandler.h"
 #include "gameworld.h"
+#include "playermapping.h"
 #include "teehistorian.h"
 
 #include <base/types.h>
@@ -21,6 +22,7 @@
 
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 
 /*
@@ -70,7 +72,7 @@ struct CSnapContext
 
 	int GetClientVersion() const { return m_ClientVersion; }
 	bool IsSixup() const { return m_Sixup; }
-	bool ClientId() const { return m_ClientId; }
+	int ClientId() const { return m_ClientId; }
 
 private:
 	int m_ClientVersion;
@@ -123,6 +125,7 @@ class CGameContext : public IGameServer
 	protocol7::CNetObjHandler m_NetObjHandler7;
 	CNetObjHandler m_NetObjHandler;
 	CTuningParams m_aTuningList[TuneZone::NUM];
+	LOCKED_TUNES m_aLockedTuning[TuneZone::NUM];
 	std::vector<std::string> m_vCensorlist;
 
 	bool m_TeeHistorianActive;
@@ -134,6 +137,7 @@ class CGameContext : public IGameServer
 
 	bool m_Resetting;
 
+	static std::optional<std::vector<int>> ClientsForVictim(int ClientId, const char *pVictim, void *pUser);
 	static void CommandCallback(int ClientId, int FlagMask, const char *pCmd, IConsole::IResult *pResult, void *pUser);
 	static void TeeHistorianWrite(const void *pData, int DataSize, void *pUser);
 
@@ -146,6 +150,10 @@ class CGameContext : public IGameServer
 	static void ConTuneResetZone(IConsole::IResult *pResult, void *pUserData);
 	static void ConTuneSetZoneMsgEnter(IConsole::IResult *pResult, void *pUserData);
 	static void ConTuneSetZoneMsgLeave(IConsole::IResult *pResult, void *pUserData);
+	static void ConTuneLock(IConsole::IResult *pResult, void *pUserData);
+	static void ConTuneLockDump(IConsole::IResult *pResult, void *pUserData);
+	static void ConTuneLockReset(IConsole::IResult *pResult, void *pUserData);
+	static void ConTuneLockSetMsgEnter(IConsole::IResult *pResult, void *pUserData);
 	static void ConMapbug(IConsole::IResult *pResult, void *pUserData);
 	static void ConSwitchOpen(IConsole::IResult *pResult, void *pUserData);
 	static void ConPause(IConsole::IResult *pResult, void *pUserData);
@@ -175,17 +183,22 @@ class CGameContext : public IGameServer
 	static void ConchainSettingUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainPracticeByDefaultUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConDumpLog(IConsole::IResult *pResult, void *pUserData);
+	static void ConTuneLockPlayer(IConsole::IResult *pResult, void *pUserData);
+	static void ConTuneLockPlayerReset(IConsole::IResult *pResult, void *pUserData);
+	static void ConTuneLockPlayerDump(IConsole::IResult *pResult, void *pUserData);
 
 	void AddVote(const char *pDescription, const char *pCommand);
 	static int MapScan(const char *pName, int IsDir, int DirType, void *pUserData);
 
-	struct CPersistentData
+	class CPersistentData
 	{
+	public:
 		CUuid m_PrevGameUuid;
 	};
 
-	struct CPersistentClientData
+	class CPersistentClientData
 	{
+	public:
 		bool m_IsSpectator;
 		bool m_IsAfk;
 		int m_LastWhisperTo;
@@ -208,6 +221,7 @@ public:
 	bool TeeHistorianActive() const { return m_TeeHistorianActive; }
 	CNetObjHandler *GetNetObjHandler() override { return &m_NetObjHandler; }
 	protocol7::CNetObjHandler *GetNetObjHandler7() override { return &m_NetObjHandler7; }
+	LOCKED_TUNES *LockedTuning() { return m_aLockedTuning; }
 
 	CGameContext(bool Resetting = false);
 	~CGameContext() override;
@@ -229,10 +243,15 @@ public:
 
 	IGameController *m_pController;
 	CGameWorld m_World;
+	CPlayerMapping m_PlayerMapping;
 
 	// helper functions
 	CCharacter *GetPlayerChar(int ClientId);
 	const CCharacter *GetPlayerChar(int ClientId) const;
+	const CPlayer *FindPlayerByName(const char *pName) const;
+	// Returns `nullptr` if no player is found.
+	CPlayer *FindPlayerByName(const char *pName);
+	std::optional<int> FindClientIdByName(const char *pName) const;
 	bool EmulateBug(int Bug) const;
 	std::vector<SSwitchers> &Switchers() { return m_World.m_Core.m_vSwitchers; }
 
@@ -256,6 +275,7 @@ public:
 	int m_VoteEnforce;
 	char m_aaZoneEnterMsg[TuneZone::NUM][256]; // 0 is used for switching from or to area without tunings
 	char m_aaZoneLeaveMsg[TuneZone::NUM][256];
+	char m_aaTuneLockMsg[TuneZone::NUM][256];
 
 	void CreateAllEntities(bool Initial);
 	CPlayer *CreatePlayer(int ClientId, int StartTeam, bool Afk, int LastWhisperTo);
@@ -289,8 +309,8 @@ public:
 	void CreateSoundGlobal(int Sound, int Target = -1) const;
 
 	void SnapSwitchers(int SnappingClient);
-	bool SnapLaserObject(const CSnapContext &Context, int SnapId, const vec2 &To, const vec2 &From, int StartTick, int Owner = -1, int LaserType = -1, int Subtype = -1, int SwitchNumber = -1) const;
-	bool SnapPickup(const CSnapContext &Context, int SnapId, const vec2 &Pos, int Type, int SubType, int SwitchNumber, int Flags) const;
+	void SnapLaserObject(const CSnapContext &Context, int SnapId, const vec2 &To, const vec2 &From, int StartTick, int Owner = -1, int LaserType = -1, int Subtype = -1, int SwitchNumber = -1, int ShotgunStrength = 0, int BounceNum = 0, int BounceCost = 0, int BounceDelay = 0) const;
+	void SnapPickup(const CSnapContext &Context, int SnapId, const vec2 &Pos, int Type, int SubType, int SwitchNumber, int Flags) const;
 
 	enum
 	{
@@ -309,14 +329,24 @@ public:
 	void SendMotd(int ClientId) const;
 	void SendSettings(int ClientId) const;
 	void SendServerAlert(const char *pMessage);
-	void SendModeratorAlert(const char *pMessage, int ToClientId);
+	void SendModeratorAlert(int ToClientId, const char *pMessage);
 	void SendBroadcast(const char *pText, int ClientId, bool IsImportant = true);
+
+	/**
+	 * The 0.7 protocol does not support renaming connected clients (or changing clan/country).
+	 * But the 0.6 protocol does allow that. And the server supports both.
+	 * So when a 0.6 client renames we update the state for 0.7 clients
+	 * by reconnecting the renamed client. This is abstracted away by this method.
+	 * During the reconnect also other properties than name are being resent and potentially
+	 * updated. Those are: name, country, clan, team and skin
+	 *
+	 * @param ClientId This is the id of the client that will be updated. Not the id that will receive the message. The message gets broadcasted to all 0.7 clients.
+	 */
+	void SendRename7(int ClientId);
 	void SendSkinChange7(int ClientId);
 
 	void List(int ClientId, const char *pFilter);
 
-	//
-	void CheckPureTuning();
 	void SendTuningParams(int ClientId, int Zone = 0);
 
 	const CVoteOptionServer *GetVoteOption(int Index) const;
@@ -336,8 +366,6 @@ public:
 	void OnTick() override;
 	void OnSnap(int ClientId, bool GlobalSnap, bool RecordingDemo) override;
 	void OnPostGlobalSnap() override;
-
-	void UpdatePlayerMaps();
 
 	void *PreProcessMsg(int *pMsgId, CUnpacker *pUnpacker, int ClientId);
 	void CensorMessage(char *pCensoredMessage, const char *pMessage, int Size);
@@ -387,6 +415,7 @@ public:
 
 	CUuid GameUuid() const override;
 	const char *GameType() const override;
+	char m_aVersionString[32];
 	const char *Version() const override;
 	const char *NetVersion() const override;
 
@@ -476,7 +505,6 @@ private:
 	void Teleport(CCharacter *pChr, vec2 Pos);
 	static void ConTeleport(IConsole::IResult *pResult, void *pUserData);
 
-	static void ConCredits(IConsole::IResult *pResult, void *pUserData);
 	static void ConInfo(IConsole::IResult *pResult, void *pUserData);
 	static void ConHelp(IConsole::IResult *pResult, void *pUserData);
 	static void ConSettings(IConsole::IResult *pResult, void *pUserData);
@@ -602,6 +630,7 @@ private:
 	static void ConVoteMutes(IConsole::IResult *pResult, void *pUserData);
 
 	void Whisper(int ClientId, char *pStr);
+	int WhisperRecordFlag(int ClientId) const;
 	void WhisperId(int ClientId, int VictimId, const char *pMessage);
 	void Converse(int ClientId, char *pStr);
 	bool IsVersionBanned(int Version);
@@ -651,6 +680,7 @@ public:
 	void SendFinish(int ClientId, float Time, std::optional<float> PreviousBestTime);
 	void SendSaveCode(int Team, int TeamSize, int State, const char *pError, const char *pSaveRequester, const char *pServerName, const char *pGeneratedCode, const char *pCode);
 	void OnSetAuthed(int ClientId, int Level) override;
+	void OnSetTimedOut(int ClientId) override;
 
 	void ResetTuning();
 };

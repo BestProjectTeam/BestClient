@@ -2,8 +2,9 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include <antibot/antibot_data.h>
 
+#include <base/dbg.h>
 #include <base/math.h>
-#include <base/system.h>
+#include <base/mem.h>
 #include <base/vmath.h>
 
 #include <engine/map.h>
@@ -55,6 +56,7 @@ void CCollision::Init(class CLayers *pLayers)
 	m_Width = m_pLayers->GameLayer()->m_Width;
 	m_Height = m_pLayers->GameLayer()->m_Height;
 	m_pTiles = static_cast<CTile *>(m_pLayers->Map()->GetData(m_pLayers->GameLayer()->m_Data));
+	m_HasHookTeleIns = false;
 
 	if(m_pLayers->TeleLayer())
 	{
@@ -94,27 +96,30 @@ void CCollision::Init(class CLayers *pLayers)
 			m_pFront = static_cast<CTile *>(m_pLayers->Map()->GetData(m_pLayers->FrontLayer()->m_Front));
 	}
 
-	for(int i = 0; i < m_Width * m_Height; i++)
+	if(m_pSwitch)
 	{
-		int Index;
-		if(m_pSwitch)
+		for(int i = 0; i < m_Width * m_Height; i++)
 		{
 			if(m_pSwitch[i].m_Number > m_HighestSwitchNumber)
+			{
 				m_HighestSwitchNumber = m_pSwitch[i].m_Number;
+			}
 
-			if(m_pSwitch[i].m_Number)
-				m_pDoor[i].m_Number = m_pSwitch[i].m_Number;
-			else
-				m_pDoor[i].m_Number = 0;
+			m_pDoor[i].m_Number = m_pSwitch[i].m_Number;
 
-			Index = m_pSwitch[i].m_Type;
-
+			const unsigned char Index = m_pSwitch[i].m_Type;
 			if(Index <= TILE_NPH_ENABLE)
 			{
-				if((Index >= TILE_JUMP && Index <= TILE_SUBTRACT_TIME) || Index == TILE_ALLOW_TELE_GUN || Index == TILE_ALLOW_BLUE_TELE_GUN)
+				if((Index >= TILE_JUMP && Index <= TILE_SUBTRACT_TIME) ||
+					Index == TILE_ALLOW_TELE_GUN ||
+					Index == TILE_ALLOW_BLUE_TELE_GUN)
+				{
 					m_pSwitch[i].m_Type = Index;
+				}
 				else
+				{
 					m_pSwitch[i].m_Type = 0;
+				}
 			}
 		}
 	}
@@ -123,25 +128,28 @@ void CCollision::Init(class CLayers *pLayers)
 	{
 		for(int i = 0; i < m_Width * m_Height; i++)
 		{
-			int Number = m_pTele[i].m_Number;
-			int Type = m_pTele[i].m_Type;
-			if(Number > 0)
+			const unsigned char Number = m_pTele[i].m_Number;
+			const unsigned char Type = m_pTele[i].m_Type;
+			if(Number && Type)
 			{
+				const vec2 TelePos = vec2(i % m_Width * 32.0f + 16.0f, i / m_Width * 32.0f + 16.0f);
 				if(Type == TILE_TELEIN)
 				{
-					m_TeleIns[Number - 1].emplace_back(i % m_Width * 32.0f + 16.0f, i / m_Width * 32.0f + 16.0f);
+					m_TeleIns[Number - 1].push_back(TelePos);
 				}
 				else if(Type == TILE_TELEOUT)
 				{
-					m_TeleOuts[Number - 1].emplace_back(i % m_Width * 32.0f + 16.0f, i / m_Width * 32.0f + 16.0f);
+					m_TeleOuts[Number - 1].push_back(TelePos);
 				}
 				else if(Type == TILE_TELECHECKOUT)
 				{
-					m_TeleCheckOuts[Number - 1].emplace_back(i % m_Width * 32.0f + 16.0f, i / m_Width * 32.0f + 16.0f);
+					m_TeleCheckOuts[Number - 1].push_back(TelePos);
 				}
-				else if(Type)
+				else
 				{
-					m_TeleOthers[Number - 1].emplace_back(i % m_Width * 32.0f + 16.0f, i / m_Width * 32.0f + 16.0f);
+					m_TeleOthers[Number - 1].push_back(TelePos);
+					if(Type == TILE_TELEINHOOK)
+						m_HasHookTeleIns = true;
 				}
 			}
 		}
@@ -301,7 +309,7 @@ int CCollision::GetMoveRestrictions(CALLBACK_SWITCHACTIVE pfnSwitchActive, void 
 		{
 			CDoorTile DoorTile;
 			GetDoorTile(ModMapIndex, &DoorTile);
-			if(in_range(DoorTile.m_Number, 0, m_HighestSwitchNumber) &&
+			if((int)DoorTile.m_Number <= m_HighestSwitchNumber &&
 				pfnSwitchActive(DoorTile.m_Number, pUser))
 			{
 				Restrictions |= ::GetMoveRestrictions(d, DoorTile.m_Index, DoorTile.m_Flags);
@@ -518,6 +526,16 @@ bool CCollision::TestBox(vec2 Pos, vec2 Size) const
 	return false;
 }
 
+bool CCollision::IsOnGround(vec2 Pos, float Size) const
+{
+	if(CheckPoint(Pos.x + Size / 2, Pos.y + Size / 2 + 5))
+		return true;
+	if(CheckPoint(Pos.x - Size / 2, Pos.y + Size / 2 + 5))
+		return true;
+
+	return false;
+}
+
 void CCollision::MoveBox(vec2 *pInoutPos, vec2 *pInoutVel, vec2 Size, vec2 Elasticity, bool *pGrounded) const
 {
 	// do the move
@@ -719,15 +737,10 @@ int CCollision::IsTeleportHook(int Index) const
 	return 0;
 }
 
-int CCollision::IsSpeedup(int Index) const
+bool CCollision::IsSpeedup(int Index) const
 {
-	if(Index < 0 || !m_pSpeedup)
-		return 0;
-
-	if(m_pSpeedup[Index].m_Force > 0)
-		return Index;
-
-	return 0;
+	dbg_assert(Index >= 0, "Invalid speedup index %d", Index);
+	return m_pSpeedup && m_pSpeedup[Index].m_Force > 0;
 }
 
 int CCollision::IsTune(int Index) const
@@ -735,8 +748,21 @@ int CCollision::IsTune(int Index) const
 	if(Index < 0 || !m_pTune)
 		return 0;
 
-	if(m_pTune[Index].m_Type)
+	if(m_pTune[Index].m_Type == TILE_TUNE)
 		return m_pTune[Index].m_Number;
+
+	return 0;
+}
+
+int CCollision::IsTuneLock(int Index) const
+{
+	if(Index < 0 || !m_pTune)
+		return 0;
+
+	if(m_pTune[Index].m_Type == TILE_TUNELOCK)
+		return m_pTune[Index].m_Number;
+	if(m_pTune[Index].m_Type == TILE_TUNELOCK_RESET)
+		return -1;
 
 	return 0;
 }
@@ -769,7 +795,7 @@ int CCollision::GetSwitchNumber(int Index) const
 	if(Index < 0 || !m_pSwitch)
 		return 0;
 
-	if(m_pSwitch[Index].m_Type > 0 && m_pSwitch[Index].m_Number > 0)
+	if(m_pSwitch[Index].m_Type > 0 && m_pSwitch[Index].m_Number > 0 && m_pSwitch[Index].m_Number <= m_HighestSwitchNumber)
 		return m_pSwitch[Index].m_Number;
 
 	return 0;
@@ -826,6 +852,11 @@ int CCollision::MoverSpeed(int x, int y, vec2 *pSpeed) const
 	}
 	*pSpeed = Target;
 	return Index;
+}
+
+bool CCollision::HasHookTeleIns() const
+{
+	return m_HasHookTeleIns || (g_Config.m_SvOldTeleportHook && !m_TeleIns.empty());
 }
 
 int CCollision::GetPureMapIndex(float x, float y) const
@@ -1081,7 +1112,7 @@ void CCollision::SetCollisionAt(float x, float y, int Index)
 	m_pTiles[Ny * m_Width + Nx].m_Index = Index;
 }
 
-void CCollision::SetDoorCollisionAt(float x, float y, int Type, int Flags, int Number)
+void CCollision::SetDoorCollisionAt(float x, float y, unsigned char Type, unsigned char Flags, unsigned char Number)
 {
 	if(!m_pDoor)
 		return;

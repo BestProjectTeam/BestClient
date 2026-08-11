@@ -3,6 +3,7 @@
 
 #include <base/log.h>
 
+#include <engine/http.h>
 #include <engine/shared/json.h>
 #include <engine/shared/jsonwriter.h>
 #include <engine/shared/protocol.h>
@@ -478,13 +479,13 @@ bool ITranslateBackend::CompareTargets(const char *pA, const char *pB) const
 class ITranslateBackendHttp : public ITranslateBackend
 {
 protected:
-	std::shared_ptr<CHttpRequest> m_pHttpRequest = nullptr;
+	std::shared_ptr<IHttpRequest> m_pHttpRequest = nullptr;
 	virtual bool ParseResponse(CTranslateResponse &Out) = 0;
 	virtual bool ParseHttpError() const { return false; }
 
-	void CreateHttpRequest(IHttp &Http, const char *pUrl)
+	void StartHttpRequest(IHttp &Http, const char *pUrl)
 	{
-		auto pGet = std::make_shared<CHttpRequest>(pUrl);
+		std::shared_ptr<IHttpRequest> pGet = HttpGet(pUrl);
 		pGet->LogProgress(HTTPLOG::FAILURE);
 		pGet->FailOnErrorStatus(false);
 		pGet->Timeout(CTimeout{10000, 0, 500, 10});
@@ -635,7 +636,7 @@ public:
 			Json.WriteStrValue(g_Config.m_TcTranslateKey);
 		}
 		Json.EndObject();
-		CreateHttpRequest(Http, g_Config.m_TcTranslateEndpoint[0] == '\0' ? "localhost:5000/translate" : g_Config.m_TcTranslateEndpoint);
+		StartHttpRequest(Http, g_Config.m_TcTranslateEndpoint[0] == '\0' ? "localhost:5000/translate" : g_Config.m_TcTranslateEndpoint);
 		const std::string JsonStr = Json.GetOutputString();
 		m_pHttpRequest->PostJson(JsonStr.c_str());
 	}
@@ -722,10 +723,10 @@ public:
 			!UrlEncode(pText, aBuf + PrefixLen, sizeof(aBuf) - PrefixLen))
 		{
 			log_error("translate", "FreeTranslateAPI: failed to build request URL");
-			CreateHttpRequest(Http, "https://ftapi.pythonanywhere.com/translate?dl=en&text=");
+			StartHttpRequest(Http, "https://ftapi.pythonanywhere.com/translate?dl=en&text=");
 			return;
 		}
-		CreateHttpRequest(Http, aBuf);
+		StartHttpRequest(Http, aBuf);
 	}
 };
 
@@ -805,10 +806,10 @@ public:
 			!UrlEncode(pText, aBuf + PrefixLen, sizeof(aBuf) - PrefixLen))
 		{
 			log_error("translate", "Google Translate: failed to build request URL");
-			CreateHttpRequest(Http, "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=");
+			StartHttpRequest(Http, "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=");
 			return;
 		}
-		CreateHttpRequest(Http, aBuf);
+		StartHttpRequest(Http, aBuf);
 	}
 };
 

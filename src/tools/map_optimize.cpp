@@ -1,6 +1,9 @@
+#include <base/dbg.h>
+#include <base/fs.h>
 #include <base/logger.h>
+#include <base/mem.h>
 #include <base/os.h>
-#include <base/system.h>
+#include <base/str.h>
 
 #include <engine/gfx/image_manipulation.h>
 #include <engine/shared/datafile.h>
@@ -99,13 +102,21 @@ int main(int argc, const char **argv)
 	{
 		str_format(aFilename, sizeof(aFilename), "out/%s", argv[2]);
 
-		fs_makedir_rec_for(aFilename);
+		if(fs_makedir_rec_for(aFilename) != 0)
+		{
+			// Error already logged by fs_makedir_rec_for
+			return -1;
+		}
 	}
 	else
 	{
-		fs_makedir("out");
+		if(fs_makedir("out") != 0)
+		{
+			// Error already logged by fs_makedir
+			return -1;
+		}
 		char aBuff[IO_MAX_PATH_LENGTH];
-		IStorage::StripPathAndExtension(argv[1], aBuff, sizeof(aBuff));
+		fs_split_file_extension(fs_filename(argv[1]), aBuff, sizeof(aBuff));
 		str_format(aFilename, sizeof(aFilename), "out/%s.map", aBuff);
 	}
 

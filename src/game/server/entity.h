@@ -30,7 +30,7 @@ private:
 	CGameWorld *m_pGameWorld;
 	CCollision *m_pCCollision;
 
-	int m_Id;
+	std::optional<int> m_Id;
 	int m_ObjType;
 
 	/*
@@ -51,10 +51,10 @@ public: // TODO: Maybe make protected
 	vec2 m_Pos;
 
 	/* Getters */
-	int GetId() const { return m_Id; }
+	std::optional<int> GetId() const { return m_Id; }
 
 	/* Constructor */
-	CEntity(CGameWorld *pGameWorld, int Objtype, vec2 Pos = vec2(0, 0), int ProximityRadius = 0);
+	CEntity(CGameWorld *pGameWorld, int Objtype, bool SnapFreeId, vec2 Pos = vec2(0, 0), int ProximityRadius = 0);
 
 	/* Destructor */
 	virtual ~CEntity();
@@ -62,9 +62,6 @@ public: // TODO: Maybe make protected
 	/* Objects */
 	std::vector<SSwitchers> &Switchers() { return m_pGameWorld->m_Core.m_vSwitchers; }
 	CGameWorld *GameWorld() { return m_pGameWorld; }
-	CTuningParams *GlobalTuning() { return &GameWorld()->TuningList()[0]; }
-	CTuningParams *TuningList() { return GameWorld()->TuningList(); }
-	CTuningParams *GetTuning(int i) { return GameWorld()->GetTuning(i); }
 	class CConfig *Config() { return m_pGameWorld->Config(); }
 	class CGameContext *GameServer() { return m_pGameWorld->GameServer(); }
 	class IServer *Server() { return m_pGameWorld->Server(); }

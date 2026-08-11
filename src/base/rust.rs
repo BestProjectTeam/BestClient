@@ -1,9 +1,13 @@
+use crate::dbg_assert_imp;
 use std::cmp;
 use std::ffi::CStr;
+use std::ffi::CString;
 use std::fmt;
 use std::marker::PhantomData;
 use std::ops;
 use std::os::raw::c_char;
+use std::panic;
+use std::panic::PanicHookInfo;
 use std::ptr;
 use std::str;
 
@@ -21,6 +25,7 @@ use std::str;
 /// # Examples
 ///
 /// ```
+/// # extern crate ddnet_test;
 /// use ddnet_base::UserPtr;
 ///
 /// struct CallbackData {
@@ -53,6 +58,7 @@ impl UserPtr {
     /// # Examples
     ///
     /// ```
+    /// # extern crate ddnet_test;
     /// use ddnet_base::UserPtr;
     ///
     /// // Can't do anything useful with this.
@@ -73,6 +79,7 @@ impl UserPtr {
     /// # Examples
     ///
     /// ```
+    /// # extern crate ddnet_test;
     /// use ddnet_base::UserPtr;
     ///
     /// let the_answer = 42;
@@ -97,6 +104,7 @@ impl UserPtr {
     /// # Examples
     ///
     /// ```
+    /// # extern crate ddnet_test;
     /// use ddnet_base::UserPtr;
     ///
     /// let mut seen_it = false;
@@ -139,6 +147,7 @@ impl<'a, T> From<&'a mut T> for UserPtr {
 /// # Examples
 ///
 /// ```
+/// # extern crate ddnet_test;
 /// # fn some_c_function(_: StrRef<'_>) {}
 /// use ddnet_base::StrRef;
 /// use ddnet_base::s;
@@ -179,12 +188,14 @@ impl<'a> StrRef<'a> {
     /// # Examples
     ///
     /// ```
+    /// # extern crate ddnet_test;
     /// use ddnet_base::s;
     ///
     /// let str1: &'static str = s!("static string").to_str();
     /// ```
     ///
     /// ```compile_fail
+    /// # extern crate ddnet_test;
     /// use ddnet_base::s;
     ///
     /// // Wrong lifetime.
@@ -252,6 +263,7 @@ impl ops::Deref for StrRef<'_> {
 /// # Examples
 ///
 /// ```
+/// # extern crate ddnet_test;
 /// use ddnet_base::StrRef;
 /// use ddnet_base::s;
 ///
@@ -265,4 +277,51 @@ macro_rules! s {
             ::std::ffi::CStr::from_bytes_with_nul(::std::concat!($str, "\0").as_bytes()).unwrap(),
         )
     };
+}
+
+// TODO (MSRV 1.91): Replace with built-in `PanicHookInfo::payload_as_str`.
+//
+// Adapted from that function.
+fn payload_as_str<'a>(panic_info: &'a PanicHookInfo) -> Option<&'a str> {
+    if let Some(s) = panic_info.payload().downcast_ref::<&str>() {
+        Some(s)
+    } else if let Some(s) = panic_info.payload().downcast_ref::<String>() {
+        Some(s)
+    } else {
+        None
+    }
+}
+
+// This function tries pretty hard not to panic, even for suspicious parameters.
+fn dbg_assert_panic_handler(panic_info: &PanicHookInfo) -> ! {
+    // TODO (MSRV 1.92): Use `file_as_c_str`.
+    let filename = panic_info.location().map(|l| l.file()).unwrap_or("unknown");
+    let line = panic_info.location().map(|l| l.line()).unwrap_or(0);
+    let message = payload_as_str(panic_info).unwrap_or("(non-string panic payload)");
+
+    let filename = CString::new(filename)
+        .ok()
+        .unwrap_or_else(|| CString::new("(invalid filename)").unwrap());
+    let message = CString::new(message).ok().unwrap_or_else(|| {
+        CString::new(format!(
+            "interior NULs in message: {}",
+            message.replace('\0', "<NUL>")
+        ))
+        .unwrap()
+    });
+    unsafe {
+        // Just cast the line number to `i32` and accept the overflow.
+        dbg_assert_imp(
+            filename.as_ptr(),
+            line as i32,
+            b"%s\0".as_ptr() as *const c_char,
+            message.as_ptr(),
+        );
+    }
+}
+
+/// Installs a panic handler for Rust that calls `dbg_assert_failed` on panic.
+#[no_mangle]
+pub extern "C" fn rust_panic_use_dbg_assert() {
+    panic::set_hook(Box::new(|info| dbg_assert_panic_handler(info)));
 }

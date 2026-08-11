@@ -15,7 +15,7 @@
 #include <engine/font_icons.h>
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
-#include <engine/shared/http.h>
+#include <engine/http.h>
 #include <engine/shared/jobs.h>
 #include <engine/storage.h>
 #include <engine/textrender.h>
@@ -2725,7 +2725,7 @@ public:
 	int64_t m_LastRawSnapshotPositionMs = -1;
 	EMusicPlaybackState m_PlaybackAnchorState = EMusicPlaybackState::STOPPED;
 	std::string m_LastArtKey;
-	std::shared_ptr<CHttpRequest> m_pArtRequest;
+	std::shared_ptr<IHttpRequest> m_pArtRequest;
 	std::shared_ptr<CMusicPlayerArtDecodeJob> m_pArtDecodeJob;
 	std::optional<SMediaDecodedFrames> m_OptArtDecodedFrames;
 	int m_ArtUploadIndex = 0;
@@ -3220,7 +3220,7 @@ public:
 		BeginArtLoad(pOwner);
 		if(m_pArtRequest && m_pArtRequest->State() == EHttpState::DONE)
 		{
-			std::shared_ptr<CHttpRequest> pFinished = m_pArtRequest;
+			std::shared_ptr<IHttpRequest> pFinished = m_pArtRequest;
 			m_pArtRequest.reset();
 			if(pFinished->StatusCode() < 200 || pFinished->StatusCode() >= 400)
 			{
@@ -3924,7 +3924,7 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	const float CompactTextSlotWidthBase = ComputeCompactTextSlotWidth(TextRender(), GameTimer, CompactTitleFont, LayoutScale, LayoutWidthScale, false);
 	const float MiniTextSlotWidthBase = ComputeMiniTextSlotWidth(TextRender(), Snapshot, GameTimer, MiniTitleFont, LayoutScale, LayoutWidthScale, false);
 	const int NumBars = MusicPlayerVisualizerColumns();
-	Graphics()->MapScreen(0.0f, 0.0f, Width, Height);
+	Graphics()->MapScreen(CScreenRect(vec2(0.0f, 0.0f), vec2(Width, Height)));
 
 	const bool BackgroundEnabled = Layout.m_BackgroundEnabled;
 	const unsigned BackgroundColor = Layout.m_BackgroundColor;
@@ -4329,7 +4329,7 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 		RenderButtonIcon(UiNextRect, FontIcon::FORWARD_STEP, Snapshot.m_CanNext, NextHovered);
 	}
 
-	Graphics()->MapScreen(0.0f, 0.0f, Width, Height);
+	Graphics()->MapScreen(CScreenRect(vec2(0.0f, 0.0f), vec2(Width, Height)));
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
 	TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
 }

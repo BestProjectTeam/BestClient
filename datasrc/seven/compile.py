@@ -174,7 +174,10 @@ def main():
 		lines = []
 
 		lines += ['#include "protocol7.h"']
-		lines += ['#include <base/system.h>']
+		lines += ['']
+		lines += ['#include <base/dbg.h>']
+		lines += ['#include <base/str.h>']
+		lines += ['']
 		lines += ['#include <engine/shared/packer.h>']
 		lines += ['#include <engine/shared/protocol.h>']
 		lines += ['#include <engine/shared/snapshot.h>']
@@ -285,10 +288,8 @@ void CNetObjHandler::DebugDumpSnapshot(const ::CSnapshot *pSnap) const
 		const CSnapshotItem *pItem = pSnap->GetItem(i);
 		int Size = pSnap->GetItemSize(i);
 		int Type = pSnap->GetItemType(i);
-		const char *pName = GetObjName(pItem->Type());
-		if(Type > OFFSET_UUID && Type < g_UuidManager.NumUuids() + OFFSET_UUID)
-			pName = g_UuidManager.GetName(Type);
-		dbg_msg("snapshot", "\\t%s type=%d id=%d size=%d", pName, pItem->Type(), pItem->Id(), Size);
+		const char *pName = GetObjName(Type);
+		dbg_msg("snapshot", "\\t%s type=%d id=%d size=%d", pName, pItem->InternalType(), pItem->Id(), Size);
 		if(!DumpObj(Type, pItem->Data(), Size))
 			continue;
 
@@ -315,8 +316,8 @@ void CNetObjHandler::DebugDumpSnapshot(const ::CSnapshot *pSnap) const
 
 		lines += ['void *CNetObjHandler::SecureUnpackMsg(int Type, CUnpacker *pUnpacker)']
 		lines += ['{']
-		lines += ['\tm_pMsgFailedOn = 0;']
-		lines += ['\tm_pObjFailedOn = 0;']
+		lines += ['\tm_pMsgFailedOn = nullptr;']
+		lines += ['\tm_pObjFailedOn = nullptr;']
 		lines += ['\tswitch(Type)']
 		lines += ['\t{']
 
@@ -339,7 +340,7 @@ void CNetObjHandler::DebugDumpSnapshot(const ::CSnapshot *pSnap) const
 		lines += ['\t\t\tm_pMsgFailedOn = "";']
 		lines += ['\t\tif(!m_pObjFailedOn)']
 		lines += ['\t\t\tm_pObjFailedOn = "";']
-		lines += ['\t\treturn 0;']
+		lines += ['\t\treturn nullptr;']
 		lines += ['\t}']
 		lines += ['\tm_pMsgFailedOn = "";']
 		lines += ['\tm_pObjFailedOn = "";']

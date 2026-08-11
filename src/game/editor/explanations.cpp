@@ -1,6 +1,6 @@
 #include "explanations.h"
 
-#include <base/system.h>
+#include <base/dbg.h>
 
 #include <game/mapitems.h>
 
@@ -263,6 +263,14 @@ const char *CExplanations::ExplainDDNet(int Tile, int Layer)
 	case TILE_TUNE:
 		if(Layer == LAYER_TUNE)
 			return "TUNE ZONE: Area where defined tunes work.";
+		break;
+	case TILE_TUNELOCK:
+		if(Layer == LAYER_TUNE)
+			return "TUNE LOCK: Locks the defined tunes for the specific player, overrides tune zones.";
+		break;
+	case TILE_TUNELOCK_RESET:
+		if(Layer == LAYER_TUNE)
+			return "TUNE LOCK RESET: Resets all locked tunes for the specific player.";
 		break;
 	case TILE_OLDLASER:
 		if(Layer == LAYER_GAME || Layer == LAYER_FRONT)

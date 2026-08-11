@@ -2,9 +2,11 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 
 #include "chat.h"
+#include <base/color.h>
 
 #include <base/io.h>
 #include <base/log.h>
+#include <base/log_color.h>
 #include <base/time.h>
 
 #include <engine/editor.h>
@@ -14,7 +16,7 @@
 #include <engine/keys.h>
 #include <engine/shared/config.h>
 #include <engine/shared/csv.h>
-#include <engine/shared/http.h>
+#include <engine/http.h>
 #include <engine/textrender.h>
 
 #include <generated/protocol.h>
@@ -484,7 +486,7 @@ CChat::CChat()
 				str_startswith(pStr, "/load ")))
 		{
 			bool Censor = false;
-			const size_t NumLetters = minimum(NumChars, sizeof(ms_aDisplayText) - 1);
+			const size_t NumLetters = std::min(NumChars, sizeof(ms_aDisplayText) - 1);
 			for(size_t i = 0; i < NumLetters; ++i)
 			{
 				if(Censor)
@@ -832,7 +834,7 @@ void CChat::ConChat(IConsole::IResult *pResult, void *pUserData)
 	else if(str_comp(pMode, "team") == 0)
 		((CChat *)pUserData)->EnableMode(1);
 	else
-		((CChat *)pUserData)->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "console", "expected all or team as mode");
+		log_error("chat", "expected all or team as mode");
 
 	CChat *pChat = (CChat *)pUserData;
 	if(pResult->GetString(1)[0])
@@ -1374,7 +1376,9 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 				m_pHistoryEntry = pTest;
 		}
 		else
+		{
 			m_pHistoryEntry = m_History.Last();
+		}
 
 		if(m_pHistoryEntry)
 			m_Input.Set(m_pHistoryEntry->m_aText);
@@ -1411,7 +1415,6 @@ void CChat::EnableMode(int Team)
 		else
 			m_Mode = MODE_ALL;
 
-		Input()->Clear();
 		m_CompletionChosen = -1;
 		m_CompletionUsed = false;
 		m_ChatOpenAnimationStart = time_get();
@@ -3113,7 +3116,7 @@ void CChat::StartMediaDownload(CLine &Line)
 		}
 	}
 
-	std::shared_ptr<CHttpRequest> pGet = HttpGet(Line.m_aMediaUrl);
+	std::shared_ptr<IHttpRequest> pGet = HttpGet(Line.m_aMediaUrl);
 	pGet->Timeout(CTimeout{8000, 0, 4096, 8});
 	pGet->MaxResponseSize(CHAT_MEDIA_MAX_RESPONSE_SIZE);
 	pGet->FailOnErrorStatus(false);
@@ -3863,7 +3866,9 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 			pEnd = nullptr;
 		}
 		else if(pEnd == nullptr)
+		{
 			pEnd = pStrOld;
+		}
 
 		if(++Length >= MAX_LINE_LENGTH)
 		{
@@ -3879,10 +3884,7 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 
 	bool Highlighted = false;
 
-	auto &&FChatMsgCheckAndPrint = [this](const CLine &Line) {
-		char aBuf[1024];
-		str_format(aBuf, sizeof(aBuf), "%s%s%s", Line.m_aName, Line.m_ClientId >= 0 ? ": " : "", Line.m_aText);
-
+	auto &&FChatMsgCheckAndPrint = [](const CLine &Line) {
 		ColorRGBA ChatLogColor = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
 		if(Line.m_Highlighted)
 		{
@@ -3914,7 +3916,7 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 		else
 			pFrom = "chat/all";
 
-		Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, pFrom, aBuf, ChatLogColor);
+		log_info_color(color_cast<LOG_COLOR>(ChatLogColor), pFrom, "%s%s%s", Line.m_aName, Line.m_ClientId >= 0 ? ": " : "", Line.m_aText);
 	};
 
 	// Custom color for new line
@@ -4604,7 +4606,7 @@ void CChat::OnPrepareLines(float x, float y, int StartLine, int HoveredTranslate
 			}
 			else
 			{
-				FullWidth += maximum(LineCursor.m_LongestLineWidth, AppendCursor.m_LongestLineWidth);
+				FullWidth += std::max(LineCursor.m_LongestLineWidth, AppendCursor.m_LongestLineWidth);
 			}
 			if(Line.m_aMediaPreviewWidth[OffsetType] > 0.0f)
 			{
@@ -4686,7 +4688,7 @@ void CChat::OnRender()
 
 	const float Height = 300.0f;
 	const float Width = Height * Graphics()->ScreenAspect();
-	Graphics()->MapScreen(0.0f, 0.0f, Width, Height);
+	Graphics()->MapScreenToSize(Width, Height);
 
 	// Determine which translated line the cursor hovers over (using last frame's screen-space rects)
 	int HoveredTranslateLineIndex = -1;
@@ -4930,7 +4932,11 @@ void CChat::OnRender()
 			if(CaretVisible)
 			{
 				float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
-				Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
+				const CScreenRect ScreenRect = Graphics()->GetScreen();
+				ScreenX0 = ScreenRect.m_TopLeft.x;
+				ScreenY0 = ScreenRect.m_TopLeft.y;
+				ScreenX1 = ScreenRect.m_BottomRight.x;
+				ScreenY1 = ScreenRect.m_BottomRight.y;
 				const float CursorInnerWidth = ((ScreenX1 - ScreenX0) / Graphics()->ScreenWidth()) * 2.0f;
 				const float CursorOuterWidth = CursorInnerWidth * 2.0f;
 				const float CursorOuterInnerDiff = (CursorOuterWidth - CursorInnerWidth) / 2.0f;
@@ -5001,7 +5007,7 @@ void CChat::OnRender()
 			m_TranslateButtonRectValid = true;
 			Ui()->MapScreen();
 			RenderTranslateSettingsButton(m_TranslateButtonUiRect);
-			Graphics()->MapScreen(0.0f, 0.0f, Width, Height);
+			Graphics()->MapScreenToSize(Width, Height);
 			if(Ui()->HotItem() == &m_TranslateSettingsButton || m_TranslateButtonPressed)
 			{
 				m_MouseIsPress = false;
@@ -5404,7 +5410,7 @@ void CChat::OnRender()
 		Ui()->MapScreen();
 		Ui()->Update(vec2(0.0f, 0.0f));
 		Ui()->RenderPopupMenus();
-		Graphics()->MapScreen(0.0f, 0.0f, Width, Height);
+		Graphics()->MapScreenToSize(Width, Height);
 	}
 
 	RenderFullscreenMedia(Width, Height);

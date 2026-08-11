@@ -6,8 +6,10 @@
 #include "voting.h"
 
 #include <base/color.h>
+#include <base/dbg.h>
 #include <base/math.h>
-#include <base/system.h>
+#include <base/str.h>
+#include <base/time.h>
 
 #include <engine/console.h>
 #include <engine/demo.h>
@@ -661,8 +663,7 @@ void CMenus::RenderServerInfo(CUIRect MainView)
 	const float FontSizeTitle = 32.0f;
 	const float FontSizeBody = 20.0f;
 
-	CServerInfo CurrentServerInfo;
-	Client()->GetServerInfo(&CurrentServerInfo);
+	const CServerInfo &CurrentServerInfo = Client()->ServerInfo();
 
 	CUIRect ServerInfo, GameInfo, Motd;
 	MainView.Draw(ms_ColorTabbarActive, IGraphics::CORNER_B, 10.0f);
@@ -858,11 +859,9 @@ void CMenus::RenderServerInfoMotd(CUIRect Motd)
 		return;
 
 	static CScrollRegion s_ScrollRegion;
-	vec2 ScrollOffset(0.0f, 0.0f);
 	CScrollRegionParams ScrollParams;
 	ScrollParams.m_ScrollUnit = 5 * MotdFontSize;
-	s_ScrollRegion.Begin(&Motd, &ScrollOffset, &ScrollParams);
-	Motd.y += ScrollOffset.y;
+	s_ScrollRegion.Begin(&Motd, &ScrollParams);
 
 	static float s_MotdHeight = 0.0f;
 	static int64_t s_MotdLastUpdateTime = -1;
@@ -1225,6 +1224,27 @@ void CMenus::RenderInGameNetwork(CUIRect MainView)
 		NewPage = PAGE_FAVORITES;
 	}
 	GameClient()->m_Tooltips.DoToolTip(&s_FavoritesButton, &Button, Localize("Favorites"));
+
+	const int MaxPage = PAGE_FAVORITES + ServerBrowser()->FavoriteCommunities().size();
+	if(
+		!Ui()->IsPopupOpen() &&
+		CLineInput::GetActiveInput() == nullptr &&
+		(g_Config.m_UiPage >= PAGE_INTERNET && g_Config.m_UiPage <= MaxPage) &&
+		(m_MenuPage >= PAGE_INTERNET && m_MenuPage <= PAGE_FAVORITE_COMMUNITY_5))
+	{
+		if(Input()->KeyPress(KEY_RIGHT))
+		{
+			NewPage = g_Config.m_UiPage + 1;
+			if(NewPage > MaxPage)
+				NewPage = PAGE_INTERNET;
+		}
+		if(Input()->KeyPress(KEY_LEFT))
+		{
+			NewPage = g_Config.m_UiPage - 1;
+			if(NewPage < PAGE_INTERNET)
+				NewPage = MaxPage;
+		}
+	}
 
 	size_t FavoriteCommunityIndex = 0;
 	static CButtonContainer s_aFavoriteCommunityButtons[5];
@@ -1644,7 +1664,7 @@ void CMenus::RenderIngameHint()
 		return;
 
 	float Width = 300 * Graphics()->ScreenAspect();
-	Graphics()->MapScreen(0, 0, Width, 300);
+	Graphics()->MapScreenToSize(Width, 300);
 	TextRender()->TextColor(1, 1, 1, 1);
 	TextRender()->Text(5, 280, 5, Localize("Menu opened. Press Esc key again to close menu."), -1.0f);
 	Ui()->MapScreen();
