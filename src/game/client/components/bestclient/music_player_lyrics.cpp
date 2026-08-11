@@ -62,7 +62,22 @@ void CMusicPlayerLyrics::ClearActiveTrack()
 	m_CurrentLineIndex = -1;
 	m_OutgoingLineIndex = -1;
 	m_LineTransitionT = 1.0f;
-	m_RenderPositionMs = 0;
+	m_LayoutValid = false;
+	m_LayoutText.clear();
+	m_vCharMetrics.clear();
+	m_BaseLineWidth = 0.0f;
+	m_PreviewFirstLine = false;
+	m_ClockPositionMs = 0;
+	m_ClockTick = 0;
+	m_ClockPlaying = false;
+	m_ClockDurationMs = 0;
+}
+
+void CMusicPlayerLyrics::ClearLayoutState()
+{
+	m_CurrentLineIndex = -1;
+	m_OutgoingLineIndex = -1;
+	m_LineTransitionT = 1.0f;
 	m_LayoutValid = false;
 	m_LayoutText.clear();
 	m_vCharMetrics.clear();
@@ -97,6 +112,7 @@ std::string CMusicPlayerLyrics::BuildCacheKey(const char *pTitle, const char *pA
 	const int DurationSec = (int)((maximum<int64_t>(0, DurationMs) + 500) / 1000);
 	std::string Key;
 	Key.reserve(128);
+	Key += "v2|";
 	Key += pArtist ? pArtist : "";
 	Key += '|';
 	Key += pTitle ? pTitle : "";
@@ -220,14 +236,40 @@ bool CMusicPlayerLyrics::ParseSyncedLyrics(const char *pSyncedLyrics, std::vecto
 	std::stable_sort(vOut.begin(), vOut.end(), [](const SLine &A, const SLine &B) {
 		return A.m_StartMs < B.m_StartMs;
 	});
-	return true;
+	MergeConsecutiveIdenticalLines(vOut);
+	return !vOut.empty();
+}
+
+void CMusicPlayerLyrics::MergeConsecutiveIdenticalLines(std::vector<SLine> &vLines)
+{
+	if(vLines.size() < 2)
+		return;
+
+	// Only drop near-duplicate timestamps of the same text (e.g. [01:00.00][01:00.05]).
+	// Merging repeats that span seconds makes karaoke progress crawl through one line.
+	static constexpr int64_t NearDuplicateMs = 150;
+
+	std::vector<SLine> vMerged;
+	vMerged.reserve(vLines.size());
+	for(SLine &Line : vLines)
+	{
+		if(!vMerged.empty() &&
+			vMerged.back().m_Text == Line.m_Text &&
+			Line.m_StartMs - vMerged.back().m_StartMs <= NearDuplicateMs)
+		{
+			continue;
+		}
+		vMerged.push_back(std::move(Line));
+	}
+	vLines = std::move(vMerged);
 }
 
 void CMusicPlayerLyrics::ApplyCacheEntry(const SCacheEntry &Entry)
 {
 	m_DisplayState = Entry.m_State;
 	m_vLines = Entry.m_vLines;
-	ClearActiveTrack();
+	MergeConsecutiveIdenticalLines(m_vLines);
+	ClearLayoutState();
 }
 
 void CMusicPlayerLyrics::StartRequest(IHttp *pHttp, const char *pTitle, const char *pArtist, const char *pAlbum, int64_t DurationMs)
@@ -335,14 +377,41 @@ void CMusicPlayerLyrics::ProcessRequest()
 	ApplyCacheEntry(Entry);
 }
 
-void CMusicPlayerLyrics::SetRenderPositionMs(int64_t PositionMs)
+int64_t CMusicPlayerLyrics::CurrentPositionMs() const
 {
-	m_RenderPositionMs = maximum<int64_t>(0, PositionMs);
+	int64_t Position = maximum<int64_t>(0, m_ClockPositionMs);
+	if(m_ClockPlaying && m_ClockTick > 0)
+		Position += ((time_get() - m_ClockTick) * 1000) / time_freq();
+	if(m_ClockDurationMs > 0)
+		Position = minimum(Position, m_ClockDurationMs);
+	return Position;
 }
 
-void CMusicPlayerLyrics::Update(IHttp *pHttp, const char *pTitle, const char *pArtist, const char *pAlbum, int64_t DurationMs, int64_t PositionMs)
+void CMusicPlayerLyrics::SyncMediaClock(int64_t SnapshotPositionMs, int64_t DurationMs, bool Playing, bool ForceReset)
 {
-	m_RenderPositionMs = maximum<int64_t>(0, PositionMs);
+	SnapshotPositionMs = maximum<int64_t>(0, SnapshotPositionMs);
+	m_ClockDurationMs = maximum<int64_t>(0, DurationMs);
+	const int64_t Now = time_get();
+
+	if(ForceReset || m_ClockTick == 0 || !Playing)
+	{
+		m_ClockPositionMs = SnapshotPositionMs;
+		m_ClockTick = Now;
+		m_ClockPlaying = Playing;
+		return;
+	}
+
+	// Follow extrapolated media position 1:1. ApplySnapshot no longer sawtooths
+	// backwards on stale polls, so this stays smooth and on timing.
+	m_ClockPositionMs = SnapshotPositionMs;
+	m_ClockTick = Now;
+	m_ClockPlaying = true;
+	if(m_ClockDurationMs > 0)
+		m_ClockPositionMs = minimum(m_ClockPositionMs, m_ClockDurationMs);
+}
+
+void CMusicPlayerLyrics::Update(IHttp *pHttp, const char *pTitle, const char *pArtist, const char *pAlbum, int64_t DurationMs, int64_t SnapshotPositionMs, bool Playing)
+{
 	ProcessRequest();
 
 	const bool HasIdentity = (pTitle && pTitle[0] != '\0') || (pArtist && pArtist[0] != '\0');
@@ -360,13 +429,15 @@ void CMusicPlayerLyrics::Update(IHttp *pHttp, const char *pTitle, const char *pA
 	}
 
 	const std::string Key = BuildCacheKey(pTitle, pArtist, DurationMs);
-	if(Key != m_ActiveKey)
+	const bool NewTrack = Key != m_ActiveKey;
+	if(NewTrack)
 	{
 		AbortRequest();
 		m_ActiveKey = Key;
 		m_vLines.clear();
 		ClearActiveTrack();
 		m_OfflineRetryAt = 0;
+		SyncMediaClock(SnapshotPositionMs, DurationMs, Playing, true);
 
 		const auto It = m_Cache.find(Key);
 		if(It != m_Cache.end())
@@ -379,6 +450,8 @@ void CMusicPlayerLyrics::Update(IHttp *pHttp, const char *pTitle, const char *pA
 		StartRequest(pHttp, pTitle, pArtist, pAlbum, DurationMs);
 		return;
 	}
+
+	SyncMediaClock(SnapshotPositionMs, DurationMs, Playing, false);
 
 	if(m_DisplayState == EDisplayState::Offline && !m_pRequest)
 	{
@@ -593,13 +666,19 @@ void CMusicPlayerLyrics::Render(ITextRender *pTextRender, CUi *pUi, const CUIRec
 		return;
 	}
 
-	int LineIndex = FindLineIndex(m_RenderPositionMs);
+	const int64_t PositionMs = CurrentPositionMs();
+	int LineIndex = FindLineIndex(PositionMs);
 	m_PreviewFirstLine = false;
 	if(LineIndex < 0 && !m_vLines.empty())
 	{
 		// Before first timed line: show first couplet inactive (all gray).
 		LineIndex = 0;
 		m_PreviewFirstLine = true;
+	}
+	// While playing forward, never step back to a previous line (stale boundary jitter).
+	else if(m_ClockPlaying && m_CurrentLineIndex >= 0 && LineIndex >= 0 && LineIndex < m_CurrentLineIndex)
+	{
+		LineIndex = m_CurrentLineIndex;
 	}
 
 	if(LineIndex != m_CurrentLineIndex)
@@ -633,7 +712,7 @@ void CMusicPlayerLyrics::Render(ITextRender *pTextRender, CUi *pUi, const CUIRec
 	if(!m_LayoutValid || m_vCharMetrics.empty())
 		return;
 
-	const float Progress = m_PreviewFirstLine ? 0.0f : LineProgress(m_CurrentLineIndex, m_RenderPositionMs);
+	const float Progress = m_PreviewFirstLine ? 0.0f : LineProgress(m_CurrentLineIndex, PositionMs);
 	const float ProgressChars = Progress * (float)m_vCharMetrics.size();
 	const float PlayheadX = PlayheadXInLine(ProgressChars);
 	const float CenterX = Area.x + Area.w * 0.5f;

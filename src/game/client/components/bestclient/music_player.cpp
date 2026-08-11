@@ -2450,6 +2450,7 @@ public:
 	std::string m_PlaybackTrackKey;
 	int64_t m_PlaybackAnchorPositionMs = 0;
 	int64_t m_PlaybackAnchorTick = 0;
+	int64_t m_LastRawSnapshotPositionMs = -1;
 	EMusicPlaybackState m_PlaybackAnchorState = EMusicPlaybackState::STOPPED;
 	std::string m_LastArtKey;
 	std::shared_ptr<CHttpRequest> m_pArtRequest;
@@ -2543,6 +2544,7 @@ public:
 		m_PlaybackTrackKey.clear();
 		m_PlaybackAnchorPositionMs = 0;
 		m_PlaybackAnchorTick = 0;
+		m_LastRawSnapshotPositionMs = -1;
 		m_PlaybackAnchorState = EMusicPlaybackState::STOPPED;
 		m_VisualTrackKey.clear();
 		m_VisualPositionMs = 0.0f;
@@ -3030,11 +3032,19 @@ public:
 		const bool StateChanged = Snapshot.m_PlaybackState != m_PlaybackAnchorState;
 		const int64_t PredictedPosition = DisplayPositionMs();
 		const int64_t Drift = SnapshotPosition - PredictedPosition;
+		// Media APIs often keep reporting a stale position for a few seconds while we
+		// extrapolate ahead. Hard-resyncing on that negative drift causes a periodic
+		// sawtooth (~1.5–3s) that breaks lyrics timing. Only hard-resync backwards
+		// when the raw snapshot itself moved backwards (real seek).
+		const bool SnapshotSeekedBackwards =
+			m_LastRawSnapshotPositionMs >= 0 &&
+			SnapshotPosition + 500 < m_LastRawSnapshotPositionMs;
 		const bool NeedsHardResync =
 			NewTrack ||
 			m_PlaybackAnchorTick == 0 ||
 			StateChanged ||
-			std::llabs(Drift) > 1500;
+			Drift > 1500 ||
+			(Drift < -1500 && SnapshotSeekedBackwards);
 
 		if(NeedsHardResync)
 		{
@@ -3053,6 +3063,7 @@ public:
 			m_PlaybackAnchorTick = Now;
 		}
 
+		m_LastRawSnapshotPositionMs = SnapshotPosition;
 		m_PlaybackTrackKey = TrackKey;
 		m_PlaybackAnchorState = Snapshot.m_PlaybackState;
 		m_Snapshot = std::move(Snapshot);
@@ -3514,7 +3525,8 @@ void CMusicPlayer::OnUpdate()
 			m_pImpl->m_Snapshot.m_Artist.c_str(),
 			m_pImpl->m_Snapshot.m_Album.c_str(),
 			m_pImpl->m_Snapshot.m_DurationMs,
-			m_pImpl->DisplayPositionMs());
+			m_pImpl->DisplayPositionMs(),
+			m_pImpl->m_Snapshot.m_PlaybackState == EMusicPlaybackState::PLAYING);
 	}
 	else
 	{
@@ -3732,7 +3744,8 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 		TitleRect.y -= 1.0f * PixelHeight;
 	}
 
-	const float PositionMs = ForcePreview ? (float)Snapshot.m_PositionMs : m_pImpl->VisualPositionMs(Delta);
+	const float VisualPositionMs = ForcePreview ? (float)Snapshot.m_PositionMs : m_pImpl->VisualPositionMs(Delta);
+	const float PositionMs = VisualPositionMs;
 
 	if(RenderVisualizer && (!RenderMiniLayout || !MiniControlsVisible))
 	{
@@ -3854,7 +3867,6 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	const float UiTitleFont = TitleFont * UiFontScale;
 	if(LyricsEnabled)
 	{
-		m_pImpl->m_Lyrics.SetRenderPositionMs((int64_t)PositionMs);
 		m_pImpl->m_Lyrics.Render(TextRender(), Ui(), UiTitleRect, UiTitleFont, Delta);
 	}
 	else
