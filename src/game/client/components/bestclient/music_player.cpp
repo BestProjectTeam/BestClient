@@ -1462,17 +1462,200 @@ namespace
 
 	static float LyricsBelowTimerFont(float Scale, float TextScale)
 	{
-		return 4.2f * Scale * TextScale;
+		return 5.5f * Scale * TextScale;
 	}
 
 	static float LyricsBelowTimerPadY(float Scale)
 	{
-		return 1.05f * Scale;
+		return 1.15f * Scale;
+	}
+
+	static float LyricsBelowTimerPadX(float Scale, float WidthScale)
+	{
+		return 2.8f * Scale * WidthScale;
 	}
 
 	static float LyricsBelowTimerBlockHeight(float Scale, float TextScale)
 	{
 		return LyricsBelowTimerFont(Scale, TextScale) + LyricsBelowTimerPadY(Scale) * 2.0f;
+	}
+
+	static float LyricsBelowTimerFillet(float Scale)
+	{
+		return 1.85f * Scale;
+	}
+
+	// Fills the concave shoulder where a centered timer tab meets the main pill.
+	static void DrawLyricsTimerConcaveJunction(IGraphics *pGraphics, float JunctionX, float JunctionY, float Radius, bool LeftSide, ColorRGBA Color)
+	{
+		if(pGraphics == nullptr || Radius <= 0.001f || Color.a <= 0.001f)
+			return;
+
+		const int NumSegments = 8;
+		const float Cx = LeftSide ? (JunctionX - Radius) : (JunctionX + Radius);
+		const float Cy = JunctionY + Radius;
+		const float Angle0 = -pi / 2.0f;
+		const float Angle1 = LeftSide ? 0.0f : -pi;
+
+		pGraphics->TextureClear();
+		pGraphics->QuadsBegin();
+		pGraphics->SetColor(Color);
+		for(int i = 0; i < NumSegments; i += 2)
+		{
+			const float A1 = mix(Angle0, Angle1, i / (float)NumSegments);
+			const float A2 = mix(Angle0, Angle1, (i + 1) / (float)NumSegments);
+			const float A3 = mix(Angle0, Angle1, (i + 2) / (float)NumSegments);
+			const IGraphics::CFreeformItem Item(
+				JunctionX, JunctionY,
+				Cx + std::cos(A1) * Radius, Cy + std::sin(A1) * Radius,
+				Cx + std::cos(A3) * Radius, Cy + std::sin(A3) * Radius,
+				Cx + std::cos(A2) * Radius, Cy + std::sin(A2) * Radius);
+			pGraphics->QuadsDrawFreeform(&Item, 1);
+		}
+		pGraphics->QuadsEnd();
+	}
+
+	// Like DrawRect(CORNER_ALL), but leaves a gap in the bottom radius band so a timer
+	// stem can continue the fill without a double-blended horizontal seam.
+	static void DrawRoundedRectBottomGap(IGraphics *pGraphics, float X, float Y, float W, float H, float Radius, float GapX0, float GapX1, ColorRGBA Color)
+	{
+		if(pGraphics == nullptr || W <= 0.0f || H <= 0.0f || Color.a <= 0.001f)
+			return;
+
+		float R = std::clamp(Radius, 0.0f, minimum(W, H) * 0.5f);
+		GapX0 = std::clamp(GapX0, X, X + W);
+		GapX1 = std::clamp(GapX1, GapX0, X + W);
+
+		pGraphics->TextureClear();
+		pGraphics->QuadsBegin();
+		pGraphics->SetColor(Color);
+
+		if(R <= 0.001f)
+		{
+			IGraphics::CQuadItem Item(X, Y, W, H);
+			pGraphics->QuadsDrawTL(&Item, 1);
+			pGraphics->QuadsEnd();
+			return;
+		}
+
+		const int NumSegments = 8;
+		const float SegmentsAngle = pi / 2.0f / (float)NumSegments;
+		for(int i = 0; i < NumSegments; i += 2)
+		{
+			const float A1 = i * SegmentsAngle;
+			const float A2 = (i + 1) * SegmentsAngle;
+			const float A3 = (i + 2) * SegmentsAngle;
+			const float Ca1 = std::cos(A1);
+			const float Ca2 = std::cos(A2);
+			const float Ca3 = std::cos(A3);
+			const float Sa1 = std::sin(A1);
+			const float Sa2 = std::sin(A2);
+			const float Sa3 = std::sin(A3);
+
+			IGraphics::CFreeformItem aCorners[4];
+			size_t NumCorners = 0;
+			aCorners[NumCorners++] = IGraphics::CFreeformItem(
+				X + R, Y + R,
+				X + (1.0f - Ca1) * R, Y + (1.0f - Sa1) * R,
+				X + (1.0f - Ca3) * R, Y + (1.0f - Sa3) * R,
+				X + (1.0f - Ca2) * R, Y + (1.0f - Sa2) * R);
+			aCorners[NumCorners++] = IGraphics::CFreeformItem(
+				X + W - R, Y + R,
+				X + W - R + Ca1 * R, Y + (1.0f - Sa1) * R,
+				X + W - R + Ca3 * R, Y + (1.0f - Sa3) * R,
+				X + W - R + Ca2 * R, Y + (1.0f - Sa2) * R);
+			if(GapX0 > X + R + 0.01f)
+			{
+				aCorners[NumCorners++] = IGraphics::CFreeformItem(
+					X + R, Y + H - R,
+					X + (1.0f - Ca1) * R, Y + H - R + Sa1 * R,
+					X + (1.0f - Ca3) * R, Y + H - R + Sa3 * R,
+					X + (1.0f - Ca2) * R, Y + H - R + Sa2 * R);
+			}
+			if(GapX1 < X + W - R - 0.01f)
+			{
+				aCorners[NumCorners++] = IGraphics::CFreeformItem(
+					X + W - R, Y + H - R,
+					X + W - R + Ca1 * R, Y + H - R + Sa1 * R,
+					X + W - R + Ca3 * R, Y + H - R + Sa3 * R,
+					X + W - R + Ca2 * R, Y + H - R + Sa2 * R);
+			}
+			pGraphics->QuadsDrawFreeform(aCorners, NumCorners);
+		}
+
+		IGraphics::CQuadItem aQuads[10];
+		size_t NumQuads = 0;
+		aQuads[NumQuads++] = IGraphics::CQuadItem(X + R, Y, W - R * 2.0f, R); // top
+		aQuads[NumQuads++] = IGraphics::CQuadItem(X, Y + R, R, H - R * 2.0f); // left
+		aQuads[NumQuads++] = IGraphics::CQuadItem(X + W - R, Y + R, R, H - R * 2.0f); // right
+
+		// Center split so the timer stem owns the whole middle column under the top band.
+		const float CenterTop = Y + R;
+		const float CenterFullH = maximum(0.0f, H - R * 2.0f);
+		const float MidLeftW = maximum(0.0f, GapX0 - (X + R));
+		const float MidRightW = maximum(0.0f, (X + W - R) - GapX1);
+		if(MidLeftW > 0.01f)
+			aQuads[NumQuads++] = IGraphics::CQuadItem(X + R, CenterTop, MidLeftW, CenterFullH);
+		if(MidRightW > 0.01f)
+			aQuads[NumQuads++] = IGraphics::CQuadItem(GapX1, CenterTop, MidRightW, CenterFullH);
+
+		// Bottom radius band split around the timer stem gap.
+		const float BottomY = Y + H - R;
+		const float BottomLeftW = maximum(0.0f, GapX0 - (X + R));
+		if(BottomLeftW > 0.01f)
+			aQuads[NumQuads++] = IGraphics::CQuadItem(X + R, BottomY, BottomLeftW, R);
+		const float BottomRightX = maximum(X + R, GapX1);
+		const float BottomRightW = maximum(0.0f, (X + W - R) - BottomRightX);
+		if(BottomRightW > 0.01f)
+			aQuads[NumQuads++] = IGraphics::CQuadItem(BottomRightX, BottomY, BottomRightW, R);
+
+		pGraphics->QuadsDrawTL(aQuads, NumQuads);
+		pGraphics->QuadsEnd();
+	}
+
+	static CUIRect MakeLyricsTimerTabRect(const CUIRect &View, float TabWidth, float TabHeight)
+	{
+		CUIRect Tab;
+		Tab.w = TabWidth;
+		Tab.h = TabHeight;
+		Tab.x = View.x + (View.w - Tab.w) * 0.5f;
+		Tab.y = View.y + View.h;
+		return Tab;
+	}
+
+	static void DrawMusicPlayerPanelWithTimerTab(IGraphics *pGraphics, const CUIRect &View, float TabWidth, float TabHeight, float Fillet, float Rounding, ColorRGBA Color, float CanvasWidth, float CanvasHeight)
+	{
+		if(pGraphics == nullptr || View.w <= 0.0f || View.h <= 0.0f)
+			return;
+
+		const float TabW = std::clamp(TabWidth, 0.0f, View.w);
+		const float TabH = maximum(0.0f, TabHeight);
+		if(TabW <= 0.01f || TabH <= 0.01f)
+		{
+			const int Corners = HudLayout::BackgroundCorners(IGraphics::CORNER_ALL, View.x, View.y, View.w, View.h, CanvasWidth, CanvasHeight);
+			pGraphics->DrawRect(View.x, View.y, View.w, View.h, Color, Corners, Rounding);
+			return;
+		}
+
+		const float R = std::clamp(Rounding, 0.0f, minimum(View.w, View.h) * 0.5f);
+		const float TabX = View.x + (View.w - TabW) * 0.5f;
+		const float JunctionY = View.y + View.h;
+		const float TabRounding = minimum(R * 0.75f, TabH * 0.42f);
+		const float SafeFillet = minimum(Fillet, TabW * 0.35f);
+
+		DrawRoundedRectBottomGap(pGraphics, View.x, View.y, View.w, View.h, R, TabX, TabX + TabW, Color);
+
+		// One continuous middle column from under the top band through the timer tab.
+		const float StemTop = View.y + R;
+		const float StemH = maximum(0.0f, JunctionY - StemTop) + TabH;
+		const int TabCorners = HudLayout::BackgroundCorners(IGraphics::CORNER_B, TabX, StemTop, TabW, StemH, CanvasWidth, CanvasHeight);
+		pGraphics->DrawRect(TabX, StemTop, TabW, StemH, Color, TabCorners, TabRounding);
+
+		if(SafeFillet > 0.05f)
+		{
+			DrawLyricsTimerConcaveJunction(pGraphics, TabX, JunctionY, SafeFillet, true, Color);
+			DrawLyricsTimerConcaveJunction(pGraphics, TabX + TabW, JunctionY, SafeFillet, false, Color);
+		}
 	}
 
 	static std::string FormatMusicPositionMs(int64_t PositionMs)
@@ -2512,6 +2695,8 @@ public:
 	int64_t m_ArtAnimationStart = 0;
 	std::array<float, VISUALIZER_BARS> m_aVisualizerLevels{};
 	float m_CompactTextSlotWidthAnim = 0.0f;
+	float m_LyricsTimerWidthAnim = 0.0f;
+	float m_LyricsTimerHeightAnim = 0.0f;
 	CMusicPlayer::SHudReservation m_HudReservation;
 	SMusicPlayerPalette m_Palette = DefaultMusicPlayerPalette();
 	ColorRGBA m_Accent = DefaultMusicPlayerAccent();
@@ -2567,6 +2752,8 @@ public:
 		m_VisualTrackKey.clear();
 		m_aVisualizerLevels.fill(0.18f);
 		m_CompactTextSlotWidthAnim = 0.0f;
+		m_LyricsTimerWidthAnim = 0.0f;
+		m_LyricsTimerHeightAnim = 0.0f;
 		m_HudReservation = CMusicPlayer::SHudReservation();
 		m_DebugLastRenderPath.clear();
 		m_DebugNextRenderVerboseTick = 0;
@@ -3350,10 +3537,29 @@ public:
 		const float LyricsSlotWidth = MiniMode ? MiniTextSlotWidthLyrics : CompactTextSlotWidthLyrics;
 		const float WidthSpan = maximum(1.0f, LyricsSlotWidth - BaseSlotWidth);
 		const float LyricsWidthPushT = std::clamp((m_CompactTextSlotWidthAnim - BaseSlotWidth) / WidthSpan, 0.0f, 1.0f);
+		const bool WantLyricsTimer = LyricsEnabled && g_Config.m_BcMusicPlayerShowCurrentTime != 0;
+		const float TimerHeightTarget = WantLyricsTimer ? LyricsBelowTimerBlockHeight(Metrics.m_Scale, TextScale) : 0.0f;
+		const float TimerHeightSpeed = TimerHeightTarget > m_LyricsTimerHeightAnim ? MusicPlayerAnimationSpeed(10.0f) : MusicPlayerAnimationSpeed(8.0f);
+		m_LyricsTimerHeightAnim = ApproachAnim(m_LyricsTimerHeightAnim, TimerHeightTarget, Delta, TimerHeightSpeed);
+
+		float TimerWidthTarget = 0.0f;
+		if(WantLyricsTimer || m_LyricsTimerHeightAnim > 0.01f)
+		{
+			const std::string TimerText = GameTimer.m_Valid ? GameTimer.m_Text : FormatMusicPositionMs(m_Snapshot.m_PositionMs);
+			const float TimerFont = LyricsBelowTimerFont(Metrics.m_Scale, TextScale);
+			const float TimerTextW = pOwner->TextRender() != nullptr ? pOwner->TextRender()->TextWidth(TimerFont, TimerText.c_str(), -1, -1.0f) : TimerFont * 5.0f;
+			TimerWidthTarget = minimum(Metrics.m_ViewRect.w * 0.92f, TimerTextW + LyricsBelowTimerPadX(Metrics.m_Scale, CompactWidthScale) * 2.0f);
+			if(!WantLyricsTimer)
+				TimerWidthTarget = m_LyricsTimerWidthAnim > 0.0f ? m_LyricsTimerWidthAnim : TimerWidthTarget;
+		}
+		if(m_LyricsTimerWidthAnim <= 0.0f && TimerWidthTarget > 0.0f)
+			m_LyricsTimerWidthAnim = TimerWidthTarget;
+		const float TimerWidthSpeed = TimerWidthTarget > m_LyricsTimerWidthAnim ? MusicPlayerAnimationSpeed(10.0f) : MusicPlayerAnimationSpeed(8.0f);
+		m_LyricsTimerWidthAnim = ApproachAnim(m_LyricsTimerWidthAnim, WantLyricsTimer ? TimerWidthTarget : (m_LyricsTimerHeightAnim > 0.01f ? TimerWidthTarget : 0.0f), Delta, TimerWidthSpeed);
 
 		CUIRect ReservationRect = Metrics.m_ViewRect;
-		if(LyricsWidthPushT > 0.001f)
-			ReservationRect.h += LyricsBelowTimerBlockHeight(Metrics.m_Scale, TextScale) * LyricsWidthPushT;
+		if(m_LyricsTimerHeightAnim > 0.01f && LyricsWidthPushT > 0.001f)
+			ReservationRect.h += m_LyricsTimerHeightAnim * LyricsWidthPushT;
 
 		m_HudReservation.m_Rect = ReservationRect;
 		m_HudReservation.m_Visible = true;
@@ -3706,21 +3912,25 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	PanelColor.a *= MusicPlayerHudAlphaScale();
 	GlowColor.a *= MusicPlayerHudAlphaScale();
 	const float OuterPad = 0.42f * Scale + HoverT * 0.48f * Scale;
-	const float LyricsTimerFooterH = LyricsEnabled ? LyricsBelowTimerBlockHeight(Scale, TextScale) : 0.0f;
-	const CUIRect PanelRect = {
-		View.x,
-		View.y,
-		View.w,
-		View.h + LyricsTimerFooterH};
+	const float LyricsTimerFooterH = (!ForcePreview && LyricsEnabled) ? m_pImpl->m_LyricsTimerHeightAnim : ((LyricsEnabled && g_Config.m_BcMusicPlayerShowCurrentTime != 0) ? LyricsBelowTimerBlockHeight(Scale, TextScale) : 0.0f);
+	const float LyricsTimerTabW = (!ForcePreview && LyricsEnabled) ? m_pImpl->m_LyricsTimerWidthAnim : 0.0f;
+	const bool DrawLyricsTimerTab = LyricsTimerFooterH > 0.05f && (ForcePreview || LyricsTimerTabW > 0.05f);
 
 	if(GlowColor.a > 0.001f)
 	{
-		const int Corners = HudLayout::BackgroundCorners(IGraphics::CORNER_ALL, PanelRect.x - OuterPad, PanelRect.y - OuterPad, PanelRect.w + OuterPad * 2.0f, PanelRect.h + OuterPad * 2.0f, Width, Height);
-		Graphics()->DrawRect(PanelRect.x - OuterPad, PanelRect.y - OuterPad, PanelRect.w + OuterPad * 2.0f, PanelRect.h + OuterPad * 2.0f, GlowColor, Corners, Metrics.m_Rounding + OuterPad);
+		const float GlowH = View.h + (DrawLyricsTimerTab ? LyricsTimerFooterH * 0.55f : 0.0f);
+		const int Corners = HudLayout::BackgroundCorners(IGraphics::CORNER_ALL, View.x - OuterPad, View.y - OuterPad, View.w + OuterPad * 2.0f, GlowH + OuterPad * 2.0f, Width, Height);
+		Graphics()->DrawRect(View.x - OuterPad, View.y - OuterPad, View.w + OuterPad * 2.0f, GlowH + OuterPad * 2.0f, GlowColor, Corners, Metrics.m_Rounding + OuterPad);
 	}
+	if(DrawLyricsTimerTab)
 	{
-		const int Corners = HudLayout::BackgroundCorners(IGraphics::CORNER_ALL, PanelRect.x, PanelRect.y, PanelRect.w, PanelRect.h, Width, Height);
-		Graphics()->DrawRect(PanelRect.x, PanelRect.y, PanelRect.w, PanelRect.h, PanelColor, Corners, Metrics.m_Rounding);
+		const float TabW = ForcePreview ? minimum(View.w * 0.45f, LyricsBelowTimerFont(Scale, TextScale) * 6.5f) : LyricsTimerTabW;
+		DrawMusicPlayerPanelWithTimerTab(Graphics(), View, TabW, LyricsTimerFooterH, LyricsBelowTimerFillet(Scale), Metrics.m_Rounding, PanelColor, Width, Height);
+	}
+	else
+	{
+		const int Corners = HudLayout::BackgroundCorners(IGraphics::CORNER_ALL, View.x, View.y, View.w, View.h, Width, Height);
+		Graphics()->DrawRect(View.x, View.y, View.w, View.h, PanelColor, Corners, Metrics.m_Rounding);
 	}
 
 	CUIRect Content = View;
@@ -3938,34 +4148,41 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	Props.m_EllipsisAtEnd = true;
 	Props.m_MaxWidth = UiTextArea.w;
 
+	CUIRect BelowTimerHud{};
+	std::string BelowTimerText;
+	bool ShowBelowGameTimer = false;
+	const bool ShowLyricsTimer = DrawLyricsTimerTab;
+	if(ShowLyricsTimer)
+	{
+		ShowBelowGameTimer = GameTimer.m_Valid;
+		BelowTimerText = ShowBelowGameTimer ? GameTimer.m_Text : FormatMusicPositionMs((int64_t)PositionMs);
+		const float TabW = ForcePreview ? minimum(View.w * 0.45f, LyricsBelowTimerFont(Scale, TextScale) * 6.5f) : maximum(LyricsTimerTabW, 1.0f);
+		BelowTimerHud = MakeLyricsTimerTabRect(View, TabW, LyricsTimerFooterH);
+	}
+
 	Ui()->MapScreen();
 	const float UiTitleFont = TitleFont * UiFontScale;
 	if(LyricsEnabled)
 	{
 		m_pImpl->m_Lyrics.Render(TextRender(), Ui(), UiTitleRect, UiTitleFont, Delta);
 
-		// Same timer logic as the old center slot: prefer game timer, else song position.
-		const bool ShowBelowGameTimer = GameTimer.m_Valid;
-		const std::string BelowTimerText = ShowBelowGameTimer ? GameTimer.m_Text : FormatMusicPositionMs((int64_t)PositionMs);
-		const float BelowFontHud = LyricsBelowTimerFont(Scale, TextScale);
-		CUIRect BelowTimerHud = {
-			View.x,
-			View.y + View.h,
-			View.w,
-			LyricsTimerFooterH};
-		const CUIRect UiBelowTimer = HudToUiRect(BelowTimerHud, UiScreen, Width, Height);
-		const float BelowFontUi = BelowFontHud * UiFontScale;
-		ColorRGBA BelowColor = ColorRGBA(1.0f, 1.0f, 1.0f, 0.92f);
-		if(ShowBelowGameTimer && GameTimer.m_Warning)
-			BelowColor = ColorRGBA(1.0f, 0.25f, 0.25f, GameTimer.m_Blink ? 0.5f : 1.0f);
-		TextRender()->TextColor(BelowColor);
-		const float BelowWidth = TextRender()->TextWidth(BelowFontUi, BelowTimerText.c_str(), -1, -1.0f);
-		TextRender()->Text(
-			UiBelowTimer.x + (UiBelowTimer.w - BelowWidth) * 0.5f,
-			UiBelowTimer.y + (UiBelowTimer.h - BelowFontUi) * 0.5f,
-			BelowFontUi,
-			BelowTimerText.c_str(),
-			-1.0f);
+		if(ShowLyricsTimer)
+		{
+			const CUIRect UiBelowTimer = HudToUiRect(BelowTimerHud, UiScreen, Width, Height);
+			const float BelowFontUi = LyricsBelowTimerFont(Scale, TextScale) * UiFontScale;
+			const float HeightT = std::clamp(LyricsTimerFooterH / maximum(0.001f, LyricsBelowTimerBlockHeight(Scale, TextScale)), 0.0f, 1.0f);
+			ColorRGBA BelowColor = ColorRGBA(1.0f, 1.0f, 1.0f, 0.92f * HeightT);
+			if(ShowBelowGameTimer && GameTimer.m_Warning)
+				BelowColor = ColorRGBA(1.0f, 0.25f, 0.25f, (GameTimer.m_Blink ? 0.5f : 1.0f) * HeightT);
+			TextRender()->TextColor(BelowColor);
+			const float BelowWidth = TextRender()->TextWidth(BelowFontUi, BelowTimerText.c_str(), -1, -1.0f);
+			TextRender()->Text(
+				UiBelowTimer.x + (UiBelowTimer.w - BelowWidth) * 0.5f,
+				UiBelowTimer.y + (UiBelowTimer.h - BelowFontUi) * 0.5f,
+				BelowFontUi,
+				BelowTimerText.c_str(),
+				-1.0f);
+		}
 	}
 	else
 	{

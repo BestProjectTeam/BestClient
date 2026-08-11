@@ -1211,9 +1211,16 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 	const float MusicPlayerColorPickerSpacing = 5.0f;
 	const bool MusicPlayerEnabled = g_Config.m_BcMusicPlayer != 0;
 	const bool MusicPlayerShowStaticColor = MusicPlayerEnabled && g_Config.m_BcMusicPlayerColorMode == 0;
+	const bool MusicPlayerShowLyrics = MusicPlayerEnabled && g_Config.m_BcMusicPlayerShowLyrics != 0;
 	static float s_MusicPlayerRevealPhase = 0.0f;
+	static float s_MusicPlayerLyricsRevealPhase = 0.0f;
 	UpdateModuleRevealPhase(s_MusicPlayerRevealPhase, MusicPlayerEnabled, Client()->RenderFrameTime());
-	const float MusicPlayerExpandedTargetHeight = (MarginSmall + LineSize) * 6.0f + (MusicPlayerShowStaticColor ? MusicPlayerColorPickerSpacing + MusicPlayerColorPickerLineSize : 0.0f);
+	UpdateModuleRevealPhase(s_MusicPlayerLyricsRevealPhase, MusicPlayerShowLyrics, Client()->RenderFrameTime());
+	const float MusicPlayerBaseRows = 6.0f; // color, visualizer, text scale, columns, rounding, lyrics
+	const float MusicPlayerExpandedTargetHeight =
+		(MarginSmall + LineSize) * MusicPlayerBaseRows +
+		(MusicPlayerShowStaticColor ? MusicPlayerColorPickerSpacing + MusicPlayerColorPickerLineSize : 0.0f) +
+		(MarginSmall + LineSize) * BCUiAnimations::EaseOutCubic(s_MusicPlayerLyricsRevealPhase);
 	const float MusicPlayerExpandedHeight = MusicPlayerExpandedTargetHeight * BCUiAnimations::EaseOutCubic(s_MusicPlayerRevealPhase);
 	const float MusicPlayerContentHeight = LineSize + MarginSmall + LineSize + MusicPlayerExpandedHeight;
 
@@ -1246,6 +1253,7 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		g_Config.m_BcMusicPlayerVisualizerRounding = DefaultConfig::BcMusicPlayerVisualizerRounding;
 		g_Config.m_BcMusicPlayerVisualizerColumns = DefaultConfig::BcMusicPlayerVisualizerColumns;
 		g_Config.m_BcMusicPlayerShowLyrics = DefaultConfig::BcMusicPlayerShowLyrics;
+		g_Config.m_BcMusicPlayerShowCurrentTime = DefaultConfig::BcMusicPlayerShowCurrentTime;
 	}
 	static CButtonContainer s_MusicPlayerHudEditorButton;
 	const bool MusicPlayerCanOpenHudEditor = Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK;
@@ -1318,15 +1326,6 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 
 		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
 		MainView.HSplitTop(LineSize, &Button, &MainView);
-		{
-			CUIRect LyricsRow = Button;
-			DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &LyricsRow, Localize("BETA"), 12.0f,
-				ColorRGBA(0.95f, 0.25f, 0.25f, 1.0f), ColorRGBA(0.75f, 0.08f, 0.08f, 1.0f), MarginSmall);
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcMusicPlayerShowLyrics, Localize("Show song lyrics"), &g_Config.m_BcMusicPlayerShowLyrics, &LyricsRow, LineSize);
-		}
-
-		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
-		MainView.HSplitTop(LineSize, &Button, &MainView);
 		Ui()->DoScrollbarOption(&g_Config.m_BcMusicPlayerVisualizerColumns, &g_Config.m_BcMusicPlayerVisualizerColumns, &Button, Localize("Columns"), 5, 10);
 
 		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
@@ -1349,6 +1348,22 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 			g_Config.m_BcMusicPlayerVisualizerRounding = 0;
 		if(DoButton_Menu(&s_MusicPlayerVisualizerRoundingSoft, Localize("Soft"), MusicPlayerRoundingPreset == 1, &MusicPlayerSoftButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
 			g_Config.m_BcMusicPlayerVisualizerRounding = 200;
+
+		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+		MainView.HSplitTop(LineSize, &Button, &MainView);
+		{
+			CUIRect LyricsRow = Button;
+			DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &LyricsRow, Localize("BETA"), 12.0f,
+				ColorRGBA(0.95f, 0.25f, 0.25f, 1.0f), ColorRGBA(0.75f, 0.08f, 0.08f, 1.0f), MarginSmall);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcMusicPlayerShowLyrics, Localize("Show song lyrics"), &g_Config.m_BcMusicPlayerShowLyrics, &LyricsRow, LineSize);
+		}
+
+		if(s_MusicPlayerLyricsRevealPhase > 0.001f)
+		{
+			MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+			MainView.HSplitTop(LineSize, &Button, &MainView);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcMusicPlayerShowCurrentTime, Localize("Show current time"), &g_Config.m_BcMusicPlayerShowCurrentTime, &Button, LineSize);
+		}
 
 		Ui()->ClipDisable();
 	}
