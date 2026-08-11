@@ -1,5 +1,6 @@
 /* Copyright © 2026 BestProject Team */
 #include "music_player.h"
+#include "music_player_lyrics.h"
 
 #include "visualizer/analyzer.h"
 #include "visualizer/service.h"
@@ -1452,8 +1453,35 @@ namespace
 		return Text;
 	}
 
-	static float ComputeCompactTextSlotWidth(ITextRender *pTextRender, const SGameTimerDisplay &GameTimer, float TitleFont, float Scale, float WidthScale)
+	static float ComputeMusicPlayerTextWidth(ITextRender *pTextRender, const std::string &Text, float FontSize)
 	{
+		if(pTextRender == nullptr)
+			return FontSize * 5.0f;
+		return pTextRender->TextWidth(FontSize, Text.c_str(), -1, -1.0f);
+	}
+
+	static float ComputeMiniTextSlotWidth(ITextRender *pTextRender, const SNowPlayingSnapshot &Snapshot, const SGameTimerDisplay &GameTimer, float TitleFont, float Scale, float WidthScale, bool LyricsEnabled)
+	{
+		if(LyricsEnabled)
+			return CMusicPlayerLyrics::LyricsTextSlotWidth(Scale, WidthScale);
+
+		if(GameTimer.m_Valid && !GameTimer.m_Text.empty())
+		{
+			const std::string Reference = MusicPlayerReferenceDigits(GameTimer.m_Text);
+			const float TextWidth = ComputeMusicPlayerTextWidth(pTextRender, Reference, TitleFont);
+			const float Padding = (Reference.size() > 5 ? 3.6f : 4.4f) * Scale * WidthScale;
+			return TextWidth + Padding;
+		}
+
+		const float TextWidth = ComputeMusicPlayerTextWidth(pTextRender, MusicPlayerMiniText(Snapshot, GameTimer), TitleFont);
+		return TextWidth + 3.4f * Scale * WidthScale;
+	}
+
+	static float ComputeCompactTextSlotWidth(ITextRender *pTextRender, const SGameTimerDisplay &GameTimer, float TitleFont, float Scale, float WidthScale, bool LyricsEnabled)
+	{
+		if(LyricsEnabled)
+			return CMusicPlayerLyrics::LyricsTextSlotWidth(Scale, WidthScale);
+
 		if(pTextRender == nullptr)
 			return 28.8f * Scale * WidthScale;
 
@@ -1465,27 +1493,6 @@ namespace
 		const float TextWidth = pTextRender->TextWidth(TitleFont, Reference.c_str(), -1, -1.0f);
 		const float Padding = (WideTimer ? 4.2f : 5.4f) * Scale * WidthScale;
 		return TextWidth + Padding;
-	}
-
-	static float ComputeMusicPlayerTextWidth(ITextRender *pTextRender, const std::string &Text, float FontSize)
-	{
-		if(pTextRender == nullptr)
-			return FontSize * 5.0f;
-		return pTextRender->TextWidth(FontSize, Text.c_str(), -1, -1.0f);
-	}
-
-	static float ComputeMiniTextSlotWidth(ITextRender *pTextRender, const SNowPlayingSnapshot &Snapshot, const SGameTimerDisplay &GameTimer, float TitleFont, float Scale, float WidthScale)
-	{
-		if(GameTimer.m_Valid && !GameTimer.m_Text.empty())
-		{
-			const std::string Reference = MusicPlayerReferenceDigits(GameTimer.m_Text);
-			const float TextWidth = ComputeMusicPlayerTextWidth(pTextRender, Reference, TitleFont);
-			const float Padding = (Reference.size() > 5 ? 3.6f : 4.4f) * Scale * WidthScale;
-			return TextWidth + Padding;
-		}
-
-		const float TextWidth = ComputeMusicPlayerTextWidth(pTextRender, MusicPlayerMiniText(Snapshot, GameTimer), TitleFont);
-		return TextWidth + 3.4f * Scale * WidthScale;
 	}
 
 	static float EaseInOutCubic(float t)
@@ -2477,6 +2484,7 @@ public:
 	int64_t m_DebugNextVisualizerVerboseTick = 0;
 	std::string m_DebugLastRenderPath;
 	int64_t m_DebugNextRenderVerboseTick = 0;
+	CMusicPlayerLyrics m_Lyrics;
 
 	CImpl()
 	{
@@ -2513,6 +2521,7 @@ public:
 		m_HudReservation = CMusicPlayer::SHudReservation();
 		m_DebugLastRenderPath.clear();
 		m_DebugNextRenderVerboseTick = 0;
+		m_Lyrics.ClearActiveTrack();
 	}
 
 	bool IsIdle() const
@@ -2736,6 +2745,7 @@ public:
 		ResetHudState();
 		ResetPlaybackAnchor();
 		ResetArtwork(pGraphics);
+		m_Lyrics.Reset();
 	}
 
 	void Shutdown(IGraphics *pGraphics)
@@ -3201,8 +3211,9 @@ public:
 		const float CompactWidthScale = Width / maximum(HudLayout::CANVAS_WIDTH, 0.001f);
 		const float CompactTitleFont = 6.6f * CompactScale * TextScale;
 		const float MiniTitleFont = 6.0f * CompactScale * TextScale;
-		const float CompactTextSlotWidth = ComputeCompactTextSlotWidth(pOwner->TextRender(), GameTimer, CompactTitleFont, CompactScale, CompactWidthScale);
-		const float MiniTextSlotWidth = ComputeMiniTextSlotWidth(pOwner->TextRender(), m_Snapshot, GameTimer, MiniTitleFont, CompactScale, CompactWidthScale);
+		const bool LyricsEnabled = g_Config.m_BcMusicPlayerShowLyrics != 0;
+		const float CompactTextSlotWidth = ComputeCompactTextSlotWidth(pOwner->TextRender(), GameTimer, CompactTitleFont, CompactScale, CompactWidthScale, LyricsEnabled);
+		const float MiniTextSlotWidth = ComputeMiniTextSlotWidth(pOwner->TextRender(), m_Snapshot, GameTimer, MiniTitleFont, CompactScale, CompactWidthScale, LyricsEnabled);
 		const CUIRect UiScreen = *pOwner->Ui()->Screen();
 		if(UiScreen.w <= 0.0f || UiScreen.h <= 0.0f)
 		{
@@ -3429,8 +3440,8 @@ CUIRect CMusicPlayer::GetHudEditorRect(bool ForcePreview) const
 	const SGameTimerDisplay GameTimer = BuildGameTimerDisplay(GameClient()->m_Snap.m_pGameInfoObj, Client()->GameTick(g_Config.m_ClDummy), Client()->GameTickSpeed(), true);
 	SNowPlayingSnapshot PreviewSnapshot;
 	PreviewSnapshot.m_Title = "Blinding Lights";
-	const float CompactTextSlotWidth = ComputeCompactTextSlotWidth(TextRender(), GameTimer, CompactTitleFont, LayoutScale, LayoutWidthScale);
-	const float MiniTextSlotWidth = ComputeMiniTextSlotWidth(TextRender(), PreviewSnapshot, GameTimer, MiniTitleFont, LayoutScale, LayoutWidthScale);
+	const float CompactTextSlotWidth = ComputeCompactTextSlotWidth(TextRender(), GameTimer, CompactTitleFont, LayoutScale, LayoutWidthScale, g_Config.m_BcMusicPlayerShowLyrics != 0);
+	const float MiniTextSlotWidth = ComputeMiniTextSlotWidth(TextRender(), PreviewSnapshot, GameTimer, MiniTitleFont, LayoutScale, LayoutWidthScale, g_Config.m_BcMusicPlayerShowLyrics != 0);
 	const SMusicPlayerMetrics Metrics = ComputeMusicPlayerMetrics(Layout, Width, Height, 0.0f, CompactTextSlotWidth, MiniTextSlotWidth, MiniMode, ShowCover, TextScale);
 	return Metrics.m_ViewRect;
 }
@@ -3483,6 +3494,7 @@ void CMusicPlayer::OnUpdate()
 	if(g_Config.m_BcMusicPlayer == 0)
 	{
 		m_pImpl->ResetHudState();
+		m_pImpl->m_Lyrics.Disable();
 		return;
 	}
 	if(m_pImpl->m_Snapshot.m_Valid &&
@@ -3494,6 +3506,20 @@ void CMusicPlayer::OnUpdate()
 	}
 
 	m_pImpl->UpdateArtwork(this);
+	if(g_Config.m_BcMusicPlayerShowLyrics != 0 && m_pImpl->m_Snapshot.m_Valid)
+	{
+		m_pImpl->m_Lyrics.Update(
+			Http(),
+			m_pImpl->m_Snapshot.m_Title.c_str(),
+			m_pImpl->m_Snapshot.m_Artist.c_str(),
+			m_pImpl->m_Snapshot.m_Album.c_str(),
+			m_pImpl->m_Snapshot.m_DurationMs,
+			m_pImpl->DisplayPositionMs());
+	}
+	else
+	{
+		m_pImpl->m_Lyrics.Disable();
+	}
 	m_pImpl->UpdateHudReservation(this);
 }
 
@@ -3549,8 +3575,9 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	const float LayoutWidthScale = Width / maximum(HudLayout::CANVAS_WIDTH, 0.001f);
 	const float CompactTitleFont = 6.6f * LayoutScale * TextScale;
 	const float MiniTitleFont = 6.0f * LayoutScale * TextScale;
-	const float CompactTextSlotWidth = ComputeCompactTextSlotWidth(TextRender(), GameTimer, CompactTitleFont, LayoutScale, LayoutWidthScale);
-	const float MiniTextSlotWidth = ComputeMiniTextSlotWidth(TextRender(), Snapshot, GameTimer, MiniTitleFont, LayoutScale, LayoutWidthScale);
+	const bool LyricsEnabled = !ForcePreview && g_Config.m_BcMusicPlayerShowLyrics != 0;
+	const float CompactTextSlotWidth = ComputeCompactTextSlotWidth(TextRender(), GameTimer, CompactTitleFont, LayoutScale, LayoutWidthScale, LyricsEnabled);
+	const float MiniTextSlotWidth = ComputeMiniTextSlotWidth(TextRender(), Snapshot, GameTimer, MiniTitleFont, LayoutScale, LayoutWidthScale, LyricsEnabled);
 	const int NumBars = MusicPlayerVisualizerColumns();
 	Graphics()->MapScreen(0.0f, 0.0f, Width, Height);
 
@@ -3658,8 +3685,11 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 		const float MiniTextRightInset = 0.25f * Scale * WidthScale;
 		LayoutTextArea.x += MiniTextInset;
 		LayoutTextArea.w = maximum(0.0f, LayoutTextArea.w - MiniTextInset - MiniTextRightInset);
-		const float MiniSlotWidth = maximum(0.0f, AnimatedTextSlotWidth + 0.20f * Scale * WidthScale);
-		LayoutTextArea.w = minimum(LayoutTextArea.w, MiniSlotWidth);
+		if(!LyricsEnabled)
+		{
+			const float MiniSlotWidth = maximum(0.0f, AnimatedTextSlotWidth + 0.20f * Scale * WidthScale);
+			LayoutTextArea.w = minimum(LayoutTextArea.w, MiniSlotWidth);
+		}
 	}
 
 	const float ArtRounding = minimum(2.4f * Scale, ArtRect.w * 0.22f);
@@ -3682,7 +3712,7 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	const bool PlayerHovered = TitleHoverAllowed &&
 				   (IsPointInsideRect(View, MousePos, 1.5f * Scale) || IsPointInsideRect(UiViewRect, UiMousePos, 1.5f * Scale * UiFontScale));
 	const std::string TrackTitle = MusicPlayerPrimaryText(Snapshot);
-	const bool ShowGameTimer = GameTimer.m_Valid && (RenderMiniLayout || !PlayerHovered);
+	const bool ShowGameTimer = !LyricsEnabled && GameTimer.m_Valid && (RenderMiniLayout || !PlayerHovered);
 	const std::string Title = ShowGameTimer ? GameTimer.m_Text : TrackTitle;
 	const std::string Artist = Snapshot.m_Artist.empty() ? Localize("Unknown artist") : Snapshot.m_Artist;
 	const float TitleFont = (RenderMiniLayout ? 6.0f : (ShowGameTimer ? 6.6f : 5.25f)) * Scale * TextScale;
@@ -3702,9 +3732,10 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 		TitleRect.y -= 1.0f * PixelHeight;
 	}
 
+	const float PositionMs = ForcePreview ? (float)Snapshot.m_PositionMs : m_pImpl->VisualPositionMs(Delta);
+
 	if(RenderVisualizer && (!RenderMiniLayout || !MiniControlsVisible))
 	{
-		const float PositionMs = ForcePreview ? (float)Snapshot.m_PositionMs : m_pImpl->VisualPositionMs(Delta);
 		m_pImpl->UpdateVisualizerLevels(this, Snapshot, (int64_t)PositionMs, NumBars, Delta);
 
 		const bool SoftRounding = IsSoftVisualizerRounding();
@@ -3820,11 +3851,18 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	Props.m_MaxWidth = UiTextArea.w;
 
 	Ui()->MapScreen();
+	const float UiTitleFont = TitleFont * UiFontScale;
+	if(LyricsEnabled)
+	{
+		m_pImpl->m_Lyrics.SetRenderPositionMs((int64_t)PositionMs);
+		m_pImpl->m_Lyrics.Render(TextRender(), Ui(), UiTitleRect, UiTitleFont, Delta);
+	}
+	else
+	{
 	ColorRGBA TitleColor = WithAlpha(ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f), 0.98f);
 	if(ShowGameTimer && GameTimer.m_Warning)
 		TitleColor = ColorRGBA(1.0f, 0.25f, 0.25f, GameTimer.m_Blink ? 0.5f : 1.0f);
 	TextRender()->TextColor(TitleColor);
-	const float UiTitleFont = TitleFont * UiFontScale;
 	const float TitleWidth = TextRender()->TextWidth(UiTitleFont, Title.c_str(), -1, -1.0f);
 	if(ShowGameTimer)
 	{
@@ -3888,6 +3926,7 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 		{
 			Ui()->DoLabel(&UiTitleRect, Title.c_str(), UiTitleFont, TEXTALIGN_MC, Props);
 		}
+	}
 	}
 	if(ShowArtist)
 	{

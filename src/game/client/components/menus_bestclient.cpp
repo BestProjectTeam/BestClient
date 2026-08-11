@@ -1213,7 +1213,7 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 	const bool MusicPlayerShowStaticColor = MusicPlayerEnabled && g_Config.m_BcMusicPlayerColorMode == 0;
 	static float s_MusicPlayerRevealPhase = 0.0f;
 	UpdateModuleRevealPhase(s_MusicPlayerRevealPhase, MusicPlayerEnabled, Client()->RenderFrameTime());
-	const float MusicPlayerExpandedTargetHeight = (MarginSmall + LineSize) * 5.0f + (MusicPlayerShowStaticColor ? MusicPlayerColorPickerSpacing + MusicPlayerColorPickerLineSize : 0.0f);
+	const float MusicPlayerExpandedTargetHeight = (MarginSmall + LineSize) * 6.0f + (MusicPlayerShowStaticColor ? MusicPlayerColorPickerSpacing + MusicPlayerColorPickerLineSize : 0.0f);
 	const float MusicPlayerExpandedHeight = MusicPlayerExpandedTargetHeight * BCUiAnimations::EaseOutCubic(s_MusicPlayerRevealPhase);
 	const float MusicPlayerContentHeight = LineSize + MarginSmall + LineSize + MusicPlayerExpandedHeight;
 
@@ -1245,6 +1245,7 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		g_Config.m_BcMusicPlayerVisualizerMode = DefaultConfig::BcMusicPlayerVisualizerMode;
 		g_Config.m_BcMusicPlayerVisualizerRounding = DefaultConfig::BcMusicPlayerVisualizerRounding;
 		g_Config.m_BcMusicPlayerVisualizerColumns = DefaultConfig::BcMusicPlayerVisualizerColumns;
+		g_Config.m_BcMusicPlayerShowLyrics = DefaultConfig::BcMusicPlayerShowLyrics;
 	}
 	static CButtonContainer s_MusicPlayerHudEditorButton;
 	const bool MusicPlayerCanOpenHudEditor = Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK;
@@ -1314,6 +1315,15 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
 		MainView.HSplitTop(LineSize, &Button, &MainView);
 		Ui()->DoScrollbarOption(&g_Config.m_BcMusicPlayerTextScale, &g_Config.m_BcMusicPlayerTextScale, &Button, Localize("Text scale"), 70, 150, &CUi::ms_LinearScrollbarScale, 0u, "%");
+
+		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+		MainView.HSplitTop(LineSize, &Button, &MainView);
+		{
+			CUIRect LyricsRow = Button;
+			DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &LyricsRow, Localize("BETA"), 12.0f,
+				ColorRGBA(0.95f, 0.25f, 0.25f, 1.0f), ColorRGBA(0.75f, 0.08f, 0.08f, 1.0f), MarginSmall);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcMusicPlayerShowLyrics, Localize("Show song lyrics"), &g_Config.m_BcMusicPlayerShowLyrics, &LyricsRow, LineSize);
+		}
 
 		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
 		MainView.HSplitTop(LineSize, &Button, &MainView);

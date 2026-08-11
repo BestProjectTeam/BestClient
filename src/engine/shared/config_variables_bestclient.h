@@ -269,6 +269,7 @@ MACRO_CONFIG_INT(BcMusicPlayerSizeMode, bc_music_player_size_mode, 1, 0, 1, CFGF
 MACRO_CONFIG_INT(BcMusicPlayerTextScale, bc_music_player_text_scale, 110, 70, 150, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player text scale in percent")
 MACRO_CONFIG_INT(BcMusicPlayerAnimationMs, bc_music_player_animation_ms, 180, 50, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player animation duration in milliseconds")
 MACRO_CONFIG_INT(BcMusicPlayerShowCover, bc_music_player_show_cover, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show cover art in the music player")
+MACRO_CONFIG_INT(BcMusicPlayerShowLyrics, bc_music_player_show_lyrics, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show synchronized song lyrics in the music player (BETA)")
 MACRO_CONFIG_INT(BcMusicPlayerUseColorForHud, bc_music_player_use_color_for_hud, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use the Music Player color for HUD rectangles in hud.cpp")
 MACRO_CONFIG_INT(BcMusicPlayerHudColorAlpha, bc_music_player_hud_color_alpha, 100, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Alpha multiplier for the Music Player and HUD colors")
 MACRO_CONFIG_INT(DbgMusicPlayer, dbg_music_player, 0, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Debug logging for music player (0=off, 1=state changes, 2=verbose periodic diagnostics)")

@@ -2866,6 +2866,8 @@ if(CLIENT)
     components/bestclient/menus_assets_editor.cpp
     components/bestclient/music_player.cpp
     components/bestclient/music_player.h
+    components/bestclient/music_player_lyrics.cpp
+    components/bestclient/music_player_lyrics.h
     components/bestclient/quick_binds.cpp
     components/bestclient/quick_binds.h
     components/bestclient/r_jelly.cpp
