@@ -830,8 +830,6 @@ void CMusicPlayerLyrics::Render(ITextRender *pTextRender, CUi *pUi, const CUIRec
 				       (FallbackMode ? 0.0f : LineProgress(m_CurrentLineIndex, PositionMs));
 	const float ProgressChars = Progress * (float)m_vCharMetrics.size();
 	const float CenterX = Area.x + Area.w * 0.5f;
-	// Digits sit optically left of their glyph box; nudge countdown to match the timer below.
-	const float CountdownOpticalNudgeX = FontSize * 0.12f + 1.0f;
 	float TextStartX;
 	if(TitleMarquee)
 	{
@@ -839,7 +837,7 @@ void CMusicPlayerLyrics::Render(ITextRender *pTextRender, CUi *pUi, const CUIRec
 	}
 	else if(IsCountdownIndex(m_CurrentLineIndex) || FallbackMode)
 	{
-		TextStartX = CenterX - m_BaseLineWidth * 0.5f + (IsCountdownIndex(m_CurrentLineIndex) ? CountdownOpticalNudgeX : 0.0f);
+		TextStartX = CenterX - m_BaseLineWidth * 0.5f;
 	}
 	else
 	{
@@ -937,7 +935,7 @@ void CMusicPlayerLyrics::Render(ITextRender *pTextRender, CUi *pUi, const CUIRec
 		{
 			OutWidth = pTextRender->TextWidth(FontSize, m_vLines[m_OutgoingLineIndex].m_Text.c_str(), -1, -1.0f);
 		}
-		const float OutX = CenterX - OutWidth * 0.5f + (IsCountdownIndex(m_OutgoingLineIndex) ? CountdownOpticalNudgeX : 0.0f);
+		const float OutX = CenterX - OutWidth * 0.5f;
 		const int OutColorMode = (m_OutgoingLineIndex == FALLBACK_NOT_FOUND) ? 1 : 2;
 		DrawDisplay(m_OutgoingLineIndex, OutX, OutgoingY, 0.0f, 1.0f - SlideT, OutColorMode);
 	}

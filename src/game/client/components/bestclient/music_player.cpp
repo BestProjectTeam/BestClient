@@ -3586,7 +3586,10 @@ public:
 		const float BaseSlotWidth = MiniMode ? MiniTextSlotWidthBase : CompactTextSlotWidthBase;
 		const float LyricsSlotWidth = MiniMode ? MiniTextSlotWidthLyrics : CompactTextSlotWidthLyrics;
 		const float WidthSpan = maximum(1.0f, LyricsSlotWidth - BaseSlotWidth);
-		const float LyricsWidthPushT = std::clamp((m_CompactTextSlotWidthAnim - BaseSlotWidth) / WidthSpan, 0.0f, 1.0f);
+		// Short titles shrink the text slot below the lyrics max (sometimes even below the
+		// non-lyrics base). Push must stay active whenever lyrics mode is on — neighbors use
+		// ReservationRect for the actual size, and PushAmount only scales that offset.
+		const float LyricsWidthPushT = LyricsEnabled ? 1.0f : std::clamp((m_CompactTextSlotWidthAnim - BaseSlotWidth) / WidthSpan, 0.0f, 1.0f);
 		const bool WantLyricsTimer = LyricsEnabled && g_Config.m_BcMusicPlayerShowCurrentTime != 0;
 		const float TimerHeightTarget = WantLyricsTimer ? LyricsBelowTimerBlockHeight(Metrics.m_Scale, TextScale) : 0.0f;
 		const float TimerHeightSpeed = TimerHeightTarget > m_LyricsTimerHeightAnim ? MusicPlayerAnimationSpeed(10.0f) : MusicPlayerAnimationSpeed(8.0f);
@@ -4025,18 +4028,17 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	const float TextCenterX = View.x + View.w * 0.5f;
 	const float TextHalfW = maximum(0.0f, minimum(TextCenterX - TextArea.x, TextRight - TextCenterX));
 	CUIRect CenteredTextArea = TextHalfW > 0.0f ? CUIRect{TextCenterX - TextHalfW, TextArea.y, TextHalfW * 2.0f, TextArea.h} : TextArea;
-	CUIRect LayoutTextArea = RenderMiniLayout ? TextArea : CenteredTextArea;
-	if(RenderMiniLayout)
+	// Lyrics (countdown/couplets) stay pill-centered; mini TextArea is cover/visualizer-asymmetric
+	// and would jump sideways when hover expands into the non-mini layout.
+	CUIRect LayoutTextArea = (RenderMiniLayout && !LyricsEnabled) ? TextArea : CenteredTextArea;
+	if(RenderMiniLayout && !LyricsEnabled)
 	{
 		const float MiniTextInset = 0.35f * Scale * WidthScale;
 		const float MiniTextRightInset = 0.25f * Scale * WidthScale;
 		LayoutTextArea.x += MiniTextInset;
 		LayoutTextArea.w = maximum(0.0f, LayoutTextArea.w - MiniTextInset - MiniTextRightInset);
-		if(!LyricsEnabled)
-		{
-			const float MiniSlotWidth = maximum(0.0f, AnimatedTextSlotWidth + 0.20f * Scale * WidthScale);
-			LayoutTextArea.w = minimum(LayoutTextArea.w, MiniSlotWidth);
-		}
+		const float MiniSlotWidth = maximum(0.0f, AnimatedTextSlotWidth + 0.20f * Scale * WidthScale);
+		LayoutTextArea.w = minimum(LayoutTextArea.w, MiniSlotWidth);
 	}
 
 	const float ArtRounding = minimum(2.4f * Scale, ArtRect.w * 0.22f);
@@ -4062,7 +4064,8 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	const bool ShowGameTimer = !LyricsEnabled && GameTimer.m_Valid && (RenderMiniLayout || !PlayerHovered);
 	const std::string Title = ShowGameTimer ? GameTimer.m_Text : TrackTitle;
 	const std::string Artist = Snapshot.m_Artist.empty() ? Localize("Unknown artist") : Snapshot.m_Artist;
-	const float TitleFont = (RenderMiniLayout ? 6.0f : (ShowGameTimer ? 6.6f : 5.25f)) * Scale * TextScale;
+	// Lyrics font follows MiniMode setting, not hover expand, so countdown doesn't resize/jump.
+	const float TitleFont = (LyricsEnabled ? (MiniMode ? 6.0f : 5.25f) : (RenderMiniLayout ? 6.0f : (ShowGameTimer ? 6.6f : 5.25f))) * Scale * TextScale;
 	const float ArtistFont = 3.45f * Scale * TextScale;
 	const bool ShowArtist = !RenderMiniLayout && TextT > 0.38f && ExpandT > 0.42f;
 	const bool MiniControlsVisible = RenderMiniLayout && AllowInteraction && PlayerHovered;
