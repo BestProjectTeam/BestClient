@@ -527,129 +527,6 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		Ui()->ClipDisable();
 	}
 
-	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
-
-	const bool SwapTimerExpanded = g_Config.m_BcSwapTimer != 0;
-	static float s_SwapTimerRevealPhase = 0.0f;
-	UpdateModuleRevealPhase(s_SwapTimerRevealPhase, SwapTimerExpanded, Client()->RenderFrameTime());
-	const float SwapTimerHeaderHeight = LineSize + MarginSmall + LineSize;
-	// Style + size + 2 checkboxes + 3 keybinds; nameplate adds cooldown/remaining fields
-	float SwapTimerExpandedTargetHeight = (MarginSmall + LineSize) * 5.0f + LineSize * 3.0f;
-	if(g_Config.m_BcSwapTimerStyle == 1)
-		SwapTimerExpandedTargetHeight += (MarginSmall + LineSize) * 2.0f;
-	const float SwapTimerExpandedHeight = SwapTimerExpandedTargetHeight * BCUiAnimations::EaseOutCubic(s_SwapTimerRevealPhase);
-	const float SwapTimerBlockHeight = SwapTimerHeaderHeight + SwapTimerExpandedHeight;
-
-	CUIRect SwapTimerBlock;
-	Column.HSplitTop(SwapTimerBlockHeight, &SwapTimerBlock, &Column);
-
-	CUIRect SwapTimerBlockBg = SwapTimerBlock;
-	SwapTimerBlockBg.w += BlockPadding;
-	SwapTimerBlockBg.h += BlockPadding;
-	SwapTimerBlockBg.x -= BlockPadding * 0.5f;
-	SwapTimerBlockBg.y -= BlockPadding * 0.5f;
-	SwapTimerBlockBg.Draw(BlockColor, IGraphics::CORNER_ALL, 10.0f);
-
-	MainView = SwapTimerBlock;
-
-	MainView.HSplitTop(LineSize, &Label, &MainView);
-	CUIRect SwapTimerTitleLabel, SwapTimerHudEditorButton, SwapTimerResetButton;
-	Label.VSplitRight(LineSize + 8.0f, &Label, &SwapTimerResetButton);
-	Label.VSplitRight(MarginSmall, &Label, nullptr);
-	Label.VSplitRight(LineSize + 8.0f, &SwapTimerTitleLabel, &SwapTimerHudEditorButton);
-	static CButtonContainer s_SwapTimerResetButton;
-	const bool SwapTimerResetClicked = Ui()->DoButton_FontIcon(&s_SwapTimerResetButton, FontIcon::ARROW_ROTATE_LEFT, 0, &SwapTimerResetButton, BUTTONFLAG_LEFT);
-	GameClient()->m_Tooltips.DoToolTip(&s_SwapTimerResetButton, &SwapTimerResetButton, Localize("Reset to defaults"));
-	if(SwapTimerResetClicked)
-	{
-		g_Config.m_BcSwapTimerSize = DefaultConfig::BcSwapTimerSize;
-		g_Config.m_BcSwapTimerShowHotkeys = DefaultConfig::BcSwapTimerShowHotkeys;
-		g_Config.m_BcSwapTimerShowTees = DefaultConfig::BcSwapTimerShowTees;
-		g_Config.m_BcSwapTimerStyle = DefaultConfig::BcSwapTimerStyle;
-		str_copy(g_Config.m_BcSwapTimerWaitText, DefaultConfig::BcSwapTimerWaitText, sizeof(g_Config.m_BcSwapTimerWaitText));
-		str_copy(g_Config.m_BcSwapTimerLeftText, DefaultConfig::BcSwapTimerLeftText, sizeof(g_Config.m_BcSwapTimerLeftText));
-	}
-	static CButtonContainer s_SwapTimerHudEditorButton;
-	const bool SwapTimerCanOpenHudEditor = Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK;
-	const bool SwapTimerHudEditorClicked = Ui()->DoButton_FontIcon(&s_SwapTimerHudEditorButton, FontIcon::UP_RIGHT_AND_DOWN_LEFT_FROM_CENTER, SwapTimerCanOpenHudEditor ? 0 : -1, &SwapTimerHudEditorButton, BUTTONFLAG_LEFT);
-	GameClient()->m_Tooltips.DoToolTip(&s_SwapTimerHudEditorButton, &SwapTimerHudEditorButton, SwapTimerCanOpenHudEditor ? Localize("Open in HUD editor") : Localize("Join a game first"));
-	GameClient()->m_Tooltips.SetFadeTime(&s_SwapTimerHudEditorButton, 0.0f);
-	if(SwapTimerHudEditorClicked && SwapTimerCanOpenHudEditor)
-	{
-		SetActive(false);
-		GameClient()->m_HudEditor.Activate();
-	}
-	Ui()->DoLabel(&SwapTimerTitleLabel, Localize("Swap timer"), HeadlineFontSize, TEXTALIGN_ML);
-	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
-
-	MainView.HSplitTop(LineSize, &Content, &MainView);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcSwapTimer, Localize("Enable swap timer"), &g_Config.m_BcSwapTimer, &Content, LineSize);
-
-	if(SwapTimerExpandedHeight > 0.5f)
-	{
-		CUIRect SwapTimerVisible = MainView;
-		SwapTimerVisible.h = SwapTimerExpandedHeight;
-		Ui()->ClipEnable(&SwapTimerVisible);
-
-		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
-		MainView.HSplitTop(LineSize, &Button, &MainView);
-		static CButtonContainer s_SwapTimerStyleHud;
-		static CButtonContainer s_SwapTimerStyleNameplate;
-		CUIRect SwapHudStyleButton, SwapNameplateStyleButton;
-		Button.VSplitMid(&SwapHudStyleButton, &SwapNameplateStyleButton, 2.0f);
-		SwapHudStyleButton.HMargin(2.0f, &SwapHudStyleButton);
-		SwapNameplateStyleButton.HMargin(2.0f, &SwapNameplateStyleButton);
-		if(DoButton_Menu(&s_SwapTimerStyleHud, Localize("HUD"), g_Config.m_BcSwapTimerStyle == 0, &SwapHudStyleButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_L))
-			g_Config.m_BcSwapTimerStyle = 0;
-		if(DoButton_Menu(&s_SwapTimerStyleNameplate, Localize("Nameplate"), g_Config.m_BcSwapTimerStyle == 1, &SwapNameplateStyleButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
-			g_Config.m_BcSwapTimerStyle = 1;
-
-		if(g_Config.m_BcSwapTimerStyle == 1)
-		{
-			CUIRect MinimalLabel, MinimalField;
-
-			MainView.HSplitTop(MarginSmall, nullptr, &MainView);
-			MainView.HSplitTop(LineSize, &Content, &MainView);
-			Content.VSplitMid(&MinimalLabel, &MinimalField);
-			Ui()->DoLabel(&MinimalLabel, Localize("Cooldown text"), 14.0f, TEXTALIGN_ML);
-			static CLineInput s_SwapWaitTextInput(g_Config.m_BcSwapTimerWaitText, sizeof(g_Config.m_BcSwapTimerWaitText));
-			s_SwapWaitTextInput.SetEmptyText("[%ds]");
-			Ui()->DoEditBox(&s_SwapWaitTextInput, &MinimalField, 12.0f);
-			GameClient()->m_Tooltips.DoToolTip(&s_SwapWaitTextInput, &MinimalField, Localize("%d seconds, %y your name, %n other name"));
-
-			MainView.HSplitTop(MarginSmall, nullptr, &MainView);
-			MainView.HSplitTop(LineSize, &Content, &MainView);
-			Content.VSplitMid(&MinimalLabel, &MinimalField);
-			Ui()->DoLabel(&MinimalLabel, Localize("Remaining text"), 14.0f, TEXTALIGN_ML);
-			static CLineInput s_SwapLeftTextInput(g_Config.m_BcSwapTimerLeftText, sizeof(g_Config.m_BcSwapTimerLeftText));
-			s_SwapLeftTextInput.SetEmptyText("[%ds]");
-			GameClient()->m_Tooltips.DoToolTip(&s_SwapLeftTextInput, &MinimalField, Localize("%d seconds, %y your name, %n other name"));
-			Ui()->DoEditBox(&s_SwapLeftTextInput, &MinimalField, 12.0f);
-		}
-
-		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
-		MainView.HSplitTop(LineSize, &Button, &MainView);
-		DoSliderWithScaledValue(&g_Config.m_BcSwapTimerSize, &g_Config.m_BcSwapTimerSize, &Button, Localize("Swap timer size"), 50, 200, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "%");
-
-		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
-		MainView.HSplitTop(LineSize, &Content, &MainView);
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcSwapTimerShowHotkeys, Localize("Show accept/decline hotkeys"), &g_Config.m_BcSwapTimerShowHotkeys, &Content, LineSize);
-
-		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
-		MainView.HSplitTop(LineSize, &Content, &MainView);
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcSwapTimerShowTees, Localize("Show tee icons"), &g_Config.m_BcSwapTimerShowTees, &Content, LineSize);
-
-		static CButtonContainer s_SwapAcceptReader, s_SwapAcceptClear;
-		static CButtonContainer s_SwapDeclineReader, s_SwapDeclineClear;
-		DoLine_KeyReader(MainView, s_SwapAcceptReader, s_SwapAcceptClear, Localize("Accept swap"), "bc_swap_accept");
-		DoLine_KeyReader(MainView, s_SwapDeclineReader, s_SwapDeclineClear, Localize("Decline/dismiss swap"), "bc_swap_decline");
-
-		static CButtonContainer s_SwapPeekReader, s_SwapPeekClear;
-		DoLine_KeyReader(MainView, s_SwapPeekReader, s_SwapPeekClear, Localize("Peek swap partner"), "+bc_swap_peek");
-
-		Ui()->ClipDisable();
-	}
-
 	// Jelly tee (left column block)
 	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
 
@@ -2918,11 +2795,7 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 		Ui()->DoEditBox(&s_SpecMovedNotifyTextInput, &TextField, 14.0f);
 	}
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcScoreboardTeamGradients, Localize("Gradient team colors"), &g_Config.m_BcScoreboardTeamGradients, &MiscBlock, LineSize);
-	CUIRect ShowPointsButtonView;
-	MiscBlock.HSplitTop(LineSize, &ShowPointsButtonView, &MiscBlock);
-	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &ShowPointsButtonView, Localize("NEW"), 11.0f,
-		ColorRGBA(0.25f, 0.85f, 0.40f, 1.0f), ColorRGBA(0.10f, 0.60f, 0.25f, 1.0f), MarginSmall);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowPointsInTab, Localize("Show points in tab"), &g_Config.m_BcShowPointsInTab, &ShowPointsButtonView, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowPointsInTab, Localize("Show points in tab"), &g_Config.m_BcShowPointsInTab, &MiscBlock, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcMastersrv, Localize("Use BestClient MasterServer"), &g_Config.m_BcMastersrv, &MiscBlock, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowhudDummyCoordIndicator, Localize("Show player below indicator"), &g_Config.m_BcShowhudDummyCoordIndicator, &MiscBlock, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowCorrectCheckpoint, Localize("Show correct checkpoint"), &g_Config.m_BcShowCorrectCheckpoint, &MiscBlock, LineSize);
@@ -3100,6 +2973,133 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 			ChatFilterBlock.HSplitTop(LineSize, &Label, &ChatFilterBlock);
 			DoEditBoxWithLabel(&s_PartialReplacementChar, &Label, Localize("Partial Replacement char"), "*", g_Config.m_BcBlockedContentPartialReplacementChar, sizeof(g_Config.m_BcBlockedContentPartialReplacementChar));
 		}
+
+		Ui()->ClipDisable();
+	}
+
+	// Swap timer (left column, below Chat Filter)
+	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
+
+	const bool SwapTimerExpanded = g_Config.m_BcSwapTimer != 0;
+	static float s_SwapTimerRevealPhase = 0.0f;
+	UpdateModuleRevealPhase(s_SwapTimerRevealPhase, SwapTimerExpanded, Client()->RenderFrameTime());
+	const float SwapTimerHeaderHeight = LineSize + MarginSmall + LineSize;
+	// Style + size + 2 checkboxes + 3 keybinds; nameplate adds cooldown/remaining fields
+	float SwapTimerExpandedTargetHeight = (MarginSmall + LineSize) * 5.0f + LineSize * 3.0f;
+	if(g_Config.m_BcSwapTimerStyle == 1)
+		SwapTimerExpandedTargetHeight += (MarginSmall + LineSize) * 2.0f;
+	const float SwapTimerExpandedHeight = SwapTimerExpandedTargetHeight * BCUiAnimations::EaseOutCubic(s_SwapTimerRevealPhase);
+	const float SwapTimerBlockHeight = SwapTimerHeaderHeight + SwapTimerExpandedHeight;
+
+	CUIRect SwapTimerBlock;
+	Column.HSplitTop(SwapTimerBlockHeight, &SwapTimerBlock, &Column);
+
+	CUIRect SwapTimerBlockBg = SwapTimerBlock;
+	SwapTimerBlockBg.w += BlockPadding;
+	SwapTimerBlockBg.h += BlockPadding;
+	SwapTimerBlockBg.x -= BlockPadding * 0.5f;
+	SwapTimerBlockBg.y -= BlockPadding * 0.5f;
+	SwapTimerBlockBg.Draw(BlockColor, IGraphics::CORNER_ALL, 10.0f);
+
+	CUIRect SwapView = SwapTimerBlock;
+
+	SwapView.HSplitTop(LineSize, &Label, &SwapView);
+	CUIRect SwapTimerTitleLabel, SwapTimerHudEditorButton, SwapTimerResetButton;
+	Label.VSplitRight(LineSize + 8.0f, &Label, &SwapTimerResetButton);
+	Label.VSplitRight(MarginSmall, &Label, nullptr);
+	Label.VSplitRight(LineSize + 8.0f, &SwapTimerTitleLabel, &SwapTimerHudEditorButton);
+	static CButtonContainer s_SwapTimerResetButton;
+	const bool SwapTimerResetClicked = Ui()->DoButton_FontIcon(&s_SwapTimerResetButton, FontIcon::ARROW_ROTATE_LEFT, 0, &SwapTimerResetButton, BUTTONFLAG_LEFT);
+	GameClient()->m_Tooltips.DoToolTip(&s_SwapTimerResetButton, &SwapTimerResetButton, Localize("Reset to defaults"));
+	if(SwapTimerResetClicked)
+	{
+		g_Config.m_BcSwapTimerSize = DefaultConfig::BcSwapTimerSize;
+		g_Config.m_BcSwapTimerShowHotkeys = DefaultConfig::BcSwapTimerShowHotkeys;
+		g_Config.m_BcSwapTimerShowTees = DefaultConfig::BcSwapTimerShowTees;
+		g_Config.m_BcSwapTimerStyle = DefaultConfig::BcSwapTimerStyle;
+		str_copy(g_Config.m_BcSwapTimerWaitText, DefaultConfig::BcSwapTimerWaitText, sizeof(g_Config.m_BcSwapTimerWaitText));
+		str_copy(g_Config.m_BcSwapTimerLeftText, DefaultConfig::BcSwapTimerLeftText, sizeof(g_Config.m_BcSwapTimerLeftText));
+	}
+	static CButtonContainer s_SwapTimerHudEditorButton;
+	const bool SwapTimerCanOpenHudEditor = Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK;
+	const bool SwapTimerHudEditorClicked = Ui()->DoButton_FontIcon(&s_SwapTimerHudEditorButton, FontIcon::UP_RIGHT_AND_DOWN_LEFT_FROM_CENTER, SwapTimerCanOpenHudEditor ? 0 : -1, &SwapTimerHudEditorButton, BUTTONFLAG_LEFT);
+	GameClient()->m_Tooltips.DoToolTip(&s_SwapTimerHudEditorButton, &SwapTimerHudEditorButton, SwapTimerCanOpenHudEditor ? Localize("Open in HUD editor") : Localize("Join a game first"));
+	GameClient()->m_Tooltips.SetFadeTime(&s_SwapTimerHudEditorButton, 0.0f);
+	if(SwapTimerHudEditorClicked && SwapTimerCanOpenHudEditor)
+	{
+		SetActive(false);
+		GameClient()->m_HudEditor.Activate();
+	}
+	SwapTimerTitleLabel.VSplitRight(MarginSmall, &SwapTimerTitleLabel, nullptr);
+	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &SwapTimerTitleLabel, Localize("NEW"), 12.0f,
+		ColorRGBA(0.25f, 0.85f, 0.40f, 1.0f), ColorRGBA(0.10f, 0.60f, 0.25f, 1.0f), MarginSmall);
+	Ui()->DoLabel(&SwapTimerTitleLabel, Localize("Swap timer"), HeadlineFontSize, TEXTALIGN_ML);
+	SwapView.HSplitTop(MarginSmall, nullptr, &SwapView);
+
+	SwapView.HSplitTop(LineSize, &Content, &SwapView);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcSwapTimer, Localize("Enable swap timer"), &g_Config.m_BcSwapTimer, &Content, LineSize);
+
+	if(SwapTimerExpandedHeight > 0.5f)
+	{
+		CUIRect SwapTimerVisible = SwapView;
+		SwapTimerVisible.h = SwapTimerExpandedHeight;
+		Ui()->ClipEnable(&SwapTimerVisible);
+
+		SwapView.HSplitTop(MarginSmall, nullptr, &SwapView);
+		SwapView.HSplitTop(LineSize, &Button, &SwapView);
+		static CButtonContainer s_SwapTimerStyleHud;
+		static CButtonContainer s_SwapTimerStyleNameplate;
+		CUIRect SwapHudStyleButton, SwapNameplateStyleButton;
+		Button.VSplitMid(&SwapHudStyleButton, &SwapNameplateStyleButton, 2.0f);
+		SwapHudStyleButton.HMargin(2.0f, &SwapHudStyleButton);
+		SwapNameplateStyleButton.HMargin(2.0f, &SwapNameplateStyleButton);
+		if(DoButton_Menu(&s_SwapTimerStyleHud, Localize("HUD"), g_Config.m_BcSwapTimerStyle == 0, &SwapHudStyleButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_L))
+			g_Config.m_BcSwapTimerStyle = 0;
+		if(DoButton_Menu(&s_SwapTimerStyleNameplate, Localize("Nameplate"), g_Config.m_BcSwapTimerStyle == 1, &SwapNameplateStyleButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
+			g_Config.m_BcSwapTimerStyle = 1;
+
+		if(g_Config.m_BcSwapTimerStyle == 1)
+		{
+			CUIRect MinimalLabel, MinimalField;
+
+			SwapView.HSplitTop(MarginSmall, nullptr, &SwapView);
+			SwapView.HSplitTop(LineSize, &Content, &SwapView);
+			Content.VSplitMid(&MinimalLabel, &MinimalField);
+			Ui()->DoLabel(&MinimalLabel, Localize("Cooldown text"), 14.0f, TEXTALIGN_ML);
+			static CLineInput s_SwapWaitTextInput(g_Config.m_BcSwapTimerWaitText, sizeof(g_Config.m_BcSwapTimerWaitText));
+			s_SwapWaitTextInput.SetEmptyText("[%ds]");
+			Ui()->DoEditBox(&s_SwapWaitTextInput, &MinimalField, 12.0f);
+			GameClient()->m_Tooltips.DoToolTip(&s_SwapWaitTextInput, &MinimalField, Localize("%d seconds, %y your name, %n other name"));
+
+			SwapView.HSplitTop(MarginSmall, nullptr, &SwapView);
+			SwapView.HSplitTop(LineSize, &Content, &SwapView);
+			Content.VSplitMid(&MinimalLabel, &MinimalField);
+			Ui()->DoLabel(&MinimalLabel, Localize("Remaining text"), 14.0f, TEXTALIGN_ML);
+			static CLineInput s_SwapLeftTextInput(g_Config.m_BcSwapTimerLeftText, sizeof(g_Config.m_BcSwapTimerLeftText));
+			s_SwapLeftTextInput.SetEmptyText("[%ds]");
+			GameClient()->m_Tooltips.DoToolTip(&s_SwapLeftTextInput, &MinimalField, Localize("%d seconds, %y your name, %n other name"));
+			Ui()->DoEditBox(&s_SwapLeftTextInput, &MinimalField, 12.0f);
+		}
+
+		SwapView.HSplitTop(MarginSmall, nullptr, &SwapView);
+		SwapView.HSplitTop(LineSize, &Button, &SwapView);
+		DoSliderWithScaledValue(&g_Config.m_BcSwapTimerSize, &g_Config.m_BcSwapTimerSize, &Button, Localize("Swap timer size"), 50, 200, 1, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "%");
+
+		SwapView.HSplitTop(MarginSmall, nullptr, &SwapView);
+		SwapView.HSplitTop(LineSize, &Content, &SwapView);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcSwapTimerShowHotkeys, Localize("Show accept/decline hotkeys"), &g_Config.m_BcSwapTimerShowHotkeys, &Content, LineSize);
+
+		SwapView.HSplitTop(MarginSmall, nullptr, &SwapView);
+		SwapView.HSplitTop(LineSize, &Content, &SwapView);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcSwapTimerShowTees, Localize("Show tee icons"), &g_Config.m_BcSwapTimerShowTees, &Content, LineSize);
+
+		static CButtonContainer s_SwapAcceptReader, s_SwapAcceptClear;
+		static CButtonContainer s_SwapDeclineReader, s_SwapDeclineClear;
+		DoLine_KeyReader(SwapView, s_SwapAcceptReader, s_SwapAcceptClear, Localize("Accept swap"), "bc_swap_accept");
+		DoLine_KeyReader(SwapView, s_SwapDeclineReader, s_SwapDeclineClear, Localize("Decline/dismiss swap"), "bc_swap_decline");
+
+		static CButtonContainer s_SwapPeekReader, s_SwapPeekClear;
+		DoLine_KeyReader(SwapView, s_SwapPeekReader, s_SwapPeekClear, Localize("Peek swap partner"), "+bc_swap_peek");
 
 		Ui()->ClipDisable();
 	}
