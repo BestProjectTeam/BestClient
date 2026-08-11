@@ -680,6 +680,17 @@ void CFastPractice::Enable()
 	}
 	m_RequireDummy = m_EnableDummyClientId >= 0;
 
+	// Solo blocks player/dummy interaction (hammerfly, hook, collision), so refuse to start.
+	if(m_RequireDummy &&
+		(GameClient()->m_aClients[m_EnableLocalClientId].m_Solo || GameClient()->m_aClients[m_EnableDummyClientId].m_Solo))
+	{
+		EchoPractice("you and dummy must not be in solo");
+		m_EnableLocalClientId = -1;
+		m_EnableDummyClientId = -1;
+		m_RequireDummy = false;
+		return;
+	}
+
 	if(!Rebuild())
 	{
 		ResetPracticeState();
@@ -1354,13 +1365,20 @@ void CFastPractice::TickPracticeWorld()
 
 		if(pDummyChar && g_Config.m_ClDummyHammer)
 		{
-			DummyNeutralizedInput = pDummyInputData ? *pDummyInputData : CNetObj_PlayerInput{};
-			pDummyInputData = &DummyNeutralizedInput;
+			// Match vanilla hammerfly: reuse m_HammerInput (Fire only advances in OnSnapInput
+			// every ~25 sends). Applying the same Fire value across ticks/repredicts does not
+			// create new CountInput presses — unlike inventing Tick%25 edges on fast-input
+			// overrun ticks, which were replayed every frame then discarded on restore, so the
+			// dummy looked like it was spamming hammer without actually flying.
+			DummyNeutralizedInput = GameClient()->m_HammerInput;
+			DummyNeutralizedInput.m_WantedWeapon = WEAPON_HAMMER + 1;
+			DummyNeutralizedInput.m_PlayerFlags = PLAYERFLAG_PLAYING;
 			const vec2 Dir = pLocalChar->Core()->m_Pos - pDummyChar->Core()->m_Pos;
 			DummyNeutralizedInput.m_TargetX = (int)Dir.x;
 			DummyNeutralizedInput.m_TargetY = (int)Dir.y;
 			if(DummyNeutralizedInput.m_TargetX == 0 && DummyNeutralizedInput.m_TargetY == 0)
 				DummyNeutralizedInput.m_TargetY = -1;
+			pDummyInputData = &DummyNeutralizedInput;
 		}
 
 		const bool DummyFirst = pInputData && pDummyInputData && pDummyChar && pDummyChar->GetCid() < pLocalChar->GetCid();
@@ -1544,7 +1562,10 @@ void CFastPractice::SyncFromPrediction()
 	if(Pending.m_HasPendingTeleport)
 	{
 		if(CCharacter *pChar = m_PracticeWorld.GetCharacterById(LocalClientId))
+		{
 			ApplyPracticeTeleport(LocalClientId, pChar, ClampToPracticePlayableBounds(Pending.m_PendingTeleportPos));
+			FinishMutation(LocalClientId, DummyClientId, pChar, false);
+		}
 		Pending.m_HasPendingTeleport = false;
 	}
 
@@ -2026,6 +2047,26 @@ void CFastPractice::FinishMutation(int LocalClientId, int DummyClientId, CCharac
 		if(m_RequireDummy && DummyClientId >= 0)
 			NormalizeWeaponSelectionInput(m_PracticeWorld.GetCharacterById(DummyClientId));
 	}
+
+	// Teleports/resets zero the character Fire counter. Matching it to the current live
+	// (released) Fire prevents CountInput from treating the next real input as a fresh press
+	// (which looked like a phantom shot/hammer after /tc).
+	auto SyncFireAfterMutation = [&](CCharacter *pTarget, bool Dummy) {
+		if(!pTarget)
+			return;
+		CNetObj_PlayerInput Live{};
+		BuildLiveInput(Live, Dummy);
+		CNetObj_PlayerInput Input = *pTarget->LatestInput();
+		Input.m_Fire = ReleasedFireState(Live.m_Fire);
+		Input.m_WantedWeapon = 0;
+		Input.m_NextWeapon = 0;
+		Input.m_PrevWeapon = 0;
+		pTarget->SetInput(&Input);
+		pTarget->ResetInput();
+	};
+	SyncFireAfterMutation(pChar, GameClient()->m_IsDummySwapping != 0);
+	if(m_RequireDummy && DummyClientId >= 0)
+		SyncFireAfterMutation(m_PracticeWorld.GetCharacterById(DummyClientId), (GameClient()->m_IsDummySwapping ^ 1) != 0);
 
 	m_SuppressFireOnNextPredictTick = true;
 	m_InputSuppressTicks = std::max(m_InputSuppressTicks, 2);
