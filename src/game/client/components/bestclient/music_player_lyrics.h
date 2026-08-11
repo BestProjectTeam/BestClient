@@ -54,6 +54,9 @@ public:
 	void Render(ITextRender *pTextRender, CUi *pUi, const CUIRect &Area, float FontSize, float Delta);
 
 private:
+	// Display index: -99 = none, -3/-2/-1 = countdown 3/2/1, >=0 = lyric line.
+	static constexpr int LINE_NONE = -99;
+
 	struct SCacheEntry
 	{
 		EDisplayState m_State = EDisplayState::NotFound;
@@ -70,6 +73,8 @@ private:
 	static std::string BuildCacheKey(const char *pTitle, const char *pArtist, int64_t DurationMs);
 	static bool ParseLrcTimestamp(const char *pText, int64_t &OutMs, const char **ppEnd);
 	static void MergeConsecutiveIdenticalLines(std::vector<SLine> &vLines);
+	static bool IsCountdownIndex(int Index) { return Index >= -3 && Index <= -1; }
+	static int CountdownDigit(int Index) { return -Index; }
 	void ApplyCacheEntry(const SCacheEntry &Entry);
 	void StartRequest(IHttp *pHttp, const char *pTitle, const char *pArtist, const char *pAlbum, int64_t DurationMs);
 	void ProcessRequest();
@@ -77,6 +82,7 @@ private:
 	void EnsureLayout(ITextRender *pTextRender, float FontSize, int LineIndex);
 	int FindLineIndex(int64_t PositionMs) const;
 	float LineProgress(int LineIndex, int64_t PositionMs) const;
+	float CountdownProgress(int CountdownIndex, int64_t RemainingMs) const;
 	void BuildColorSplits(float ProgressChars, float Alpha, std::vector<STextColorSplit> &vOut) const;
 	float PlayheadXInLine(float ProgressChars) const;
 	float ComputeTextStartX(float AreaLeft, float AreaWidth, float CenterX, float PlayheadX) const;
@@ -95,10 +101,9 @@ private:
 	bool m_ClockPlaying = false;
 	int64_t m_ClockDurationMs = 0;
 
-	int m_CurrentLineIndex = -1;
-	int m_OutgoingLineIndex = -1;
+	int m_CurrentLineIndex = LINE_NONE;
+	int m_OutgoingLineIndex = LINE_NONE;
 	float m_LineTransitionT = 1.0f;
-	bool m_PreviewFirstLine = false;
 
 	std::string m_LayoutText;
 	float m_LayoutFontSize = 0.0f;

@@ -13,7 +13,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cctype>
 #include <cstring>
 
 namespace
@@ -59,14 +58,13 @@ void CMusicPlayerLyrics::Reset()
 
 void CMusicPlayerLyrics::ClearActiveTrack()
 {
-	m_CurrentLineIndex = -1;
-	m_OutgoingLineIndex = -1;
+	m_CurrentLineIndex = LINE_NONE;
+	m_OutgoingLineIndex = LINE_NONE;
 	m_LineTransitionT = 1.0f;
 	m_LayoutValid = false;
 	m_LayoutText.clear();
 	m_vCharMetrics.clear();
 	m_BaseLineWidth = 0.0f;
-	m_PreviewFirstLine = false;
 	m_ClockPositionMs = 0;
 	m_ClockTick = 0;
 	m_ClockPlaying = false;
@@ -75,14 +73,13 @@ void CMusicPlayerLyrics::ClearActiveTrack()
 
 void CMusicPlayerLyrics::ClearLayoutState()
 {
-	m_CurrentLineIndex = -1;
-	m_OutgoingLineIndex = -1;
+	m_CurrentLineIndex = LINE_NONE;
+	m_OutgoingLineIndex = LINE_NONE;
 	m_LineTransitionT = 1.0f;
 	m_LayoutValid = false;
 	m_LayoutText.clear();
 	m_vCharMetrics.clear();
 	m_BaseLineWidth = 0.0f;
-	m_PreviewFirstLine = false;
 }
 
 void CMusicPlayerLyrics::Disable()
@@ -503,15 +500,46 @@ float CMusicPlayerLyrics::LineProgress(int LineIndex, int64_t PositionMs) const
 	return (float)(PositionMs - StartMs) / (float)(EndMs - StartMs);
 }
 
+float CMusicPlayerLyrics::CountdownProgress(int CountdownIndex, int64_t RemainingMs) const
+{
+	if(CountdownIndex == -3)
+	{
+		if(RemainingMs >= 3000)
+			return 0.0f;
+		return std::clamp((3000.0f - (float)RemainingMs) / 1000.0f, 0.0f, 1.0f);
+	}
+	if(CountdownIndex == -2)
+		return std::clamp((2000.0f - (float)RemainingMs) / 1000.0f, 0.0f, 1.0f);
+	if(CountdownIndex == -1)
+		return std::clamp((1000.0f - (float)RemainingMs) / 1000.0f, 0.0f, 1.0f);
+	return 0.0f;
+}
+
 void CMusicPlayerLyrics::EnsureLayout(ITextRender *pTextRender, float FontSize, int LineIndex)
 {
-	if(pTextRender == nullptr || LineIndex < 0 || LineIndex >= (int)m_vLines.size())
+	if(pTextRender == nullptr)
 	{
 		m_LayoutValid = false;
 		return;
 	}
 
-	const std::string &Text = m_vLines[LineIndex].m_Text;
+	std::string Text;
+	if(IsCountdownIndex(LineIndex))
+	{
+		char aDigit[4];
+		str_format(aDigit, sizeof(aDigit), "%d", CountdownDigit(LineIndex));
+		Text = aDigit;
+	}
+	else if(LineIndex >= 0 && LineIndex < (int)m_vLines.size())
+	{
+		Text = m_vLines[LineIndex].m_Text;
+	}
+	else
+	{
+		m_LayoutValid = false;
+		return;
+	}
+
 	if(m_LayoutValid && m_LayoutText == Text && std::fabs(m_LayoutFontSize - FontSize) < 0.01f)
 		return;
 
@@ -668,14 +696,23 @@ void CMusicPlayerLyrics::Render(ITextRender *pTextRender, CUi *pUi, const CUIRec
 
 	const int64_t PositionMs = CurrentPositionMs();
 	int LineIndex = FindLineIndex(PositionMs);
-	m_PreviewFirstLine = false;
+	int64_t CountdownRemainingMs = 0;
+
 	if(LineIndex < 0 && !m_vLines.empty())
 	{
-		// Before first timed line: show first couplet inactive (all gray).
-		LineIndex = 0;
-		m_PreviewFirstLine = true;
+		CountdownRemainingMs = m_vLines.front().m_StartMs - PositionMs;
+		// Hold "3" until the last 3 seconds, then 3 → 2 → 1, then lyrics.
+		// Indices -3/-2/-1 so -1→0 is a sequential slide into the first line.
+		if(CountdownRemainingMs > 2000)
+			LineIndex = -3;
+		else if(CountdownRemainingMs > 1000)
+			LineIndex = -2;
+		else if(CountdownRemainingMs > 0)
+			LineIndex = -1;
+		else
+			LineIndex = 0;
 	}
-	// While playing forward, never step back to a previous line (stale boundary jitter).
+	// While playing forward, never step back to a previous lyric line (stale boundary jitter).
 	else if(m_ClockPlaying && m_CurrentLineIndex >= 0 && LineIndex >= 0 && LineIndex < m_CurrentLineIndex)
 	{
 		LineIndex = m_CurrentLineIndex;
@@ -683,7 +720,8 @@ void CMusicPlayerLyrics::Render(ITextRender *pTextRender, CUi *pUi, const CUIRec
 
 	if(LineIndex != m_CurrentLineIndex)
 	{
-		const bool SequentialForward = !m_PreviewFirstLine && m_CurrentLineIndex >= 0 && LineIndex == m_CurrentLineIndex + 1;
+		const bool SequentialForward =
+			m_CurrentLineIndex != LINE_NONE && LineIndex == m_CurrentLineIndex + 1;
 		if(SequentialForward)
 		{
 			m_OutgoingLineIndex = m_CurrentLineIndex;
@@ -691,7 +729,7 @@ void CMusicPlayerLyrics::Render(ITextRender *pTextRender, CUi *pUi, const CUIRec
 		}
 		else
 		{
-			m_OutgoingLineIndex = -1;
+			m_OutgoingLineIndex = LINE_NONE;
 			m_LineTransitionT = 1.0f;
 		}
 		m_CurrentLineIndex = LineIndex;
@@ -702,33 +740,55 @@ void CMusicPlayerLyrics::Render(ITextRender *pTextRender, CUi *pUi, const CUIRec
 	{
 		m_LineTransitionT = std::clamp(m_LineTransitionT + Delta * 1000.0f / LYRICS_LINE_SLIDE_MS, 0.0f, 1.0f);
 		if(m_LineTransitionT >= 1.0f)
-			m_OutgoingLineIndex = -1;
+			m_OutgoingLineIndex = LINE_NONE;
 	}
 
-	if(m_CurrentLineIndex < 0)
+	if(m_CurrentLineIndex == LINE_NONE)
 		return;
 
 	EnsureLayout(pTextRender, FontSize, m_CurrentLineIndex);
 	if(!m_LayoutValid || m_vCharMetrics.empty())
 		return;
 
-	const float Progress = m_PreviewFirstLine ? 0.0f : LineProgress(m_CurrentLineIndex, PositionMs);
+	const float Progress = IsCountdownIndex(m_CurrentLineIndex) ?
+				       CountdownProgress(m_CurrentLineIndex, CountdownRemainingMs) :
+				       LineProgress(m_CurrentLineIndex, PositionMs);
 	const float ProgressChars = Progress * (float)m_vCharMetrics.size();
-	const float PlayheadX = PlayheadXInLine(ProgressChars);
 	const float CenterX = Area.x + Area.w * 0.5f;
-	const float TextStartX = ComputeTextStartX(Area.x, Area.w, CenterX, PlayheadX);
+	// Digits sit optically left of their glyph box; nudge countdown to match the timer below.
+	const float CountdownOpticalNudgeX = FontSize * 0.12f + 1.0f;
+	float TextStartX;
+	if(IsCountdownIndex(m_CurrentLineIndex))
+	{
+		TextStartX = CenterX - m_BaseLineWidth * 0.5f + CountdownOpticalNudgeX;
+	}
+	else
+	{
+		const float PlayheadX = PlayheadXInLine(ProgressChars);
+		TextStartX = ComputeTextStartX(Area.x, Area.w, CenterX, PlayheadX);
+	}
 
 	const float SlideT = EaseOutCubic(m_LineTransitionT);
 	const float BaseY = Area.y + (Area.h - FontSize) * 0.5f;
 	const float IncomingY = BaseY + (1.0f - SlideT) * Area.h;
 	const float OutgoingY = BaseY - SlideT * Area.h;
 
-	auto DrawLine = [&](int DrawLineIndex, float X, float Y, float ProgressCharsForColor, float Alpha, int ColorMode) {
+	auto DrawDisplay = [&](int DrawIndex, float X, float Y, float ProgressCharsForColor, float Alpha, int ColorMode) {
 		// ColorMode: 0=karaoke wipe, 1=all upcoming (gray), 2=all passed (white)
-		if(DrawLineIndex < 0 || DrawLineIndex >= (int)m_vLines.size() || Alpha <= 0.001f)
+		if(DrawIndex == LINE_NONE || Alpha <= 0.001f)
+			return;
+		if(!IsCountdownIndex(DrawIndex) && (DrawIndex < 0 || DrawIndex >= (int)m_vLines.size()))
 			return;
 
-		const std::string &Text = m_vLines[DrawLineIndex].m_Text;
+		const char *pText = IsCountdownIndex(DrawIndex) ? m_LayoutText.c_str() : m_vLines[DrawIndex].m_Text.c_str();
+		// Outgoing countdown may differ from current layout — build a local digit.
+		char aDigit[4];
+		if(IsCountdownIndex(DrawIndex) && DrawIndex != m_CurrentLineIndex)
+		{
+			str_format(aDigit, sizeof(aDigit), "%d", CountdownDigit(DrawIndex));
+			pText = aDigit;
+		}
+
 		CUIRect Clip = Area;
 		pUi->ClipEnable(&Clip);
 
@@ -736,6 +796,10 @@ void CMusicPlayerLyrics::Render(ITextRender *pTextRender, CUi *pUi, const CUIRec
 		if(ColorMode == 1)
 			vSplits.emplace_back(0, -1, LYRICS_UPCOMING_COLOR.WithAlpha(Alpha));
 		else if(ColorMode == 2)
+			vSplits.emplace_back(0, -1, LYRICS_PASSED_COLOR.WithAlpha(Alpha));
+		else if(IsCountdownIndex(DrawIndex) && DrawIndex == m_CurrentLineIndex)
+			BuildColorSplits(ProgressCharsForColor, Alpha, vSplits);
+		else if(IsCountdownIndex(DrawIndex))
 			vSplits.emplace_back(0, -1, LYRICS_PASSED_COLOR.WithAlpha(Alpha));
 		else
 			BuildColorSplits(ProgressCharsForColor, Alpha, vSplits);
@@ -746,18 +810,28 @@ void CMusicPlayerLyrics::Render(ITextRender *pTextRender, CUi *pUi, const CUIRec
 		Cursor.SetPosition(vec2(X, Y));
 		Cursor.m_vColorSplits = std::move(vSplits);
 		pTextRender->TextColor(LYRICS_UPCOMING_COLOR.WithAlpha(Alpha));
-		pTextRender->TextEx(&Cursor, Text.c_str(), -1);
+		pTextRender->TextEx(&Cursor, pText, -1);
 
 		pUi->ClipDisable();
 	};
 
-	if(m_OutgoingLineIndex >= 0 && m_LineTransitionT < 1.0f)
+	if(m_OutgoingLineIndex != LINE_NONE && m_LineTransitionT < 1.0f)
 	{
-		const float OutWidth = pTextRender->TextWidth(FontSize, m_vLines[m_OutgoingLineIndex].m_Text.c_str(), -1, -1.0f);
-		const float OutX = CenterX - OutWidth * 0.5f;
-		DrawLine(m_OutgoingLineIndex, OutX, OutgoingY, 0.0f, 1.0f - SlideT, 2);
+		float OutWidth;
+		if(IsCountdownIndex(m_OutgoingLineIndex))
+		{
+			char aDigit[4];
+			str_format(aDigit, sizeof(aDigit), "%d", CountdownDigit(m_OutgoingLineIndex));
+			OutWidth = pTextRender->TextWidth(FontSize, aDigit, -1, -1.0f);
+		}
+		else
+		{
+			OutWidth = pTextRender->TextWidth(FontSize, m_vLines[m_OutgoingLineIndex].m_Text.c_str(), -1, -1.0f);
+		}
+		const float OutX = CenterX - OutWidth * 0.5f + (IsCountdownIndex(m_OutgoingLineIndex) ? CountdownOpticalNudgeX : 0.0f);
+		DrawDisplay(m_OutgoingLineIndex, OutX, OutgoingY, 0.0f, 1.0f - SlideT, 2);
 	}
 
-	const float ActiveAlpha = m_OutgoingLineIndex >= 0 ? SlideT : 1.0f;
-	DrawLine(m_CurrentLineIndex, TextStartX, IncomingY, ProgressChars, ActiveAlpha, m_PreviewFirstLine ? 1 : 0);
+	const float ActiveAlpha = m_OutgoingLineIndex != LINE_NONE ? SlideT : 1.0f;
+	DrawDisplay(m_CurrentLineIndex, TextStartX, IncomingY, ProgressChars, ActiveAlpha, 0);
 }
