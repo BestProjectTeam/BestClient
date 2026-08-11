@@ -19,6 +19,7 @@ namespace
 {
 	static constexpr float LYRICS_SLOT_WIDTH = 70.0f;
 	static constexpr float LYRICS_LINE_SLIDE_MS = 260.0f;
+	static constexpr float LYRICS_TITLE_MARQUEE_GAP_FACTOR = 2.5f;
 	static constexpr ColorRGBA LYRICS_PASSED_COLOR(1.0f, 1.0f, 1.0f, 1.0f);
 	static constexpr ColorRGBA LYRICS_UPCOMING_COLOR(0.45f, 0.45f, 0.48f, 1.0f);
 	static constexpr int64_t LYRICS_OFFLINE_RETRY_MS = 15000;
@@ -65,6 +66,8 @@ void CMusicPlayerLyrics::ClearActiveTrack()
 	m_LayoutText.clear();
 	m_vCharMetrics.clear();
 	m_BaseLineWidth = 0.0f;
+	m_NotFoundDisplayMs = 0.0f;
+	m_TitleMarqueeOffset = 0.0f;
 	m_ClockPositionMs = 0;
 	m_ClockTick = 0;
 	m_ClockPlaying = false;
@@ -267,6 +270,8 @@ void CMusicPlayerLyrics::ApplyCacheEntry(const SCacheEntry &Entry)
 	m_vLines = Entry.m_vLines;
 	MergeConsecutiveIdenticalLines(m_vLines);
 	ClearLayoutState();
+	if(Entry.m_State == EDisplayState::NotFound)
+		m_NotFoundDisplayMs = 0.0f;
 }
 
 void CMusicPlayerLyrics::StartRequest(IHttp *pHttp, const char *pTitle, const char *pArtist, const char *pAlbum, int64_t DurationMs)
@@ -411,6 +416,8 @@ void CMusicPlayerLyrics::Update(IHttp *pHttp, const char *pTitle, const char *pA
 {
 	ProcessRequest();
 
+	m_TrackTitle = (pTitle != nullptr && pTitle[0] != '\0') ? pTitle : "";
+
 	const bool HasIdentity = (pTitle && pTitle[0] != '\0') || (pArtist && pArtist[0] != '\0');
 	if(!HasIdentity)
 	{
@@ -420,6 +427,7 @@ void CMusicPlayerLyrics::Update(IHttp *pHttp, const char *pTitle, const char *pA
 			m_ActiveKey.clear();
 			m_DisplayState = EDisplayState::Idle;
 			m_vLines.clear();
+			m_TrackTitle.clear();
 			ClearActiveTrack();
 		}
 		return;
@@ -515,6 +523,15 @@ float CMusicPlayerLyrics::CountdownProgress(int CountdownIndex, int64_t Remainin
 	return 0.0f;
 }
 
+const char *CMusicPlayerLyrics::FallbackText(int Index) const
+{
+	if(Index == FALLBACK_NOT_FOUND)
+		return "Lyrics not found";
+	if(Index == FALLBACK_TITLE)
+		return m_TrackTitle.empty() ? "Unknown title" : m_TrackTitle.c_str();
+	return "";
+}
+
 void CMusicPlayerLyrics::EnsureLayout(ITextRender *pTextRender, float FontSize, int LineIndex)
 {
 	if(pTextRender == nullptr)
@@ -530,11 +547,21 @@ void CMusicPlayerLyrics::EnsureLayout(ITextRender *pTextRender, float FontSize, 
 		str_format(aDigit, sizeof(aDigit), "%d", CountdownDigit(LineIndex));
 		Text = aDigit;
 	}
+	else if(IsFallbackIndex(LineIndex))
+	{
+		Text = FallbackText(LineIndex);
+	}
 	else if(LineIndex >= 0 && LineIndex < (int)m_vLines.size())
 	{
 		Text = m_vLines[LineIndex].m_Text;
 	}
 	else
+	{
+		m_LayoutValid = false;
+		return;
+	}
+
+	if(Text.empty())
 	{
 		m_LayoutValid = false;
 		return;
@@ -677,7 +704,6 @@ void CMusicPlayerLyrics::Render(ITextRender *pTextRender, CUi *pUi, const CUIRec
 		pStatusText = "…";
 		break;
 	case EDisplayState::NotFound:
-		pStatusText = "Lyrics not found";
 		break;
 	case EDisplayState::Offline:
 		pStatusText = "No connection";
@@ -695,27 +721,36 @@ void CMusicPlayerLyrics::Render(ITextRender *pTextRender, CUi *pUi, const CUIRec
 	}
 
 	const int64_t PositionMs = CurrentPositionMs();
-	int LineIndex = FindLineIndex(PositionMs);
+	int LineIndex = LINE_NONE;
 	int64_t CountdownRemainingMs = 0;
 
-	if(LineIndex < 0 && !m_vLines.empty())
+	if(m_DisplayState == EDisplayState::NotFound)
 	{
-		CountdownRemainingMs = m_vLines.front().m_StartMs - PositionMs;
-		// Hold "3" until the last 3 seconds, then 3 → 2 → 1, then lyrics.
-		// Indices -3/-2/-1 so -1→0 is a sequential slide into the first line.
-		if(CountdownRemainingMs > 2000)
-			LineIndex = -3;
-		else if(CountdownRemainingMs > 1000)
-			LineIndex = -2;
-		else if(CountdownRemainingMs > 0)
-			LineIndex = -1;
-		else
-			LineIndex = 0;
+		m_NotFoundDisplayMs += Delta * 1000.0f;
+		LineIndex = (m_NotFoundDisplayMs < (float)NOT_FOUND_HOLD_MS) ? FALLBACK_NOT_FOUND : FALLBACK_TITLE;
 	}
-	// While playing forward, never step back to a previous lyric line (stale boundary jitter).
-	else if(m_ClockPlaying && m_CurrentLineIndex >= 0 && LineIndex >= 0 && LineIndex < m_CurrentLineIndex)
+	else
 	{
-		LineIndex = m_CurrentLineIndex;
+		LineIndex = FindLineIndex(PositionMs);
+		if(LineIndex < 0 && !m_vLines.empty())
+		{
+			CountdownRemainingMs = m_vLines.front().m_StartMs - PositionMs;
+			// Hold "3" until the last 3 seconds, then 3 → 2 → 1, then lyrics.
+			// Indices -3/-2/-1 so -1→0 is a sequential slide into the first line.
+			if(CountdownRemainingMs > 2000)
+				LineIndex = -3;
+			else if(CountdownRemainingMs > 1000)
+				LineIndex = -2;
+			else if(CountdownRemainingMs > 0)
+				LineIndex = -1;
+			else
+				LineIndex = 0;
+		}
+		// While playing forward, never step back to a previous lyric line (stale boundary jitter).
+		else if(m_ClockPlaying && m_CurrentLineIndex >= 0 && LineIndex >= 0 && LineIndex < m_CurrentLineIndex)
+		{
+			LineIndex = m_CurrentLineIndex;
+		}
 	}
 
 	if(LineIndex != m_CurrentLineIndex)
@@ -750,17 +785,37 @@ void CMusicPlayerLyrics::Render(ITextRender *pTextRender, CUi *pUi, const CUIRec
 	if(!m_LayoutValid || m_vCharMetrics.empty())
 		return;
 
+	const bool FallbackMode = IsFallbackIndex(m_CurrentLineIndex);
+	const bool TitleMarquee = m_CurrentLineIndex == FALLBACK_TITLE && m_BaseLineWidth > Area.w + 0.5f;
+	if(TitleMarquee)
+	{
+		const float Gap = FontSize * LYRICS_TITLE_MARQUEE_GAP_FACTOR;
+		const float LoopW = m_BaseLineWidth + Gap;
+		const float Speed = maximum(22.0f, FontSize * 2.8f);
+		m_TitleMarqueeOffset += Delta * Speed;
+		if(m_TitleMarqueeOffset >= LoopW)
+			m_TitleMarqueeOffset = fmodf(m_TitleMarqueeOffset, LoopW);
+	}
+	else if(m_CurrentLineIndex != FALLBACK_TITLE)
+	{
+		m_TitleMarqueeOffset = 0.0f;
+	}
+
 	const float Progress = IsCountdownIndex(m_CurrentLineIndex) ?
 				       CountdownProgress(m_CurrentLineIndex, CountdownRemainingMs) :
-				       LineProgress(m_CurrentLineIndex, PositionMs);
+				       (FallbackMode ? 0.0f : LineProgress(m_CurrentLineIndex, PositionMs));
 	const float ProgressChars = Progress * (float)m_vCharMetrics.size();
 	const float CenterX = Area.x + Area.w * 0.5f;
 	// Digits sit optically left of their glyph box; nudge countdown to match the timer below.
 	const float CountdownOpticalNudgeX = FontSize * 0.12f + 1.0f;
 	float TextStartX;
-	if(IsCountdownIndex(m_CurrentLineIndex))
+	if(TitleMarquee)
 	{
-		TextStartX = CenterX - m_BaseLineWidth * 0.5f + CountdownOpticalNudgeX;
+		TextStartX = Area.x - m_TitleMarqueeOffset;
+	}
+	else if(IsCountdownIndex(m_CurrentLineIndex) || FallbackMode)
+	{
+		TextStartX = CenterX - m_BaseLineWidth * 0.5f + (IsCountdownIndex(m_CurrentLineIndex) ? CountdownOpticalNudgeX : 0.0f);
 	}
 	else
 	{
@@ -777,16 +832,35 @@ void CMusicPlayerLyrics::Render(ITextRender *pTextRender, CUi *pUi, const CUIRec
 		// ColorMode: 0=karaoke wipe, 1=all upcoming (gray), 2=all passed (white)
 		if(DrawIndex == LINE_NONE || Alpha <= 0.001f)
 			return;
-		if(!IsCountdownIndex(DrawIndex) && (DrawIndex < 0 || DrawIndex >= (int)m_vLines.size()))
+		if(!IsCountdownIndex(DrawIndex) && !IsFallbackIndex(DrawIndex) && (DrawIndex < 0 || DrawIndex >= (int)m_vLines.size()))
 			return;
 
-		const char *pText = IsCountdownIndex(DrawIndex) ? m_LayoutText.c_str() : m_vLines[DrawIndex].m_Text.c_str();
-		// Outgoing countdown may differ from current layout — build a local digit.
+		const char *pText = nullptr;
 		char aDigit[4];
-		if(IsCountdownIndex(DrawIndex) && DrawIndex != m_CurrentLineIndex)
+		float TextW = 0.0f;
+		if(IsCountdownIndex(DrawIndex))
 		{
-			str_format(aDigit, sizeof(aDigit), "%d", CountdownDigit(DrawIndex));
-			pText = aDigit;
+			if(DrawIndex == m_CurrentLineIndex)
+			{
+				pText = m_LayoutText.c_str();
+				TextW = m_BaseLineWidth;
+			}
+			else
+			{
+				str_format(aDigit, sizeof(aDigit), "%d", CountdownDigit(DrawIndex));
+				pText = aDigit;
+				TextW = pTextRender->TextWidth(FontSize, aDigit, -1, -1.0f);
+			}
+		}
+		else if(IsFallbackIndex(DrawIndex))
+		{
+			pText = (DrawIndex == m_CurrentLineIndex) ? m_LayoutText.c_str() : FallbackText(DrawIndex);
+			TextW = (DrawIndex == m_CurrentLineIndex) ? m_BaseLineWidth : pTextRender->TextWidth(FontSize, pText, -1, -1.0f);
+		}
+		else
+		{
+			pText = m_vLines[DrawIndex].m_Text.c_str();
+			TextW = m_BaseLineWidth;
 		}
 
 		CUIRect Clip = Area;
@@ -799,18 +873,25 @@ void CMusicPlayerLyrics::Render(ITextRender *pTextRender, CUi *pUi, const CUIRec
 			vSplits.emplace_back(0, -1, LYRICS_PASSED_COLOR.WithAlpha(Alpha));
 		else if(IsCountdownIndex(DrawIndex) && DrawIndex == m_CurrentLineIndex)
 			BuildColorSplits(ProgressCharsForColor, Alpha, vSplits);
-		else if(IsCountdownIndex(DrawIndex))
+		else if(IsCountdownIndex(DrawIndex) || IsFallbackIndex(DrawIndex))
 			vSplits.emplace_back(0, -1, LYRICS_PASSED_COLOR.WithAlpha(Alpha));
 		else
 			BuildColorSplits(ProgressCharsForColor, Alpha, vSplits);
 
-		CTextCursor Cursor;
-		Cursor.m_FontSize = FontSize;
-		Cursor.m_Flags = TEXTFLAG_RENDER;
-		Cursor.SetPosition(vec2(X, Y));
-		Cursor.m_vColorSplits = std::move(vSplits);
-		pTextRender->TextColor(LYRICS_UPCOMING_COLOR.WithAlpha(Alpha));
-		pTextRender->TextEx(&Cursor, pText, -1);
+		auto DrawOnce = [&](float DrawX) {
+			CTextCursor Cursor;
+			Cursor.m_FontSize = FontSize;
+			Cursor.m_Flags = TEXTFLAG_RENDER;
+			Cursor.SetPosition(vec2(DrawX, Y));
+			Cursor.m_vColorSplits = vSplits;
+			pTextRender->TextColor(LYRICS_UPCOMING_COLOR.WithAlpha(Alpha));
+			pTextRender->TextEx(&Cursor, pText, -1);
+		};
+
+		const bool MarqueeCopy = DrawIndex == FALLBACK_TITLE && TextW > Area.w + 0.5f;
+		DrawOnce(X);
+		if(MarqueeCopy)
+			DrawOnce(X + TextW + FontSize * LYRICS_TITLE_MARQUEE_GAP_FACTOR);
 
 		pUi->ClipDisable();
 	};
@@ -824,14 +905,24 @@ void CMusicPlayerLyrics::Render(ITextRender *pTextRender, CUi *pUi, const CUIRec
 			str_format(aDigit, sizeof(aDigit), "%d", CountdownDigit(m_OutgoingLineIndex));
 			OutWidth = pTextRender->TextWidth(FontSize, aDigit, -1, -1.0f);
 		}
+		else if(IsFallbackIndex(m_OutgoingLineIndex))
+		{
+			OutWidth = pTextRender->TextWidth(FontSize, FallbackText(m_OutgoingLineIndex), -1, -1.0f);
+		}
 		else
 		{
 			OutWidth = pTextRender->TextWidth(FontSize, m_vLines[m_OutgoingLineIndex].m_Text.c_str(), -1, -1.0f);
 		}
 		const float OutX = CenterX - OutWidth * 0.5f + (IsCountdownIndex(m_OutgoingLineIndex) ? CountdownOpticalNudgeX : 0.0f);
-		DrawDisplay(m_OutgoingLineIndex, OutX, OutgoingY, 0.0f, 1.0f - SlideT, 2);
+		const int OutColorMode = (m_OutgoingLineIndex == FALLBACK_NOT_FOUND) ? 1 : 2;
+		DrawDisplay(m_OutgoingLineIndex, OutX, OutgoingY, 0.0f, 1.0f - SlideT, OutColorMode);
 	}
 
 	const float ActiveAlpha = m_OutgoingLineIndex != LINE_NONE ? SlideT : 1.0f;
-	DrawDisplay(m_CurrentLineIndex, TextStartX, IncomingY, ProgressChars, ActiveAlpha, 0);
+	int ActiveColorMode = 0;
+	if(m_CurrentLineIndex == FALLBACK_NOT_FOUND)
+		ActiveColorMode = 1;
+	else if(m_CurrentLineIndex == FALLBACK_TITLE)
+		ActiveColorMode = 2;
+	DrawDisplay(m_CurrentLineIndex, TextStartX, IncomingY, ProgressChars, ActiveAlpha, ActiveColorMode);
 }

@@ -1515,9 +1515,10 @@ namespace
 		pGraphics->QuadsEnd();
 	}
 
-	// Like DrawRect(CORNER_ALL), but leaves a gap in the bottom radius band so a timer
-	// stem can continue the fill without a double-blended horizontal seam.
-	static void DrawRoundedRectBottomGap(IGraphics *pGraphics, float X, float Y, float W, float H, float Radius, float GapX0, float GapX1, ColorRGBA Color)
+	// Like DrawRect, but leaves a gap in the bottom radius band so a timer stem can
+	// continue the fill without a double-blended horizontal seam. Honors Corners the
+	// same way DrawRectExt does (edge-snapped sides drop rounding).
+	static void DrawRoundedRectBottomGap(IGraphics *pGraphics, float X, float Y, float W, float H, float Radius, int Corners, float GapX0, float GapX1, ColorRGBA Color)
 	{
 		if(pGraphics == nullptr || W <= 0.0f || H <= 0.0f || Color.a <= 0.001f)
 			return;
@@ -1525,12 +1526,16 @@ namespace
 		float R = std::clamp(Radius, 0.0f, minimum(W, H) * 0.5f);
 		GapX0 = std::clamp(GapX0, X, X + W);
 		GapX1 = std::clamp(GapX1, GapX0, X + W);
+		const bool RoundTL = (Corners & IGraphics::CORNER_TL) != 0;
+		const bool RoundTR = (Corners & IGraphics::CORNER_TR) != 0;
+		const bool RoundBL = (Corners & IGraphics::CORNER_BL) != 0;
+		const bool RoundBR = (Corners & IGraphics::CORNER_BR) != 0;
 
 		pGraphics->TextureClear();
 		pGraphics->QuadsBegin();
 		pGraphics->SetColor(Color);
 
-		if(R <= 0.001f)
+		if(R <= 0.001f || Corners == 0)
 		{
 			IGraphics::CQuadItem Item(X, Y, W, H);
 			pGraphics->QuadsDrawTL(&Item, 1);
@@ -1552,42 +1557,59 @@ namespace
 			const float Sa2 = std::sin(A2);
 			const float Sa3 = std::sin(A3);
 
-			IGraphics::CFreeformItem aCorners[4];
-			size_t NumCorners = 0;
-			aCorners[NumCorners++] = IGraphics::CFreeformItem(
-				X + R, Y + R,
-				X + (1.0f - Ca1) * R, Y + (1.0f - Sa1) * R,
-				X + (1.0f - Ca3) * R, Y + (1.0f - Sa3) * R,
-				X + (1.0f - Ca2) * R, Y + (1.0f - Sa2) * R);
-			aCorners[NumCorners++] = IGraphics::CFreeformItem(
-				X + W - R, Y + R,
-				X + W - R + Ca1 * R, Y + (1.0f - Sa1) * R,
-				X + W - R + Ca3 * R, Y + (1.0f - Sa3) * R,
-				X + W - R + Ca2 * R, Y + (1.0f - Sa2) * R);
-			if(GapX0 > X + R + 0.01f)
+			IGraphics::CFreeformItem aCornerItems[4];
+			size_t NumCornerItems = 0;
+			if(RoundTL)
 			{
-				aCorners[NumCorners++] = IGraphics::CFreeformItem(
+				aCornerItems[NumCornerItems++] = IGraphics::CFreeformItem(
+					X + R, Y + R,
+					X + (1.0f - Ca1) * R, Y + (1.0f - Sa1) * R,
+					X + (1.0f - Ca3) * R, Y + (1.0f - Sa3) * R,
+					X + (1.0f - Ca2) * R, Y + (1.0f - Sa2) * R);
+			}
+			if(RoundTR)
+			{
+				aCornerItems[NumCornerItems++] = IGraphics::CFreeformItem(
+					X + W - R, Y + R,
+					X + W - R + Ca1 * R, Y + (1.0f - Sa1) * R,
+					X + W - R + Ca3 * R, Y + (1.0f - Sa3) * R,
+					X + W - R + Ca2 * R, Y + (1.0f - Sa2) * R);
+			}
+			if(RoundBL && GapX0 > X + R + 0.01f)
+			{
+				aCornerItems[NumCornerItems++] = IGraphics::CFreeformItem(
 					X + R, Y + H - R,
 					X + (1.0f - Ca1) * R, Y + H - R + Sa1 * R,
 					X + (1.0f - Ca3) * R, Y + H - R + Sa3 * R,
 					X + (1.0f - Ca2) * R, Y + H - R + Sa2 * R);
 			}
-			if(GapX1 < X + W - R - 0.01f)
+			if(RoundBR && GapX1 < X + W - R - 0.01f)
 			{
-				aCorners[NumCorners++] = IGraphics::CFreeformItem(
+				aCornerItems[NumCornerItems++] = IGraphics::CFreeformItem(
 					X + W - R, Y + H - R,
 					X + W - R + Ca1 * R, Y + H - R + Sa1 * R,
 					X + W - R + Ca3 * R, Y + H - R + Sa3 * R,
 					X + W - R + Ca2 * R, Y + H - R + Sa2 * R);
 			}
-			pGraphics->QuadsDrawFreeform(aCorners, NumCorners);
+			if(NumCornerItems > 0)
+				pGraphics->QuadsDrawFreeform(aCornerItems, NumCornerItems);
 		}
 
-		IGraphics::CQuadItem aQuads[10];
+		IGraphics::CQuadItem aQuads[12];
 		size_t NumQuads = 0;
 		aQuads[NumQuads++] = IGraphics::CQuadItem(X + R, Y, W - R * 2.0f, R); // top
 		aQuads[NumQuads++] = IGraphics::CQuadItem(X, Y + R, R, H - R * 2.0f); // left
 		aQuads[NumQuads++] = IGraphics::CQuadItem(X + W - R, Y + R, R, H - R * 2.0f); // right
+
+		// Square fills for edge-snapped corners (same as DrawRectExt).
+		if(!RoundTL)
+			aQuads[NumQuads++] = IGraphics::CQuadItem(X, Y, R, R);
+		if(!RoundTR)
+			aQuads[NumQuads++] = IGraphics::CQuadItem(X + W, Y, -R, R);
+		if(!RoundBL)
+			aQuads[NumQuads++] = IGraphics::CQuadItem(X, Y + H, R, -R);
+		if(!RoundBR)
+			aQuads[NumQuads++] = IGraphics::CQuadItem(X + W, Y + H, -R, -R);
 
 		// Center split so the timer stem owns the whole middle column under the top band.
 		const float CenterTop = Y + R;
@@ -1601,13 +1623,31 @@ namespace
 
 		// Bottom radius band split around the timer stem gap.
 		const float BottomY = Y + H - R;
-		const float BottomLeftW = maximum(0.0f, GapX0 - (X + R));
-		if(BottomLeftW > 0.01f)
-			aQuads[NumQuads++] = IGraphics::CQuadItem(X + R, BottomY, BottomLeftW, R);
-		const float BottomRightX = maximum(X + R, GapX1);
-		const float BottomRightW = maximum(0.0f, (X + W - R) - BottomRightX);
-		if(BottomRightW > 0.01f)
-			aQuads[NumQuads++] = IGraphics::CQuadItem(BottomRightX, BottomY, BottomRightW, R);
+		if(RoundBL)
+		{
+			const float BottomLeftW = maximum(0.0f, GapX0 - (X + R));
+			if(BottomLeftW > 0.01f)
+				aQuads[NumQuads++] = IGraphics::CQuadItem(X + R, BottomY, BottomLeftW, R);
+		}
+		else
+		{
+			const float FlatLeftW = maximum(0.0f, GapX0 - X);
+			if(FlatLeftW > 0.01f)
+				aQuads[NumQuads++] = IGraphics::CQuadItem(X, BottomY, FlatLeftW, R);
+		}
+		if(RoundBR)
+		{
+			const float BottomRightX = maximum(X + R, GapX1);
+			const float BottomRightW = maximum(0.0f, (X + W - R) - BottomRightX);
+			if(BottomRightW > 0.01f)
+				aQuads[NumQuads++] = IGraphics::CQuadItem(BottomRightX, BottomY, BottomRightW, R);
+		}
+		else
+		{
+			const float FlatRightW = maximum(0.0f, X + W - GapX1);
+			if(FlatRightW > 0.01f)
+				aQuads[NumQuads++] = IGraphics::CQuadItem(GapX1, BottomY, FlatRightW, R);
+		}
 
 		pGraphics->QuadsDrawTL(aQuads, NumQuads);
 		pGraphics->QuadsEnd();
@@ -1630,10 +1670,10 @@ namespace
 
 		const float TabW = std::clamp(TabWidth, 0.0f, View.w);
 		const float TabH = maximum(0.0f, TabHeight);
+		const int BodyCorners = HudLayout::BackgroundCorners(IGraphics::CORNER_ALL, View.x, View.y, View.w, View.h, CanvasWidth, CanvasHeight);
 		if(TabW <= 0.01f || TabH <= 0.01f)
 		{
-			const int Corners = HudLayout::BackgroundCorners(IGraphics::CORNER_ALL, View.x, View.y, View.w, View.h, CanvasWidth, CanvasHeight);
-			pGraphics->DrawRect(View.x, View.y, View.w, View.h, Color, Corners, Rounding);
+			pGraphics->DrawRect(View.x, View.y, View.w, View.h, Color, BodyCorners, Rounding);
 			return;
 		}
 
@@ -1643,11 +1683,12 @@ namespace
 		const float TabRounding = minimum(R * 0.75f, TabH * 0.42f);
 		const float SafeFillet = minimum(Fillet, TabW * 0.35f);
 
-		DrawRoundedRectBottomGap(pGraphics, View.x, View.y, View.w, View.h, R, TabX, TabX + TabW, Color);
+		DrawRoundedRectBottomGap(pGraphics, View.x, View.y, View.w, View.h, R, BodyCorners, TabX, TabX + TabW, Color);
 
 		// One continuous middle column from under the top band through the timer tab.
 		const float StemTop = View.y + R;
 		const float StemH = maximum(0.0f, JunctionY - StemTop) + TabH;
+		// Snap tab bottom corners to the canvas using the combined silhouette height.
 		const int TabCorners = HudLayout::BackgroundCorners(IGraphics::CORNER_B, TabX, StemTop, TabW, StemH, CanvasWidth, CanvasHeight);
 		pGraphics->DrawRect(TabX, StemTop, TabW, StemH, Color, TabCorners, TabRounding);
 
