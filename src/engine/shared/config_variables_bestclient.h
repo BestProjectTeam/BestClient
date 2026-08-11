@@ -164,22 +164,12 @@ MACRO_CONFIG_INT(BcHookComboSize, bc_hook_combo_size, 100, 50, 200, CFGFLAG_CLIE
 // Swap timer
 MACRO_CONFIG_INT(BcSwapTimer, bc_swap_timer, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show a HUD timer for pending swap requests")
 MACRO_CONFIG_INT(BcSwapTimerStyle, bc_swap_timer_style, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Swap timer style (0 = HUD, 1 = Nameplate)")
-MACRO_CONFIG_INT(BcSwapTimerNameplateMinimal, bc_swap_timer_nameplate_minimal, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Draw the nameplate swap timer as plain text without a background")
 MACRO_CONFIG_STR(BcSwapTimerWaitText, bc_swap_timer_wait_text, 32, "[%ds]", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Minimal nameplate cooldown text (%d seconds, %y your name, %n other name)")
 MACRO_CONFIG_STR(BcSwapTimerLeftText, bc_swap_timer_left_text, 32, "[%ds]", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Minimal nameplate remaining time text (%d seconds, %y your name, %n other name)")
 
 MACRO_CONFIG_INT(BcSwapTimerSize, bc_swap_timer_size, 100, 50, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Swap timer size")
 MACRO_CONFIG_INT(BcSwapTimerShowHotkeys, bc_swap_timer_show_hotkeys, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show accept and decline hotkeys in the swap timer")
 MACRO_CONFIG_INT(BcSwapTimerShowTees, bc_swap_timer_show_tees, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show tee icons next to the names in the swap timer")
-MACRO_CONFIG_INT(BcSwapPeekAnimation, bc_swap_peek_animation, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Glide the camera when peeking at the swap partner instead of jumping")
-MACRO_CONFIG_INT(BcSwapPeekTravelTime, bc_swap_peek_travel_time, 700, 100, 3000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Swap peek camera travel duration towards the other player in milliseconds")
-MACRO_CONFIG_INT(BcSwapPeekReturnTime, bc_swap_peek_return_time, 700, 100, 3000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Swap peek camera travel duration on the way back in milliseconds")
-MACRO_CONFIG_INT(BcSwapPeekHoldTime, bc_swap_peek_hold_time, 1500, 100, 10000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "How long the swap peek camera stays on the other player in milliseconds")
-MACRO_CONFIG_INT(BcSwapPeekFreezeInput, bc_swap_peek_freeze_input, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Block movement, aiming and shooting while the swap peek camera is active")
-MACRO_CONFIG_STR(BcSwapAcceptCommand, bc_swap_accept_command, 32, "/swap", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Chat command used to accept a swap request")
-MACRO_CONFIG_STR(BcSwapDeclineCommand, bc_swap_decline_command, 32, "/cancelswap", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Chat command used to decline or cancel a swap request")
-MACRO_CONFIG_INT(BcSwapTimerAnimations, bc_swap_timer_animations, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Animate the swap timer appearance and button states")
-MACRO_CONFIG_INT(BcSwapTimerAnimationTime, bc_swap_timer_animation_time, 250, 50, 2000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Swap timer animation duration in milliseconds")
 
 // HUD editor
 MACRO_CONFIG_INT(BcHudMusicPlayerX, bc_hud_music_player_x, 198, -1000, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "HUD editor X position for music player")

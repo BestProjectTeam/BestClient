@@ -78,6 +78,9 @@ void CControls::ConKeyInputState(IConsole::IResult *pResult, void *pUserData)
 {
 	CInputState *pState = (CInputState *)pUserData;
 
+	if(pState->m_pControls->GameClient()->m_SwapTimer.IsInputFrozen())
+		return;
+
 	if(pState->m_pControls->GameClient()->m_GameInfo.m_BugDDRaceInput && pState->m_pControls->GameClient()->m_Snap.m_SpecInfo.m_Active)
 		return;
 
@@ -87,6 +90,9 @@ void CControls::ConKeyInputState(IConsole::IResult *pResult, void *pUserData)
 void CControls::ConKeyInputCounter(IConsole::IResult *pResult, void *pUserData)
 {
 	CInputState *pState = (CInputState *)pUserData;
+
+	if(pState->m_pControls->GameClient()->m_SwapTimer.IsInputFrozen())
+		return;
 
 	if((pState->m_pControls->GameClient()->m_GameInfo.m_BugDDRaceInput && pState->m_pControls->GameClient()->m_Snap.m_SpecInfo.m_Active) || pState->m_pControls->GameClient()->m_Spectator.IsActive())
 		return;
@@ -219,12 +225,10 @@ int CControls::SnapInput(int *pData)
 		m_aInputData[g_Config.m_ClDummy].m_PlayerFlags = PLAYERFLAG_CHATTING;
 	else if(GameClient()->m_Menus.IsActive())
 		m_aInputData[g_Config.m_ClDummy].m_PlayerFlags = PLAYERFLAG_IN_MENU;
+	else if(GameClient()->m_SwapTimer.IsInputFrozen()) // BestClient swap peek spectate
+		m_aInputData[g_Config.m_ClDummy].m_PlayerFlags = 0;
 	else
 		m_aInputData[g_Config.m_ClDummy].m_PlayerFlags = PLAYERFLAG_PLAYING;
-
-	// BestClient Swap timer ( reusing )
-	if(GameClient()->m_SwapTimer.IsInputFrozen())
-		m_aInputData[g_Config.m_ClDummy].m_PlayerFlags &= ~PLAYERFLAG_PLAYING;
 
 	if(GameClient()->m_Scoreboard.IsActive())
 		m_aInputData[g_Config.m_ClDummy].m_PlayerFlags |= PLAYERFLAG_SCOREBOARD;
@@ -268,7 +272,8 @@ int CControls::SnapInput(int *pData)
 	// we freeze the input if chat or menu is activated
 	if(!(m_aInputData[g_Config.m_ClDummy].m_PlayerFlags & PLAYERFLAG_PLAYING))
 	{
-		if(!GameClient()->m_GameInfo.m_BugDDRaceInput)
+		// Always clear leftover movement while swap-peeking; DDRace skips ResetInput for chat/menu.
+		if(!GameClient()->m_GameInfo.m_BugDDRaceInput || GameClient()->m_SwapTimer.IsInputFrozen())
 			ResetInput(g_Config.m_ClDummy);
 
 		mem_copy(pData, &m_aInputData[g_Config.m_ClDummy], sizeof(m_aInputData[0]));

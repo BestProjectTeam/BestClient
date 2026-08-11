@@ -11,14 +11,11 @@
 #include <game/client/ui_rect.h>
 
 #include <memory>
-#include <vector>
 
 class CSwapTimer : public CComponent
 {
 	enum
 	{
-		MAX_VISIBLE_CARDS = 4,
-		MAX_ENTRIES_PER_CONN = 16,
 		MINIMAL_TEXT_SIZE = 64,
 		ENTRY_TEXT_SIZE = 256,
 	};
@@ -26,6 +23,7 @@ class CSwapTimer : public CComponent
 	static constexpr float REQUEST_COOLDOWN_SECONDS = 30.0f;
 	static constexpr float REQUEST_TIMEOUT_SECONDS = 180.0f;
 	static constexpr float HUD_CANVAS_HEIGHT = 300.0f;
+	static constexpr float ANIMATION_TIME_SECONDS = 0.25f;
 
 	enum class ECloseEvent
 	{
@@ -37,6 +35,7 @@ class CSwapTimer : public CComponent
 
 	struct SSwapEntry
 	{
+		bool m_Active = false;
 		bool m_Incoming = false;
 		char m_aOtherName[MAX_NAME_LENGTH] = {};
 		float m_ExpireTime = 0.0f;
@@ -44,19 +43,9 @@ class CSwapTimer : public CComponent
 		float m_AnimPhase = 0.0f;
 		float m_AcceptPhase = 0.0f;
 		bool m_Closing = false;
-		bool m_FromDummy = false; // paired with the entry mirrored the other connection
+		bool m_FromDummy = false;
 		std::shared_ptr<CManagedTeeRenderInfo> m_pSelfTee;
 		std::shared_ptr<CManagedTeeRenderInfo> m_pOtherTee;
-	};
-
-	struct SVisibleCard
-	{
-		int m_Index = 0;
-		float m_Slot = 0.0f;
-		float m_Distance = 0.0f;
-		float m_Alpha = 1.0f;
-		float m_Squeeze = 1.0f;
-		bool m_Selected = false;
 	};
 
 	struct SHotkeyLayout
@@ -72,46 +61,27 @@ class CSwapTimer : public CComponent
 		bool m_HasAny = false;
 	};
 
-	enum class EPeekStage
-	{
-		IDLE,
-		TRAVEL_TO,
-		HOLD,
-		TRAVEL_BACK,
-	};
-
 	static void ConSwapAccept(IConsole::IResult *pResult, void *pUserData);
 	static void ConSwapDecline(IConsole::IResult *pResult, void *pUserData);
-	static void ConSwapNext(IConsole::IResult *pResult, void *pUserData);
-	static void ConSwapPrev(IConsole::IResult *pResult, void *pUserData);
 	static void ConSwapPeek(IConsole::IResult *pResult, void *pUserData);
 
-	std::vector<SSwapEntry> m_avEntries[NUM_DUMMIES];
-	int m_aSelected[NUM_DUMMIES] = {};
-	float m_aScrollAnim[NUM_DUMMIES] = {};
-
-	EPeekStage m_PeekStage = EPeekStage::IDLE;
+	SSwapEntry m_aEntries[NUM_DUMMIES];
+	bool m_PeekHeld = false;
 	int m_PeekClientId = -1;
-	float m_PeekStageStart = 0.0f;
-	vec2 m_PeekOrigin = vec2(0.0f, 0.0f);
 
 	void ResetState();
-	void AddEntry(int Conn, const char *pName, bool Incoming, float CooldownSeconds);
-	void RemoveEntryAt(int Conn, int Index);
-	void CloseEntryAt(int Conn, int Index);
+	void ClearEntry(int Conn);
+	void SetEntry(int Conn, const char *pName, bool Incoming, float CooldownSeconds);
+	void CloseEntry(int Conn);
 	void CloseOnConn(int Conn, bool OutgoingOnly);
 	void CancelForPlayer(int ClientId);
 	void ExpireEntries();
 	void UpdateAnimations();
-	void ClampSelection(int Conn);
-	void CycleSelection(int Step);
 
-	int EntryCount(int Conn) const;
-	int FindEntry(int Conn, const char *pName, bool Incoming) const;
-	int FindPairedEntry(int Conn, bool Incoming) const;
 	int VisibleConn() const;
-	int SelectedEntry(int Conn) const;
 	bool HasActiveEntry() const;
+	SSwapEntry *ActiveEntry(int Conn);
+	const SSwapEntry *ActiveEntry(int Conn) const;
 
 	float EntryAlpha(const SSwapEntry &Entry) const;
 	float AcceptDimFactor(const SSwapEntry &Entry) const;
@@ -123,33 +93,31 @@ class CSwapTimer : public CComponent
 
 	float HudCanvasWidth() const;
 	float LineHeight(float Scale) const;
-	int VisibleSlotCount(int Conn) const;
-	float WindowStart(int Conn) const;
-	int CollectVisibleCards(int Conn, SVisibleCard *pOut) const;
 
 	void BuildHotkeyLayout(bool Show, float FontSize, float LeadGap, float IconGap, float PairGap, SHotkeyLayout &Out) const;
 	void RenderHotkeyLayout(const SHotkeyLayout &Hotkeys, float X, float Y, float Alpha, float AcceptDim);
 
 	void FormatStatusText(const SSwapEntry &Entry, float Now, char *pBuf, int BufSize) const;
 	void FormatMinimalText(const SSwapEntry &Entry, float Now, char *pBuf, int BufSize) const;
-	void FormatEntryText(const SSwapEntry &Entry, float Now, char *pBuf, int BufSize) const;
 	static void FormatPlaceholders(const char *pFormat, int Seconds, const char *pSelf, const char *pOther, char *pBuf, int BufSize);
 
 	void UpdateTeeInfos(SSwapEntry &Entry, int Conn);
 	float TeeIconSize(float FontSize) const;
 	float RenderTeeIcon(const std::shared_ptr<CManagedTeeRenderInfo> &pTee, float X, float Y, float FontSize, float Alpha) const;
 	float MeasureLineWidth(const SSwapEntry &Entry, float Scale, float Now) const;
-	void RenderLine(const SSwapEntry &Entry, float X, float Y, float Scale, float Now, float Alpha, bool Selected, bool ShowHotkeys);
+	void RenderLine(const SSwapEntry &Entry, float X, float Y, float Scale, float Now, float Alpha, bool ShowHotkeys);
 	void RenderNameplateMode();
-	void RenderNameplateCard(const SSwapEntry &Entry, int ClientId, float Now, const SVisibleCard &Card);
+	void RenderNameplateCard(const SSwapEntry &Entry, int ClientId, float Now);
 
 	void StopPeek();
+	void SetPeekHeld(bool Held);
 	int FindClientByName(const char *pName) const;
 
 	static void CopyName(const char *pStart, const char *pEnd, char *pBuf, int BufSize);
 	static const char *SkipMessagePrefix(const char *pMessage);
 	static bool ParseIncoming(const char *pMessage, char *pName, int NameSize, float *pCooldown);
 	static bool ParseOutgoing(const char *pMessage, char *pName, int NameSize);
+	static bool ParseAcceptWait(const char *pMessage, float *pSeconds);
 	static ECloseEvent ParseCloseEvent(const char *pMessage, char *pFirst, char *pSecond, int NameSize);
 
 public:
@@ -166,10 +134,8 @@ public:
 
 	void AcceptSwap();
 	void DeclineSwap();
-	void SelectNext();
-	void SelectPrev();
-	void PeekPartner();
-	void ApplyPeekCamera();
+	// Returns true if SpecInfo was overridden for peek this call.
+	bool ApplyPeekSpectate();
 	bool IsInputFrozen() const;
 
 	CUIRect GetRect(bool ForcePreview) const;

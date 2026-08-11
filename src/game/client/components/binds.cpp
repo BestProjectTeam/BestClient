@@ -321,9 +321,6 @@ void CBinds::SetDefaults()
 	Bind(KEY_F3, "vote yes");
 	Bind(KEY_F4, "vote no");
 
-	Bind(KEY_F7, "bc_swap_accept");
-	Bind(KEY_F8, "bc_swap_decline");
-
 	Bind(KEY_K, "kill");
 	Bind(KEY_J, "toggle_admin_panel");
 	Bind(KEY_Q, "say /spec");

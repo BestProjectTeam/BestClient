@@ -2667,8 +2667,8 @@ Accept command
 Enable swap timer
 == Включить таймер свапа
 
-Decline swap
-== Отклонить свап
+Decline/dismiss swap
+== Отклонить/скрыть свап
 
 You
 == Ты

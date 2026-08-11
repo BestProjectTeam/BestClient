@@ -3469,16 +3469,8 @@ bool CHud::RebuildFinishPredictionPathData() const
 	m_vFinishPredictionDistances.assign(MapSize, -1);
 	m_vFinishPredictionPassable.assign(MapSize, 0);
 
-	for(int y = 0; y < m_FinishPredictionMapHeight; ++y)
-	{
-		for(int x = 0; x < m_FinishPredictionMapWidth; ++x)
-		{
-			const int Index = y * m_FinishPredictionMapWidth + x;
-			const vec2 TileCenter(x * 32.0f + 16.0f, y * 32.0f + 16.0f);
-			m_vFinishPredictionPassable[Index] = !Collision()->TestBox(TileCenter, vec2(CCharacterCore::PhysicalSize(), CCharacterCore::PhysicalSize())) ? 1 : 0;
-		}
-	}
-
+	// Use tile solidity instead of TestBox-per-tile: TestBox does 4 collision probes
+	// and freezes the main thread for seconds on large maps.
 	using TDistanceNode = std::pair<int, int>;
 	std::priority_queue<TDistanceNode, std::vector<TDistanceNode>, std::greater<>> PriorityQueue;
 	for(int y = 0; y < m_FinishPredictionMapHeight; ++y)
@@ -3486,8 +3478,14 @@ bool CHud::RebuildFinishPredictionPathData() const
 		for(int x = 0; x < m_FinishPredictionMapWidth; ++x)
 		{
 			const int Index = y * m_FinishPredictionMapWidth + x;
-			const bool StartTile = Collision()->GetTileIndex(Index) == TILE_START || Collision()->GetFrontTileIndex(Index) == TILE_START;
-			const bool FinishTile = Collision()->GetTileIndex(Index) == TILE_FINISH || Collision()->GetFrontTileIndex(Index) == TILE_FINISH;
+			const int GameTile = Collision()->GetTileIndex(Index);
+			const int FrontTile = Collision()->GetFrontTileIndex(Index);
+			const bool Blocked = GameTile == TILE_SOLID || GameTile == TILE_NOHOOK ||
+					    FrontTile == TILE_SOLID || FrontTile == TILE_NOHOOK;
+			m_vFinishPredictionPassable[Index] = Blocked ? 0 : 1;
+
+			const bool StartTile = GameTile == TILE_START || FrontTile == TILE_START;
+			const bool FinishTile = GameTile == TILE_FINISH || FrontTile == TILE_FINISH;
 			if(StartTile)
 				m_vFinishPredictionStartTiles.emplace_back(x, y);
 			if(FinishTile && m_vFinishPredictionPassable[Index] != 0)

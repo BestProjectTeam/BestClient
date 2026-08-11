@@ -136,6 +136,9 @@ void CCamera::ResetAutoSpecCamera()
 
 void CCamera::UpdateCamera()
 {
+	CGameClient::CSnapState::CSpectateInfo SpecBackup = GameClient()->m_Snap.m_SpecInfo;
+	const bool PeekApplied = GameClient()->m_SwapTimer.ApplyPeekSpectate();
+
 	RemoveDemoDynamicFov();
 
 	// use hardcoded smooth camera for spectating unless player explicitly turn it off
@@ -312,6 +315,10 @@ void CCamera::UpdateCamera()
 	m_UsingAutoSpecCamera = UsingAutoSpecCamera;
 
 	UpdateDemoCameraEffects(DeltaTime);
+
+	// Peek only overrides SpecInfo for this camera update; never leak into the rest of the frame.
+	if(PeekApplied)
+		GameClient()->m_Snap.m_SpecInfo = SpecBackup;
 }
 
 void CCamera::UpdateDemoCameraEffects(float DeltaTime)
@@ -403,6 +410,9 @@ void CCamera::UpdateDemoCameraEffects(float DeltaTime)
 
 void CCamera::OnRender()
 {
+	CGameClient::CSnapState::CSpectateInfo SpecBackup = GameClient()->m_Snap.m_SpecInfo;
+	const bool PeekApplied = GameClient()->m_SwapTimer.ApplyPeekSpectate();
+
 	if(m_CameraSmoothing)
 	{
 		if(!GameClient()->m_Snap.m_SpecInfo.m_Active)
@@ -557,13 +567,14 @@ void CCamera::OnRender()
 	if(m_CameraSmoothing)
 		m_Center = m_CameraSmoothingCenter;
 
-	GameClient()->m_SwapTimer.ApplyPeekCamera(); // BestClient
-
 	m_PrevCenter = m_Center;
 	m_PrevSpecId = SpecId;
 
 	// demo always count as spectating
 	m_WasSpectating = GameClient()->m_Snap.m_SpecInfo.m_Active;
+
+	if(PeekApplied)
+		GameClient()->m_Snap.m_SpecInfo = SpecBackup;
 }
 
 void CCamera::OnConsoleInit()

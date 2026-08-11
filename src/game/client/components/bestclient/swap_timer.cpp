@@ -13,14 +13,13 @@
 
 #include <generated/protocol.h>
 
+#include <game/client/animstate.h>
 #include <game/client/components/binds.h>
 #include <game/client/components/camera.h>
-#include <game/client/components/chat.h>
 #include <game/client/components/hud_layout.h>
 #include <game/client/components/menus.h>
 #include <game/client/components/nameplates.h>
 #include <game/client/components/scoreboard.h>
-#include <game/client/animstate.h>
 #include <game/client/gameclient.h>
 #include <game/client/render.h>
 #include <game/localization.h>
@@ -30,9 +29,10 @@
 static constexpr int SWAP_SERVER_MSG = -1;
 static constexpr float DIMMED_ALPHA = 0.35f;
 static constexpr const char *DEFAULT_MINIMAL_TEXT = "[%ds]";
+static constexpr const char *ACCEPT_COMMAND = "/swap";
+static constexpr const char *DECLINE_COMMAND = "/cancelswap";
 
 static const ColorRGBA s_TextColor = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
-static const ColorRGBA s_FadedTextColor = ColorRGBA(0.72f, 0.76f, 0.82f, 1.0f);
 static const ColorRGBA s_AcceptColor = ColorRGBA(0.35f, 0.85f, 0.35f, 1.0f);
 static const ColorRGBA s_DeclineColor = ColorRGBA(0.90f, 0.32f, 0.28f, 1.0f);
 static const ColorRGBA s_PeekColor = ColorRGBA(0.32f, 0.62f, 0.98f, 1.0f);
@@ -41,17 +41,6 @@ static float Smoothstep(float Phase)
 {
 	Phase = std::clamp(Phase, 0.0f, 1.0f);
 	return Phase * Phase * (3.0f - 2.0f * Phase);
-}
-
-// Quintic ease in/out - lingers at both ends and sprints through the middle.
-static float PeekEase(float Phase)
-{
-	Phase = std::clamp(Phase, 0.0f, 1.0f);
-	if(Phase < 0.5f)
-		return 16.0f * Phase * Phase * Phase * Phase * Phase;
-
-	const float Shifted = -2.0f * Phase + 2.0f;
-	return 1.0f - Shifted * Shifted * Shifted * Shifted * Shifted * 0.5f;
 }
 
 void CSwapTimer::ConSwapAccept(IConsole::IResult *pResult, void *pUserData)
@@ -66,31 +55,16 @@ void CSwapTimer::ConSwapDecline(IConsole::IResult *pResult, void *pUserData)
 	static_cast<CSwapTimer *>(pUserData)->DeclineSwap();
 }
 
-void CSwapTimer::ConSwapNext(IConsole::IResult *pResult, void *pUserData)
-{
-	(void)pResult;
-	static_cast<CSwapTimer *>(pUserData)->SelectNext();
-}
-
-void CSwapTimer::ConSwapPrev(IConsole::IResult *pResult, void *pUserData)
-{
-	(void)pResult;
-	static_cast<CSwapTimer *>(pUserData)->SelectPrev();
-}
-
 void CSwapTimer::ConSwapPeek(IConsole::IResult *pResult, void *pUserData)
 {
-	(void)pResult;
-	static_cast<CSwapTimer *>(pUserData)->PeekPartner();
+	static_cast<CSwapTimer *>(pUserData)->SetPeekHeld(pResult->GetInteger(0) != 0);
 }
 
 void CSwapTimer::OnConsoleInit()
 {
-	Console()->Register("bc_swap_accept", "", CFGFLAG_CLIENT, ConSwapAccept, this, "Accept the selected swap request");
-	Console()->Register("bc_swap_decline", "", CFGFLAG_CLIENT, ConSwapDecline, this, "Decline or cancel the selected swap request");
-	Console()->Register("bc_swap_next", "", CFGFLAG_CLIENT, ConSwapNext, this, "Select the next swap request");
-	Console()->Register("bc_swap_prev", "", CFGFLAG_CLIENT, ConSwapPrev, this, "Select the previous swap request");
-	Console()->Register("bc_swap_peek", "", CFGFLAG_CLIENT, ConSwapPeek, this, "Move the camera to the selected swap partner and back");
+	Console()->Register("bc_swap_accept", "", CFGFLAG_CLIENT, ConSwapAccept, this, "Accept the pending swap request");
+	Console()->Register("bc_swap_decline", "", CFGFLAG_CLIENT, ConSwapDecline, this, "Cancel an outgoing swap, or dismiss an incoming swap card");
+	Console()->Register("+bc_swap_peek", "", CFGFLAG_CLIENT, ConSwapPeek, this, "Hold to spectate the swap partner");
 }
 
 void CSwapTimer::OnReset()
@@ -108,22 +82,42 @@ void CSwapTimer::OnStateChange(int NewState, int OldState)
 void CSwapTimer::ResetState()
 {
 	for(int Conn = 0; Conn < NUM_DUMMIES; Conn++)
-	{
-		m_avEntries[Conn].clear();
-		m_aSelected[Conn] = 0;
-		m_aScrollAnim[Conn] = 0.0f;
-	}
+		ClearEntry(Conn);
 	StopPeek();
 }
 
-int CSwapTimer::EntryCount(int Conn) const
+void CSwapTimer::ClearEntry(int Conn)
 {
-	return static_cast<int>(m_avEntries[Conn].size());
+	m_aEntries[Conn] = SSwapEntry();
 }
 
 int CSwapTimer::VisibleConn() const
 {
 	return std::clamp(g_Config.m_ClDummy, 0, NUM_DUMMIES - 1);
+}
+
+CSwapTimer::SSwapEntry *CSwapTimer::ActiveEntry(int Conn)
+{
+	if(Conn < 0 || Conn >= NUM_DUMMIES || !m_aEntries[Conn].m_Active || m_aEntries[Conn].m_Closing)
+		return nullptr;
+	return &m_aEntries[Conn];
+}
+
+const CSwapTimer::SSwapEntry *CSwapTimer::ActiveEntry(int Conn) const
+{
+	if(Conn < 0 || Conn >= NUM_DUMMIES || !m_aEntries[Conn].m_Active || m_aEntries[Conn].m_Closing)
+		return nullptr;
+	return &m_aEntries[Conn];
+}
+
+bool CSwapTimer::HasActiveEntry() const
+{
+	for(const SSwapEntry &Entry : m_aEntries)
+	{
+		if(Entry.m_Active && !Entry.m_Closing)
+			return true;
+	}
+	return false;
 }
 
 float CSwapTimer::HudCanvasWidth() const
@@ -136,131 +130,81 @@ float CSwapTimer::LineHeight(float Scale) const
 	return 11.0f * Scale;
 }
 
-int CSwapTimer::FindEntry(int Conn, const char *pName, bool Incoming) const
+void CSwapTimer::CloseEntry(int Conn)
 {
-	if(!pName || !pName[0])
-		return -1;
-
-	const std::vector<SSwapEntry> &vEntries = m_avEntries[Conn];
-	for(int i = 0, Count = static_cast<int>(vEntries.size()); i < Count; i++)
-	{
-		if(vEntries[i].m_Closing || vEntries[i].m_Incoming != Incoming)
-			continue;
-		if(str_comp(vEntries[i].m_aOtherName, pName) == 0)
-			return i;
-	}
-	return -1;
-}
-
-int CSwapTimer::FindPairedEntry(int Conn, bool Incoming) const
-{
-	const std::vector<SSwapEntry> &vEntries = m_avEntries[Conn];
-	for(int i = 0, Count = static_cast<int>(vEntries.size()); i < Count; i++)
-	{
-		if(!vEntries[i].m_Closing && vEntries[i].m_FromDummy && vEntries[i].m_Incoming == Incoming)
-			return i;
-	}
-	return -1;
-}
-
-void CSwapTimer::ClampSelection(int Conn)
-{
-	const int Count = EntryCount(Conn);
-	m_aSelected[Conn] = Count > 0 ? std::clamp(m_aSelected[Conn], 0, Count - 1) : 0;
-}
-
-void CSwapTimer::RemoveEntryAt(int Conn, int Index)
-{
-	m_avEntries[Conn].erase(m_avEntries[Conn].begin() + Index);
-	if(m_aSelected[Conn] > Index)
-		m_aSelected[Conn]--;
-	ClampSelection(Conn);
-}
-
-void CSwapTimer::CloseEntryAt(int Conn, int Index)
-{
-	if(Index < 0 || Index >= EntryCount(Conn) || m_avEntries[Conn][Index].m_Closing)
+	if(Conn < 0 || Conn >= NUM_DUMMIES || !m_aEntries[Conn].m_Active || m_aEntries[Conn].m_Closing)
 		return;
 
-	const bool Paired = m_avEntries[Conn][Index].m_FromDummy;
-	const bool WasIncoming = m_avEntries[Conn][Index].m_Incoming;
+	const bool Paired = m_aEntries[Conn].m_FromDummy;
+	const bool WasIncoming = m_aEntries[Conn].m_Incoming;
 
-	if(g_Config.m_BcSwapTimerAnimations)
-		m_avEntries[Conn][Index].m_Closing = true;
-	else
-		RemoveEntryAt(Conn, Index);
+	m_aEntries[Conn].m_Closing = true;
 
 	if(!Paired)
 		return;
 
-	// a swap with our own dummy shows up on both connections because idk how to say but it like you swapping with other player xD
 	const int OtherConn = Conn ^ 1;
-	const int MirrorIndex = FindPairedEntry(OtherConn, !WasIncoming);
-	if(MirrorIndex < 0)
+	SSwapEntry &Mirror = m_aEntries[OtherConn];
+	if(!Mirror.m_Active || Mirror.m_Closing || !Mirror.m_FromDummy || Mirror.m_Incoming == WasIncoming)
 		return;
-
-	if(g_Config.m_BcSwapTimerAnimations)
-		m_avEntries[OtherConn][MirrorIndex].m_Closing = true;
-	else
-		RemoveEntryAt(OtherConn, MirrorIndex);
+	Mirror.m_Closing = true;
 }
 
 void CSwapTimer::CloseOnConn(int Conn, bool OutgoingOnly)
 {
-	// Shit optimiz
-	for(int i = EntryCount(Conn) - 1; i >= 0; i--)
-	{
-		if(!OutgoingOnly || !m_avEntries[Conn][i].m_Incoming)
-			CloseEntryAt(Conn, i);
-	}
+	if(Conn < 0 || Conn >= NUM_DUMMIES || !m_aEntries[Conn].m_Active)
+		return;
+	if(OutgoingOnly && m_aEntries[Conn].m_Incoming)
+		return;
+	CloseEntry(Conn);
 }
 
-void CSwapTimer::AddEntry(int Conn, const char *pName, bool Incoming, float CooldownSeconds)
+void CSwapTimer::SetEntry(int Conn, const char *pName, bool Incoming, float CooldownSeconds)
 {
-	if(!pName || !pName[0])
+	if(!pName || !pName[0] || Conn < 0 || Conn >= NUM_DUMMIES)
 		return;
 
 	const float Now = Client()->LocalTime();
 	const bool Paired = IsOwnOtherTee(Conn, pName);
 
 	SSwapEntry Entry;
+	Entry.m_Active = true;
 	Entry.m_Incoming = Incoming;
 	Entry.m_FromDummy = Paired;
 	str_copy(Entry.m_aOtherName, pName, sizeof(Entry.m_aOtherName));
 	Entry.m_CooldownEnd = Now + maximum(CooldownSeconds, 0.0f);
 	Entry.m_ExpireTime = Entry.m_CooldownEnd + REQUEST_TIMEOUT_SECONDS;
 
-	const auto Insert = [this](int TargetConn, const SSwapEntry &NewEntry) {
-		const int Existing = FindEntry(TargetConn, NewEntry.m_aOtherName, NewEntry.m_Incoming);
-		if(Existing >= 0)
-		{
-			const float AnimPhase = m_avEntries[TargetConn][Existing].m_AnimPhase;
-			const float AcceptPhase = m_avEntries[TargetConn][Existing].m_AcceptPhase;
-			m_avEntries[TargetConn][Existing] = NewEntry;
-			m_avEntries[TargetConn][Existing].m_AnimPhase = AnimPhase;
-			m_avEntries[TargetConn][Existing].m_AcceptPhase = AcceptPhase;
-			return;
-		}
+	if(m_aEntries[Conn].m_Active && !m_aEntries[Conn].m_Closing &&
+		str_comp(m_aEntries[Conn].m_aOtherName, pName) == 0 &&
+		m_aEntries[Conn].m_Incoming == Incoming)
+	{
+		Entry.m_AnimPhase = m_aEntries[Conn].m_AnimPhase;
+		Entry.m_AcceptPhase = m_aEntries[Conn].m_AcceptPhase;
+		Entry.m_pSelfTee = m_aEntries[Conn].m_pSelfTee;
+		Entry.m_pOtherTee = m_aEntries[Conn].m_pOtherTee;
+	}
 
-		if(EntryCount(TargetConn) >= MAX_ENTRIES_PER_CONN)
-			RemoveEntryAt(TargetConn, 0);
-		m_avEntries[TargetConn].push_back(NewEntry);
-	};
-
-	Insert(Conn, Entry);
+	m_aEntries[Conn] = Entry;
 
 	if(!Paired)
 		return;
 
 	const int SelfId = GameClient()->m_aLocalIds[Conn];
 	const int OtherConn = Conn ^ 1;
-	if(SelfId < 0 || FindPairedEntry(OtherConn, !Incoming) >= 0)
+	if(SelfId < 0)
 		return;
 
-	SSwapEntry Mirror = Entry;
-	Mirror.m_Incoming = !Incoming;
-	str_copy(Mirror.m_aOtherName, GameClient()->m_aClients[SelfId].m_aName, sizeof(Mirror.m_aOtherName));
-	Insert(OtherConn, Mirror);
+	SSwapEntry &Mirror = m_aEntries[OtherConn];
+	if(Mirror.m_Active && !Mirror.m_Closing && Mirror.m_FromDummy && Mirror.m_Incoming != Incoming)
+		return;
+
+	SSwapEntry MirrorEntry = Entry;
+	MirrorEntry.m_Incoming = !Incoming;
+	str_copy(MirrorEntry.m_aOtherName, GameClient()->m_aClients[SelfId].m_aName, sizeof(MirrorEntry.m_aOtherName));
+	MirrorEntry.m_pSelfTee = nullptr;
+	MirrorEntry.m_pOtherTee = nullptr;
+	m_aEntries[OtherConn] = MirrorEntry;
 }
 
 void CSwapTimer::ExpireEntries()
@@ -268,11 +212,8 @@ void CSwapTimer::ExpireEntries()
 	const float Now = Client()->LocalTime();
 	for(int Conn = 0; Conn < NUM_DUMMIES; Conn++)
 	{
-		for(int i = EntryCount(Conn) - 1; i >= 0; i--)
-		{
-			if(!m_avEntries[Conn][i].m_Closing && Now >= m_avEntries[Conn][i].m_ExpireTime)
-				CloseEntryAt(Conn, i);
-		}
+		if(m_aEntries[Conn].m_Active && !m_aEntries[Conn].m_Closing && Now >= m_aEntries[Conn].m_ExpireTime)
+			CloseEntry(Conn);
 	}
 }
 
@@ -290,14 +231,10 @@ void CSwapTimer::CancelForPlayer(int ClientId)
 			continue;
 		}
 
-		if(!pName[0])
+		if(!pName[0] || !m_aEntries[Conn].m_Active)
 			continue;
-
-		for(int i = EntryCount(Conn) - 1; i >= 0; i--)
-		{
-			if(str_comp(m_avEntries[Conn][i].m_aOtherName, pName) == 0)
-				CloseEntryAt(Conn, i);
-		}
+		if(str_comp(m_aEntries[Conn].m_aOtherName, pName) == 0)
+			CloseEntry(Conn);
 	}
 }
 
@@ -332,19 +269,6 @@ void CSwapTimer::OnMessage(int MsgType, void *pRawMsg)
 	}
 }
 
-bool CSwapTimer::HasActiveEntry() const
-{
-	for(const auto &vEntries : m_avEntries)
-	{
-		for(const SSwapEntry &Entry : vEntries)
-		{
-			if(!Entry.m_Closing)
-				return true;
-		}
-	}
-	return false;
-}
-
 bool CSwapTimer::IsCooldownActive(const SSwapEntry &Entry) const
 {
 	return Client()->LocalTime() < Entry.m_CooldownEnd;
@@ -375,8 +299,9 @@ const char *CSwapTimer::DisplayName(const SSwapEntry &Entry) const
 CSwapTimer::SSwapEntry CSwapTimer::MakePreviewEntry(float Now) const
 {
 	SSwapEntry Preview;
+	Preview.m_Active = true;
 	Preview.m_Incoming = true;
-	str_copy(Preview.m_aOtherName, "RoflikBEST", sizeof(Preview.m_aOtherName));
+	str_copy(Preview.m_aOtherName, "Player", sizeof(Preview.m_aOtherName));
 	Preview.m_CooldownEnd = Now;
 	Preview.m_ExpireTime = Now + 163.0f;
 	Preview.m_AnimPhase = 1.0f;
@@ -384,74 +309,35 @@ CSwapTimer::SSwapEntry CSwapTimer::MakePreviewEntry(float Now) const
 	return Preview;
 }
 
-int CSwapTimer::SelectedEntry(int Conn) const
-{
-	if(Conn < 0)
-		return -1;
-
-	const int Index = m_aSelected[Conn];
-	if(Index >= EntryCount(Conn) || m_avEntries[Conn][Index].m_Closing)
-		return -1;
-	return Index;
-}
-
-void CSwapTimer::CycleSelection(int Step)
-{
-	const int Conn = VisibleConn();
-	const int Count = EntryCount(Conn);
-	if(Count <= 1)
-		return;
-
-	// skips cards that are already fading out just a base of animations ( I hate writing in english or at? idk)
-	for(int i = 0; i < Count; i++)
-	{
-		m_aSelected[Conn] = (m_aSelected[Conn] + Step + Count) % Count;
-		if(!m_avEntries[Conn][m_aSelected[Conn]].m_Closing)
-			return;
-	}
-}
-
-void CSwapTimer::SelectNext()
-{
-	CycleSelection(1);
-}
-
-void CSwapTimer::SelectPrev()
-{
-	CycleSelection(-1);
-}
-
 void CSwapTimer::AcceptSwap()
 {
 	const int Conn = VisibleConn();
-	const int Index = SelectedEntry(Conn);
-	if(Index < 0 || !IsAcceptEnabled(m_avEntries[Conn][Index]))
+	SSwapEntry *pEntry = ActiveEntry(Conn);
+	if(!pEntry || !IsAcceptEnabled(*pEntry))
 		return;
 
-	const char *pCommand = g_Config.m_BcSwapAcceptCommand[0] ? g_Config.m_BcSwapAcceptCommand : "/swap";
 	char aBuf[256];
-	str_format(aBuf, sizeof(aBuf), "say %s %s", pCommand, m_avEntries[Conn][Index].m_aOtherName);
+	str_format(aBuf, sizeof(aBuf), "say %s %s", ACCEPT_COMMAND, pEntry->m_aOtherName);
 	Console()->ExecuteLine(aBuf, IConsole::CLIENT_ID_UNSPECIFIED);
-	CloseEntryAt(Conn, Index);
+	CloseEntry(Conn);
 }
 
 void CSwapTimer::DeclineSwap()
 {
 	const int Conn = VisibleConn();
-	const int Index = SelectedEntry(Conn);
-	if(Index < 0)
+	SSwapEntry *pEntry = ActiveEntry(Conn);
+	if(!pEntry)
 		return;
 
-	// only our own request can be cancelled because its ddnet ( Its strange, why who receives cant cancel request??? )
-	if(!m_avEntries[Conn][Index].m_Incoming)
+	// DDNet only lets the initiator cancel. Incoming cards are dismissed locally.
+	if(!pEntry->m_Incoming)
 	{
-		const char *pCommand = g_Config.m_BcSwapDeclineCommand[0] ? g_Config.m_BcSwapDeclineCommand : "/cancelswap";
 		char aBuf[256];
-		str_format(aBuf, sizeof(aBuf), "say %s", pCommand);
+		str_format(aBuf, sizeof(aBuf), "say %s", DECLINE_COMMAND);
 		Console()->ExecuteLine(aBuf, IConsole::CLIENT_ID_UNSPECIFIED);
 	}
 
-	CloseEntryAt(Conn, Index);
+	CloseEntry(Conn);
 }
 
 int CSwapTimer::FindClientByName(const char *pName) const
@@ -469,111 +355,75 @@ int CSwapTimer::FindClientByName(const char *pName) const
 
 void CSwapTimer::StopPeek()
 {
-	m_PeekStage = EPeekStage::IDLE;
+	if(m_PeekHeld)
+	{
+		// Undo client-side SpecInfo override when the player is not actually spectating/paused.
+		const int LocalId = GameClient()->m_Snap.m_LocalClientId;
+		bool ReallySpectating = false;
+		if(LocalId >= 0 && LocalId < MAX_CLIENTS)
+		{
+			const auto &Local = GameClient()->m_aClients[LocalId];
+			ReallySpectating = Local.m_Team == TEAM_SPECTATORS || Local.m_Paused || Local.m_Spec;
+		}
+		if(!ReallySpectating)
+		{
+			GameClient()->m_Snap.m_SpecInfo.m_Active = false;
+			GameClient()->m_Snap.m_SpecInfo.m_UsePosition = false;
+			GameClient()->m_Snap.m_SpecInfo.m_SpectatorId = SPEC_FREEVIEW;
+		}
+	}
+
+	m_PeekHeld = false;
 	m_PeekClientId = -1;
 }
 
-void CSwapTimer::PeekPartner()
+void CSwapTimer::SetPeekHeld(bool Held)
 {
-	if(m_PeekStage != EPeekStage::IDLE)
-	{
-		// Cancelling mid-flight rewinds through the same animation instead of snapping back.
-		if(m_PeekStage == EPeekStage::TRAVEL_BACK || !g_Config.m_BcSwapPeekAnimation)
-		{
-			StopPeek();
-			return;
-		}
-
-		const float Now = Client()->LocalTime();
-		float Progress = 1.0f;
-		if(m_PeekStage == EPeekStage::TRAVEL_TO)
-		{
-			const float TravelTime = maximum(g_Config.m_BcSwapPeekTravelTime / 1000.0f, 0.001f);
-			Progress = std::clamp((Now - m_PeekStageStart) / TravelTime, 0.0f, 1.0f);
-		}
-
-		const float ReturnTime = maximum(g_Config.m_BcSwapPeekReturnTime / 1000.0f, 0.001f);
-		m_PeekStage = EPeekStage::TRAVEL_BACK;
-		m_PeekStageStart = Now - (1.0f - Progress) * ReturnTime;
-		return;
-	}
-
-	const int Conn = VisibleConn();
-	const int Index = SelectedEntry(Conn);
-	if(Index < 0)
-		return;
-
-	const int ClientId = FindClientByName(m_avEntries[Conn][Index].m_aOtherName);
-	if(ClientId < 0 || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active)
-		return;
-
-	m_PeekClientId = ClientId;
-	m_PeekOrigin = GameClient()->m_Camera.m_Center;
-	m_PeekStageStart = Client()->LocalTime();
-	m_PeekStage = g_Config.m_BcSwapPeekAnimation ? EPeekStage::TRAVEL_TO : EPeekStage::HOLD;
-}
-
-bool CSwapTimer::IsInputFrozen() const
-{
-	return m_PeekStage != EPeekStage::IDLE && g_Config.m_BcSwapPeekFreezeInput;
-}
-
-void CSwapTimer::ApplyPeekCamera()
-{
-	if(m_PeekStage == EPeekStage::IDLE)
-		return;
-
-	if(m_PeekClientId < 0 || !GameClient()->m_Snap.m_aCharacters[m_PeekClientId].m_Active)
+	if(!Held)
 	{
 		StopPeek();
 		return;
 	}
 
-	const float Now = Client()->LocalTime();
-	const float Elapsed = Now - m_PeekStageStart;
-	const vec2 Target = GameClient()->m_aClients[m_PeekClientId].m_RenderPos;
-	const float TravelTime = maximum(g_Config.m_BcSwapPeekTravelTime / 1000.0f, 0.001f);
-	const float ReturnTime = maximum(g_Config.m_BcSwapPeekReturnTime / 1000.0f, 0.001f);
+	const SSwapEntry *pEntry = ActiveEntry(VisibleConn());
+	if(!pEntry)
+		return;
 
-	// The origin follows our own tee, so returning lands on it even if we kept moving.
-	const int SelfId = GameClient()->m_aLocalIds[VisibleConn()];
-	if(SelfId >= 0 && GameClient()->m_Snap.m_aCharacters[SelfId].m_Active)
-		m_PeekOrigin = GameClient()->m_aClients[SelfId].m_RenderPos;
+	const int ClientId = FindClientByName(pEntry->m_aOtherName);
+	if(ClientId < 0 || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active)
+		return;
 
-	switch(m_PeekStage)
+	m_PeekHeld = true;
+	m_PeekClientId = ClientId;
+}
+
+bool CSwapTimer::IsInputFrozen() const
+{
+	return m_PeekHeld;
+}
+
+bool CSwapTimer::ApplyPeekSpectate()
+{
+	if(!m_PeekHeld)
+		return false;
+
+	if(m_PeekClientId < 0 || !GameClient()->m_Snap.m_aCharacters[m_PeekClientId].m_Active)
 	{
-	case EPeekStage::TRAVEL_TO:
-		if(Elapsed >= TravelTime)
-		{
-			m_PeekStage = EPeekStage::HOLD;
-			m_PeekStageStart = Now;
-			GameClient()->m_Camera.m_Center = Target;
-			break;
-		}
-		GameClient()->m_Camera.m_Center = mix(m_PeekOrigin, Target, PeekEase(Elapsed / TravelTime));
-		break;
-
-	case EPeekStage::HOLD:
-		GameClient()->m_Camera.m_Center = Target;
-		if(Elapsed >= g_Config.m_BcSwapPeekHoldTime / 1000.0f)
-		{
-			m_PeekStage = g_Config.m_BcSwapPeekAnimation ? EPeekStage::TRAVEL_BACK : EPeekStage::IDLE;
-			m_PeekStageStart = Now;
-		}
-		break;
-
-	case EPeekStage::TRAVEL_BACK:
-		if(Elapsed >= ReturnTime)
-		{
-			StopPeek();
-			break;
-		}
-		GameClient()->m_Camera.m_Center = mix(Target, m_PeekOrigin, PeekEase(Elapsed / ReturnTime));
-		break;
-
-	case EPeekStage::IDLE:
-		break;
+		StopPeek();
+		return false;
 	}
+
+	// Client-side spectate: reuse the same SpecInfo path the camera uses for native follow.
+	CGameClient::CSnapState::CSpectateInfo &Spec = GameClient()->m_Snap.m_SpecInfo;
+	const CGameClient::CSnapState::CCharacterInfo &Char = GameClient()->m_Snap.m_aCharacters[m_PeekClientId];
+	Spec.m_Active = true;
+	Spec.m_SpectatorId = m_PeekClientId;
+	Spec.m_UsePosition = true;
+	Spec.m_Position = mix(
+		vec2(Char.m_Prev.m_X, Char.m_Prev.m_Y),
+		vec2(Char.m_Cur.m_X, Char.m_Cur.m_Y),
+		Client()->IntraGameTick(g_Config.m_ClDummy));
+	return true;
 }
 
 void CSwapTimer::CopyName(const char *pStart, const char *pEnd, char *pBuf, int BufSize)
@@ -588,7 +438,6 @@ void CSwapTimer::CopyName(const char *pStart, const char *pEnd, char *pBuf, int 
 
 const char *CSwapTimer::SkipMessagePrefix(const char *pMessage)
 {
-	// just prefiiixxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 	while(*pMessage == '*' || *pMessage == ' ')
 		pMessage++;
 	return pMessage;
@@ -619,12 +468,26 @@ bool CSwapTimer::ParseIncoming(const char *pMessage, char *pName, int NameSize, 
 
 bool CSwapTimer::ParseOutgoing(const char *pMessage, char *pName, int NameSize)
 {
-	const char *pPrefix = str_find(pMessage, "You have requested to swap with ");
-	if(!pPrefix)
+	static const char *const s_apPrefixes[] = {
+		"You have already requested to swap with ",
+		"You have requested to swap with ",
+	};
+
+	const char *pStart = nullptr;
+	for(const char *pPrefix : s_apPrefixes)
+	{
+		const char *pFound = str_find(pMessage, pPrefix);
+		if(!pFound)
+			continue;
+		pStart = pFound + str_length(pPrefix);
+		break;
+	}
+	if(!pStart)
 		return false;
 
-	const char *pStart = pPrefix + str_length("You have requested to swap with ");
 	const char *pEnd = str_find(pStart, ". Use /cancelswap");
+	if(!pEnd)
+		pEnd = str_find(pStart, ".");
 	CopyName(pStart, pEnd ? pEnd : pStart + str_length(pStart), pName, NameSize);
 	return pName[0] != '\0';
 }
@@ -660,10 +523,24 @@ CSwapTimer::ECloseEvent CSwapTimer::ParseCloseEvent(const char *pMessage, char *
 		return ECloseEvent::COMPLETE;
 	}
 
-	if(str_find(pMessage, "no swap request"))
+	if(str_find(pMessage, "swap request timed out") || str_find(pMessage, "no swap request"))
 		return ECloseEvent::CANCEL_OUTGOING;
 
 	return ECloseEvent::NONE;
+}
+
+bool CSwapTimer::ParseAcceptWait(const char *pMessage, float *pSeconds)
+{
+	const char *pWait = str_find(pMessage, "You have to wait ");
+	if(!pWait || !str_find(pMessage, "until you can swap"))
+		return false;
+
+	const int Seconds = str_toint(pWait + str_length("You have to wait "));
+	if(Seconds <= 0)
+		return false;
+
+	*pSeconds = static_cast<float>(Seconds);
+	return true;
 }
 
 void CSwapTimer::OnChatMessage(int ClientId, const char *pMessage, int Conn)
@@ -679,12 +556,25 @@ void CSwapTimer::OnChatMessage(int ClientId, const char *pMessage, int Conn)
 
 	if(ParseIncoming(pMessage, aName, sizeof(aName), &Cooldown))
 	{
-		AddEntry(Conn, aName, true, Cooldown);
+		SetEntry(Conn, aName, true, Cooldown);
 		return;
 	}
 	if(ParseOutgoing(pMessage, aName, sizeof(aName)))
 	{
-		AddEntry(Conn, aName, false, REQUEST_COOLDOWN_SECONDS);
+		SetEntry(Conn, aName, false, REQUEST_COOLDOWN_SECONDS);
+		return;
+	}
+
+	float AcceptWaitSeconds = 0.0f;
+	if(ParseAcceptWait(pMessage, &AcceptWaitSeconds))
+	{
+		SSwapEntry *pEntry = ActiveEntry(Conn);
+		if(pEntry && pEntry->m_Incoming)
+		{
+			const float Now = Client()->LocalTime();
+			pEntry->m_CooldownEnd = Now + AcceptWaitSeconds;
+			pEntry->m_ExpireTime = maximum(pEntry->m_ExpireTime, pEntry->m_CooldownEnd + REQUEST_TIMEOUT_SECONDS);
+		}
 		return;
 	}
 
@@ -695,22 +585,28 @@ void CSwapTimer::OnChatMessage(int ClientId, const char *pMessage, int Conn)
 	if(Event == ECloseEvent::CANCEL_INCOMING || Event == ECloseEvent::CANCEL_OUTGOING)
 	{
 		const bool Incoming = Event == ECloseEvent::CANCEL_INCOMING;
-		const int Index = FindEntry(Conn, aName, Incoming);
-		if(Index >= 0)
-			CloseEntryAt(Conn, Index);
+		SSwapEntry &Entry = m_aEntries[Conn];
+		if(Entry.m_Active && !Entry.m_Closing && Entry.m_Incoming == Incoming &&
+			(!aName[0] || str_comp(Entry.m_aOtherName, aName) == 0))
+		{
+			CloseEntry(Conn);
+		}
 		else if(!Incoming)
+		{
 			CloseOnConn(Conn, true);
+		}
 		return;
 	}
 
 	for(const char *pName : {aName, aSecondName})
 	{
-		for(const bool Incoming : {true, false})
+		if(!pName[0])
+			continue;
+		for(int C = 0; C < NUM_DUMMIES; C++)
 		{
-			const int Index = FindEntry(Conn, pName, Incoming);
-			if(Index >= 0)
+			if(m_aEntries[C].m_Active && !m_aEntries[C].m_Closing && str_comp(m_aEntries[C].m_aOtherName, pName) == 0)
 			{
-				CloseEntryAt(Conn, Index);
+				CloseEntry(C);
 				return;
 			}
 		}
@@ -719,67 +615,43 @@ void CSwapTimer::OnChatMessage(int ClientId, const char *pMessage, int Conn)
 
 float CSwapTimer::EntryAlpha(const SSwapEntry &Entry) const
 {
-	if(!g_Config.m_BcSwapTimerAnimations)
-		return Entry.m_Closing ? 0.0f : 1.0f;
 	return Smoothstep(Entry.m_AnimPhase);
 }
 
 float CSwapTimer::AcceptDimFactor(const SSwapEntry &Entry) const
 {
-	if(!g_Config.m_BcSwapTimerAnimations)
-		return IsAcceptEnabled(Entry) ? 1.0f : DIMMED_ALPHA;
 	return DIMMED_ALPHA + (1.0f - DIMMED_ALPHA) * Smoothstep(Entry.m_AcceptPhase);
 }
 
 void CSwapTimer::UpdateAnimations()
 {
 	const float FrameTime = Client()->RenderFrameTime();
-	const float Duration = maximum(g_Config.m_BcSwapTimerAnimationTime / 1000.0f, 0.001f);
-	const float Step = FrameTime / Duration;
-	const bool Animate = g_Config.m_BcSwapTimerAnimations != 0;
+	const float Step = FrameTime / maximum(ANIMATION_TIME_SECONDS, 0.001f);
 
 	for(int Conn = 0; Conn < NUM_DUMMIES; Conn++)
 	{
-		for(int i = EntryCount(Conn) - 1; i >= 0; i--)
+		SSwapEntry &Entry = m_aEntries[Conn];
+		if(!Entry.m_Active)
+			continue;
+
+		UpdateTeeInfos(Entry, Conn);
+		const float AcceptTarget = IsAcceptEnabled(Entry) ? 1.0f : 0.0f;
+
+		if(Entry.m_AcceptPhase < AcceptTarget)
+			Entry.m_AcceptPhase = minimum(Entry.m_AcceptPhase + Step, AcceptTarget);
+		else if(Entry.m_AcceptPhase > AcceptTarget)
+			Entry.m_AcceptPhase = maximum(Entry.m_AcceptPhase - Step, AcceptTarget);
+
+		if(Entry.m_Closing)
 		{
-			SSwapEntry &Entry = m_avEntries[Conn][i];
-			UpdateTeeInfos(Entry, Conn);
-			const float AcceptTarget = IsAcceptEnabled(Entry) ? 1.0f : 0.0f;
-
-			if(!Animate)
-			{
-				Entry.m_AcceptPhase = AcceptTarget;
-				Entry.m_AnimPhase = 1.0f;
-				if(Entry.m_Closing)
-					RemoveEntryAt(Conn, i);
-				continue;
-			}
-
-			if(Entry.m_AcceptPhase < AcceptTarget)
-				Entry.m_AcceptPhase = minimum(Entry.m_AcceptPhase + Step, AcceptTarget);
-			else if(Entry.m_AcceptPhase > AcceptTarget)
-				Entry.m_AcceptPhase = maximum(Entry.m_AcceptPhase - Step, AcceptTarget);
-
-			if(Entry.m_Closing)
-			{
-				Entry.m_AnimPhase -= Step;
-				if(Entry.m_AnimPhase <= 0.0f)
-					RemoveEntryAt(Conn, i);
-			}
-			else if(Entry.m_AnimPhase < 1.0f)
-			{
-				Entry.m_AnimPhase = minimum(Entry.m_AnimPhase + Step, 1.0f);
-			}
+			Entry.m_AnimPhase -= Step;
+			if(Entry.m_AnimPhase <= 0.0f)
+				ClearEntry(Conn);
 		}
-
-		ClampSelection(Conn);
-
-		const float ScrollTarget = static_cast<float>(m_aSelected[Conn]);
-		const float Delta = ScrollTarget - m_aScrollAnim[Conn];
-		if(!Animate || absolute(Delta) < 0.001f)
-			m_aScrollAnim[Conn] = ScrollTarget;
-		else
-			m_aScrollAnim[Conn] += Delta * std::clamp(FrameTime / (Duration * 0.75f), 0.0f, 1.0f);
+		else if(Entry.m_AnimPhase < 1.0f)
+		{
+			Entry.m_AnimPhase = minimum(Entry.m_AnimPhase + Step, 1.0f);
+		}
 	}
 }
 
@@ -787,7 +659,7 @@ void CSwapTimer::OnRender()
 {
 	if(Client()->State() != IClient::STATE_ONLINE || !g_Config.m_BcSwapTimer)
 	{
-		ResetState();
+		StopPeek();
 		return;
 	}
 
@@ -796,51 +668,6 @@ void CSwapTimer::OnRender()
 
 	if(g_Config.m_BcSwapTimerStyle == 1)
 		RenderNameplateMode();
-}
-
-int CSwapTimer::VisibleSlotCount(int Conn) const
-{
-	return minimum(EntryCount(Conn), (int)MAX_VISIBLE_CARDS);
-}
-
-float CSwapTimer::WindowStart(int Conn) const
-{
-	// The box keeps its size and position, only the entries scroll inside of it.
-	const int Slots = VisibleSlotCount(Conn);
-	const int Last = maximum(EntryCount(Conn) - Slots, 0);
-	return std::clamp(m_aScrollAnim[Conn] - (Slots - 1) * 0.5f, 0.0f, static_cast<float>(Last));
-}
-
-int CSwapTimer::CollectVisibleCards(int Conn, SVisibleCard *pOut) const
-{
-	const float Start = WindowStart(Conn);
-	const float Slots = static_cast<float>(VisibleSlotCount(Conn));
-
-	int Num = 0;
-	for(int i = 0, Count = EntryCount(Conn); i < Count && Num < MAX_VISIBLE_CARDS; i++)
-	{
-		const float Slot = i - Start;
-		if(Slot < -0.5f || Slot > Slots - 0.5f)
-			continue;
-
-		const float Distance = absolute(i - m_aScrollAnim[Conn]);
-		const float Alpha = EntryAlpha(m_avEntries[Conn][i]) * std::clamp(1.0f - Distance * 0.22f, 0.0f, 1.0f);
-		if(Alpha <= 0.01f)
-			continue;
-
-		SVisibleCard &Card = pOut[Num++];
-		Card.m_Index = i;
-		Card.m_Slot = Slot;
-		Card.m_Distance = Distance;
-		Card.m_Alpha = Alpha;
-		Card.m_Squeeze = std::clamp(1.0f - Distance * 0.06f, 0.7f, 1.0f);
-		Card.m_Selected = Distance < 0.5f;
-	}
-
-	std::sort(pOut, pOut + Num, [](const SVisibleCard &Left, const SVisibleCard &Right) {
-		return Left.m_Distance > Right.m_Distance;
-	});
-	return Num;
 }
 
 void CSwapTimer::BuildHotkeyLayout(bool Show, float FontSize, float LeadGap, float IconGap, float PairGap, SHotkeyLayout &Out) const
@@ -856,7 +683,7 @@ void CSwapTimer::BuildHotkeyLayout(bool Show, float FontSize, float LeadGap, flo
 
 	GameClient()->m_Binds.GetKey("bc_swap_accept", Out.m_aAcceptKey, sizeof(Out.m_aAcceptKey));
 	GameClient()->m_Binds.GetKey("bc_swap_decline", Out.m_aDeclineKey, sizeof(Out.m_aDeclineKey));
-	GameClient()->m_Binds.GetKey("bc_swap_peek", Out.m_aPeekKey, sizeof(Out.m_aPeekKey));
+	GameClient()->m_Binds.GetKey("+bc_swap_peek", Out.m_aPeekKey, sizeof(Out.m_aPeekKey));
 
 	const auto KeyWidth = [&](const char *pKey) {
 		return pKey[0] ? LeadGap + FontSize + IconGap + TextRender()->TextWidth(FontSize, pKey, -1, -1.0f) : 0.0f;
@@ -962,18 +789,6 @@ void CSwapTimer::FormatStatusText(const SSwapEntry &Entry, float Now, char *pBuf
 		str_format(pBuf, BufSize, Localize("%ds left"), maximum(0, round_to_int(Entry.m_ExpireTime - Now)));
 }
 
-void CSwapTimer::FormatEntryText(const SSwapEntry &Entry, float Now, char *pBuf, int BufSize) const
-{
-	char aTimeBuf[32];
-	FormatStatusText(Entry, Now, aTimeBuf, sizeof(aTimeBuf));
-
-	const char *pTitle = Entry.m_Incoming ? Localize("Incoming swap") : Localize("Outcoming swap");
-	const char *pFrom = Entry.m_Incoming ? DisplayName(Entry) : Localize("You");
-	const char *pTo = Entry.m_Incoming ? Localize("You") : DisplayName(Entry);
-
-	str_format(pBuf, BufSize, "%s: %s → %s  (%s)", pTitle, pFrom, pTo, aTimeBuf);
-}
-
 void CSwapTimer::UpdateTeeInfos(SSwapEntry &Entry, int Conn)
 {
 	if(!g_Config.m_BcSwapTimerShowTees)
@@ -1029,10 +844,15 @@ float CSwapTimer::MeasureLineWidth(const SSwapEntry &Entry, float Scale, float N
 {
 	const float FontSize = 8.0f * Scale;
 
-	char aBuf[ENTRY_TEXT_SIZE];
-	FormatEntryText(Entry, Now, aBuf, sizeof(aBuf));
+	char aTimeBuf[32];
+	FormatStatusText(Entry, Now, aTimeBuf, sizeof(aTimeBuf));
 
-	// when scrolling box dont need to resize
+	const char *pFrom = Entry.m_Incoming ? DisplayName(Entry) : Localize("You");
+	const char *pTo = Entry.m_Incoming ? Localize("You") : DisplayName(Entry);
+
+	char aBuf[ENTRY_TEXT_SIZE];
+	str_format(aBuf, sizeof(aBuf), "%s → %s  (%s)", pFrom, pTo, aTimeBuf);
+
 	SHotkeyLayout Hotkeys;
 	BuildHotkeyLayout(true, FontSize, 6.0f * Scale, 2.0f * Scale, 0.0f, Hotkeys);
 
@@ -1040,10 +860,10 @@ float CSwapTimer::MeasureLineWidth(const SSwapEntry &Entry, float Scale, float N
 	return TextRender()->TextWidth(FontSize, aBuf, -1, -1.0f) + Hotkeys.m_Width + Icons;
 }
 
-void CSwapTimer::RenderLine(const SSwapEntry &Entry, float X, float Y, float Scale, float Now, float Alpha, bool Selected, bool ShowHotkeys)
+void CSwapTimer::RenderLine(const SSwapEntry &Entry, float X, float Y, float Scale, float Now, float Alpha, bool ShowHotkeys)
 {
 	const float FontSize = 8.0f * Scale;
-	const ColorRGBA Color = (Selected ? s_TextColor : s_FadedTextColor).WithMultipliedAlpha(Alpha);
+	const ColorRGBA Color = s_TextColor.WithMultipliedAlpha(Alpha);
 
 	char aTimeBuf[32];
 	FormatStatusText(Entry, Now, aTimeBuf, sizeof(aTimeBuf));
@@ -1053,9 +873,6 @@ void CSwapTimer::RenderLine(const SSwapEntry &Entry, float X, float Y, float Sca
 	const char *pToName = Incoming ? Localize("You") : DisplayName(Entry);
 	const auto &pFromTee = Incoming ? Entry.m_pOtherTee : Entry.m_pSelfTee;
 	const auto &pToTee = Incoming ? Entry.m_pSelfTee : Entry.m_pOtherTee;
-
-	char aTitle[128];
-	str_format(aTitle, sizeof(aTitle), "%s: ", Incoming ? Localize("Incoming swap") : Localize("Outcoming swap"));
 
 	char aTail[64];
 	str_format(aTail, sizeof(aTail), "  (%s)", aTimeBuf);
@@ -1067,7 +884,6 @@ void CSwapTimer::RenderLine(const SSwapEntry &Entry, float X, float Y, float Sca
 		CursorX += TextRender()->TextWidth(FontSize, pText, -1, -1.0f);
 	};
 
-	DrawText(aTitle);
 	CursorX += RenderTeeIcon(pFromTee, CursorX, Y, FontSize, Alpha);
 	DrawText(pFromName);
 	DrawText(" → ");
@@ -1095,21 +911,16 @@ CUIRect CSwapTimer::GetRect(bool ForcePreview) const
 	const float Now = Client()->LocalTime();
 
 	float MaxWidth = 0.0f;
-	float Slots = 1.0f;
-
 	if(ForcePreview)
 	{
 		MaxWidth = MeasureLineWidth(MakePreviewEntry(Now), Scale, Now);
 	}
 	else
 	{
-		const int Conn = VisibleConn();
-		if(EntryCount(Conn) <= 0)
+		const SSwapEntry &Entry = m_aEntries[VisibleConn()];
+		if(!Entry.m_Active)
 			return {0.0f, 0.0f, 0.0f, 0.0f};
-
-		for(const SSwapEntry &Entry : m_avEntries[Conn])
-			MaxWidth = maximum(MaxWidth, MeasureLineWidth(Entry, Scale, Now));
-		Slots = static_cast<float>(VisibleSlotCount(Conn));
+		MaxWidth = MeasureLineWidth(Entry, Scale, Now);
 	}
 
 	if(MaxWidth <= 0.0f)
@@ -1120,7 +931,7 @@ CUIRect CSwapTimer::GetRect(bool ForcePreview) const
 
 	CUIRect Rect;
 	Rect.w = MaxWidth + PaddingX * 2.0f;
-	Rect.h = LineHeight(Scale) * Slots + PaddingY * 2.0f;
+	Rect.h = LineHeight(Scale) + PaddingY * 2.0f;
 	Rect.x = std::clamp(Layout.m_X - Rect.w * 0.5f, 0.0f, maximum(0.0f, Width - Rect.w));
 	Rect.y = std::clamp(Layout.m_Y, 0.0f, maximum(0.0f, HUD_CANVAS_HEIGHT - Rect.h));
 	return Rect;
@@ -1148,19 +959,14 @@ void CSwapTimer::Render(bool ForcePreview)
 	const float TopY = Rect.y + 2.0f * Scale;
 	const int Conn = VisibleConn();
 
-	SVisibleCard aCards[MAX_VISIBLE_CARDS];
-	int Num = 0;
 	float BackgroundAlpha = 1.0f;
-
 	if(!ForcePreview)
 	{
-		Num = CollectVisibleCards(Conn, aCards);
-		if(Num <= 0)
+		if(!m_aEntries[Conn].m_Active)
 			return;
-
-		BackgroundAlpha = 0.0f;
-		for(int i = 0; i < Num; i++)
-			BackgroundAlpha = maximum(BackgroundAlpha, aCards[i].m_Alpha);
+		BackgroundAlpha = EntryAlpha(m_aEntries[Conn]);
+		if(BackgroundAlpha <= 0.01f)
+			return;
 	}
 
 	if(Layout.m_BackgroundEnabled)
@@ -1172,100 +978,39 @@ void CSwapTimer::Render(bool ForcePreview)
 
 	if(ForcePreview)
 	{
-		RenderLine(MakePreviewEntry(Now), X, TopY, Scale, Now, 1.0f, true, true);
+		RenderLine(MakePreviewEntry(Now), X, TopY, Scale, Now, 1.0f, true);
 		return;
 	}
 
-	for(int i = 0; i < Num; i++)
-	{
-		const SVisibleCard &Card = aCards[i];
-		const float Y = TopY + Card.m_Slot * LineHeight(Scale);
-		RenderLine(m_avEntries[Conn][Card.m_Index], X + Card.m_Distance * 3.0f * Scale, Y, Scale, Now, Card.m_Alpha, Card.m_Selected, Card.m_Selected);
-	}
+	RenderLine(m_aEntries[Conn], X, TopY, Scale, Now, BackgroundAlpha, true);
 }
 
-void CSwapTimer::RenderNameplateCard(const SSwapEntry &Entry, int ClientId, float Now, const SVisibleCard &Card)
+void CSwapTimer::RenderNameplateCard(const SSwapEntry &Entry, int ClientId, float Now)
 {
-	const bool Minimal = g_Config.m_BcSwapTimerNameplateMinimal != 0;
-	const float UserScale = std::clamp(g_Config.m_BcSwapTimerSize / 100.0f, 0.5f, 2.0f) * Card.m_Squeeze;
-	const float FontSize = (Minimal ? 20.0f : 24.0f) * UserScale;
-	const float HotkeyFontSize = FontSize * (Minimal ? 0.8f : 0.85f);
-	const float PaddingX = Minimal ? 0.0f : FontSize * 0.35f;
-	const float PaddingY = Minimal ? 0.0f : FontSize * 0.22f;
-	const float RowSpacing = FontSize * (Minimal ? 0.12f : 0.15f);
+	const float UserScale = std::clamp(g_Config.m_BcSwapTimerSize / 100.0f, 0.5f, 2.0f);
+	const float FontSize = 20.0f * UserScale;
+	const float HotkeyFontSize = FontSize * 0.8f;
+	const float RowSpacing = FontSize * 0.12f;
 
 	char aBuf[ENTRY_TEXT_SIZE];
-	if(Minimal)
-		FormatMinimalText(Entry, Now, aBuf, MINIMAL_TEXT_SIZE);
-	else
-		FormatEntryText(Entry, Now, aBuf, sizeof(aBuf));
+	FormatMinimalText(Entry, Now, aBuf, MINIMAL_TEXT_SIZE);
 
 	SHotkeyLayout Hotkeys;
-	BuildHotkeyLayout(Card.m_Selected, HotkeyFontSize, 0.0f, HotkeyFontSize * 0.25f, HotkeyFontSize * 0.7f, Hotkeys);
+	BuildHotkeyLayout(true, HotkeyFontSize, 0.0f, HotkeyFontSize * 0.25f, HotkeyFontSize * 0.7f, Hotkeys);
 
-	const float IconSize = Minimal ? 0.0f : TeeIconSize(FontSize);
-	const float TextWidth = TextRender()->TextWidth(FontSize, aBuf, -1, -1.0f) + IconSize * 2.0f;
-	const float BoxWidth = maximum(TextWidth, Hotkeys.m_Width) + PaddingX * 2.0f;
-	const float BoxHeight = FontSize + (Hotkeys.m_HasAny ? RowSpacing + HotkeyFontSize : 0.0f) + PaddingY * 2.0f;
+	const float TextWidth = TextRender()->TextWidth(FontSize, aBuf, -1, -1.0f);
+	const float BoxHeight = FontSize + (Hotkeys.m_HasAny ? RowSpacing + HotkeyFontSize : 0.0f);
 
-	// just because no nameplate ( found by mistake because i playing with own name on )
 	const vec2 Position = GameClient()->m_aClients[ClientId].m_RenderPos;
 	const float PlateHeight = maximum(GameClient()->m_NamePlates.GetNamePlateOffset(ClientId), 38.0f);
-	const float BoxY = Position.y - PlateHeight - FontSize * (Minimal ? 0.2f : 0.4f) - BoxHeight - (BoxHeight + FontSize * 0.18f) * Card.m_Slot;
+	const float BoxY = Position.y - PlateHeight - FontSize * 0.2f - BoxHeight;
 
-	if(!Minimal)
-	{
-		const auto Layout = HudLayout::Get(HudLayout::MODULE_SWAP_TIMER, HudCanvasWidth(), HUD_CANVAS_HEIGHT);
-		if(Layout.m_BackgroundEnabled)
-		{
-			const ColorRGBA Background = color_cast<ColorRGBA>(ColorHSLA(Layout.m_BackgroundColor, true)).WithMultipliedAlpha(Card.m_Alpha);
-			Graphics()->DrawRect(Position.x - BoxWidth * 0.5f, BoxY, BoxWidth, BoxHeight, Background, IGraphics::CORNER_ALL, FontSize * 0.25f);
-		}
-	}
+	const float Alpha = EntryAlpha(Entry);
+	TextRender()->TextOutlineColor(ColorRGBA(0.0f, 0.0f, 0.0f, 0.4f * Alpha));
+	TextRender()->TextColor(s_TextColor.WithMultipliedAlpha(Alpha));
+	TextRender()->Text(Position.x - TextWidth * 0.5f, BoxY, FontSize, aBuf, -1.0f);
 
-	const ColorRGBA Color = (Card.m_Selected ? s_TextColor : s_FadedTextColor).WithMultipliedAlpha(Card.m_Alpha);
-	TextRender()->TextOutlineColor(ColorRGBA(0.0f, 0.0f, 0.0f, (Minimal ? 0.4f : 0.3f) * Card.m_Alpha));
-	TextRender()->TextColor(Color);
-
-	if(IconSize <= 0.0f)
-	{
-		TextRender()->Text(Position.x - TextWidth * 0.5f, BoxY + PaddingY, FontSize, aBuf, -1.0f);
-	}
-	else
-	{
-		const bool Incoming = Entry.m_Incoming;
-		const char *pFromName = Incoming ? DisplayName(Entry) : Localize("You");
-		const char *pToName = Incoming ? Localize("You") : DisplayName(Entry);
-		const auto &pFromTee = Incoming ? Entry.m_pOtherTee : Entry.m_pSelfTee;
-		const auto &pToTee = Incoming ? Entry.m_pSelfTee : Entry.m_pOtherTee;
-
-		char aTimeBuf[32];
-		FormatStatusText(Entry, Now, aTimeBuf, sizeof(aTimeBuf));
-
-		char aTitle[128];
-		str_format(aTitle, sizeof(aTitle), "%s: ", Incoming ? Localize("Incoming swap") : Localize("Outcoming swap"));
-
-		char aTail[64];
-		str_format(aTail, sizeof(aTail), "  (%s)", aTimeBuf);
-
-		float CursorX = Position.x - TextWidth * 0.5f;
-		const float TextY = BoxY + PaddingY;
-		const auto DrawText = [&](const char *pText) {
-			TextRender()->TextColor(Color);
-			TextRender()->Text(CursorX, TextY, FontSize, pText, -1.0f);
-			CursorX += TextRender()->TextWidth(FontSize, pText, -1, -1.0f);
-		};
-
-		DrawText(aTitle);
-		CursorX += RenderTeeIcon(pFromTee, CursorX, TextY, FontSize, Card.m_Alpha);
-		DrawText(pFromName);
-		DrawText(" → ");
-		CursorX += RenderTeeIcon(pToTee, CursorX, TextY, FontSize, Card.m_Alpha);
-		DrawText(pToName);
-		DrawText(aTail);
-	}
-
-	RenderHotkeyLayout(Hotkeys, Position.x - Hotkeys.m_Width * 0.5f, BoxY + PaddingY + FontSize + RowSpacing, Card.m_Alpha, AcceptDimFactor(Entry));
+	RenderHotkeyLayout(Hotkeys, Position.x - Hotkeys.m_Width * 0.5f, BoxY + FontSize + RowSpacing, Alpha, AcceptDimFactor(Entry));
 
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
 	TextRender()->TextOutlineColor(TextRender()->DefaultTextOutlineColor());
@@ -1279,15 +1024,13 @@ void CSwapTimer::RenderNameplateMode()
 		return;
 
 	const int Conn = VisibleConn();
+	if(!m_aEntries[Conn].m_Active)
+		return;
+
 	const int ClientId = GameClient()->m_aLocalIds[Conn];
 	if(ClientId < 0 || !GameClient()->m_aClients[ClientId].m_Active || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active)
 		return;
 	if(!GameClient()->OptimizerAllowRenderPos(GameClient()->m_aClients[ClientId].m_RenderPos))
-		return;
-
-	SVisibleCard aCards[MAX_VISIBLE_CARDS];
-	const int Num = CollectVisibleCards(Conn, aCards);
-	if(Num <= 0)
 		return;
 
 	const float Now = Client()->LocalTime();
@@ -1302,8 +1045,7 @@ void CSwapTimer::RenderNameplateMode()
 		Graphics()->ScreenAspect(), GameClient()->m_Camera.m_Zoom, aPoints);
 	Graphics()->MapScreen(aPoints[0], aPoints[1], aPoints[2], aPoints[3]);
 
-	for(int i = 0; i < Num; i++)
-		RenderNameplateCard(m_avEntries[Conn][aCards[i].m_Index], ClientId, Now, aCards[i]);
+	RenderNameplateCard(m_aEntries[Conn], ClientId, Now);
 
 	Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
 }
