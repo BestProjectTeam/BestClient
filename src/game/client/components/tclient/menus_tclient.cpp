@@ -190,16 +190,12 @@ bool CMenus::DoSliderWithDividedValue(const void *pId, int *pOption, const CUIRe
 	int Value = *pOption;
 
 	if(Input()->ModifierIsPressed() && Input()->KeyPress(KEY_MOUSE_WHEEL_UP) && Ui()->MouseInside(pRect))
-		Value = std::clamp(Value + 1, Min, Max);
+		Value = std::clamp(Value + Divisor, Min, Max);
 	if(Input()->ModifierIsPressed() && Input()->KeyPress(KEY_MOUSE_WHEEL_DOWN) && Ui()->MouseInside(pRect))
-		Value = std::clamp(Value - 1, Min, Max);
+		Value = std::clamp(Value - Divisor, Min, Max);
 
 	char aBuf[256];
-	// Format as tenths explicitly (e.g. 105 → "10.5") so the label is always xx.x, not raw tenths.
-	if(Divisor == 10)
-		str_format(aBuf, sizeof(aBuf), "%s: %d.%d%s", pStr, Value / Divisor, Value % Divisor, pSuffix);
-	else
-		str_format(aBuf, sizeof(aBuf), "%s: %.1f%s", pStr, Value / (float)Divisor, pSuffix);
+	str_format(aBuf, sizeof(aBuf), "%s: %d%s", pStr, Value / Divisor, pSuffix);
 
 	const int PrevValue = Value;
 	Value = std::clamp(Value, Min, Max);
@@ -211,6 +207,7 @@ bool CMenus::DoSliderWithDividedValue(const void *pId, int *pOption, const CUIRe
 	Ui()->DoLabel(&Label, aBuf, LabelFontSize, TEXTALIGN_ML);
 
 	Value = pScale->ToAbsolute(Ui()->DoScrollbarH(pId, &ScrollBar, pScale->ToRelative(Value, Min, Max)), Min, Max);
+	Value = (Value / Divisor) * Divisor;
 	if(NoClampValue && ((Value == Min && PrevValue < Min) || (Value == Max && PrevValue > Max)))
 		Value = PrevValue;
 
@@ -597,7 +594,7 @@ void CMenus::RenderSettingsTClientSettings(CUIRect MainView)
 	Column.HSplitTop(MarginSmall, nullptr, &Column);
 
 	Column.HSplitTop(LineSize, &Button, &Column);
-	DoSliderWithDividedValue(&g_Config.m_ClPredictionMargin, &g_Config.m_ClPredictionMargin, &Button, TCLocalize("Prediction Margin"), 1, 750, 10, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "ms");
+	DoSliderWithDividedValue(&g_Config.m_ClPredictionMargin, &g_Config.m_ClPredictionMargin, &Button, TCLocalize("Prediction Margin"), 10, 750, 10, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "ms");
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcRemoveAnti, TCLocalize("Remove prediction & antiping in freeze"), &g_Config.m_TcRemoveAnti, &Column, LineSize);
 	if(g_Config.m_TcRemoveAnti)
 	{

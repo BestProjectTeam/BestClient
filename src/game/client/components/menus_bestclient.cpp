@@ -1047,70 +1047,6 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		Ui()->ClipDisable();
 	}
 
-	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
-
-	// Physic Balls (left column block, from Entity-Client)
-	const float PhysicBallsBlockHeight = LineSize + MarginSmall + LineSize + MarginSmall + LineSize + MarginSmall + 25.0f;
-	CUIRect PhysicBallsBlock;
-	Column.HSplitTop(PhysicBallsBlockHeight, &PhysicBallsBlock, &Column);
-
-	CUIRect PhysicBallsBlockBg = PhysicBallsBlock;
-	PhysicBallsBlockBg.w += BlockPadding;
-	PhysicBallsBlockBg.h += BlockPadding;
-	PhysicBallsBlockBg.x -= BlockPadding * 0.5f;
-	PhysicBallsBlockBg.y -= BlockPadding * 0.5f;
-	PhysicBallsBlockBg.Draw(BlockColor, IGraphics::CORNER_ALL, 10.0f);
-
-	MainView = PhysicBallsBlock;
-	MainView.HSplitTop(LineSize, &Label, &MainView);
-	CUIRect PhysicBallsTitleLabel = Label;
-	PhysicBallsTitleLabel.VSplitRight(MarginSmall, &PhysicBallsTitleLabel, nullptr);
-	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &PhysicBallsTitleLabel, Localize("NEW"), 12.0f,
-		ColorRGBA(0.25f, 0.85f, 0.40f, 1.0f), ColorRGBA(0.10f, 0.60f, 0.25f, 1.0f), MarginSmall);
-	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &PhysicBallsTitleLabel, "E-Client", 12.0f,
-		ColorRGBA(0.95f, 0.80f, 0.20f, 1.0f), ColorRGBA(0.75f, 0.55f, 0.05f, 1.0f), MarginSmall);
-	Ui()->DoLabel(&PhysicBallsTitleLabel, Localize("Physic Balls"), HeadlineFontSize, TEXTALIGN_ML);
-	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
-
-	MainView.HSplitTop(LineSize, &Button, &MainView);
-	char aBallAmount[64];
-	str_format(aBallAmount, sizeof(aBallAmount), Localize("Ball amount: %d"), (int)GameClient()->m_PhysicBalls.GetBallCount());
-	CUIRect BallAmountLabel, ClearBallsButton;
-	Button.VSplitRight(LineSize + 8.0f, &BallAmountLabel, &ClearBallsButton);
-	Ui()->DoLabel(&BallAmountLabel, aBallAmount, 14.0f, TEXTALIGN_ML);
-	static CButtonContainer s_ClearPhysicBallsButton;
-	if(Ui()->DoButton_FontIcon(&s_ClearPhysicBallsButton, FontIcon::TRASH, 0, &ClearBallsButton, BUTTONFLAG_LEFT))
-		GameClient()->m_PhysicBalls.OnReset();
-	GameClient()->m_Tooltips.DoToolTip(&s_ClearPhysicBallsButton, &ClearBallsButton, Localize("Clear all balls"));
-
-	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
-	MainView.HSplitTop(LineSize, &Button, &MainView);
-	{
-		static CLineInput s_PhysicBallsSkinInput;
-		s_PhysicBallsSkinInput.SetBuffer(g_Config.m_BcPhysicBallsSkin, sizeof(g_Config.m_BcPhysicBallsSkin));
-		s_PhysicBallsSkinInput.SetEmptyText("volleyball");
-		CUIRect SkinLabel, SkinField;
-		Button.VSplitLeft(70.0f, &SkinLabel, &Button);
-		Button.VSplitLeft(MarginSmall, nullptr, &Button);
-		Button.VSplitLeft(140.0f, &SkinField, nullptr);
-		Ui()->DoLabel(&SkinLabel, Localize("Ball skin"), 14.0f, TEXTALIGN_ML);
-		Ui()->DoEditBox(&s_PhysicBallsSkinInput, &SkinField, 14.0f);
-	}
-
-	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
-	MainView.HSplitTop(25.0f, &Button, &MainView);
-	CUIRect SpawnBallButton, SpawnCursorButton;
-	Button.VSplitLeft(110.0f, &SpawnBallButton, &Button);
-	Button.VSplitLeft(MarginSmall, nullptr, &Button);
-	Button.VSplitLeft(130.0f, &SpawnCursorButton, nullptr);
-	static CButtonContainer s_SpawnPhysicBallButton;
-	static CButtonContainer s_SpawnPhysicBallCursorButton;
-	const ColorRGBA PhysicBallButtonColor = ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f);
-	if(DoButton_Menu(&s_SpawnPhysicBallButton, Localize("New Ball"), 0, &SpawnBallButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, PhysicBallButtonColor))
-		GameClient()->m_PhysicBalls.NewBallPlayer(60.0f);
-	if(DoButton_Menu(&s_SpawnPhysicBallCursorButton, Localize("New Ball Cursor"), 0, &SpawnCursorButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, PhysicBallButtonColor))
-		GameClient()->m_PhysicBalls.NewBallCursor(60.0f);
-
 	const float LeftColumnEndY = Column.y;
 
 	// Motion blur (right column block)
@@ -1846,6 +1782,70 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		Ui()->DoLabel(&Label, Localize("Looks like you're on a server where this feature is forbidden"), 14.0f, TEXTALIGN_ML);
 		TextRender()->TextColor(TextRender()->DefaultTextColor());
 	}
+
+	// Physic Balls (right column block, from Entity-Client)
+	RightColumn.HSplitTop(MarginBetweenViews, nullptr, &RightColumn);
+
+	const float PhysicBallsBlockHeight = LineSize + MarginSmall + LineSize + MarginSmall + LineSize + MarginSmall + 25.0f;
+	CUIRect PhysicBallsBlock;
+	RightColumn.HSplitTop(PhysicBallsBlockHeight, &PhysicBallsBlock, &RightColumn);
+
+	CUIRect PhysicBallsBlockBg = PhysicBallsBlock;
+	PhysicBallsBlockBg.w += BlockPadding;
+	PhysicBallsBlockBg.h += BlockPadding;
+	PhysicBallsBlockBg.x -= BlockPadding * 0.5f;
+	PhysicBallsBlockBg.y -= BlockPadding * 0.5f;
+	PhysicBallsBlockBg.Draw(BlockColor, IGraphics::CORNER_ALL, 10.0f);
+
+	MainView = PhysicBallsBlock;
+	MainView.HSplitTop(LineSize, &Label, &MainView);
+	CUIRect PhysicBallsTitleLabel = Label;
+	PhysicBallsTitleLabel.VSplitRight(MarginSmall, &PhysicBallsTitleLabel, nullptr);
+	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &PhysicBallsTitleLabel, Localize("NEW"), 12.0f,
+		ColorRGBA(0.25f, 0.85f, 0.40f, 1.0f), ColorRGBA(0.10f, 0.60f, 0.25f, 1.0f), MarginSmall);
+	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &PhysicBallsTitleLabel, "E-Client", 12.0f,
+		ColorRGBA(0.95f, 0.80f, 0.20f, 1.0f), ColorRGBA(0.75f, 0.55f, 0.05f, 1.0f), MarginSmall);
+	Ui()->DoLabel(&PhysicBallsTitleLabel, Localize("Physic Balls"), HeadlineFontSize, TEXTALIGN_ML);
+	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+
+	MainView.HSplitTop(LineSize, &Button, &MainView);
+	char aBallAmount[64];
+	str_format(aBallAmount, sizeof(aBallAmount), Localize("Ball amount: %d"), (int)GameClient()->m_PhysicBalls.GetBallCount());
+	CUIRect BallAmountLabel, ClearBallsButton;
+	Button.VSplitRight(LineSize + 8.0f, &BallAmountLabel, &ClearBallsButton);
+	Ui()->DoLabel(&BallAmountLabel, aBallAmount, 14.0f, TEXTALIGN_ML);
+	static CButtonContainer s_ClearPhysicBallsButton;
+	if(Ui()->DoButton_FontIcon(&s_ClearPhysicBallsButton, FontIcon::TRASH, 0, &ClearBallsButton, BUTTONFLAG_LEFT))
+		GameClient()->m_PhysicBalls.OnReset();
+	GameClient()->m_Tooltips.DoToolTip(&s_ClearPhysicBallsButton, &ClearBallsButton, Localize("Clear all balls"));
+
+	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+	MainView.HSplitTop(LineSize, &Button, &MainView);
+	{
+		static CLineInput s_PhysicBallsSkinInput;
+		s_PhysicBallsSkinInput.SetBuffer(g_Config.m_BcPhysicBallsSkin, sizeof(g_Config.m_BcPhysicBallsSkin));
+		s_PhysicBallsSkinInput.SetEmptyText("volleyball");
+		CUIRect SkinLabel, SkinField;
+		Button.VSplitLeft(70.0f, &SkinLabel, &Button);
+		Button.VSplitLeft(MarginSmall, nullptr, &Button);
+		Button.VSplitLeft(140.0f, &SkinField, nullptr);
+		Ui()->DoLabel(&SkinLabel, Localize("Ball skin"), 14.0f, TEXTALIGN_ML);
+		Ui()->DoEditBox(&s_PhysicBallsSkinInput, &SkinField, 14.0f);
+	}
+
+	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+	MainView.HSplitTop(25.0f, &Button, &MainView);
+	CUIRect SpawnBallButton, SpawnCursorButton;
+	Button.VSplitLeft(110.0f, &SpawnBallButton, &Button);
+	Button.VSplitLeft(MarginSmall, nullptr, &Button);
+	Button.VSplitLeft(130.0f, &SpawnCursorButton, nullptr);
+	static CButtonContainer s_SpawnPhysicBallButton;
+	static CButtonContainer s_SpawnPhysicBallCursorButton;
+	const ColorRGBA PhysicBallButtonColor = ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f);
+	if(DoButton_Menu(&s_SpawnPhysicBallButton, Localize("New Ball"), 0, &SpawnBallButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, PhysicBallButtonColor))
+		GameClient()->m_PhysicBalls.NewBallPlayer(60.0f);
+	if(DoButton_Menu(&s_SpawnPhysicBallCursorButton, Localize("New Ball Cursor"), 0, &SpawnCursorButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, PhysicBallButtonColor))
+		GameClient()->m_PhysicBalls.NewBallCursor(60.0f);
 
 	const float RightColumnEndY = RightColumn.y;
 	CUIRect VisualsScrollContentRect;

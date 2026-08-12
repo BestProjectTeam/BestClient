@@ -152,7 +152,8 @@ void CMenus::RenderSettingsDDNet(CUIRect MainView)
 	Ui()->DoScrollbarOption(&g_Config.m_ClMouseMaxDistance, &g_Config.m_ClMouseMaxDistance, &Button, Localize("Mouse max distance"), 1, 1000);
 
 	Right.HSplitTop(20.0f, &Button, &Right);
-	Ui()->DoScrollbarOption(&g_Config.m_ClPredictionMargin, &g_Config.m_ClPredictionMargin, &Button, Localize("Prediction margin"), 1, 300);
+	// ClPredictionMargin is stored in 0.1 ms units (160 = 16 ms); show whole milliseconds.
+	DoSliderWithDividedValue(&g_Config.m_ClPredictionMargin, &g_Config.m_ClPredictionMargin, &Button, Localize("Prediction margin"), 10, 3000, 10, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "ms");
 
 	Right.HSplitTop(20.0f, &Button, &Right);
 	if(DoButton_CheckBox(&g_Config.m_ClPredictEvents, Localize("Predict events (experimental)"), g_Config.m_ClPredictEvents, &Button))
