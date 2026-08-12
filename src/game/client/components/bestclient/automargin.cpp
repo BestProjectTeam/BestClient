@@ -44,6 +44,7 @@ void CBcAutoMargin::ResetState()
 	m_SmoothedPing = -1.0f;
 	m_SmoothedJitter = 0.0f;
 	m_HighPing = false;
+	// Keep m_WasEnabled / m_SavedMargin: used to restore margin when auto is toggled off.
 }
 
 void CBcAutoMargin::OnReset()
@@ -77,7 +78,26 @@ void CBcAutoMargin::OnNewSnapshot()
 
 void CBcAutoMargin::OnUpdate()
 {
-	if(!g_Config.m_BcAutoMargin || Client()->State() != IClient::STATE_ONLINE || !GameClient()->m_Snap.m_pLocalInfo)
+	if(!g_Config.m_BcAutoMargin)
+	{
+		if(m_WasEnabled)
+		{
+			if(m_SavedMargin >= 0)
+				g_Config.m_ClPredictionMargin = m_SavedMargin;
+			m_WasEnabled = false;
+			m_SavedMargin = -1;
+		}
+		ResetState();
+		return;
+	}
+
+	if(!m_WasEnabled)
+	{
+		m_SavedMargin = g_Config.m_ClPredictionMargin;
+		m_WasEnabled = true;
+	}
+
+	if(Client()->State() != IClient::STATE_ONLINE || !GameClient()->m_Snap.m_pLocalInfo)
 	{
 		ResetState();
 		return;
