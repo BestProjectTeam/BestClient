@@ -334,6 +334,7 @@ private:
 	char m_aNetVersion[128];
 
 	bool m_RefreshingHttp = false;
+	bool m_PingCacheLoaded = false;
 	IServerBrowserHttp *m_pHttp = nullptr;
 	IServerBrowserPingCache *m_pPingCache = nullptr;
 	const char *m_pHttpPrevBestUrl = nullptr;
@@ -375,6 +376,7 @@ private:
 	int m_NumSortedPlayers;
 
 	int m_ServerlistType;
+	int m_HttpRefreshGeneration = 0;
 	int64_t m_BroadcastTime;
 	unsigned char m_aTokenSeed[16];
 
@@ -400,6 +402,7 @@ private:
 	int SortHash() const;
 
 	void CleanUp();
+	void CompactServerlistStorage();
 
 	void UpdateFromHttp();
 	CServerEntry *Add(const NETADDR *pAddrs, int NumAddrs);

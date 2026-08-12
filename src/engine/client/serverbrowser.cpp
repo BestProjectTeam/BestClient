@@ -1101,7 +1101,13 @@ void CServerBrowser::Refresh(int Type, bool Force)
 	else
 	{
 		m_pHttp->Refresh();
-		m_pPingCache->Load();
+		// Ping cache is already kept up to date via CachePing(); reloading the
+		// SQLite table on every refresh caused a main-thread hitch for auto-refresh.
+		if(!m_PingCacheLoaded)
+		{
+			m_pPingCache->Load();
+			m_PingCacheLoaded = true;
+		}
 		m_RefreshingHttp = true;
 
 		if(ServerListTypeChanged && m_pHttp->NumServers() > 0)
@@ -1201,9 +1207,12 @@ void CServerBrowser::SetCurrentServerPing(const NETADDR &Addr, int Ping)
 void CServerBrowser::UpdateFromHttp()
 {
 	const int OwnLocation = DetermineOwnLocation();
+	const bool Incremental = !m_vpServerlist.empty();
+	m_HttpRefreshGeneration++;
 
 	int NumServers = m_pHttp->NumServers();
-	m_vpServerlist.reserve(NumServers);
+	if(!Incremental)
+		m_vpServerlist.reserve(NumServers);
 	std::function<bool(const NETADDR *, int)> Want = [](const NETADDR *pAddrs, int NumAddrs) { return true; };
 	if(m_ServerlistType == IServerBrowser::TYPE_FAVORITES)
 	{
@@ -1242,15 +1251,35 @@ void CServerBrowser::UpdateFromHttp()
 
 	for(int i = 0; i < NumServers; i++)
 	{
-		CServerInfo Info = m_pHttp->Server(i);
-		if(!Want(Info.m_aAddresses, Info.m_NumAddresses))
+		const CServerInfo &HttpInfo = m_pHttp->Server(i);
+		if(!Want(HttpInfo.m_aAddresses, HttpInfo.m_NumAddresses))
 		{
 			continue;
 		}
-		UpdateServerLatency(&Info, OwnLocation);
-		CServerEntry *pEntry = Add(Info.m_aAddresses, Info.m_NumAddresses);
-		SetInfo(pEntry, Info);
+
+		CServerEntry *pEntry = nullptr;
+		if(Incremental)
+		{
+			for(int AddressIndex = 0; AddressIndex < HttpInfo.m_NumAddresses; AddressIndex++)
+			{
+				pEntry = Find(HttpInfo.m_aAddresses[AddressIndex]);
+				if(pEntry)
+					break;
+			}
+		}
+
+		if(pEntry)
+		{
+			SetInfo(pEntry, HttpInfo);
+		}
+		else
+		{
+			pEntry = Add(HttpInfo.m_aAddresses, HttpInfo.m_NumAddresses);
+			SetInfo(pEntry, HttpInfo);
+		}
+		UpdateServerLatency(&pEntry->m_Info, OwnLocation);
 		pEntry->m_RequestIgnoreInfo = true;
+		pEntry->m_RefreshGeneration = m_HttpRefreshGeneration;
 	}
 
 	if(m_ServerlistType == IServerBrowser::TYPE_FAVORITES)
@@ -1261,9 +1290,11 @@ void CServerBrowser::UpdateFromHttp()
 		for(int i = 0; i < NumFavorites; i++)
 		{
 			bool Found = false;
+			CServerEntry *pFoundEntry = nullptr;
 			for(int j = 0; j < pFavorites[i].m_NumAddrs; j++)
 			{
-				if(Find(pFavorites[i].m_aAddrs[j]))
+				pFoundEntry = Find(pFavorites[i].m_aAddrs[j]);
+				if(pFoundEntry)
 				{
 					Found = true;
 					break;
@@ -1271,14 +1302,46 @@ void CServerBrowser::UpdateFromHttp()
 			}
 			if(Found)
 			{
+				pFoundEntry->m_RefreshGeneration = m_HttpRefreshGeneration;
 				continue;
 			}
 			// (Also add favorites we're not allowed to ping.)
 			CServerEntry *pEntry = Add(pFavorites[i].m_aAddrs, pFavorites[i].m_NumAddrs);
+			pEntry->m_RefreshGeneration = m_HttpRefreshGeneration;
 			if(pFavorites[i].m_AllowPing)
 			{
 				QueueRequest(pEntry);
 			}
+		}
+	}
+
+	if(Incremental)
+	{
+		std::vector<CServerEntry *> vKept;
+		vKept.reserve(m_vpServerlist.size());
+		m_ByAddr.clear();
+		for(CServerEntry *pEntry : m_vpServerlist)
+		{
+			if(pEntry->m_RefreshGeneration != m_HttpRefreshGeneration)
+			{
+				RemoveRequest(pEntry);
+				continue;
+			}
+
+			const int ServerIndex = (int)vKept.size();
+			pEntry->m_Info.m_ServerIndex = ServerIndex;
+			for(int AddressIndex = 0; AddressIndex < pEntry->m_Info.m_NumAddresses; AddressIndex++)
+				m_ByAddr[pEntry->m_Info.m_aAddresses[AddressIndex]] = ServerIndex;
+			vKept.push_back(pEntry);
+		}
+		m_vpServerlist = std::move(vKept);
+
+		// Drop zombie entries left in storage after removals so memory does not
+		// grow without bound across many auto-refreshes.
+		if(m_ServerlistStorage.size() > m_vpServerlist.size() + 256 &&
+			m_ServerlistStorage.size() > m_vpServerlist.size() * 5 / 4)
+		{
+			CompactServerlistStorage();
 		}
 	}
 
@@ -1299,6 +1362,32 @@ void CServerBrowser::CleanUp()
 	m_CurrentMaxRequests = g_Config.m_BrMaxRequests;
 }
 
+void CServerBrowser::CompactServerlistStorage()
+{
+	std::deque<CServerEntry> NewStorage;
+	std::vector<CServerEntry *> NewList;
+	NewList.reserve(m_vpServerlist.size());
+	m_ByAddr.clear();
+	m_pFirstReqServer = nullptr;
+	m_pLastReqServer = nullptr;
+	m_NumRequests = 0;
+
+	for(CServerEntry *pOld : m_vpServerlist)
+	{
+		NewStorage.push_back(*pOld);
+		CServerEntry *pNew = &NewStorage.back();
+		pNew->m_pPrevReq = nullptr;
+		pNew->m_pNextReq = nullptr;
+		pNew->m_Info.m_ServerIndex = (int)NewList.size();
+		for(int AddressIndex = 0; AddressIndex < pNew->m_Info.m_NumAddresses; AddressIndex++)
+			m_ByAddr[pNew->m_Info.m_aAddresses[AddressIndex]] = pNew->m_Info.m_ServerIndex;
+		NewList.push_back(pNew);
+	}
+
+	m_ServerlistStorage = std::move(NewStorage);
+	m_vpServerlist = std::move(NewList);
+}
+
 void CServerBrowser::Update()
 {
 	int64_t Timeout = time_freq();
@@ -1316,11 +1405,16 @@ void CServerBrowser::Update()
 	if(m_ServerlistType != TYPE_LAN && m_RefreshingHttp && !m_pHttp->IsRefreshing())
 	{
 		m_RefreshingHttp = false;
-		CleanUp();
-		UpdateFromHttp();
-		// TODO: move this somewhere else
-		Sort();
-		return;
+		if(m_pHttp->ServersDataChanged())
+		{
+			// Keep existing entries when possible so auto-refresh does not wipe
+			// and rebuild thousands of servers (and their client lists) every tick.
+			if(m_vpServerlist.empty())
+				CleanUp();
+			UpdateFromHttp();
+			Sort();
+			return;
+		}
 	}
 
 	{

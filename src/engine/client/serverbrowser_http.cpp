@@ -1,6 +1,7 @@
 #include "serverbrowser_http.h"
 
 #include <base/dbg.h>
+#include <base/hash.h>
 #include <base/io.h>
 #include <base/lock.h>
 #include <base/log.h>
@@ -22,6 +23,7 @@
 
 #include <chrono>
 #include <memory>
+#include <optional>
 #include <vector>
 
 using namespace std::chrono_literals;
@@ -327,6 +329,10 @@ public:
 	{
 		return m_vServers[Index];
 	}
+	bool ServersDataChanged() const override
+	{
+		return m_ServersDataChanged;
+	}
 
 private:
 	enum
@@ -350,6 +356,8 @@ private:
 	bool m_UseBestClientMaster = false;
 
 	std::vector<CServerInfo> m_vServers;
+	std::optional<SHA256_DIGEST> m_ServersSha256;
+	bool m_ServersDataChanged = false;
 
 	void ResetMasterChooser(const char *pPreviousBestUrl);
 };
@@ -410,27 +418,44 @@ void CServerBrowserHttp::Update()
 		std::shared_ptr<IHttpRequest> pGetServers = nullptr;
 		std::swap(m_pGetServers, pGetServers);
 
-		bool Success = true;
-		json_value *pJson = pGetServers->State() == EHttpState::DONE ? pGetServers->ResultJson() : nullptr;
-		Success = Success && pJson;
-		Success = Success && !Parse(pJson, &m_vServers);
+		m_ServersDataChanged = false;
+		if(pGetServers->State() != EHttpState::DONE)
+		{
+			log_error("serverbrowser_http", "failed getting serverlist, trying to find best URL");
+			m_pChooseMaster->Reset();
+			m_pChooseMaster->Refresh();
+			return;
+		}
+
+		const SHA256_DIGEST &ServersSha256 = pGetServers->ResultSha256();
+		if(m_ServersSha256 && *m_ServersSha256 == ServersSha256)
+		{
+			// Identical payload: keep the previously parsed list and skip the
+			// expensive JSON parse + browser rebuild on auto-refresh.
+			return;
+		}
+
+		json_value *pJson = pGetServers->ResultJson();
+		const bool Success = pJson && !Parse(pJson, &m_vServers);
 		json_value_free(pJson);
 		if(!Success)
 		{
 			log_error("serverbrowser_http", "failed getting serverlist, trying to find best URL");
 			m_pChooseMaster->Reset();
 			m_pChooseMaster->Refresh();
+			return;
 		}
-		else
+
+		m_ServersSha256 = ServersSha256;
+		m_ServersDataChanged = true;
+
+		// Try to find new master if the current one returns
+		// results that are 5 minutes old.
+		int Age = SanitizeAge(pGetServers->ResultAgeSeconds());
+		if(Age > 300)
 		{
-			// Try to find new master if the current one returns
-			// results that are 5 minutes old.
-			int Age = SanitizeAge(pGetServers->ResultAgeSeconds());
-			if(Age > 300)
-			{
-				log_info("serverbrowser_http", "got stale serverlist, age=%ds, trying to find best URL", Age);
-				m_pChooseMaster->Refresh();
-			}
+			log_info("serverbrowser_http", "got stale serverlist, age=%ds, trying to find best URL", Age);
+			m_pChooseMaster->Refresh();
 		}
 	}
 }

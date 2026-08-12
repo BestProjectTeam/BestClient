@@ -1167,7 +1167,8 @@ void CMenus::Render()
 	// tab is open. Uses the plain (non-forced) refresh path so it only re-polls the
 	// current list instead of re-requesting DDNet info and force-rebuilding the
 	// community cache every tick, which caused noticeable stutter with a short
-	// refresh interval.
+	// refresh interval. Unchanged master payloads are skipped entirely by the
+	// serverbrowser HTTP layer; changed payloads are applied incrementally.
 	const bool BrowserPageActive = m_MenuPage >= PAGE_INTERNET && m_MenuPage <= PAGE_FAVORITE_COMMUNITY_5;
 	if(BrowserPageActive && g_Config.m_BcAutoServerListRefresh)
 	{
@@ -1181,7 +1182,6 @@ void CMenus::Render()
 			else if(RefreshInterval > 0 && Now - m_LastServerBrowserRefreshTick >= RefreshInterval)
 			{
 				ServerBrowser()->Refresh(ServerBrowser()->GetCurrentType());
-				UpdateCommunityCache(false);
 				m_LastServerBrowserRefreshTick = Now;
 			}
 		}
