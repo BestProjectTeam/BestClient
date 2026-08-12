@@ -1770,16 +1770,12 @@ void CPlayers::OnRender()
 
 	// get screen edges to avoid rendering offscreen
 	CScreenRect ScreenRect = Graphics()->GetScreen();
-	float ScreenX0 = ScreenRect.m_TopLeft.x, ScreenY0 = ScreenRect.m_TopLeft.y, ScreenX1 = ScreenRect.m_BottomRight.x, ScreenY1 = ScreenRect.m_BottomRight.y;
 	// expand the edges to prevent popping in/out onscreen
 	//
 	// it is assumed that the tee, all its weapons, and emotes fit into a 200x200 box centered on the tee
 	// this may need to be changed or calculated differently in the future
-	float BorderBuffer = 100;
-	ScreenX0 -= BorderBuffer;
-	ScreenX1 += BorderBuffer;
-	ScreenY0 -= BorderBuffer;
-	ScreenY1 += BorderBuffer;
+	constexpr float PlayerBorderBuffer = 100.0f;
+	ScreenRect.Expand(PlayerBorderBuffer);
 
 	// render everyone else's hook, then our own
 	const int LocalClientId = GameClient()->m_Snap.m_LocalClientId;
@@ -1829,7 +1825,7 @@ void CPlayers::OnRender()
 
 		RenderHookCollLine(ScreenRect, &GameClient()->m_aClients[ClientId].m_RenderPrev, &GameClient()->m_aClients[ClientId].m_RenderCur, ClientId);
 
-		if(!in_range(GameClient()->m_aClients[ClientId].m_RenderPos.x, ScreenX0, ScreenX1) || !in_range(GameClient()->m_aClients[ClientId].m_RenderPos.y, ScreenY0, ScreenY1))
+		if(!ScreenRect.Inside(GameClient()->m_aClients[ClientId].m_RenderPos))
 		{
 			if(!(g_Config.m_TcShowOthersGhosts && g_Config.m_TcSwapGhosts))
 				continue;
