@@ -169,11 +169,12 @@ enum
 
 /**
  * Country codes in ISO 3166-1 numeric.
+ * MINIMUM is extended below -1 to allow BestClient custom flags (X-WHITE, etc.).
  */
 namespace CountryCode
 {
 	inline constexpr int DEFAULT = -1;
-	inline constexpr int MINIMUM = -1;
+	inline constexpr int MINIMUM = -999;
 	inline constexpr int MAXIMUM = 999;
 };
 
