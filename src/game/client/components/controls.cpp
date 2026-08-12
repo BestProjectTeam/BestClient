@@ -535,9 +535,9 @@ void CControls::UpdateSnapTapState(int Dummy, bool LeftPressed, bool RightPresse
 int CControls::ResolveMovementDirection(int Dummy, bool LeftPressed, bool RightPressed, bool UpdateState)
 {
 	// Edge detection must only ever be driven by the authoritative tick-rate caller (SnapInput). Fast-input
-	// prediction (CheckNewInput) polls this every render frame and would otherwise consume the press/release
-	// transition before SnapInput sees it, leaving the wrong tee misprioritized and causing a visible
-	// misprediction stutter whenever the opposite direction is tapped while one is held.
+	// prediction (CheckNewInput / cloud input) polls this every render frame and would otherwise consume the
+	// press/release transition before SnapInput sees it, leaving the wrong tee misprioritized and causing a
+	// visible misprediction stutter whenever the opposite direction is tapped while one is held.
 	if(UpdateState)
 		UpdateSnapTapState(Dummy, LeftPressed, RightPressed);
 

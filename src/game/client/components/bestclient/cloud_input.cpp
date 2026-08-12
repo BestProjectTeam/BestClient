@@ -38,7 +38,7 @@ const CNetObj_PlayerInput &CCloudInput::Input(int Dummy) const
 	return m_aInput[Dummy];
 }
 
-bool CCloudInput::CheckNewInput(const CControls &Controls)
+bool CCloudInput::CheckNewInput(CControls &Controls)
 {
 	bool NewInput[2] = {};
 	for(int Dummy = 0; Dummy < NUM_DUMMIES; Dummy++)
@@ -46,11 +46,9 @@ bool CCloudInput::CheckNewInput(const CControls &Controls)
 		CNetObj_PlayerInput NextInput = Controls.m_aInputData[Dummy];
 		if(Dummy == g_Config.m_ClDummy)
 		{
-			NextInput.m_Direction = 0;
-			if(Controls.m_aInputDirectionLeft[Dummy] && !Controls.m_aInputDirectionRight[Dummy])
-				NextInput.m_Direction = -1;
-			if(!Controls.m_aInputDirectionLeft[Dummy] && Controls.m_aInputDirectionRight[Dummy])
-				NextInput.m_Direction = 1;
+			const bool LeftPressed = Controls.m_aInputDirectionLeft[Dummy] != 0;
+			const bool RightPressed = Controls.m_aInputDirectionRight[Dummy] != 0;
+			NextInput.m_Direction = Controls.ResolveMovementDirection(Dummy, LeftPressed, RightPressed, /*UpdateState=*/false);
 		}
 
 		if(m_aInput[Dummy].m_Direction != NextInput.m_Direction)

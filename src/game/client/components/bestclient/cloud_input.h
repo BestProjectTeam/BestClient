@@ -24,7 +24,7 @@ public:
 	int OthersTickOffset() const;
 	CNetObj_PlayerInput &Input(int Dummy);
 	const CNetObj_PlayerInput &Input(int Dummy) const;
-	bool CheckNewInput(const CControls &Controls);
+	bool CheckNewInput(CControls &Controls);
 	void ApplyOffset(const CGameClient &GameClient, int ClientId, int &Tick, float &Intra) const;
 	bool TryGetPredPos(const CGameClient &GameClient, int ClientId, int Tick, float Intra, vec2 &OutPos) const;
 
