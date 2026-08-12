@@ -30,6 +30,7 @@ bc_best_input_latency_comp
 bc_best_input_others
 bc_best_input_smoothing
 bc_bestclient_settings_tabs
+bc_better_spectate
 bc_blocked_content_partial_replacement_char
 bc_blocked_content_replacement_char
 bc_blocked_word_console_color
@@ -217,6 +218,7 @@ bc_optimizer_fps_fog_mode
 bc_optimizer_fps_fog_radius_tiles
 bc_optimizer_fps_fog_render_rect
 bc_optimizer_fps_fog_zoom_percent
+bc_physic_balls_skin
 bc_prev_inp_mousesens_45_degrees
 bc_prev_inp_mousesens_small_sens
 bc_prev_mouse_max_distance_45_degrees
@@ -239,6 +241,7 @@ bc_snap_tap
 bc_snap_tap_delay
 bc_spec_moved_notify
 bc_spec_moved_notify_text
+bc_spec_pause_show_delay
 bc_speedrun_timer
 bc_speedrun_timer_auto_disable
 bc_speedrun_timer_hours

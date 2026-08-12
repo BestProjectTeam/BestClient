@@ -325,8 +325,8 @@ void CBinds::SetDefaults()
 
 	Bind(KEY_K, "kill");
 	Bind(KEY_J, "toggle_admin_panel");
-	Bind(KEY_Q, "say /spec");
-	Bind(KEY_P, "say /pause");
+	Bind(KEY_Q, "say /pause");
+	Bind(KEY_P, "say /spec");
 
 	g_Config.m_ClDDRaceBindsSet = 0;
 	SetDDRaceBinds(false);

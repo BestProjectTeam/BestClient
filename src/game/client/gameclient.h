@@ -91,6 +91,8 @@ class CSnapshotBuffer;
 #include "components/bestclient/cherry_gifs.h"
 #include "components/bestclient/chat_bubbles.h"
 #include "components/bestclient/cloud_input.h"
+#include "components/bestclient/physicball.h"
+#include "components/bestclient/spec_pause_radio.h"
 #include "components/bestclient/fast_actions.h"
 #include "components/bestclient/fast_practice.h"
 #include "components/bestclient/gif_bubbles.h"
@@ -253,6 +255,8 @@ public:
 	CGifWheel m_GifWheel; // BestClient
 	CGifBubbles m_GifBubbles; // BestClient
 	CChatBubbles m_ChatBubbles; // BestClient
+	CPhysicBalls m_PhysicBalls; // BestClient (from Entity-Client)
+	CSpecPauseRadio m_SpecPauseRadio; // BestClient (from Entity-Client)
 	CFastPractice m_FastPractice; // BestClient
 	CCloudInput m_CloudInput; // BestClient
 	CBgDraw m_BgDraw;
@@ -1035,6 +1039,7 @@ public:
 	vec2 GetSmoothPos(int ClientId);
 	vec2 GetFreezePos(int ClientId);
 	vec2 GetFastInputPos(int ClientId);
+	vec2 BcGetCursorWorldPos() const;
 
 	int m_MultiViewTeam;
 	float m_MultiViewPersonalZoom;

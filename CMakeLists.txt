@@ -2967,6 +2967,10 @@ if(CLIENT)
     components/bestclient/chat_bubbles.h
     components/bestclient/cloud_input.cpp
     components/bestclient/cloud_input.h
+    components/bestclient/physicball.cpp
+    components/bestclient/physicball.h
+    components/bestclient/spec_pause_radio.cpp
+    components/bestclient/spec_pause_radio.h
     components/bestclient/fast_actions.cpp
     components/bestclient/fast_actions.h
     components/bestclient/fast_practice.cpp

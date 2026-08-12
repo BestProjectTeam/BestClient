@@ -397,6 +397,13 @@ MACRO_CONFIG_STR(BcClientIndicatorSharedToken, bc_client_indicator_shared_token,
 MACRO_CONFIG_STR(BcClientIndicatorSecretKey, bc_client_indicator_secret_key, 256, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Client indicator developer secret key")
 MACRO_CONFIG_INT(BrFilterBestclient, br_filter_bestclient, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Filter out servers with no BestClient users")
 
+// Physic Balls (from Entity-Client)
+MACRO_CONFIG_STR(BcPhysicBallsSkin, bc_physic_balls_skin, 24, "volleyball", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Base skin for physic balls")
+
+// Better Spectate / Spec Pause Radio (from Entity-Client)
+MACRO_CONFIG_INT(BcBetterSpectate, bc_better_spectate, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Replace say /pause bind (default Q) with +specpause radio menu")
+MACRO_CONFIG_INT(BcSpecPauseShowDelay, bc_spec_pause_show_delay, 0, 0, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Delay before the spec pause radio becomes visible (ms)")
+
 // Clans
 MACRO_CONFIG_INT(BcClansEnabled, bc_clans_enabled, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable Clans menu page")
 MACRO_CONFIG_STR(BcClansApiUrl, bc_clans_api_url, 128, "https://clans.bestclient.fun", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Clans API base URL (allowlisted)")

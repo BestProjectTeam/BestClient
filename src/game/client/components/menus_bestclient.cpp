@@ -243,6 +243,9 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		g_Config.m_BcChatBubbleOutlineColor = DefaultConfig::BcChatBubbleOutlineColor;
 		g_Config.m_BcChatBubbleRounding = DefaultConfig::BcChatBubbleRounding;
 	}
+	ChatBubblesTitleLabel.VSplitRight(MarginSmall, &ChatBubblesTitleLabel, nullptr);
+	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &ChatBubblesTitleLabel, "E-Client", 12.0f,
+		ColorRGBA(0.95f, 0.80f, 0.20f, 1.0f), ColorRGBA(0.75f, 0.55f, 0.05f, 1.0f), MarginSmall);
 	Ui()->DoLabel(&ChatBubblesTitleLabel, Localize("Chat Bubbles"), HeadlineFontSize, TEXTALIGN_ML);
 	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
 
@@ -1043,6 +1046,70 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 
 		Ui()->ClipDisable();
 	}
+
+	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
+
+	// Physic Balls (left column block, from Entity-Client)
+	const float PhysicBallsBlockHeight = LineSize + MarginSmall + LineSize + MarginSmall + LineSize + MarginSmall + 25.0f;
+	CUIRect PhysicBallsBlock;
+	Column.HSplitTop(PhysicBallsBlockHeight, &PhysicBallsBlock, &Column);
+
+	CUIRect PhysicBallsBlockBg = PhysicBallsBlock;
+	PhysicBallsBlockBg.w += BlockPadding;
+	PhysicBallsBlockBg.h += BlockPadding;
+	PhysicBallsBlockBg.x -= BlockPadding * 0.5f;
+	PhysicBallsBlockBg.y -= BlockPadding * 0.5f;
+	PhysicBallsBlockBg.Draw(BlockColor, IGraphics::CORNER_ALL, 10.0f);
+
+	MainView = PhysicBallsBlock;
+	MainView.HSplitTop(LineSize, &Label, &MainView);
+	CUIRect PhysicBallsTitleLabel = Label;
+	PhysicBallsTitleLabel.VSplitRight(MarginSmall, &PhysicBallsTitleLabel, nullptr);
+	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &PhysicBallsTitleLabel, Localize("NEW"), 12.0f,
+		ColorRGBA(0.25f, 0.85f, 0.40f, 1.0f), ColorRGBA(0.10f, 0.60f, 0.25f, 1.0f), MarginSmall);
+	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &PhysicBallsTitleLabel, "E-Client", 12.0f,
+		ColorRGBA(0.95f, 0.80f, 0.20f, 1.0f), ColorRGBA(0.75f, 0.55f, 0.05f, 1.0f), MarginSmall);
+	Ui()->DoLabel(&PhysicBallsTitleLabel, Localize("Physic Balls"), HeadlineFontSize, TEXTALIGN_ML);
+	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+
+	MainView.HSplitTop(LineSize, &Button, &MainView);
+	char aBallAmount[64];
+	str_format(aBallAmount, sizeof(aBallAmount), Localize("Ball amount: %d"), (int)GameClient()->m_PhysicBalls.GetBallCount());
+	CUIRect BallAmountLabel, ClearBallsButton;
+	Button.VSplitRight(LineSize + 8.0f, &BallAmountLabel, &ClearBallsButton);
+	Ui()->DoLabel(&BallAmountLabel, aBallAmount, 14.0f, TEXTALIGN_ML);
+	static CButtonContainer s_ClearPhysicBallsButton;
+	if(Ui()->DoButton_FontIcon(&s_ClearPhysicBallsButton, FontIcon::TRASH, 0, &ClearBallsButton, BUTTONFLAG_LEFT))
+		GameClient()->m_PhysicBalls.OnReset();
+	GameClient()->m_Tooltips.DoToolTip(&s_ClearPhysicBallsButton, &ClearBallsButton, Localize("Clear all balls"));
+
+	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+	MainView.HSplitTop(LineSize, &Button, &MainView);
+	{
+		static CLineInput s_PhysicBallsSkinInput;
+		s_PhysicBallsSkinInput.SetBuffer(g_Config.m_BcPhysicBallsSkin, sizeof(g_Config.m_BcPhysicBallsSkin));
+		s_PhysicBallsSkinInput.SetEmptyText("volleyball");
+		CUIRect SkinLabel, SkinField;
+		Button.VSplitLeft(70.0f, &SkinLabel, &Button);
+		Button.VSplitLeft(MarginSmall, nullptr, &Button);
+		Button.VSplitLeft(140.0f, &SkinField, nullptr);
+		Ui()->DoLabel(&SkinLabel, Localize("Ball skin"), 14.0f, TEXTALIGN_ML);
+		Ui()->DoEditBox(&s_PhysicBallsSkinInput, &SkinField, 14.0f);
+	}
+
+	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+	MainView.HSplitTop(25.0f, &Button, &MainView);
+	CUIRect SpawnBallButton, SpawnCursorButton;
+	Button.VSplitLeft(110.0f, &SpawnBallButton, &Button);
+	Button.VSplitLeft(MarginSmall, nullptr, &Button);
+	Button.VSplitLeft(130.0f, &SpawnCursorButton, nullptr);
+	static CButtonContainer s_SpawnPhysicBallButton;
+	static CButtonContainer s_SpawnPhysicBallCursorButton;
+	const ColorRGBA PhysicBallButtonColor = ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f);
+	if(DoButton_Menu(&s_SpawnPhysicBallButton, Localize("New Ball"), 0, &SpawnBallButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, PhysicBallButtonColor))
+		GameClient()->m_PhysicBalls.NewBallPlayer(60.0f);
+	if(DoButton_Menu(&s_SpawnPhysicBallCursorButton, Localize("New Ball Cursor"), 0, &SpawnCursorButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, PhysicBallButtonColor))
+		GameClient()->m_PhysicBalls.NewBallCursor(60.0f);
 
 	const float LeftColumnEndY = Column.y;
 
@@ -2774,7 +2841,7 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	const float RealHitboxColorHeight = g_Config.m_BcShowRealHitbox ? RealHitboxColorLineSize + RealHitboxColorLineSpacing : 0.0f;
 	const float AutoLockDelayHeight = g_Config.m_BcAutoTeamLock ? LineSize : 0.0f;
 	const float SpecMovedNotifyTextHeight = g_Config.m_BcSpecMovedNotify ? LineSize : 0.0f;
-	const float MiscBlockHeight = LineSize + MarginSmall + AutoUpdateHeight + 19.0f * LineSize + 2.5f + AutoLockDelayHeight + SpecMovedNotifyTextHeight + RealHitboxColorHeight;
+	const float MiscBlockHeight = LineSize + MarginSmall + AutoUpdateHeight + 20.0f * LineSize + 2.5f + AutoLockDelayHeight + SpecMovedNotifyTextHeight + RealHitboxColorHeight;
 	CUIRect MiscBlock;
 	Column.HSplitTop(MiscBlockHeight, &MiscBlock, &Column);
 
@@ -2787,7 +2854,9 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 
 	CUIRect Content, Label, Button;
 	MiscBlock.HSplitTop(LineSize, &Label, &MiscBlock);
-	Ui()->DoLabel(&Label, Localize("Misc"), HeadlineFontSize, TEXTALIGN_ML);
+	CUIRect MiscTitleLabel = Label;
+	MiscTitleLabel.VSplitRight(MarginSmall, &MiscTitleLabel, nullptr);
+	Ui()->DoLabel(&MiscTitleLabel, Localize("Misc"), HeadlineFontSize, TEXTALIGN_ML);
 	MiscBlock.HSplitTop(MarginSmall, nullptr, &MiscBlock);
 
 #if defined(CONF_AUTOUPDATE)
@@ -2802,6 +2871,20 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcSilentTyping, Localize("Silent typing"), &g_Config.m_BcSilentTyping, &MiscBlock, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatAltCommandLayout, Localize("Commands in other layout"), &g_Config.m_BcChatAltCommandLayout, &MiscBlock, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcCinematicCamera, Localize("Cinematic camera"), &g_Config.m_BcCinematicCamera, &MiscBlock, LineSize);
+	{
+		CUIRect BetterSpectateRow;
+		MiscBlock.HSplitTop(LineSize, &BetterSpectateRow, &MiscBlock);
+		DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &BetterSpectateRow, Localize("NEW"), 10.0f,
+			ColorRGBA(0.25f, 0.85f, 0.40f, 1.0f), ColorRGBA(0.10f, 0.60f, 0.25f, 1.0f), 4.0f);
+		DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &BetterSpectateRow, "E-Client", 10.0f,
+			ColorRGBA(0.95f, 0.80f, 0.20f, 1.0f), ColorRGBA(0.75f, 0.55f, 0.05f, 1.0f), 4.0f);
+		if(DoButton_CheckBox(&g_Config.m_BcBetterSpectate, Localize("Better spectate"), g_Config.m_BcBetterSpectate, &BetterSpectateRow))
+		{
+			g_Config.m_BcBetterSpectate ^= 1;
+			GameClient()->m_SpecPauseRadio.SyncSpectateBinds(g_Config.m_BcBetterSpectate != 0);
+		}
+		GameClient()->m_Tooltips.DoToolTip(&g_Config.m_BcBetterSpectate, &BetterSpectateRow, Localize("Replace your say /pause bind (default: Q) with +specpause (pause/spec radio)"));
+	}
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcSpecMovedNotify, Localize("Notify when moved in spec"), &g_Config.m_BcSpecMovedNotify, &MiscBlock, LineSize);
 	if(g_Config.m_BcSpecMovedNotify)
 	{
@@ -2949,7 +3032,11 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	ChatFilterBlockBg.Draw(BlockColor, IGraphics::CORNER_ALL, 10.0f);
 
 	ChatFilterBlock.HSplitTop(LineSize, &Label, &ChatFilterBlock);
-	Ui()->DoLabel(&Label, Localize("Chat Filter"), HeadlineFontSize, TEXTALIGN_ML);
+	CUIRect ChatFilterTitleLabel = Label;
+	ChatFilterTitleLabel.VSplitRight(MarginSmall, &ChatFilterTitleLabel, nullptr);
+	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &ChatFilterTitleLabel, "R-Client", 12.0f,
+		ColorRGBA(0.30f, 0.55f, 0.95f, 1.0f), ColorRGBA(0.15f, 0.35f, 0.75f, 1.0f), MarginSmall);
+	Ui()->DoLabel(&ChatFilterTitleLabel, Localize("Chat Filter"), HeadlineFontSize, TEXTALIGN_ML);
 	ChatFilterBlock.HSplitTop(MarginSmall, nullptr, &ChatFilterBlock);
 
 	ChatFilterBlock.HSplitTop(LineSize, &Content, &ChatFilterBlock);

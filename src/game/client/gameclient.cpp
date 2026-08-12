@@ -326,6 +326,7 @@ void CGameClient::OnConsoleInit()
 					      &m_NamePlates,
 					      &m_GifBubbles, // BestClient
 					      &m_ChatBubbles, // BestClient
+					      &m_PhysicBalls, // BestClient (from Entity-Client)
 					      &m_Particles.m_RenderExtra,
 					      &m_Particles.m_RenderGeneral,
 					      &m_FreezeBars,
@@ -337,6 +338,7 @@ void CGameClient::OnConsoleInit()
 					      &m_Hud,
 					      &m_Spectator,
 					      &m_Emoticon,
+					      &m_SpecPauseRadio, // BestClient (from Entity-Client)
 					      &m_BindChat, // TClient
 					      &m_BindWheel, // TClient
 					      &m_FastActions, // BestClient
@@ -373,6 +375,7 @@ void CGameClient::OnConsoleInit()
 						  &m_Scoreboard,
 						  &m_Motd, // for pressing esc to remove it
 						  &m_Spectator,
+						  &m_SpecPauseRadio, // BestClient (from Entity-Client)
 						  &m_BindWheel, // TClient
 						  &m_FastActions, // BestClient
 						  &m_GifWheel, // BestClient
@@ -5031,6 +5034,28 @@ void CGameClient::DetectStrongHook()
 			}
 		}
 	}
+}
+
+vec2 CGameClient::BcGetCursorWorldPos() const
+{
+	if(m_Snap.m_SpecInfo.m_Active)
+		return m_Camera.m_Center;
+
+	vec2 Target = m_Controls.m_aMousePos[g_Config.m_ClDummy];
+
+	vec2 TargetCameraOffset(0, 0);
+	float l = length(Target);
+
+	if(l > 0.0001f) // make sure that this isn't 0
+	{
+		float OffsetAmount = std::max(l - m_Snap.m_SpecInfo.m_Deadzone, 0.0f) * (m_Snap.m_SpecInfo.m_FollowFactor / 100.0f);
+		TargetCameraOffset = normalize(Target) * OffsetAmount;
+	}
+
+	vec2 Position = m_CursorInfo.Position();
+
+	const float Zoom = m_Camera.m_Zoom;
+	return Position + (Target - TargetCameraOffset) * Zoom + TargetCameraOffset;
 }
 
 vec2 CGameClient::GetSmoothPos(int ClientId)
