@@ -624,6 +624,9 @@ CHud::CHud()
 	m_KeystrokesKeyboardTexture = IGraphics::CTextureHandle();
 	m_KeystrokesMouseTexture = IGraphics::CTextureHandle();
 
+	m_PlayerCheckpointTextContainerIndex.Reset();
+	m_PlayerPrevCheckpoint = -1;
+
 	for(int i = 0; i < 2; i++)
 	{
 		m_aPlayerSpeedTextContainers[i].Reset();
@@ -648,7 +651,9 @@ void CHud::ResetHudContainers()
 	TextRender()->DeleteTextContainer(m_FPSTextContainerIndex);
 	TextRender()->DeleteTextContainer(m_DDRaceEffectsTextContainerIndex);
 	TextRender()->DeleteTextContainer(m_PlayerAngleTextContainerIndex);
+	TextRender()->DeleteTextContainer(m_PlayerCheckpointTextContainerIndex);
 	m_PlayerPrevAngle = -INFINITY;
+	m_PlayerPrevCheckpoint = -1;
 	m_LastMovementInformationFontSize = -1.0f;
 	for(int i = 0; i < 2; i++)
 	{
@@ -672,8 +677,6 @@ void CHud::OnReset()
 	m_TimeCpLastReceivedTick = 0;
 	m_ShowFinishTime = false;
 	m_SelfTimeCpDiff = false;
-	std::fill(std::begin(m_aLastTimeCheckpoint), std::end(m_aLastTimeCheckpoint), 0);
-	m_TotalTimeCheckpoints = -1;
 	m_aPlayerRecord[0] = -1.0f;
 	m_aPlayerRecord[1] = -1.0f;
 	m_aPlayerSpeed[0] = 0;
@@ -2924,7 +2927,7 @@ bool CHud::GetMovementInformationState(SMovementInformationState &State, bool Fo
 	State.m_HasValidClientId = State.m_ClientId >= 0 && State.m_ClientId < MAX_CLIENTS;
 	State.m_PosOnly = !ForcePreview && (State.m_ClientId == SPEC_FREEVIEW || (State.m_HasValidClientId && GameClient()->m_aClients[State.m_ClientId].m_SpecCharPresent));
 	State.m_ShowPosition = g_Config.m_ClShowhudPlayerPosition != 0;
-	State.m_ShowCheckpoint = g_Config.m_BcShowCorrectCheckpoint && (State.m_HasValidClientId || ForcePreview);
+	State.m_ShowCheckpoint = g_Config.m_BcShowCorrectCheckpoint != 0;
 	State.m_ShowSpeed = !State.m_PosOnly && g_Config.m_ClShowhudPlayerSpeed != 0;
 	State.m_ShowAngle = !State.m_PosOnly && g_Config.m_ClShowhudPlayerAngle != 0;
 
@@ -2934,7 +2937,6 @@ bool CHud::GetMovementInformationState(SMovementInformationState &State, bool Fo
 	if(State.m_HasValidClientId)
 	{
 		State.m_Info = GetMovementInformation(State.m_ClientId, g_Config.m_ClDummy);
-		State.m_Checkpoint = m_aLastTimeCheckpoint[State.m_ClientId];
 	}
 	else if(ForcePreview)
 	{
@@ -2942,7 +2944,7 @@ bool CHud::GetMovementInformationState(SMovementInformationState &State, bool Fo
 		State.m_Info.m_Speed = vec2(0.0f, 0.0f);
 		State.m_Info.m_Angle = 17.69f;
 	}
-	State.m_TotalCheckpoints = maximum(m_TotalTimeCheckpoints, 0);
+	State.m_Checkpoint = ForcePreview && !State.m_HasValidClientId ? 1 : GetCheckpointId();
 
 	if(Client()->DummyConnected())
 	{
@@ -3018,6 +3020,42 @@ void CHud::UpdateMovementInformationTextContainer(STextContainerIndex &TextConta
 	CTextCursor Cursor;
 	Cursor.m_FontSize = FontSize;
 	TextRender()->RecreateTextContainer(TextContainer, &Cursor, aBuf);
+}
+
+void CHud::UpdateMovementInformationTextContainer(STextContainerIndex &TextContainer, float FontSize, int Value, int &PrevValue)
+{
+	if(TextContainer.Valid() && PrevValue == Value)
+		return;
+	PrevValue = Value;
+
+	char aBuf[32];
+	str_format(aBuf, sizeof(aBuf), "%d", Value);
+
+	CTextCursor Cursor;
+	Cursor.m_FontSize = FontSize;
+	TextRender()->RecreateTextContainer(TextContainer, &Cursor, aBuf);
+}
+
+int CHud::GetCheckpointId() const
+{
+	int PlayerId = -1;
+	if(GameClient()->m_Snap.m_SpecInfo.m_SpectatorId != SPEC_FREEVIEW && GameClient()->m_Snap.m_SpecInfo.m_Active)
+	{
+		const auto &Player = GameClient()->m_aClients[GameClient()->m_Snap.m_SpecInfo.m_SpectatorId];
+		PlayerId = Player.ClientId();
+	}
+	else if(!GameClient()->m_Snap.m_SpecInfo.m_Active)
+		PlayerId = GameClient()->m_Snap.m_LocalClientId;
+
+	if(PlayerId != -1)
+	{
+		const auto &Char = GameClient()->m_Snap.m_aCharacters[PlayerId];
+		if(!Char.m_Active || !Char.m_HasExtendedData)
+			return -1;
+		return Char.m_ExtendedData.m_TeleCheckpoint;
+	}
+
+	return -1;
 }
 
 void CHud::RenderMovementInformationTextContainer(STextContainerIndex &TextContainer, const ColorRGBA &Color, float X, float Y)
@@ -3175,6 +3213,7 @@ void CHud::RenderMovementInformation(bool ForcePreview)
 	if(m_LastMovementInformationFontSize != Fontsize)
 	{
 		m_PlayerPrevAngle = -INFINITY;
+		m_PlayerPrevCheckpoint = -1;
 		for(int i = 0; i < 2; i++)
 		{
 			m_aPlayerPrevPosition[i] = -INFINITY;
@@ -3194,10 +3233,16 @@ void CHud::RenderMovementInformation(bool ForcePreview)
 		if(!State.m_ShowCheckpoint)
 			return;
 
-		char aBuf[16];
-		str_format(aBuf, sizeof(aBuf), "%d/%d", State.m_Checkpoint, State.m_TotalCheckpoints);
 		TextRender()->Text(LeftX, y, Fontsize, Localize("Checkpoint:"), -1.0f);
-		TextRender()->Text(RightX - TextRender()->TextWidth(Fontsize, aBuf), y, Fontsize, aBuf, -1.0f);
+		if(State.m_Checkpoint < 0)
+		{
+			TextRender()->Text(RightX - TextRender()->TextWidth(Fontsize, "No Info", -1, -1.0f), y, Fontsize, "No Info", -1.0f);
+		}
+		else
+		{
+			UpdateMovementInformationTextContainer(m_PlayerCheckpointTextContainerIndex, Fontsize, State.m_Checkpoint, m_PlayerPrevCheckpoint);
+			RenderMovementInformationTextContainer(m_PlayerCheckpointTextContainerIndex, TextRender()->DefaultTextColor(), RightX, y);
+		}
 		y += LineHeight;
 	};
 
@@ -4020,42 +4065,6 @@ void CHud::OnNewSnapshot()
 		return;
 	if(!GameClient()->m_Snap.m_pGameInfoObj)
 		return;
-	if(m_TotalTimeCheckpoints < 0)
-	{
-		m_TotalTimeCheckpoints = 0;
-		const int MapSize = Collision()->GetWidth() * Collision()->GetHeight();
-		for(int Index = 0; Index < MapSize; ++Index)
-		{
-			const int TimeCheckpoint = maximum(Collision()->IsTimeCheckpoint(Index), Collision()->IsFrontTimeCheckpoint(Index));
-			if(TimeCheckpoint >= 0)
-				m_TotalTimeCheckpoints = maximum(m_TotalTimeCheckpoints, TimeCheckpoint + 1);
-		}
-	}
-
-	for(int i = 0; i < MAX_CLIENTS; ++i)
-	{
-		if(!GameClient()->m_Snap.m_aCharacters[i].m_Active)
-		{
-			m_aLastTimeCheckpoint[i] = 0;
-			continue;
-		}
-
-		const CNetObj_Character &PrevChar = GameClient()->m_Snap.m_aCharacters[i].m_Prev;
-		const CNetObj_Character &CurChar = GameClient()->m_Snap.m_aCharacters[i].m_Cur;
-		std::vector<int> vIndices = Collision()->GetMapIndices(vec2(PrevChar.m_X, PrevChar.m_Y), vec2(CurChar.m_X, CurChar.m_Y));
-		if(vIndices.empty())
-			vIndices.push_back(Collision()->GetMapIndex(vec2(CurChar.m_X, CurChar.m_Y)));
-
-		for(const int Index : vIndices)
-		{
-			if(Collision()->GetTileIndex(Index) == TILE_START || Collision()->GetFrontTileIndex(Index) == TILE_START)
-				m_aLastTimeCheckpoint[i] = 0;
-
-			const int TimeCheckpoint = maximum(Collision()->IsTimeCheckpoint(Index), Collision()->IsFrontTimeCheckpoint(Index));
-			if(TimeCheckpoint >= 0)
-				m_aLastTimeCheckpoint[i] = TimeCheckpoint + 1;
-		}
-	}
 
 	int ClientId = -1;
 	if(GameClient()->m_Snap.m_pLocalCharacter && !GameClient()->m_Snap.m_SpecInfo.m_Active && !(GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_GAMEOVER))

@@ -64,7 +64,7 @@ MACRO_CONFIG_INT(BcNameplateGradientAnimateSpeed, bc_nameplate_gradient_animate_
 MACRO_CONFIG_INT(BcScoreboardTeamGradients, bc_scoreboard_team_gradients, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Render scoreboard team colors with a left-to-right gradient")
 MACRO_CONFIG_INT(BcShowPointsInTab, bc_show_points_in_tab, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show player points in the scoreboard on DDNet and EGO servers")
 MACRO_CONFIG_INT(BcShowhudDummyCoordIndicator, bc_showhud_dummy_coord_indicator, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show player-below indicator when aligned above another player")
-MACRO_CONFIG_INT(BcShowCorrectCheckpoint, bc_show_correct_checkpoint, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show the last touched time checkpoint in movement information")
+MACRO_CONFIG_INT(BcShowCorrectCheckpoint, bc_show_correct_checkpoint, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show current tele checkpoint in movement information")
 
 // SelfTimeCp
 MACRO_CONFIG_INT(BcSelfTimeCp, bc_self_time_cp, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable personal time checkpoints")

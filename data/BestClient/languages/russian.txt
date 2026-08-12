@@ -1699,8 +1699,11 @@ Notification text
 Gradient team colors
 == Градиент командных цветов
 
-Show correct checkpoint
-== Показывать текущий чекпоинт
+Show current checkpoint in hud
+== Показывать текущий чек в худе
+
+Find teleport
+== Найти телепорт
 
 Extend zoom (0.5 steps)
 == Расширенный зум (шаг 0,5)
