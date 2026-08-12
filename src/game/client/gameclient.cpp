@@ -5086,9 +5086,10 @@ vec2 CGameClient::GetSmoothPos(int ClientId)
 			if(ClientId != m_Snap.m_LocalClientId && FastInputTicksClient > 0 && FastInputOthers)
 				BcInputs::ApplyOffset(FastInputOffsetTicks, SmoothTick, SmoothIntra);
 
-			if(SmoothTick > 0 &&
-				m_aClients[ClientId].m_aPredTick[(SmoothTick - 1) % 200] >= Client()->PrevGameTick(g_Config.m_ClDummy) &&
-				m_aClients[ClientId].m_aPredTick[SmoothTick % 200] <= Client()->PredGameTick(g_Config.m_ClDummy) + FastInputTicksClient)
+			const int MaxTick = Client()->PredGameTick(g_Config.m_ClDummy) + FastInputTicksClient;
+			if(SmoothTick > 0 && SmoothTick <= MaxTick &&
+				m_aClients[ClientId].m_aPredTick[(SmoothTick - 1) % 200] == SmoothTick - 1 &&
+				m_aClients[ClientId].m_aPredTick[SmoothTick % 200] == SmoothTick)
 				Pos[i] = BcInputs::BestInterpolate(m_aClients[ClientId].m_aPredPos[(SmoothTick - 1) % 200][i], m_aClients[ClientId].m_aPredPos[SmoothTick % 200][i], SmoothIntra, BestInputInterpolationEnabled);
 		}
 	}
@@ -5192,9 +5193,11 @@ vec2 CGameClient::GetFastInputPos(int ClientId)
 	const bool BestInputInterpolationEnabled = g_Config.m_BcInputs == BC_INPUTS_BEST && FastInputTicks > 0;
 	BcInputs::ApplyOffset(FastInputOffsetTicks, PredTick, PredIntraTick);
 
-	if(PredTick > 0 &&
-		m_aClients[ClientId].m_aPredTick[(PredTick - 1) % 200] >= Client()->PrevGameTick(g_Config.m_ClDummy) &&
-		m_aClients[ClientId].m_aPredTick[PredTick % 200] <= Client()->PredGameTick(g_Config.m_ClDummy) + FastInputTicksClient)
+	// Exact tick match (same as CCloudInput::TryGetPredPos) avoids stale ring-buffer hits.
+	const int MaxTick = Client()->PredGameTick(g_Config.m_ClDummy) + FastInputTicksClient;
+	if(PredTick > 0 && PredTick <= MaxTick &&
+		m_aClients[ClientId].m_aPredTick[(PredTick - 1) % 200] == PredTick - 1 &&
+		m_aClients[ClientId].m_aPredTick[PredTick % 200] == PredTick)
 	{
 		Pos = BcInputs::BestInterpolate(m_aClients[ClientId].m_aPredPos[(PredTick - 1) % 200], m_aClients[ClientId].m_aPredPos[PredTick % 200], PredIntraTick, BestInputInterpolationEnabled);
 	}
@@ -5205,51 +5208,44 @@ vec2 CGameClient::GetFreezePos(int ClientId)
 {
 	if(IsCloudInputMode())
 	{
+		// Always sample GetSmoothFreezeTick + cloud offset (same as non-cloud GetFreezePos).
+		// The old m_aSmoothStart gate never ran for the local tee and caused teleports.
 		vec2 Pos = mix(m_aClients[ClientId].m_PrevPredicted.m_Pos, m_aClients[ClientId].m_Predicted.m_Pos, Client()->PredIntraGameTick(g_Config.m_ClDummy));
 		CCharacter *pChar = m_PredictedWorld.GetCharacterById(m_Snap.m_LocalClientId);
 		CCharacter *pExtraChar = m_ExtraPredictedWorld.GetCharacterById(m_Snap.m_LocalClientId);
 
-		int64_t Now = time_get();
-		for(int i = 0; i < 2; i++)
+		float MixAmount = 0.0f;
+		int SmoothTick;
+		float SmoothIntra;
+
+		int AdjustTicks = 0;
+		int DelayTicks = g_Config.m_TcUnfreezeLagDelayTicks;
+		int FreezeTime = 0;
+		if(pExtraChar && pChar)
 		{
-			int64_t Len = std::clamp(m_aClients[ClientId].m_aSmoothLen[i], (int64_t)1, time_freq());
-			int64_t TimePassed = Now - m_aClients[ClientId].m_aSmoothStart[i];
-			if(!in_range(TimePassed, (int64_t)0, Len - 1))
-				continue;
+			AdjustTicks = pChar->m_FreezeAccumulation;
+			if(pExtraChar->m_AliveAccumulation > 0)
+				AdjustTicks -= pExtraChar->m_AliveAccumulation;
 
-			float MixAmount = 0.0f;
-			int SmoothTick;
-			float SmoothIntra;
+			AdjustTicks = std::max(AdjustTicks, 0);
+			FreezeTime = pChar->m_FreezeTime;
 
-			int AdjustTicks = 0;
-			int DelayTicks = g_Config.m_TcUnfreezeLagDelayTicks;
-			int FreezeTime = 0;
-			if(pExtraChar && pChar)
-			{
-				AdjustTicks = pChar->m_FreezeAccumulation;
-				if(pExtraChar->m_AliveAccumulation > 0)
-					AdjustTicks -= pExtraChar->m_AliveAccumulation;
-
-				AdjustTicks = std::max(AdjustTicks, 0);
-				FreezeTime = pChar->m_FreezeTime;
-
-				AdjustTicks = std::min(FreezeTime, AdjustTicks);
-			}
-			if(g_Config.m_TcRemoveAnti && pChar && AdjustTicks > 0 && FreezeTime > 0)
-				MixAmount = mix(0.0f, 1.0f, 1.0f - AdjustTicks / (float)DelayTicks);
-			else
-				MixAmount = 1.f;
-
-			Client()->GetSmoothFreezeTick(&SmoothTick, &SmoothIntra, MixAmount);
-
-			m_aCloudSmoothTick[i] = SmoothTick;
-			m_aCloudSmoothIntraTick[i] = SmoothIntra;
-			m_CloudInput.ApplyOffset(*this, ClientId, SmoothTick, SmoothIntra);
-
-			vec2 FreezePos;
-			if(m_CloudInput.TryGetPredPos(*this, ClientId, SmoothTick, SmoothIntra, FreezePos))
-				Pos[i] = FreezePos[i];
+			AdjustTicks = std::min(FreezeTime, AdjustTicks);
 		}
+		if(g_Config.m_TcRemoveAnti && pChar && AdjustTicks > 0 && FreezeTime > 0)
+			MixAmount = mix(0.0f, 1.0f, 1.0f - AdjustTicks / (float)DelayTicks);
+		else
+			MixAmount = 1.f;
+
+		Client()->GetSmoothFreezeTick(&SmoothTick, &SmoothIntra, MixAmount);
+
+		m_SmoothTick = SmoothTick;
+		m_SmoothIntraTick = SmoothIntra;
+		m_aCloudSmoothTick[0] = m_aCloudSmoothTick[1] = SmoothTick;
+		m_aCloudSmoothIntraTick[0] = m_aCloudSmoothIntraTick[1] = SmoothIntra;
+
+		m_CloudInput.ApplyOffset(*this, ClientId, SmoothTick, SmoothIntra);
+		m_CloudInput.TryGetPredPos(*this, ClientId, SmoothTick, SmoothIntra, Pos);
 
 		return Pos;
 	}
@@ -5304,9 +5300,10 @@ vec2 CGameClient::GetFreezePos(int ClientId)
 	if(ApplyFastInputLocal || ApplyFastInputOthers)
 		BcInputs::ApplyOffset(FastInputOffsetTicks, SmoothTick, SmoothIntra);
 
-	if(SmoothTick > 0 &&
-		m_aClients[ClientId].m_aPredTick[(SmoothTick - 1) % 200] >= Client()->PrevGameTick(g_Config.m_ClDummy) &&
-		m_aClients[ClientId].m_aPredTick[SmoothTick % 200] <= Client()->PredGameTick(g_Config.m_ClDummy) + FastInputTicksClient)
+	const int MaxTick = Client()->PredGameTick(g_Config.m_ClDummy) + FastInputTicksClient;
+	if(SmoothTick > 0 && SmoothTick <= MaxTick &&
+		m_aClients[ClientId].m_aPredTick[(SmoothTick - 1) % 200] == SmoothTick - 1 &&
+		m_aClients[ClientId].m_aPredTick[SmoothTick % 200] == SmoothTick)
 	{
 		Pos = BcInputs::BestInterpolate(m_aClients[ClientId].m_aPredPos[(SmoothTick - 1) % 200], m_aClients[ClientId].m_aPredPos[SmoothTick % 200], SmoothIntra, BestInputInterpolationEnabled);
 	}
