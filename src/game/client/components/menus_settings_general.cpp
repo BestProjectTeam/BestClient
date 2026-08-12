@@ -18,15 +18,18 @@ void CMenus::RenderSettingsGeneral(CUIRect MainView)
 {
 	char aBuf[128 + IO_MAX_PATH_LENGTH];
 	CUIRect Label, Button, Left, Right, Game, ClientSettings;
-	MainView.HSplitTop(150.0f, &Game, &ClientSettings);
+	MainView.HSplitTop(190.0f, &Game, &ClientSettings);
 
 	// game
 	{
 		// headline
+		CUIRect GameLabel, LanguageLabel;
 		Game.HSplitTop(30.0f, &Label, &Game);
-		Ui()->DoLabel(&Label, Localize("Game"), 20.0f, TEXTALIGN_ML);
+		Label.VSplitMid(&GameLabel, &LanguageLabel, 20.0f);
+		Ui()->DoLabel(&GameLabel, Localize("Game"), 20.0f, TEXTALIGN_ML);
+		Ui()->DoLabel(&LanguageLabel, Localize("Language"), 20.0f, TEXTALIGN_ML);
 		Game.HSplitTop(5.0f, nullptr, &Game);
-		Game.VSplitMid(&Left, nullptr, 20.0f);
+		Game.VSplitMid(&Left, &Right, 20.0f);
 
 		// dynamic camera
 		Left.HSplitTop(20.0f, &Button, &Left);
@@ -74,6 +77,9 @@ void CMenus::RenderSettingsGeneral(CUIRect MainView)
 		Left.HSplitTop(20.0f, &Button, &Left);
 		if(DoButton_CheckBox(&g_Config.m_ClAutoswitchWeaponsOutOfAmmo, Localize("Switch weapon when out of ammo"), g_Config.m_ClAutoswitchWeaponsOutOfAmmo, &Button))
 			g_Config.m_ClAutoswitchWeaponsOutOfAmmo ^= 1;
+
+		Right.HSplitTop(5.0f, nullptr, &Right);
+		RenderLanguageSelection(Right);
 	}
 
 	// client
