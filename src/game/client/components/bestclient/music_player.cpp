@@ -4028,9 +4028,10 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	const float TextCenterX = View.x + View.w * 0.5f;
 	const float TextHalfW = maximum(0.0f, minimum(TextCenterX - TextArea.x, TextRight - TextCenterX));
 	CUIRect CenteredTextArea = TextHalfW > 0.0f ? CUIRect{TextCenterX - TextHalfW, TextArea.y, TextHalfW * 2.0f, TextArea.h} : TextArea;
-	// Lyrics (countdown/couplets) stay pill-centered; mini TextArea is cover/visualizer-asymmetric
-	// and would jump sideways when hover expands into the non-mini layout.
-	CUIRect LayoutTextArea = (RenderMiniLayout && !LyricsEnabled) ? TextArea : CenteredTextArea;
+	// Lyrics with cover: use the full cover→visualizer span so title/lines aren't clipped, and
+	// the text center sits between those edges (pill-centering leaves a larger gap by the cover).
+	// Mini non-lyrics still uses TextArea; other modes stay pill-centered.
+	CUIRect LayoutTextArea = (LyricsEnabled && RenderCover) ? TextArea : ((RenderMiniLayout && !LyricsEnabled) ? TextArea : CenteredTextArea);
 	if(RenderMiniLayout && !LyricsEnabled)
 	{
 		const float MiniTextInset = 0.35f * Scale * WidthScale;
