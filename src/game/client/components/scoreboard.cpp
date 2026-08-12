@@ -751,7 +751,8 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 		FontSize = 5.0f;
 	}
 
-	const float ScoreOffset = Scoreboard.x + MARGIN;
+	// Keep 20px left pad so the BestClient indicator (left of score) is not clipped
+	const float ScoreOffset = Scoreboard.x + 20.0f;
 	const float ScoreLength = TextRender()->TextWidth(FontSize, UseTime ? "00:00:00" : "99999");
 	const float TeeOffset = ScoreOffset + ScoreLength + MARGIN;
 	const float TeeLength = 60.0f * TeeSizeMod;
