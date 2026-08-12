@@ -4102,9 +4102,8 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 		const float LaneY = VisualRect.y + VisualInnerPadY + (VisualInnerH - LaneH) * 0.5f;
 		const float BaseMidY = LaneY + LaneH * 0.5f;
 		const int VisualizerMode = std::clamp(g_Config.m_BcMusicPlayerVisualizerMode, 0, 2);
-		// Mini stays centered; normal layout respects Bottom / Center / Up.
-		const bool CenterMode = RenderMiniLayout || VisualizerMode == 1;
-		const bool UpMode = !RenderMiniLayout && VisualizerMode == 2;
+		const bool CenterMode = VisualizerMode == 1;
+		const bool UpMode = VisualizerMode == 2;
 		const bool UseCoverVisualizerColor = CoverColorMode && (m_pImpl->m_HasCoverTint || m_pImpl->m_HasCoverBarTint);
 		const float ContentAlpha = std::clamp(0.86f + 0.08f * HoverT, 0.0f, 1.0f);
 		const std::array<ColorRGBA, COVER_BAR_TINT_CELLS> &aVisualizerBarColors = m_pImpl->UpdateVisualizerBarColors(NumBars, Delta, UseCoverVisualizerColor);
