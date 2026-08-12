@@ -2637,7 +2637,8 @@ void CMenus::RenderSettingsBestClientGameplay(CUIRect MainView)
 	const float FinishPredictionExpandedTargetHeight = (MarginSmall + LineSize) // Show time checkbox
 							    + FinishPredictionTimeExpandedHeight
 							    + MarginSmall + LineSize // Show percentage checkbox
-							    + MarginSmall + LineSize; // Show always checkbox
+							    + MarginSmall + LineSize // Show always checkbox
+							    + MarginSmall + LineSize; // Analyse teleports/freeze
 	const float FinishPredictionExpandedHeight = FinishPredictionExpandedTargetHeight * BCUiAnimations::EaseOutCubic(s_FinishPredictionRevealPhase);
 	const float FinishPredictionBlockHeight = LineSize + MarginSmall + LineSize + FinishPredictionExpandedHeight;
 
@@ -2717,6 +2718,15 @@ void CMenus::RenderSettingsBestClientGameplay(CUIRect MainView)
 		FinishPredictionView.HSplitTop(MarginSmall, nullptr, &FinishPredictionView);
 		FinishPredictionView.HSplitTop(LineSize, &Content, &FinishPredictionView);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcFinishPredictionShowAlways, Localize("Show always"), &g_Config.m_BcFinishPredictionShowAlways, &Content, LineSize);
+
+		FinishPredictionView.HSplitTop(MarginSmall, nullptr, &FinishPredictionView);
+		FinishPredictionView.HSplitTop(LineSize, &Content, &FinishPredictionView);
+		{
+			CUIRect AnalyseRow = Content;
+			DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &AnalyseRow, Localize("BETA"), 10.0f,
+				ColorRGBA(0.95f, 0.25f, 0.25f, 1.0f), ColorRGBA(0.75f, 0.08f, 0.08f, 1.0f), MarginSmall);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcFinishPredictionAnalyseTeleFreeze, Localize("Analyse teleports/freeze"), &g_Config.m_BcFinishPredictionAnalyseTeleFreeze, &AnalyseRow, LineSize);
+		}
 
 		Ui()->ClipDisable();
 	}

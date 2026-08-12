@@ -276,6 +276,7 @@ private:
 	mutable int m_FinishPredictionLastPredictTick = -1;
 	mutable int m_FinishPredictionFinishedRaceTick = -1;
 	mutable bool m_FinishPredictionUsingFastPractice = false;
+	mutable bool m_FinishPredictionAnalyseTeleFreeze = false;
 
 	inline int GetDigitsIndex(int Value, int Max);
 

@@ -313,6 +313,7 @@ MACRO_CONFIG_INT(BcFinishPredictionTimeMode, bc_finish_prediction_time_mode, 0, 
 MACRO_CONFIG_INT(BcFinishPredictionShowTime, bc_finish_prediction_show_time, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show finish prediction time")
 MACRO_CONFIG_INT(BcFinishPredictionShowPercentage, bc_finish_prediction_show_percentage, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show finish prediction progress percentage")
 MACRO_CONFIG_INT(BcFinishPredictionShowMillis, bc_finish_prediction_show_millis, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show finish prediction milliseconds")
+MACRO_CONFIG_INT(BcFinishPredictionAnalyseTeleFreeze, bc_finish_prediction_analyse_tele_freeze, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Analyse teleports and pass-through freeze walls for finish prediction")
 
 // Fast Actions
 MACRO_CONFIG_INT(BcFastActions, bc_fast_actions, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable the Fast Actions quick command selector")

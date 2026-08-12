@@ -35,6 +35,7 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <map>
 #include <queue>
 #include <vector>
 
@@ -698,6 +699,7 @@ void CHud::OnReset()
 	m_FinishPredictionLastPredictTick = -1;
 	m_FinishPredictionFinishedRaceTick = -1;
 	m_FinishPredictionUsingFastPractice = false;
+	m_FinishPredictionAnalyseTeleFreeze = false;
 	m_KeystrokesMouse1EndTime = 0;
 	m_KeystrokesWheelUpEndTime = 0;
 	m_KeystrokesWheelDownEndTime = 0;
@@ -3511,6 +3513,7 @@ bool CHud::RebuildFinishPredictionPathData() const
 	m_FinishPredictionSmoothedFinishTimeMs = -1;
 	m_FinishPredictionLastPredictTick = -1;
 	m_FinishPredictionFinishedRaceTick = -1;
+	m_FinishPredictionAnalyseTeleFreeze = g_Config.m_BcFinishPredictionAnalyseTeleFreeze != 0;
 
 	if(!Collision() || Collision()->GetWidth() <= 0 || Collision()->GetHeight() <= 0)
 		return false;
@@ -3521,10 +3524,39 @@ bool CHud::RebuildFinishPredictionPathData() const
 	m_vFinishPredictionDistances.assign(MapSize, -1);
 	m_vFinishPredictionPassable.assign(MapSize, 0);
 
+	const bool AnalyseTeleFreeze = m_FinishPredictionAnalyseTeleFreeze;
+	const auto IsFreezeTile = [](int GameTile, int FrontTile) {
+		return GameTile == TILE_FREEZE || GameTile == TILE_DFREEZE || GameTile == TILE_LFREEZE ||
+		       FrontTile == TILE_FREEZE || FrontTile == TILE_DFREEZE || FrontTile == TILE_LFREEZE;
+	};
+	const auto IsUnfreezeTile = [](int GameTile, int FrontTile) {
+		return GameTile == TILE_UNFREEZE || GameTile == TILE_DUNFREEZE || GameTile == TILE_LUNFREEZE ||
+		       FrontTile == TILE_UNFREEZE || FrontTile == TILE_DUNFREEZE || FrontTile == TILE_LUNFREEZE;
+	};
+	const auto IsSolidWallTile = [](int GameTile, int FrontTile) {
+		return GameTile == TILE_SOLID || GameTile == TILE_NOHOOK ||
+		       FrontTile == TILE_SOLID || FrontTile == TILE_NOHOOK;
+	};
+	const auto HasNearbyTile = [&](int TileX, int TileY, int Radius, const auto &Pred) {
+		for(int y = maximum(0, TileY - Radius); y <= minimum(m_FinishPredictionMapHeight - 1, TileY + Radius); ++y)
+		{
+			for(int x = maximum(0, TileX - Radius); x <= minimum(m_FinishPredictionMapWidth - 1, TileX + Radius); ++x)
+			{
+				const int NearbyIndex = y * m_FinishPredictionMapWidth + x;
+				if(Pred(Collision()->GetTileIndex(NearbyIndex), Collision()->GetFrontTileIndex(NearbyIndex)))
+					return true;
+			}
+		}
+		return false;
+	};
+
 	// Use tile solidity instead of TestBox-per-tile: TestBox does 4 collision probes
 	// and freezes the main thread for seconds on large maps.
 	using TDistanceNode = std::pair<int, int>;
 	std::priority_queue<TDistanceNode, std::vector<TDistanceNode>, std::greater<>> PriorityQueue;
+	std::map<int, std::vector<int>> TeleInsByNumber;
+	const CTeleTile *pTeleLayer = AnalyseTeleFreeze ? Collision()->TeleLayer() : nullptr;
+
 	for(int y = 0; y < m_FinishPredictionMapHeight; ++y)
 	{
 		for(int x = 0; x < m_FinishPredictionMapWidth; ++x)
@@ -3532,9 +3564,32 @@ bool CHud::RebuildFinishPredictionPathData() const
 			const int Index = y * m_FinishPredictionMapWidth + x;
 			const int GameTile = Collision()->GetTileIndex(Index);
 			const int FrontTile = Collision()->GetFrontTileIndex(Index);
-			const bool Blocked = GameTile == TILE_SOLID || GameTile == TILE_NOHOOK ||
-					    FrontTile == TILE_SOLID || FrontTile == TILE_NOHOOK;
+			const bool SolidBlocked = IsSolidWallTile(GameTile, FrontTile);
+			bool Blocked = SolidBlocked;
+
+			// With analyse mode: treat freeze as blocked unless it looks like a
+			// pass-through freeze wall (solid wall nearby + unfreeze nearby).
+			if(!Blocked && AnalyseTeleFreeze && IsFreezeTile(GameTile, FrontTile))
+			{
+				const bool NearWall = HasNearbyTile(x, y, 2, IsSolidWallTile);
+				const bool NearUnfreeze = HasNearbyTile(x, y, 6, IsUnfreezeTile);
+				Blocked = !(NearWall && NearUnfreeze);
+			}
+
 			m_vFinishPredictionPassable[Index] = Blocked ? 0 : 1;
+
+			if(AnalyseTeleFreeze && pTeleLayer)
+			{
+				const unsigned char TeleNumber = pTeleLayer[Index].m_Number;
+				const unsigned char TeleType = pTeleLayer[Index].m_Type;
+				if(TeleNumber > 0 && (TeleType == TILE_TELEIN || TeleType == TILE_TELEINEVIL || TeleType == TILE_TELEOUT))
+				{
+					// Keep teleport endpoints walkable so reverse-search edges can connect rooms.
+					m_vFinishPredictionPassable[Index] = 1;
+					if(TeleType == TILE_TELEIN || TeleType == TILE_TELEINEVIL)
+						TeleInsByNumber[TeleNumber].push_back(Index);
+				}
+			}
 
 			const bool StartTile = GameTile == TILE_START || FrontTile == TILE_START;
 			const bool FinishTile = GameTile == TILE_FINISH || FrontTile == TILE_FINISH;
@@ -3567,6 +3622,18 @@ bool CHud::RebuildFinishPredictionPathData() const
 		{{-1, 1}, 14},
 		{{-1, -1}, 14},
 	};
+	constexpr int TeleportEdgeCost = 10;
+	auto TryRelax = [&](int NextIndex, int NextDistance) {
+		if(NextIndex < 0 || NextIndex >= MapSize)
+			return;
+		if(m_vFinishPredictionPassable[NextIndex] == 0)
+			return;
+		if(m_vFinishPredictionDistances[NextIndex] >= 0 && m_vFinishPredictionDistances[NextIndex] <= NextDistance)
+			return;
+		m_vFinishPredictionDistances[NextIndex] = NextDistance;
+		PriorityQueue.emplace(NextDistance, NextIndex);
+	};
+
 	while(!PriorityQueue.empty())
 	{
 		const auto [CurDist, Index] = PriorityQueue.top();
@@ -3592,12 +3659,23 @@ bool CHud::RebuildFinishPredictionPathData() const
 				if(m_vFinishPredictionPassable[SideIndexX] == 0 || m_vFinishPredictionPassable[SideIndexY] == 0)
 					continue;
 			}
+			TryRelax(NextIndex, CurDist + DirInfo.m_Cost);
+		}
 
-			const int NextDistance = CurDist + DirInfo.m_Cost;
-			if(m_vFinishPredictionDistances[NextIndex] >= 0 && m_vFinishPredictionDistances[NextIndex] <= NextDistance)
-				continue;
-			m_vFinishPredictionDistances[NextIndex] = NextDistance;
-			PriorityQueue.emplace(NextDistance, NextIndex);
+		// Reverse-search teleport edges: finish <- ... <- tele-out <- tele-in
+		if(AnalyseTeleFreeze && pTeleLayer)
+		{
+			const unsigned char TeleNumber = pTeleLayer[Index].m_Number;
+			const unsigned char TeleType = pTeleLayer[Index].m_Type;
+			if(TeleNumber > 0 && TeleType == TILE_TELEOUT)
+			{
+				const auto InsIt = TeleInsByNumber.find(TeleNumber);
+				if(InsIt != TeleInsByNumber.end())
+				{
+					for(const int TeleInIndex : InsIt->second)
+						TryRelax(TeleInIndex, CurDist + TeleportEdgeCost);
+				}
+			}
 		}
 	}
 
@@ -3608,9 +3686,11 @@ bool CHud::EnsureFinishPredictionPathData() const
 {
 	if(!Collision() || Collision()->GetWidth() <= 0 || Collision()->GetHeight() <= 0)
 		return false;
+	const bool AnalyseTeleFreeze = g_Config.m_BcFinishPredictionAnalyseTeleFreeze != 0;
 	if(m_FinishPredictionMapWidth != Collision()->GetWidth() ||
 		m_FinishPredictionMapHeight != Collision()->GetHeight() ||
-		m_vFinishPredictionDistances.empty())
+		m_vFinishPredictionDistances.empty() ||
+		m_FinishPredictionAnalyseTeleFreeze != AnalyseTeleFreeze)
 		return RebuildFinishPredictionPathData();
 	return !m_vFinishPredictionDistances.empty();
 }

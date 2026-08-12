@@ -968,6 +968,9 @@ Show percentage
 Show always
 == Показывать всегда
 
+Analyse teleports/freeze
+== Анализ телепортов/фриза
+
 Lock team automatically after joining
 == Автоматически блокировать команду после входа
 

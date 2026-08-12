@@ -317,6 +317,7 @@ bc_f_input_others
 bc_fast_actions
 bc_filter_change_whole_word
 bc_finish_prediction
+bc_finish_prediction_analyse_tele_freeze
 bc_finish_prediction_show_always
 bc_finish_prediction_show_millis
 bc_finish_prediction_show_percentage
