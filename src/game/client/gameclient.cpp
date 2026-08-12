@@ -6801,6 +6801,12 @@ bool CGameClient::CheckNewInput()
 
 bool CGameClient::IsSnapTapBlockedByCommunity() const
 {
+	auto IsBlockedGameType = [](const char *pGameType) -> bool {
+		return pGameType != nullptr && pGameType[0] != '\0' &&
+			(str_find_nocase(pGameType, "ddracenet") != nullptr ||
+				str_find_nocase(pGameType, "0xf") != nullptr);
+	};
+
 	const char *pCommunityId = nullptr;
 
 	const CServerInfo &ServerInfo = Client()->ServerInfo();
@@ -6809,14 +6815,26 @@ bool CGameClient::IsSnapTapBlockedByCommunity() const
 	else if(m_ConnectServerInfo.has_value() && m_ConnectServerInfo->m_aCommunityId[0] != '\0')
 		pCommunityId = m_ConnectServerInfo->m_aCommunityId;
 
+	const auto *pEntry = ServerBrowser()->Find(Client()->ServerAddress());
 	if(pCommunityId == nullptr)
 	{
-		const auto *pEntry = ServerBrowser()->Find(Client()->ServerAddress());
 		if(pEntry && pEntry->m_Info.m_aCommunityId[0] != '\0')
 			pCommunityId = pEntry->m_Info.m_aCommunityId;
 	}
 
-	return pCommunityId != nullptr && str_comp_nocase(pCommunityId, IServerBrowser::COMMUNITY_DDNET) == 0;
+	if(pCommunityId != nullptr && str_comp_nocase(pCommunityId, IServerBrowser::COMMUNITY_DDNET) == 0)
+		return true;
+
+	if(IsBlockedGameType(ServerInfo.m_aGameType))
+		return true;
+	if(m_ConnectServerInfo.has_value() && IsBlockedGameType(m_ConnectServerInfo->m_aGameType))
+		return true;
+	if(pEntry && IsBlockedGameType(pEntry->m_Info.m_aGameType))
+		return true;
+	if(IsBlockedGameType(m_GameInfo.m_aGameType))
+		return true;
+
+	return false;
 }
 
 bool CGameClient::IsAspectRatioBlockedByFng() const
