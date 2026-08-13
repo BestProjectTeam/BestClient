@@ -380,10 +380,18 @@ void CMusicPlayerLyrics::ProcessRequest()
 	if(FinishedKey != m_ActiveKey)
 		return;
 
-	const EHttpState State = pFinished->State();
-	const int StatusCode = pFinished->StatusCode();
+	// Done() is also true for ERROR/ABORTED — must not call StatusCode() unless DONE.
+	if(pFinished->State() != EHttpState::DONE)
+	{
+		m_DisplayState = EDisplayState::Offline;
+		m_vLines.clear();
+		ClearActiveTrack();
+		m_OfflineRetryAt = time_get() + time_freq() * LYRICS_OFFLINE_RETRY_MS / 1000;
+		return;
+	}
 
-	if(State != EHttpState::DONE || StatusCode == 0)
+	const int StatusCode = pFinished->StatusCode();
+	if(StatusCode == 0)
 	{
 		m_DisplayState = EDisplayState::Offline;
 		m_vLines.clear();
