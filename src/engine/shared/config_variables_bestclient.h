@@ -141,10 +141,9 @@ MACRO_CONFIG_INT(BcMuteOthersHammer, bc_mute_others_hammer, 0, 0, 1, CFGFLAG_CLI
 
 // Translate
 MACRO_CONFIG_STR(BcTranslateIncomingSource, bc_translate_incoming_source, 16, "auto", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Source language for incoming chat translation (use auto to detect)")
-MACRO_CONFIG_STR(BcTranslateIncomingIgnoreLanguages, bc_translate_incoming_ignore_languages, 128, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Semicolon-separated source languages that should not be auto-translated, e.g. ru; en; zh")
+MACRO_CONFIG_STR(BcTranslateIncomingIgnoreLanguages, bc_translate_incoming_ignore_languages, 128, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Languages that should not be translated (incoming or outgoing), e.g. es/ru/zh")
 MACRO_CONFIG_STR(BcTranslateOutgoingSource, bc_translate_outgoing_source, 16, "auto", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Source language for your outgoing chat translation (use auto to detect)")
 MACRO_CONFIG_STR(BcTranslateOutgoingTarget, bc_translate_outgoing_target, 16, "en", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Target language for your outgoing chat translation")
-MACRO_CONFIG_INT(BcTranslateOutgoingStripPunctuation, bc_translate_outgoing_strip_punctuation, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Remove commas and periods from translated outgoing chat messages")
 
 // Casino
 MACRO_CONFIG_INT(BcCasinoBalance, bc_casino_balance, 500, 0, 9999999, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Casino game balance in dollars")

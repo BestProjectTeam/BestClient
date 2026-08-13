@@ -276,7 +276,6 @@ class CChat : public CComponent
 	CButtonContainer m_TranslateSettingsButton;
 	CButtonContainer m_TranslateSettingsEnableButton;
 	CButtonContainer m_TranslateSettingsEnableOutgoingButton;
-	CButtonContainer m_TranslateSettingsStripPunctuationButton;
 	SPopupMenuId m_TranslateSettingsPopupId;
 	bool m_TranslateButtonPressed;
 	bool m_TranslateButtonRectValid;

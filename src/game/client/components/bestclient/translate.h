@@ -41,22 +41,23 @@ class CTranslate : public CComponent
 		char m_aOriginalText[MAX_LINE_LENGTH] = "";
 		char m_aTextToTranslate[MAX_LINE_LENGTH] = "";
 		char m_aOutgoingPrefix[MAX_LINE_LENGTH] = "";
-		bool m_RespectIgnoredIncomingLanguages = false;
+		bool m_RespectSkippedLanguages = false;
 	};
 	std::vector<CTranslateJob> m_vJobs;
 
 	static void ConTranslate(IConsole::IResult *pResult, void *pUserData);
 	static void ConTranslateId(IConsole::IResult *pResult, void *pUserData);
-	static void ConToggleTranslate(IConsole::IResult *pResult, void *pUserData);
+	static void ConToggleTranslateOthers(IConsole::IResult *pResult, void *pUserData);
+	static void ConToggleTranslateYours(IConsole::IResult *pResult, void *pUserData);
 	std::unique_ptr<ITranslateBackend> CreateBackend(const char *pText, const char *pSourceLanguage, const char *pTargetLanguage) const;
 	const char *IncomingSourceLanguage() const;
 	const char *IncomingTargetLanguage() const;
 	const char *OutgoingSourceLanguage() const;
 	const char *OutgoingTargetLanguage() const;
-	bool IsIgnoredIncomingLanguage(const char *pLanguage) const;
+	bool IsSkippedLanguage(const char *pLanguage) const;
 	bool ShouldTranslateOutgoingChat(const char *pText) const;
 	bool HasPendingJobs() const;
-	void TranslateLine(CChat::CLine &Line, bool ShowProgress, bool RespectIgnoredIncomingLanguages);
+	void TranslateLine(CChat::CLine &Line, bool ShowProgress, bool RespectSkippedLanguages);
 
 public:
 	int Sizeof() const override { return sizeof(*this); }

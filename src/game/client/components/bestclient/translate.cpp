@@ -178,17 +178,6 @@ void NormalizeTranslatedText(char *pText, size_t Size)
 	str_copy(pText, Decoded.c_str(), Size);
 }
 
-void StripCommasAndPeriods(char *pText)
-{
-	char *pWrite = pText;
-	for(const char *pRead = pText; *pRead != '\0'; ++pRead)
-	{
-		if(*pRead != ',' && *pRead != '.')
-			*pWrite++ = *pRead;
-	}
-	*pWrite = '\0';
-}
-
 bool IsAutoLanguage(const char *pLanguage)
 {
 	return pLanguage == nullptr || pLanguage[0] == '\0' || str_comp_nocase(pLanguage, "auto") == 0;
@@ -226,9 +215,6 @@ bool SanitizeOutgoingTranslatedText(const char *pOriginalText, const char *pTran
 		if(str_comp(aNormalized, aBefore) == 0)
 			break;
 	}
-
-	if(g_Config.m_BcTranslateOutgoingStripPunctuation)
-		StripCommasAndPeriods(aNormalized);
 
 	if(!str_utf8_check(aNormalized) || *str_utf8_skip_whitespaces(aNormalized) == '\0' || HasUrlEncodedSequence(aNormalized))
 		return false;
@@ -831,13 +817,18 @@ void CTranslate::ConTranslateId(IConsole::IResult *pResult, void *pUserData)
 	pThis->Translate(pResult->GetInteger(0));
 }
 
-void CTranslate::ConToggleTranslate(IConsole::IResult *pResult, void *pUserData)
+void CTranslate::ConToggleTranslateOthers(IConsole::IResult *pResult, void *pUserData)
 {
 	CTranslate *pThis = static_cast<CTranslate *>(pUserData);
-	const int NewValue = g_Config.m_TcTranslateAutoIncoming ^ 1;
-	g_Config.m_TcTranslateAutoIncoming = NewValue;
-	g_Config.m_TcTranslateAutoOutgoing = NewValue;
-	pThis->GameClient()->m_Chat.Echo(NewValue ? Localize("Translation enabled") : Localize("Translation disabled"));
+	g_Config.m_TcTranslateAutoIncoming ^= 1;
+	pThis->GameClient()->m_Chat.Echo(g_Config.m_TcTranslateAutoIncoming ? Localize("Others translation enabled") : Localize("Others translation disabled"));
+}
+
+void CTranslate::ConToggleTranslateYours(IConsole::IResult *pResult, void *pUserData)
+{
+	CTranslate *pThis = static_cast<CTranslate *>(pUserData);
+	g_Config.m_TcTranslateAutoOutgoing ^= 1;
+	pThis->GameClient()->m_Chat.Echo(g_Config.m_TcTranslateAutoOutgoing ? Localize("Yours translation enabled") : Localize("Yours translation disabled"));
 }
 
 void CTranslate::OnConsoleInit()
@@ -858,7 +849,9 @@ void CTranslate::OnConsoleInit()
 
 	Console()->Register("translate", "?r[name]", CFGFLAG_CLIENT, ConTranslate, this, "Translate last message (of a given name)");
 	Console()->Register("translate_id", "v[id]", CFGFLAG_CLIENT, ConTranslateId, this, "Translate last message of the person with this id");
-	Console()->Register("toggle_translate", "", CFGFLAG_CLIENT, ConToggleTranslate, this, "Toggle auto-translate incoming and outgoing chat");
+	Console()->Register("toggle_translate", "", CFGFLAG_CLIENT, ConToggleTranslateOthers, this, "Toggle auto-translate for other players' chat (others)");
+	Console()->Register("toggle_translate_others", "", CFGFLAG_CLIENT, ConToggleTranslateOthers, this, "Toggle auto-translate for other players' chat (others)");
+	Console()->Register("toggle_translate_yours", "", CFGFLAG_CLIENT, ConToggleTranslateYours, this, "Toggle auto-translate for your outgoing chat (yours)");
 }
 
 std::unique_ptr<ITranslateBackend> CTranslate::CreateBackend(const char *pText, const char *pSourceLanguage, const char *pTargetLanguage) const
@@ -899,7 +892,7 @@ const char *CTranslate::OutgoingTargetLanguage() const
 	return g_Config.m_BcTranslateOutgoingTarget;
 }
 
-bool CTranslate::IsIgnoredIncomingLanguage(const char *pLanguage) const
+bool CTranslate::IsSkippedLanguage(const char *pLanguage) const
 {
 	if(!pLanguage || pLanguage[0] == '\0' || g_Config.m_BcTranslateIncomingIgnoreLanguages[0] == '\0')
 		return false;
@@ -912,13 +905,13 @@ bool CTranslate::IsIgnoredIncomingLanguage(const char *pLanguage) const
 	const char *pToken = g_Config.m_BcTranslateIncomingIgnoreLanguages;
 	while(*pToken != '\0')
 	{
-		while(*pToken != '\0' && (*pToken == ';' || *pToken == ',' || *pToken == '|' || std::isspace((unsigned char)*pToken)))
+		while(*pToken != '\0' && (*pToken == '/' || *pToken == ';' || *pToken == ',' || *pToken == '|' || std::isspace((unsigned char)*pToken)))
 			++pToken;
 		if(*pToken == '\0')
 			break;
 
 		const char *pTokenEnd = pToken;
-		while(*pTokenEnd != '\0' && *pTokenEnd != ';' && *pTokenEnd != ',' && *pTokenEnd != '|' && !std::isspace((unsigned char)*pTokenEnd))
+		while(*pTokenEnd != '\0' && *pTokenEnd != '/' && *pTokenEnd != ';' && *pTokenEnd != ',' && *pTokenEnd != '|' && !std::isspace((unsigned char)*pTokenEnd))
 			++pTokenEnd;
 
 		char aToken[32] = "";
@@ -948,6 +941,9 @@ bool CTranslate::ShouldTranslateOutgoingChat(const char *pText) const
 	if(IsAutoLanguage(OutgoingTargetLanguage()))
 		return false;
 	if(LanguagesEqual(OutgoingSourceLanguage(), OutgoingTargetLanguage()))
+		return false;
+	// Explicit source already known and listed in skip languages — keep original text.
+	if(!IsAutoLanguage(OutgoingSourceLanguage()) && IsSkippedLanguage(OutgoingSourceLanguage()))
 		return false;
 	return true;
 }
@@ -1030,7 +1026,7 @@ void CTranslate::Translate(CChat::CLine &Line, bool ShowProgress)
 	TranslateLine(Line, ShowProgress, false);
 }
 
-void CTranslate::TranslateLine(CChat::CLine &Line, bool ShowProgress, bool RespectIgnoredIncomingLanguages)
+void CTranslate::TranslateLine(CChat::CLine &Line, bool ShowProgress, bool RespectSkippedLanguages)
 {
 	if(m_vJobs.size() > 15)
 	{
@@ -1040,7 +1036,7 @@ void CTranslate::TranslateLine(CChat::CLine &Line, bool ShowProgress, bool Respe
 	CTranslateJob Job;
 	Job.m_Type = CTranslateJob::EType::CHAT_LINE;
 	Job.m_pLine = &Line;
-	Job.m_RespectIgnoredIncomingLanguages = RespectIgnoredIncomingLanguages;
+	Job.m_RespectSkippedLanguages = RespectSkippedLanguages;
 	Job.m_pTranslateResponse = std::make_shared<CTranslateResponse>();
 	Job.m_pLine->m_pTranslateResponse = Job.m_pTranslateResponse;
 	Job.m_pBackend = CreateBackend(Job.m_pLine->m_aText, IncomingSourceLanguage(), IncomingTargetLanguage());
@@ -1107,7 +1103,8 @@ void CTranslate::OnRender()
 			const char *pTextToSend = Job.m_aOriginalText;
 			char aTranslated[MAX_LINE_LENGTH] = "";
 			char aPrefixedTranslated[MAX_LINE_LENGTH] = "";
-			if(*Done && Job.m_pTranslateResponse->m_Text[0] != '\0' && str_comp_nocase(Job.m_aTextToTranslate, Job.m_pTranslateResponse->m_Text) != 0 &&
+			const bool SkippedLanguage = IsSkippedLanguage(Job.m_pTranslateResponse->m_Language);
+			if(*Done && !SkippedLanguage && Job.m_pTranslateResponse->m_Text[0] != '\0' && str_comp_nocase(Job.m_aTextToTranslate, Job.m_pTranslateResponse->m_Text) != 0 &&
 				SanitizeOutgoingTranslatedText(Job.m_aTextToTranslate, Job.m_pTranslateResponse->m_Text, aTranslated, sizeof(aTranslated)))
 			{
 				if(Job.m_aOutgoingPrefix[0] != '\0')
@@ -1130,7 +1127,7 @@ void CTranslate::OnRender()
 
 		if(*Done)
 		{
-			if(Job.m_RespectIgnoredIncomingLanguages && IsIgnoredIncomingLanguage(Job.m_pTranslateResponse->m_Language))
+			if(Job.m_RespectSkippedLanguages && IsSkippedLanguage(Job.m_pTranslateResponse->m_Language))
 			{
 				Job.m_pTranslateResponse->m_Text[0] = '\0';
 				Job.m_pTranslateResponse->m_Language[0] = '\0';
@@ -1170,6 +1167,9 @@ void CTranslate::AutoTranslate(CChat::CLine &Line)
 			return;
 	}
 	if(LanguagesEqual(IncomingSourceLanguage(), IncomingTargetLanguage()))
+		return;
+	// Explicit source already known and listed in skip languages — keep original text.
+	if(!IsAutoLanguage(IncomingSourceLanguage()) && IsSkippedLanguage(IncomingSourceLanguage()))
 		return;
 	TranslateLine(Line, false, true);
 }

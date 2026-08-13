@@ -1659,7 +1659,7 @@ void CChat::OpenTranslateSettingsPopup(const CUIRect &ButtonRect)
 	// Use UI-space coordinates so the popup is positioned correctly by CMenus
 	const float PopupW = 300.0f;
 	const float PopupX = m_TranslateButtonUiRect.x + m_TranslateButtonUiRect.w / 2.0f - PopupW / 2.0f;
-	Ui()->DoPopupMenu(&m_TranslateSettingsPopupId, PopupX, m_TranslateButtonUiRect.y, PopupW, 156.0f, this, PopupTranslateSettings);
+	Ui()->DoPopupMenu(&m_TranslateSettingsPopupId, PopupX, m_TranslateButtonUiRect.y, PopupW, 190.0f, this, PopupTranslateSettings);
 	(void)ButtonRect;
 }
 
@@ -1753,19 +1753,27 @@ CUi::EPopupMenuFunctionResult CChat::PopupTranslateSettings(void *pContext, CUIR
 		if(NewDstIdx != DstIdx)
 			ApplyTranslateLanguage(g_Config.m_BcTranslateOutgoingTarget, sizeof(g_Config.m_BcTranslateOutgoingTarget), NewDstIdx, gs_aTranslateTargetOptions);
 	}
-	View.HSplitTop(SmallGap, nullptr, &View);
-	{
-		CUIRect Row;
-		View.HSplitTop(18.0f, &Row, &View);
-		if(pChat->GameClient()->m_Menus.DoButton_CheckBox(&pChat->m_TranslateSettingsStripPunctuationButton, "No commas or periods", g_Config.m_BcTranslateOutgoingStripPunctuation, &Row))
-			g_Config.m_BcTranslateOutgoingStripPunctuation ^= 1;
-	}
 
 	RenderSep();
 
-	static CButtonContainer s_TranslateKeyReader;
-	static CButtonContainer s_TranslateKeyClear;
-	pChat->GameClient()->m_Menus.DoLine_KeyReader(View, s_TranslateKeyReader, s_TranslateKeyClear, Localize("Toggle translate"), "toggle_translate");
+	{
+		CUIRect Row, Label, Field;
+		View.HSplitTop(RowH, &Row, &View);
+		Row.VSplitLeft(Row.w * 0.42f, &Label, &Field);
+		pChat->Ui()->DoLabel(&Label, Localize("Skip languages"), FontSize, TEXTALIGN_ML);
+		static CLineInput s_IgnoreLanguagesInput;
+		s_IgnoreLanguagesInput.SetBuffer(g_Config.m_BcTranslateIncomingIgnoreLanguages, sizeof(g_Config.m_BcTranslateIncomingIgnoreLanguages));
+		s_IgnoreLanguagesInput.SetEmptyText("ru/en/zh");
+		pChat->Ui()->DoEditBox(&s_IgnoreLanguagesInput, &Field, FontSize);
+	}
+	View.HSplitTop(SmallGap, nullptr, &View);
+
+	static CButtonContainer s_TranslateOthersKeyReader;
+	static CButtonContainer s_TranslateOthersKeyClear;
+	static CButtonContainer s_TranslateYoursKeyReader;
+	static CButtonContainer s_TranslateYoursKeyClear;
+	pChat->GameClient()->m_Menus.DoLine_KeyReader(View, s_TranslateOthersKeyReader, s_TranslateOthersKeyClear, Localize("Others"), "toggle_translate");
+	pChat->GameClient()->m_Menus.DoLine_KeyReader(View, s_TranslateYoursKeyReader, s_TranslateYoursKeyClear, Localize("Yours"), "toggle_translate_yours");
 
 	return CUi::POPUP_KEEP_OPEN;
 }
