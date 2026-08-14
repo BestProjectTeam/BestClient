@@ -5027,6 +5027,14 @@ int main(int argc, const char **argv)
 
 		const char *pGraphicsError = pClient->Graphics() == nullptr ? "" : pClient->Graphics()->GetFatalError();
 		const bool GotGraphicsError = pGraphicsError[0] != '\0';
+		const bool OutOfVram = GotGraphicsError && str_find_nocase(pGraphicsError, "Out of VRAM") != nullptr;
+		const bool ResetSkinQuality = OutOfVram && g_Config.m_ClSkinMaxWidth > 1024 && pClient->ConfigManager() != nullptr;
+		if(ResetSkinQuality)
+		{
+			log_error("client", "Out of VRAM with cl_skin_max_width=%d, resetting to 1024", g_Config.m_ClSkinMaxWidth);
+			g_Config.m_ClSkinMaxWidth = 1024;
+			pClient->ConfigManager()->Save();
+		}
 		const char *pTitle;
 		const char *pPreamble;
 		const char *pPostamble;
@@ -5076,6 +5084,7 @@ int main(int argc, const char **argv)
 			"%s"
 			"%s\n\n"
 			"%s"
+			"%s"
 			"Platform: %s (%s)\n"
 			"Configuration: base"
 #if defined(CONF_AUTOUPDATE)
@@ -5102,6 +5111,7 @@ int main(int argc, const char **argv)
 			"%s", // GPU info
 			pPreamble,
 			pMsg,
+			ResetSkinQuality ? "Skin quality was reset to 1024px to prevent this crash on the next launch.\n\n" : "",
 			pPostamble,
 			CONF_PLATFORM_STRING, CONF_ARCH_ENDIAN_STRING,
 			GAME_NAME, GAME_RELEASE_VERSION, GIT_SHORTREV_HASH != nullptr ? GIT_SHORTREV_HASH : "",

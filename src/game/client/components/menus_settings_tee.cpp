@@ -2,6 +2,7 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include "menus.h"
 
+#include <base/math.h>
 #include <base/str.h>
 
 #include <engine/font_icons.h>
@@ -103,10 +104,12 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 	const float EyeButtonSize = 40.0f;
 	const float NameClanSkinHeight = 3.0f * 20.0f + 2.0f * 5.0f;
 	const float CustomColorsRowHeight = 20.0f;
-	const float EyesGridHeight = 2.0f * EyeButtonSize + 5.0f;
-	const float LeftStackHeight = NameClanSkinHeight + 5.0f + CustomColorsRowHeight;
+	const float EyesRowHeight = EyeButtonSize;
+	const float LeftStackHeight = NameClanSkinHeight + 5.0f + CustomColorsRowHeight + 5.0f + EyesRowHeight;
 	const float CheckboxesHeight = 4.0f * 20.0f;
-	const float MidStackHeight = CheckboxesHeight + 5.0f + EyesGridHeight;
+	const float QualitySliderHeight = 40.0f;
+	const float QualityWarningHeight = g_Config.m_ClSkinMaxWidth >= 4096 ? 42.0f : 0.0f;
+	const float MidStackHeight = CheckboxesHeight + 5.0f + QualitySliderHeight + QualityWarningHeight;
 	const float SkinPrefixHeight = 20.0f + 20.0f + 2.0f + 20.0f + 20.0f + 2.0f + 20.0f + 20.0f + 2.0f + 40.0f;
 	const float TopSectionHeight = maximum(maximum(LeftStackHeight, MidStackHeight), SkinPrefixHeight);
 
@@ -148,9 +151,51 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 		g_Config.m_ClFatSkins ^= 1;
 	}
 
-	// Emote preview 2x3 — fills the empty middle under checkboxes
 	Checkboxes.HSplitTop(5.0f, nullptr, &Checkboxes);
-	Checkboxes.HSplitTop(EyesGridHeight, &Eyes, &Checkboxes);
+	Checkboxes.HSplitTop(QualitySliderHeight, &Button, &Checkboxes);
+	{
+		static const int s_aSkinQualityWidths[] = {256, 512, 1024, 2048, 4096, 8192};
+		int QualityIndex = 0;
+		for(int i = 0; i < (int)std::size(s_aSkinQualityWidths); i++)
+		{
+			if(g_Config.m_ClSkinMaxWidth >= s_aSkinQualityWidths[i])
+				QualityIndex = i;
+		}
+
+		CUIRect QualityLabel, QualityBar;
+		Button.HSplitMid(&QualityLabel, &QualityBar);
+		const int NewQualityIndex = std::clamp(
+			round_to_int(Ui()->DoScrollbarH(&g_Config.m_ClSkinMaxWidth, &QualityBar, QualityIndex / (float)(std::size(s_aSkinQualityWidths) - 1)) * (float)(std::size(s_aSkinQualityWidths) - 1)),
+			0, (int)std::size(s_aSkinQualityWidths) - 1);
+		g_Config.m_ClSkinMaxWidth = s_aSkinQualityWidths[NewQualityIndex];
+
+		char aQualityBuf[64];
+		str_format(aQualityBuf, sizeof(aQualityBuf), "%s: %dpx", Localize("Skin quality"), g_Config.m_ClSkinMaxWidth);
+		Ui()->DoLabel(&QualityLabel, aQualityBuf, QualityLabel.h * CUi::ms_FontmodHeight * 0.8f, TEXTALIGN_ML);
+
+		static int s_AppliedSkinMaxWidth = -1;
+		if(s_AppliedSkinMaxWidth < 0)
+			s_AppliedSkinMaxWidth = g_Config.m_ClSkinMaxWidth;
+		if(!Ui()->CheckActiveItem(&g_Config.m_ClSkinMaxWidth) && s_AppliedSkinMaxWidth != g_Config.m_ClSkinMaxWidth)
+		{
+			s_AppliedSkinMaxWidth = g_Config.m_ClSkinMaxWidth;
+			GameClient()->RefreshSkins(CSkinDescriptor::FLAG_SIX | CSkinDescriptor::FLAG_SEVEN);
+		}
+		GameClient()->m_Tooltips.DoToolTip(&g_Config.m_ClSkinMaxWidth, &Button, Localize("Maximum skin texture size. Lower this if VRAM runs out with many high-resolution skins."));
+
+		if(g_Config.m_ClSkinMaxWidth >= 4096)
+		{
+			CUIRect WarningRect, WarningLine;
+			Checkboxes.HSplitTop(QualityWarningHeight > 0.0f ? QualityWarningHeight : 42.0f, &WarningRect, &Checkboxes);
+			TextRender()->TextColor(ColorRGBA(1.0f, 0.35f, 0.35f, 1.0f));
+			WarningRect.HSplitTop(14.0f, &WarningLine, &WarningRect);
+			Ui()->DoLabel(&WarningLine, Localize("warning"), 11.0f, TEXTALIGN_MC);
+			WarningRect.HSplitTop(14.0f, &WarningLine, &WarningRect);
+			Ui()->DoLabel(&WarningLine, Localize("high skin quality may exhaust VRAM"), 11.0f, TEXTALIGN_MC);
+			Ui()->DoLabel(&WarningRect, Localize("and crash your game"), 11.0f, TEXTALIGN_MC);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+		}
+	}
 
 	// Skin prefix
 	{
@@ -207,6 +252,8 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 	YourSkin.HSplitTop(NameClanSkinHeight, &TeePreview, &YourSkin);
 	YourSkin.HSplitTop(5.0f, nullptr, &YourSkin);
 	YourSkin.HSplitTop(CustomColorsRowHeight, &CustomColorsRow, &YourSkin);
+	YourSkin.HSplitTop(5.0f, nullptr, &YourSkin);
+	YourSkin.HSplitTop(EyesRowHeight, &Eyes, &YourSkin);
 
 	TeePreview.VSplitLeft(65.0f, &TeePreview, &Fields);
 	Fields.VSplitLeft(5.0f, nullptr, &Fields);
@@ -340,38 +387,6 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 	FlagIcon.x += (OldFlagWidth - FlagIcon.w) / 2.0f;
 	GameClient()->m_CountryFlags.Render(*pCountry, ColorRGBA(1.0f, 1.0f, 1.0f, Ui()->HotItem() == &s_FlagButton ? 1.0f : 0.85f), FlagIcon.x, FlagIcon.y, FlagIcon.w, FlagIcon.h);
 
-	// Default eyes — 2x3 grid in the middle empty space under checkboxes
-	{
-		CTeeRenderInfo EyeSkinInfo = OwnSkinInfo;
-		EyeSkinInfo.m_Size = EyeButtonSize;
-		vec2 OffsetToMid;
-		CRenderTools::GetRenderTeeOffsetToRenderedTee(CAnimState::GetIdle(), &EyeSkinInfo, OffsetToMid);
-
-		static CButtonContainer s_aEyeButtons[NUM_EMOTES];
-		CUIRect EyesRow;
-		Eyes.HSplitTop(EyeButtonSize, &EyesRow, &Eyes);
-		for(int CurrentEyeEmote = 0; CurrentEyeEmote < NUM_EMOTES; CurrentEyeEmote++)
-		{
-			EyesRow.VSplitLeft(EyeButtonSize, &Button, &EyesRow);
-			EyesRow.VSplitLeft(5.0f, nullptr, &EyesRow);
-			if((CurrentEyeEmote + 1) % 3 == 0 && CurrentEyeEmote + 1 < NUM_EMOTES)
-			{
-				Eyes.HSplitTop(5.0f, nullptr, &Eyes);
-				Eyes.HSplitTop(EyeButtonSize, &EyesRow, &Eyes);
-			}
-
-			const ColorRGBA EyeButtonColor = ColorRGBA(1.0f, 1.0f, 1.0f, 0.25f + (*pEmote == CurrentEyeEmote ? 0.25f : 0.0f));
-			if(DoButton_Menu(&s_aEyeButtons[CurrentEyeEmote], "", 0, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, EyeButtonColor))
-			{
-				*pEmote = CurrentEyeEmote;
-				if((int)m_Dummy == g_Config.m_ClDummy)
-					GameClient()->m_Emoticon.EyeEmote(CurrentEyeEmote);
-			}
-			GameClient()->m_Tooltips.DoToolTip(&s_aEyeButtons[CurrentEyeEmote], &Button, Localize("Choose default eyes when joining a server"));
-			RenderTools()->RenderTee(CAnimState::GetIdle(), &EyeSkinInfo, CurrentEyeEmote, vec2(1.0f, 0.0f), vec2(Button.x + Button.w / 2.0f, Button.y + Button.h / 2.0f + OffsetToMid.y));
-		}
-	}
-
 	// Custom colors — under Name/Clan/Skin
 	CustomColorsButton = CustomColorsRow;
 	CustomColorsButton.VSplitRight(30.0f, &CustomColorsButton, &RandomSkinButton);
@@ -421,6 +436,34 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 	{
 		*pUseCustomColor = *pUseCustomColor ? 0 : 1;
 		SetNeedSendInfo();
+	}
+
+	// Default eyes — one row under Custom colors
+	{
+		const float EyeSpacing = 4.0f;
+		const float FittedEyeSize = std::min(Eyes.h, (Eyes.w - EyeSpacing * (NUM_EMOTES - 1)) / (float)NUM_EMOTES);
+		CTeeRenderInfo EyeSkinInfo = OwnSkinInfo;
+		EyeSkinInfo.m_Size = FittedEyeSize;
+		vec2 OffsetToMid;
+		CRenderTools::GetRenderTeeOffsetToRenderedTee(CAnimState::GetIdle(), &EyeSkinInfo, OffsetToMid);
+
+		static CButtonContainer s_aEyeButtons[NUM_EMOTES];
+		for(int CurrentEyeEmote = 0; CurrentEyeEmote < NUM_EMOTES; CurrentEyeEmote++)
+		{
+			Eyes.VSplitLeft(FittedEyeSize, &Button, &Eyes);
+			if(CurrentEyeEmote + 1 < NUM_EMOTES)
+				Eyes.VSplitLeft(EyeSpacing, nullptr, &Eyes);
+
+			const ColorRGBA EyeButtonColor = ColorRGBA(1.0f, 1.0f, 1.0f, 0.25f + (*pEmote == CurrentEyeEmote ? 0.25f : 0.0f));
+			if(DoButton_Menu(&s_aEyeButtons[CurrentEyeEmote], "", 0, &Button, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, EyeButtonColor))
+			{
+				*pEmote = CurrentEyeEmote;
+				if((int)m_Dummy == g_Config.m_ClDummy)
+					GameClient()->m_Emoticon.EyeEmote(CurrentEyeEmote);
+			}
+			GameClient()->m_Tooltips.DoToolTip(&s_aEyeButtons[CurrentEyeEmote], &Button, Localize("Choose default eyes when joining a server"));
+			RenderTools()->RenderTee(CAnimState::GetIdle(), &EyeSkinInfo, CurrentEyeEmote, vec2(1.0f, 0.0f), vec2(Button.x + Button.w / 2.0f, Button.y + Button.h / 2.0f + OffsetToMid.y));
+		}
 	}
 
 	// Custom color pickers — immediately under the top section

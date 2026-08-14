@@ -148,6 +148,21 @@ bool CSkins7::LoadSkinPart(int PartType, const char *pName, int DirType)
 		return false;
 	}
 
+	// Same VRAM guard as 0.6 skins: downscale oversized custom parts.
+	const size_t MaxWidth = (size_t)g_Config.m_ClSkinMaxWidth;
+	if(Info.m_Width > MaxWidth)
+	{
+		size_t NewWidth = MaxWidth;
+		size_t NewHeight = (NewWidth * Info.m_Height) / Info.m_Width;
+		if(NewWidth < 1)
+			NewWidth = 1;
+		if(NewHeight < 1)
+			NewHeight = 1;
+		log_info("skins7", "Downscaling skin part '%s/%s' from %" PRIzu "x%" PRIzu " to %" PRIzu "x%" PRIzu,
+			CSkins7::ms_apSkinPartNames[PartType], pName, Info.m_Width, Info.m_Height, NewWidth, NewHeight);
+		ResizeImage(Info, NewWidth, NewHeight);
+	}
+
 	CSkinPart Part;
 	Part.m_Type = PartType;
 	Part.m_Flags = 0;

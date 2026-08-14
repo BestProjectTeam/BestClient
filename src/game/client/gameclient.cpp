@@ -481,6 +481,7 @@ void CGameClient::OnConsoleInit()
 	Console()->Chain("cl_download_skins", ConchainRefreshSkins, this);
 	Console()->Chain("cl_download_community_skins", ConchainRefreshSkins, this);
 	Console()->Chain("cl_vanilla_skins_only", ConchainRefreshSkins, this);
+	Console()->Chain("cl_skin_max_width", ConchainRefreshSkinMaxWidth, this);
 	Console()->Chain("events", ConchainRefreshEventSkins, this);
 
 	Console()->Chain("cl_dummy", ConchainSpecialDummy, this);
@@ -6153,6 +6154,16 @@ void CGameClient::ConchainRefreshSkins(IConsole::IResult *pResult, void *pUserDa
 	if(pResult->NumArguments() && pThis->m_Menus.IsInit())
 	{
 		pThis->RefreshSkins(CSkinDescriptor::FLAG_SIX);
+	}
+}
+
+void CGameClient::ConchainRefreshSkinMaxWidth(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData)
+{
+	CGameClient *pThis = static_cast<CGameClient *>(pUserData);
+	pfnCallback(pResult, pCallbackUserData);
+	if(pResult->NumArguments() && pThis->m_Menus.IsInit())
+	{
+		pThis->RefreshSkins(CSkinDescriptor::FLAG_SIX | CSkinDescriptor::FLAG_SEVEN);
 	}
 }
 
