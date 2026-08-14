@@ -2890,7 +2890,7 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	const float AutoLockDelayHeight = g_Config.m_BcAutoTeamLock ? LineSize : 0.0f;
 	const float SpecMovedNotifyTextHeight = g_Config.m_BcSpecMovedNotify ? LineSize : 0.0f;
 	const float CinematicCameraStrengthHeight = g_Config.m_BcCinematicCamera ? LineSize : 0.0f;
-	const float MiscBlockHeight = LineSize + MarginSmall + AutoUpdateHeight + 20.0f * LineSize + 2.5f + AutoLockDelayHeight + SpecMovedNotifyTextHeight + RealHitboxColorHeight + CinematicCameraStrengthHeight;
+	const float MiscBlockHeight = LineSize + MarginSmall + AutoUpdateHeight + 19.0f * LineSize + 2.5f + AutoLockDelayHeight + SpecMovedNotifyTextHeight + RealHitboxColorHeight + CinematicCameraStrengthHeight;
 	CUIRect MiscBlock;
 	Column.HSplitTop(MiscBlockHeight, &MiscBlock, &Column);
 
@@ -2955,10 +2955,6 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcMastersrv, Localize("Use BestClient MasterServer"), &g_Config.m_BcMastersrv, &MiscBlock, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowhudDummyCoordIndicator, Localize("Show player below indicator"), &g_Config.m_BcShowhudDummyCoordIndicator, &MiscBlock, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowCorrectCheckpoint, Localize("Show current checkpoint in hud"), &g_Config.m_BcShowCorrectCheckpoint, &MiscBlock, LineSize);
-	{
-		static CButtonContainer s_FindTeleportReader, s_FindTeleportClear;
-		DoLine_KeyReader(MiscBlock, s_FindTeleportReader, s_FindTeleportClear, Localize("Find teleport"), "bc_goto_tele_cursor");
-	}
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowRealHitbox, Localize("Show real hitbox"), &g_Config.m_BcShowRealHitbox, &MiscBlock, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcAutoTeamLock, Localize("Lock team automatically after joining"), &g_Config.m_BcAutoTeamLock, &MiscBlock, LineSize);
 	if(g_Config.m_BcAutoTeamLock)

@@ -1711,6 +1711,9 @@ Show current checkpoint in hud
 Find teleport
 == Найти телепорт
 
+Find finish
+== Найти финиш
+
 Extend zoom (0.5 steps)
 == Расширенный зум (шаг 0,5)
 
