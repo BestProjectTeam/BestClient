@@ -1789,6 +1789,9 @@ Eyes
 Gif Wheel
 == Колесо GIF
 
+Temporarily unavailable
+== Временно недоступно
+
 Semicolon-separated allowlist, for example: tenor.com; imgur.com; giphy.com; gifs.teeworlds.xyz; cdn.discordapp.com
 == Разрешённые домены через точку с запятой, например: tenor.com; imgur.com; giphy.com; gifs.teeworlds.xyz; cdn.discordapp.com
 
