@@ -151,7 +151,12 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 	// handle keyboard shortcuts independent of active menu
 	float PositionToSeek = -1.0f;
 	float TimeToSeek = 0.0f;
-	if(!GameClient()->m_GameConsole.IsActive() && m_DemoPlayerState == DEMOPLAYER_NONE && g_Config.m_ClDemoKeyboardShortcuts && !Ui()->IsPopupOpen())
+	// When the navbar is hidden, ignore leftover UI popups so demo hotkeys still work.
+	const bool DemoHotkeysAllowed = !GameClient()->m_GameConsole.IsActive() &&
+					m_DemoPlayerState == DEMOPLAYER_NONE &&
+					g_Config.m_ClDemoKeyboardShortcuts &&
+					(!m_MenuActive || !Ui()->IsPopupOpen());
+	if(DemoHotkeysAllowed)
 	{
 		// increase/decrease speed
 		if(!Input()->ModifierIsPressed() && !Input()->ShiftIsPressed() && !Input()->AltIsPressed())

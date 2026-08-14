@@ -2517,6 +2517,14 @@ void CMenus::SetActive(bool Active)
 	{
 		Ui()->SetHotItem(nullptr);
 		Ui()->SetActiveItem(nullptr);
+		if(!Active)
+		{
+			// Popups and active line inputs block demo hotkeys via IsPopupOpen() /
+			// text composition. Clear them when hiding the navbar with Escape.
+			Ui()->ClosePopupMenus();
+			if(CLineInput *pActiveInput = CLineInput::GetActiveInput())
+				pActiveInput->Deactivate();
+		}
 	}
 	m_MenuActive = Active;
 	if(!m_MenuActive)
@@ -2533,7 +2541,7 @@ void CMenus::SetActive(bool Active)
 			m_NeedSendDummyinfo = false;
 		}
 
-		if(Client()->State() == IClient::STATE_ONLINE)
+		if(Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK)
 		{
 			GameClient()->OnRelease();
 		}
@@ -2569,8 +2577,17 @@ bool CMenus::OnCursorMove(float x, float y, IInput::ECursorType CursorType)
 
 bool CMenus::OnInput(const IInput::CEvent &Event)
 {
-	// Escape key is always handled to activate/deactivate menu
-	if((Event.m_Flags & IInput::FLAG_PRESS && Event.m_Key == KEY_ESCAPE) || IsActive() || s_AspectConfirmWantsInput)
+	// Escape is always handled to activate/deactivate the menu.
+	// While a demo is playing with the navbar hidden, consume keyboard input so
+	// binds cannot steal demo hotkeys (pause/seek/speed) from RenderDemoPlayer.
+	// Leave mouse wheel alone when inactive so zoom binds still work.
+	const bool IsMouseWheel = Event.m_Key == KEY_MOUSE_WHEEL_UP || Event.m_Key == KEY_MOUSE_WHEEL_DOWN ||
+				  Event.m_Key == KEY_MOUSE_WHEEL_LEFT || Event.m_Key == KEY_MOUSE_WHEEL_RIGHT;
+	const bool DemoHotkeys = Client()->State() == IClient::STATE_DEMOPLAYBACK &&
+				 g_Config.m_ClDemoKeyboardShortcuts &&
+				 m_DemoPlayerState == DEMOPLAYER_NONE &&
+				 !IsMouseWheel;
+	if((Event.m_Flags & IInput::FLAG_PRESS && Event.m_Key == KEY_ESCAPE) || IsActive() || s_AspectConfirmWantsInput || DemoHotkeys)
 	{
 		Ui()->OnInput(Event);
 		return true;
