@@ -85,16 +85,6 @@
 #include <cmath>
 #include <limits>
 
-#if defined(CONF_FAMILY_WINDOWS)
-// clang-format off
-#include <windows.h>
-#include <tlhelp32.h>
-// clang-format on
-#ifdef ERROR
-#undef ERROR
-#endif
-#endif
-
 using namespace std::chrono_literals;
 
 const char *CGameClient::Version() const { return GAME_VERSION; }
@@ -157,38 +147,6 @@ bool CGameClient::OptimizerAllowRenderPos(vec2 WorldPos) const
 
 	const vec2 Center = m_Camera.m_Center;
 	return std::abs(WorldPos.x - Center.x) <= HalfW && std::abs(WorldPos.y - Center.y) <= HalfH;
-}
-
-void CGameClient::OptimizerUpdateProcessPriorities()
-{
-#if defined(CONF_FAMILY_WINDOWS)
-	const bool WantDdnetHigh = OptimizerEnabled() && g_Config.m_BcOptimizerDdnetPriorityHigh != 0;
-	if(WantDdnetHigh && !m_OptimizerDdnetPriorityHighActive)
-	{
-		const DWORD Prev = GetPriorityClass(GetCurrentProcess());
-		m_OptimizerDdnetPrevPriorityClass = Prev != 0 ? (unsigned long)Prev : (unsigned long)NORMAL_PRIORITY_CLASS;
-		m_OptimizerDdnetPriorityHighActive = true;
-	}
-	else if(!WantDdnetHigh && m_OptimizerDdnetPriorityHighActive)
-	{
-		SetPriorityClass(GetCurrentProcess(), (DWORD)m_OptimizerDdnetPrevPriorityClass);
-		m_OptimizerDdnetLastSetPriorityClass = m_OptimizerDdnetPrevPriorityClass;
-		m_OptimizerDdnetPriorityHighActive = false;
-	}
-
-	if(m_OptimizerDdnetPriorityHighActive)
-	{
-		// Only call SetPriorityClass when the priority isn't already HIGH_PRIORITY_CLASS
-		// to avoid a redundant kernel API call every frame.
-		if(m_OptimizerDdnetLastSetPriorityClass != (unsigned long)HIGH_PRIORITY_CLASS)
-		{
-			SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
-			m_OptimizerDdnetLastSetPriorityClass = (unsigned long)HIGH_PRIORITY_CLASS;
-		}
-	}
-#else
-	(void)0;
-#endif
 }
 
 void CGameClient::RenderOptimizerFpsFogRect()
@@ -327,6 +285,7 @@ void CGameClient::OnConsoleInit()
 					      &m_GifBubbles, // BestClient
 					      &m_ChatBubbles, // BestClient
 					      &m_PhysicBalls, // BestClient (from Entity-Client)
+					      &m_ProcessPriority, // BestClient (from Entity-Client)
 					      &m_Particles.m_RenderExtra,
 					      &m_Particles.m_RenderGeneral,
 					      &m_FreezeBars,
@@ -1088,7 +1047,17 @@ void CGameClient::OnRender()
 		pComponent->OnRender();
 	}
 
-	OptimizerUpdateProcessPriorities(); // BestClient
+	IEngineGraphics *pGraphics = Kernel()->RequestInterface<IEngineGraphics>();
+	if(pGraphics)
+	{
+		if(m_WasWindowActive != pGraphics->WindowActive())
+		{
+			for(auto &pComponent : m_vpAll)
+				pComponent->OnFocusChange(pGraphics->WindowActive());
+			m_WasWindowActive = pGraphics->WindowActive();
+		}
+	}
+
 	if(UseGameNoHudAspect && HudAspectDisabled)
 		Graphics()->SetScreenAspectOverrideEnabled(true);
 	RenderOptimizerFpsFogRect(); // BestClient

@@ -2204,7 +2204,7 @@ void CMenus::RenderSettingsBestClientGameplay(CUIRect MainView)
 	else
 		s_OptimizerFpsFogRevealPhase = OptimizerFpsFogExpanded ? 1.0f : 0.0f;
 	const float OptimizerFpsFogExpandedHeight = (4.0f * (MarginSmall + LineSize)) * BCUiAnimations::EaseOutCubic(s_OptimizerFpsFogRevealPhase);
-	const float OptimizerExpandedHeight = (3.0f * (MarginSmall + LineSize)) * BCUiAnimations::EaseOutCubic(s_OptimizerRevealPhase) + OptimizerFpsFogExpandedHeight;
+	const float OptimizerExpandedHeight = (2.0f * (MarginSmall + LineSize)) * BCUiAnimations::EaseOutCubic(s_OptimizerRevealPhase) + OptimizerFpsFogExpandedHeight;
 	const float OptimizerHeaderHeight = LineSize + MarginSmall + LineSize;
 	const float OptimizerBlockHeight = OptimizerHeaderHeight + OptimizerExpandedHeight;
 
@@ -2240,10 +2240,6 @@ void CMenus::RenderSettingsBestClientGameplay(CUIRect MainView)
 		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
 		MainView.HSplitTop(LineSize, &Content, &MainView);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcOptimizerFpsFog, Localize("FPS fog (cull outside limit)"), &g_Config.m_BcOptimizerFpsFog, &Content, LineSize);
-
-		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
-		MainView.HSplitTop(LineSize, &Content, &MainView);
-		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcOptimizerDdnetPriorityHigh, Localize("DDNet priority: High"), &g_Config.m_BcOptimizerDdnetPriorityHigh, &Content, LineSize);
 
 		if(OptimizerFpsFogExpandedHeight > 0.5f)
 		{
@@ -2284,6 +2280,43 @@ void CMenus::RenderSettingsBestClientGameplay(CUIRect MainView)
 
 		Ui()->ClipDisable();
 	}
+
+#if defined(CONF_FAMILY_WINDOWS)
+	// Performance (left column block, from Entity-Client)
+	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
+
+	const float PerformanceBlockHeight = LineSize + MarginSmall + LineSize + MarginSmall + LineSize;
+	CUIRect PerformanceBlock;
+	Column.HSplitTop(PerformanceBlockHeight, &PerformanceBlock, &Column);
+
+	CUIRect PerformanceBlockBg = PerformanceBlock;
+	PerformanceBlockBg.w += BlockPadding;
+	PerformanceBlockBg.h += BlockPadding;
+	PerformanceBlockBg.x -= BlockPadding * 0.5f;
+	PerformanceBlockBg.y -= BlockPadding * 0.5f;
+	PerformanceBlockBg.Draw(BlockColor, IGraphics::CORNER_ALL, 10.0f);
+
+	MainView = PerformanceBlock;
+	MainView.HSplitTop(LineSize, &Label, &MainView);
+	CUIRect PerformanceTitleLabel = Label;
+	PerformanceTitleLabel.VSplitRight(MarginSmall, &PerformanceTitleLabel, nullptr);
+	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &PerformanceTitleLabel, Localize("NEW"), 12.0f,
+		ColorRGBA(0.25f, 0.85f, 0.40f, 1.0f), ColorRGBA(0.10f, 0.60f, 0.25f, 1.0f), MarginSmall);
+	Ui()->DoLabel(&PerformanceTitleLabel, Localize("Performance"), HeadlineFontSize, TEXTALIGN_ML);
+	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+
+	MainView.HSplitTop(LineSize, &Content, &MainView);
+	if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcHighProcessPriority, Localize("High DDNet Process Priority"), &g_Config.m_BcHighProcessPriority, &Content, LineSize))
+		GameClient()->m_ProcessPriority.SetDDNetProcessPriority(g_Config.m_BcHighProcessPriority);
+
+	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+	MainView.HSplitTop(LineSize, &Content, &MainView);
+	if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcDiscordNormalProcessPriority, Localize("Lower Discords Process Priority"), &g_Config.m_BcDiscordNormalProcessPriority, &Content, LineSize))
+	{
+		if(g_Config.m_BcDiscordNormalProcessPriority)
+			GameClient()->m_ProcessPriority.StartDiscordPriorityThread();
+	}
+#endif
 
 	// Gores mode (left column block)
 	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);

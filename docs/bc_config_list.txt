@@ -97,6 +97,7 @@ bc_custom_aspect_ratio_mode
 bc_custom_aspect_ratio_num
 bc_delta_input_amount
 bc_delta_input_others
+bc_discord_normal_process_priority
 bc_dynamic_fov
 bc_dynamic_fov_amount
 bc_dynamic_fov_smoothness
@@ -128,6 +129,7 @@ bc_gif_bubble_offset_y
 bc_gores_mode
 bc_gores_mode_disable_weapons
 bc_hide_hud_in_settings
+bc_high_process_priority
 bc_hook_combo
 bc_hook_combo_mode
 bc_hook_combo_reset_time
@@ -211,9 +213,7 @@ bc_nameplate_gradient_skin
 bc_nameplate_voice_offset_x
 bc_nameplate_voice_offset_y
 bc_optimizer
-bc_optimizer_ddnet_priority_high
 bc_optimizer_disable_particles
-bc_optimizer_discord_priority_below_normal
 bc_optimizer_fps_fog
 bc_optimizer_fps_fog_cull_map_tiles
 bc_optimizer_fps_fog_mode

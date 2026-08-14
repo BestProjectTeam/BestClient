@@ -2969,6 +2969,8 @@ if(CLIENT)
     components/bestclient/cloud_input.h
     components/bestclient/physicball.cpp
     components/bestclient/physicball.h
+    components/bestclient/process_priority.cpp
+    components/bestclient/process_priority.h
     components/bestclient/spec_pause_radio.cpp
     components/bestclient/spec_pause_radio.h
     components/bestclient/fast_actions.cpp

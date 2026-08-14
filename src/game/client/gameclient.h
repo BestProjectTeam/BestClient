@@ -92,6 +92,7 @@ class CSnapshotBuffer;
 #include "components/bestclient/chat_bubbles.h"
 #include "components/bestclient/cloud_input.h"
 #include "components/bestclient/physicball.h"
+#include "components/bestclient/process_priority.h"
 #include "components/bestclient/spec_pause_radio.h"
 #include "components/bestclient/fast_actions.h"
 #include "components/bestclient/fast_practice.h"
@@ -256,6 +257,7 @@ public:
 	CGifBubbles m_GifBubbles; // BestClient
 	CChatBubbles m_ChatBubbles; // BestClient
 	CPhysicBalls m_PhysicBalls; // BestClient (from Entity-Client)
+	CProcessPriority m_ProcessPriority; // BestClient (from Entity-Client)
 	CSpecPauseRadio m_SpecPauseRadio; // BestClient (from Entity-Client)
 	CFastPractice m_FastPractice; // BestClient
 	CCloudInput m_CloudInput; // BestClient
@@ -1098,11 +1100,8 @@ private:
 	void RenderEyeComfortOverlay(); // BestClient
 
 	// BestClient: optimizer
-	void OptimizerUpdateProcessPriorities();
 	void RenderOptimizerFpsFogRect();
-	unsigned long m_OptimizerDdnetPrevPriorityClass = 0;
-	unsigned long m_OptimizerDdnetLastSetPriorityClass = 0;
-	bool m_OptimizerDdnetPriorityHighActive = false;
+	int m_WasWindowActive = 1;
 
 	int m_aLastUpdateTick[MAX_CLIENTS] = {0};
 	void DetectStrongHook();
