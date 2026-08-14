@@ -2981,6 +2981,60 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 
 	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
 
+	// Twitch Chat Integration
+	const float TwitchLogLineSize = 14.0f;
+	const float TwitchChatBlockHeight = LineSize + MarginSmall + LineSize + MarginSmall + LineSize + MarginSmall + LineSize;
+
+	CUIRect TwitchChatBlock;
+	Column.HSplitTop(TwitchChatBlockHeight, &TwitchChatBlock, &Column);
+
+	CUIRect TwitchChatBlockBg = TwitchChatBlock;
+	TwitchChatBlockBg.w += BlockPadding;
+	TwitchChatBlockBg.h += BlockPadding;
+	TwitchChatBlockBg.x -= BlockPadding * 0.5f;
+	TwitchChatBlockBg.y -= BlockPadding * 0.5f;
+	TwitchChatBlockBg.Draw(BlockColor, IGraphics::CORNER_ALL, 10.0f);
+
+	TwitchChatBlock.HSplitTop(LineSize, &Label, &TwitchChatBlock);
+	CUIRect TwitchTitleLabel = Label;
+	TwitchTitleLabel.VSplitRight(MarginSmall, &TwitchTitleLabel, nullptr);
+	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &TwitchTitleLabel, Localize("NEW"), 12.0f,
+		ColorRGBA(0.25f, 0.85f, 0.40f, 1.0f), ColorRGBA(0.10f, 0.60f, 0.25f, 1.0f), MarginSmall);
+	Ui()->DoLabel(&TwitchTitleLabel, Localize("Twitch Chat"), HeadlineFontSize, TEXTALIGN_ML);
+	TwitchChatBlock.HSplitTop(MarginSmall, nullptr, &TwitchChatBlock);
+
+	TwitchChatBlock.HSplitTop(LineSize, &Button, &TwitchChatBlock);
+	static CLineInput s_TwitchChatNickInput;
+	s_TwitchChatNickInput.SetBuffer(g_Config.m_BcTwitchChatNick, sizeof(g_Config.m_BcTwitchChatNick));
+	s_TwitchChatNickInput.SetEmptyText("channel");
+	CUIRect TwitchNickLabel, TwitchNickField;
+	Button.VSplitLeft(minimum(70.0f, Button.w * 0.28f), &TwitchNickLabel, &TwitchNickField);
+	Ui()->DoLabel(&TwitchNickLabel, Localize("Nick"), 14.0f, TEXTALIGN_ML);
+	Ui()->DoClearableEditBox(&s_TwitchChatNickInput, &TwitchNickField, 14.0f);
+	TwitchChatBlock.HSplitTop(MarginSmall, nullptr, &TwitchChatBlock);
+
+	TwitchChatBlock.HSplitTop(LineSize, &Button, &TwitchChatBlock);
+	CUIRect TwitchStartButton;
+	Button.VSplitRight(100.0f, nullptr, &TwitchStartButton);
+	static CButtonContainer s_TwitchStartButton;
+	const bool TwitchActive = GameClient()->m_TwitchChat.IsActive();
+	if(DoButton_Menu(&s_TwitchStartButton, TwitchActive ? Localize("Stop") : Localize("Start"), 0, &TwitchStartButton))
+	{
+		if(TwitchActive)
+			GameClient()->m_TwitchChat.Stop();
+		else
+			GameClient()->m_TwitchChat.Start();
+	}
+	TwitchChatBlock.HSplitTop(MarginSmall, nullptr, &TwitchChatBlock);
+
+	CUIRect TwitchLogRect;
+	TwitchChatBlock.HSplitTop(LineSize, &TwitchLogRect, &TwitchChatBlock);
+	char aTwitchStatus[128];
+	GameClient()->m_TwitchChat.GetStatusText(aTwitchStatus, sizeof(aTwitchStatus));
+	Ui()->DoLabel(&TwitchLogRect, aTwitchStatus, TwitchLogLineSize, TEXTALIGN_ML);
+
+	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
+
 	const bool RollbackExpanded = g_Config.m_ClReplays != 0;
 	static float s_RollbackRevealPhase = 0.0f;
 	UpdateModuleRevealPhase(s_RollbackRevealPhase, RollbackExpanded, Client()->RenderFrameTime());

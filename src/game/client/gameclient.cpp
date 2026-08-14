@@ -321,6 +321,7 @@ void CGameClient::OnConsoleInit()
 					      &m_GameConsole,
 					      &m_MenuBackground,
 					      &m_VoiceChat, // BestClient
+					      &m_TwitchChat, // BestClient
 					      &m_Clans, // BestClient
 					      &m_SwapTimer, // BestClient
 					      &m_HudEditor});

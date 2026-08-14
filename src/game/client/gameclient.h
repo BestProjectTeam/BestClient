@@ -108,6 +108,7 @@ class CSnapshotBuffer;
 #include "components/bestclient/show_points.h"
 #include "components/bestclient/swap_timer.h"
 #include "components/bestclient/translate.h"
+#include "components/bestclient/twitch_chat.h"
 #include "components/bestclient/voice/voice.h"
 #include "components/bestclient/clans/clans.h"
 #include "components/tclient/warlist.h"
@@ -277,6 +278,7 @@ public:
 	CAdminPanel m_AdminPanel; // BestClient
 	CBcAutoMargin m_BcAutoMargin; // BestClient
 	CVoiceChat m_VoiceChat; // BestClient
+	CTwitchChat m_TwitchChat; // BestClient
 	CClans m_Clans; // BestClient
 	CHudEditor m_HudEditor; // BestClient
 	CSwapTimer m_SwapTimer; // BestClient

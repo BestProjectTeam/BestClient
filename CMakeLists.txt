@@ -3009,6 +3009,8 @@ if(CLIENT)
     components/bestclient/swap_timer.h
     components/bestclient/translate.cpp
     components/bestclient/translate.h
+    components/bestclient/twitch_chat.cpp
+    components/bestclient/twitch_chat.h
     components/bestclient/version.h
     components/bestclient/visualizer/analyzer.cpp
     components/bestclient/visualizer/analyzer.h
