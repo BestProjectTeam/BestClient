@@ -3003,6 +3003,19 @@ void CEditor::RenderLayers(CUIRect LayersBox)
 
 		State.m_ScrollToSelectionNext = true;
 	}
+	if(Input()->ModifierIsPressed() && !Input()->ShiftIsPressed() && m_Dialog == DIALOG_NONE && !Ui()->IsPopupOpen() && CLineInput::GetActiveInput() == nullptr && State.m_Operation == ELayerOperation::NONE)
+	{
+		if(Input()->KeyPress(KEY_MOUSE_WHEEL_DOWN))
+		{
+			Map()->SelectNextLayer();
+			State.m_ScrollToSelectionNext = true;
+		}
+		if(Input()->KeyPress(KEY_MOUSE_WHEEL_UP))
+		{
+			Map()->SelectPreviousLayer();
+			State.m_ScrollToSelectionNext = true;
+		}
+	}
 
 	CUIRect AddGroupButton, CollapseAllButton;
 	LayersBox.HSplitTop(RowHeight + 1.0f, &AddGroupButton, &LayersBox);
@@ -4164,7 +4177,7 @@ void CEditor::Render()
 				MapView()->ResetZoom();
 		}
 
-		if(m_pBrush->IsEmpty() || !Input()->ShiftIsPressed())
+		if(!Input()->ModifierIsPressed() && (m_pBrush->IsEmpty() || !Input()->ShiftIsPressed()))
 		{
 			if(Input()->KeyPress(KEY_MOUSE_WHEEL_DOWN))
 				MapView()->Zoom()->ScaleValue(1.1f);
