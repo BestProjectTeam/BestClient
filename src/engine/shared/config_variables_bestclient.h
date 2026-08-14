@@ -243,6 +243,7 @@ MACRO_CONFIG_INT(BcCrystalLaser, bc_crystal_laser, 0, 0, 1, CFGFLAG_CLIENT | CFG
 
 // Flying name plates
 MACRO_CONFIG_INT(BcFlyingNamePlates, bc_flying_name_plates, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Render name plates like flying kites attached to players")
+MACRO_CONFIG_INT(BcFlyingNamePlatesHideLine, bc_flying_name_plates_hide_line, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide the line between players and flying name plates")
 MACRO_CONFIG_INT(BcFlyingNamePlatesLift, bc_flying_name_plates_lift, 28, 0, 120, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Extra vertical lift for flying name plates")
 MACRO_CONFIG_INT(BcFlyingNamePlatesDrag, bc_flying_name_plates_drag, 52, 0, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "How far flying name plates trail behind movement")
 MACRO_CONFIG_INT(BcFlyingNamePlatesFollow, bc_flying_name_plates_follow, 40, 1, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "How quickly flying name plates catch up to their target position")

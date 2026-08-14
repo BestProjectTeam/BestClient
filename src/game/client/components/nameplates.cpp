@@ -1258,6 +1258,8 @@ void CNamePlates::RenderFlyingNamePlateRopeGame(vec2 Position, const CNetObj_Pla
 {
 	if(!g_Config.m_BcFlyingNamePlates)
 		return;
+	if(g_Config.m_BcFlyingNamePlatesHideLine)
+		return;
 	if(g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideNames)
 		return;
 	if(!(pPlayerInfo->m_Local ? g_Config.m_ClNamePlatesOwn : g_Config.m_ClNamePlates))
@@ -1548,7 +1550,8 @@ void CNamePlates::RenderNamePlatePreview(vec2 Position, int Dummy)
 	if(g_Config.m_BcFlyingNamePlates)
 	{
 		const vec2 FlyingPos = Position - vec2(0.0f, (float)g_Config.m_BcFlyingNamePlatesLift) - TeeDirection * ((float)g_Config.m_BcFlyingNamePlatesDrag * 0.35f);
-		RenderFlyingNamePlateLine(*GameClient(), FlyingNamePlateAnchorPos(TeePos), FlyingPos, Data.m_Color);
+		if(!g_Config.m_BcFlyingNamePlatesHideLine)
+			RenderFlyingNamePlateLine(*GameClient(), FlyingNamePlateAnchorPos(TeePos), FlyingPos, Data.m_Color);
 		NamePlate.Render(*GameClient(), FlyingPos);
 	}
 	else

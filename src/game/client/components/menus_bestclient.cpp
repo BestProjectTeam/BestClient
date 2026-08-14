@@ -992,7 +992,7 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 	static float s_FlyingNamePlatesRevealPhase = 0.0f;
 	UpdateModuleRevealPhase(s_FlyingNamePlatesRevealPhase, FlyingNamePlatesExpanded, Client()->RenderFrameTime());
 	const float FlyingNamePlatesHeaderHeight = LineSize + MarginSmall + LineSize;
-	const float FlyingNamePlatesExpandedTargetHeight = MarginSmall + LineSize + MarginSmall + LineSize + MarginSmall + LineSize;
+	const float FlyingNamePlatesExpandedTargetHeight = MarginSmall + LineSize + MarginSmall + LineSize + MarginSmall + LineSize + MarginSmall + LineSize;
 	const float FlyingNamePlatesExpandedHeight = FlyingNamePlatesExpandedTargetHeight * BCUiAnimations::EaseOutCubic(s_FlyingNamePlatesRevealPhase);
 	const float FlyingNamePlatesBlockHeight = FlyingNamePlatesHeaderHeight + FlyingNamePlatesExpandedHeight;
 
@@ -1016,6 +1016,7 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 	GameClient()->m_Tooltips.DoToolTip(&s_FlyingNamePlatesResetButton, &FlyingNamePlatesResetButton, Localize("Reset to defaults"));
 	if(FlyingNamePlatesResetClicked)
 	{
+		g_Config.m_BcFlyingNamePlatesHideLine = DefaultConfig::BcFlyingNamePlatesHideLine;
 		g_Config.m_BcFlyingNamePlatesLift = DefaultConfig::BcFlyingNamePlatesLift;
 		g_Config.m_BcFlyingNamePlatesDrag = DefaultConfig::BcFlyingNamePlatesDrag;
 		g_Config.m_BcFlyingNamePlatesFollow = DefaultConfig::BcFlyingNamePlatesFollow;
@@ -1031,6 +1032,10 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		CUIRect Visible = MainView;
 		Visible.h = FlyingNamePlatesExpandedHeight;
 		Ui()->ClipEnable(&Visible);
+
+		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+		MainView.HSplitTop(LineSize, &Content, &MainView);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcFlyingNamePlatesHideLine, Localize("Hide line"), &g_Config.m_BcFlyingNamePlatesHideLine, &Content, LineSize);
 
 		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
 		MainView.HSplitTop(LineSize, &Button, &MainView);
