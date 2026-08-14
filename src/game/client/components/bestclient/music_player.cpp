@@ -3992,45 +3992,36 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	const bool RenderMiniLayout = CompactMiniLayout;
 	const bool RenderCover = ShowCover;
 	const bool RenderVisualizer = true;
-	const float VisualW = MusicPlayerVisualizerWidth(RenderMiniLayout, Scale, WidthScale, ExpandT);
+	// Lerp mini->expanded geometry with ExpandT so lyrics TextArea (equal cover/visualizer
+	// gaps) does not jump sideways when CompactMiniLayout flips off at ExpandT~0.
+	const float LayoutT = ExpandT;
 	const bool HasMusic = Snapshot.m_PlaybackState == EMusicPlaybackState::PLAYING;
-	const float VisualH = RenderMiniLayout ? maximum(0.0f, View.h - 1.8f * Scale) : (HasMusic ? (8.2f * Scale + ExpandT * 2.1f * Scale) : (3.6f * Scale + ExpandT * 0.6f * Scale));
-	CUIRect ArtRect{};
-	CUIRect VisualRect{};
+	const float MiniVisualW = MusicPlayerVisualizerWidth(true, Scale, WidthScale, 0.0f);
+	const float ExpandedVisualW = MusicPlayerVisualizerWidth(false, Scale, WidthScale, 1.0f);
+	const float VisualW = mix(MiniVisualW, ExpandedVisualW, LayoutT);
+	const float MiniVisualH = maximum(0.0f, View.h - 1.8f * Scale);
+	const float ExpandedVisualH = HasMusic ? (8.2f * Scale + 2.1f * Scale) : (3.6f * Scale + 0.6f * Scale);
+	const float VisualH = mix(MiniVisualH, ExpandedVisualH, LayoutT);
+	const float MiniArtSize = RenderCover ? maximum(0.0f, View.h - 1.7f * Scale) : 0.0f;
+	const float ExpandedArtSize = RenderCover ? minimum(View.h - 1.6f * Scale, 13.2f * Scale + 2.2f * Scale) : 0.0f;
+	const float ArtSize = mix(MiniArtSize, ExpandedArtSize, LayoutT);
+	const float CoverPad = mix(0.95f, 1.15f, LayoutT) * Scale * WidthScale;
+	const float VisualPad = mix(1.05f, 1.15f, LayoutT) * Scale * WidthScale;
+	const float VisualRightInset = mix(1.70f, 1.95f, LayoutT) * Scale * WidthScale;
+	CUIRect ArtRect = {Content.x + (RenderCover ? 0.1f * Scale * WidthScale : 0.0f), View.y + (View.h - ArtSize) * 0.5f, ArtSize, ArtSize};
+	CUIRect VisualRect = RenderVisualizer ?
+		CUIRect{View.x + View.w - VisualRightInset - VisualW, View.y + (View.h - VisualH) * 0.5f, VisualW, VisualH} :
+		CUIRect{View.x + View.w, View.y, 0.0f, 0.0f};
 	CUIRect TextArea = Content;
-	if(RenderMiniLayout)
-	{
-		const float MiniVisualPad = 1.05f * Scale * WidthScale;
-		const float MiniCoverPad = 0.95f * Scale * WidthScale;
-		const float MiniArtSize = RenderCover ? maximum(0.0f, View.h - 1.7f * Scale) : 0.0f;
-		ArtRect = {Content.x + (RenderCover ? 0.1f * Scale * WidthScale : 0.0f), View.y + (View.h - MiniArtSize) * 0.5f, MiniArtSize, MiniArtSize};
-		VisualRect = RenderVisualizer ?
-			CUIRect{View.x + View.w - 1.70f * Scale * WidthScale - VisualW, View.y + (View.h - VisualH) * 0.5f, VisualW, VisualH} :
-			CUIRect{View.x + View.w, View.y, 0.0f, 0.0f};
-		TextArea = Content;
-		if(RenderCover)
-			TextArea.x = ArtRect.x + ArtRect.w + MiniCoverPad;
-		TextArea.w = RenderVisualizer ? maximum(0.0f, VisualRect.x - MiniVisualPad - TextArea.x) : maximum(0.0f, Content.x + Content.w - TextArea.x);
-	}
-	else
-	{
-		const float VisualPad = 1.15f * Scale * WidthScale;
-		const float ArtSize = RenderCover ? minimum(View.h - 1.6f * Scale, 13.2f * Scale + ExpandT * 2.2f * Scale) : 0.0f;
-		ArtRect = {Content.x + (RenderCover ? 0.1f * Scale * WidthScale : 0.0f), View.y + (View.h - ArtSize) * 0.5f, ArtSize, ArtSize};
-		VisualRect = RenderVisualizer ?
-			CUIRect{View.x + View.w - 1.95f * Scale * WidthScale - VisualW, View.y + (View.h - VisualH) * 0.5f, VisualW, VisualH} :
-			CUIRect{View.x + View.w, View.y, 0.0f, 0.0f};
-		if(RenderCover)
-			TextArea.x = ArtRect.x + ArtRect.w + 1.15f * Scale * WidthScale;
-		TextArea.w = RenderVisualizer ? maximum(0.0f, VisualRect.x - VisualPad - TextArea.x) : maximum(0.0f, Content.x + Content.w - TextArea.x);
-	}
+	if(RenderCover)
+		TextArea.x = ArtRect.x + ArtRect.w + CoverPad;
+	TextArea.w = RenderVisualizer ? maximum(0.0f, VisualRect.x - VisualPad - TextArea.x) : maximum(0.0f, Content.x + Content.w - TextArea.x);
 	const float TextRight = RenderVisualizer ? VisualRect.x : (Content.x + Content.w);
 	const float TextCenterX = View.x + View.w * 0.5f;
 	const float TextHalfW = maximum(0.0f, minimum(TextCenterX - TextArea.x, TextRight - TextCenterX));
 	CUIRect CenteredTextArea = TextHalfW > 0.0f ? CUIRect{TextCenterX - TextHalfW, TextArea.y, TextHalfW * 2.0f, TextArea.h} : TextArea;
-	// Lyrics with cover: use the full cover→visualizer span so title/lines aren't clipped, and
-	// the text center sits between those edges (pill-centering leaves a larger gap by the cover).
-	// Mini non-lyrics still uses TextArea; other modes stay pill-centered.
+	// Lyrics with cover: cover->visualizer span (equal gaps). Non-lyrics expanded stays
+	// pill-centered; mini non-lyrics keeps TextArea + insets.
 	CUIRect LayoutTextArea = (LyricsEnabled && RenderCover) ? TextArea : ((RenderMiniLayout && !LyricsEnabled) ? TextArea : CenteredTextArea);
 	if(RenderMiniLayout && !LyricsEnabled)
 	{
@@ -4091,15 +4082,16 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 		m_pImpl->UpdateVisualizerLevels(this, Snapshot, (int64_t)PositionMs, NumBars, Delta);
 
 		const bool SoftRounding = IsSoftVisualizerRounding();
-		const float VisualInnerPadX = MusicPlayerVisualizerInnerPadX(RenderMiniLayout, Scale, WidthScale);
-		const float VisualInnerPadY = RenderMiniLayout ? maximum(0.8f, 0.9f * Scale) : 0.20f * Scale;
+		const float VisualInnerPadX = mix(MusicPlayerVisualizerInnerPadX(true, Scale, WidthScale), MusicPlayerVisualizerInnerPadX(false, Scale, WidthScale), LayoutT);
+		const float VisualInnerPadY = mix(maximum(0.8f, 0.9f * Scale), 0.20f * Scale, LayoutT);
 		const float VisualInnerW = maximum(0.0f, VisualRect.w - VisualInnerPadX * 2.0f);
 		const float VisualInnerH = maximum(0.0f, VisualRect.h - VisualInnerPadY * 2.0f);
-		const float Gap = MusicPlayerVisualizerGap(RenderMiniLayout, Scale, WidthScale);
-		const float BarW = maximum(PixelWidth, minimum(MusicPlayerVisualizerBarWidth(RenderMiniLayout, Scale, WidthScale), (VisualInnerW - Gap * (NumBars - 1)) / maximum(1.0f, (float)NumBars)));
+		const float Gap = mix(MusicPlayerVisualizerGap(true, Scale, WidthScale), MusicPlayerVisualizerGap(false, Scale, WidthScale), LayoutT);
+		const float BarWMax = mix(MusicPlayerVisualizerBarWidth(true, Scale, WidthScale), MusicPlayerVisualizerBarWidth(false, Scale, WidthScale), LayoutT);
+		const float BarW = maximum(PixelWidth, minimum(BarWMax, (VisualInnerW - Gap * (NumBars - 1)) / maximum(1.0f, (float)NumBars)));
 		const float BarsTotalW = NumBars * BarW + (NumBars - 1) * Gap;
 		const float BarsStartX = VisualRect.x + VisualInnerPadX + maximum(0.0f, (VisualInnerW - BarsTotalW) * 0.5f);
-		const float LaneH = maximum(RenderMiniLayout ? 2.8f * Scale : 5.2f * Scale, VisualInnerH);
+		const float LaneH = maximum(mix(2.8f * Scale, 5.2f * Scale, LayoutT), VisualInnerH);
 		const float LaneY = VisualRect.y + VisualInnerPadY + (VisualInnerH - LaneH) * 0.5f;
 		const float BaseMidY = LaneY + LaneH * 0.5f;
 		const int VisualizerMode = std::clamp(g_Config.m_BcMusicPlayerVisualizerMode, 0, 2);
