@@ -463,7 +463,9 @@ void CCamera::OnRender()
 				m_CinematicCameraPosition = m_Center;
 				m_CinematicCameraSmoothing = true;
 			}
-			const float FollowSpeed = 8.0f;
+			// Strength 0 = mild (faster follow), 50 ≈ previous default 8, 100 = strong (slower follow)
+			const float Strength01 = g_Config.m_BcCinematicCameraStrength / 100.0f;
+			const float FollowSpeed = maximum(0.5f, 16.0f * (1.0f - Strength01));
 			m_CinematicCameraPosition += (TargetCenter - m_CinematicCameraPosition) * minimum(Client()->RenderFrameTime() * FollowSpeed, 1.0f);
 			m_Center = m_CinematicCameraPosition;
 		}

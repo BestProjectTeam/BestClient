@@ -71,6 +71,7 @@ bc_chat_typing_animation_ms
 bc_cherrygifs_show_nsfw
 bc_cherrygifs_sort_top
 bc_cinematic_camera
+bc_cinematic_camera_strength
 bc_clans_allow_local_dev
 bc_clans_api_url
 bc_clans_enabled

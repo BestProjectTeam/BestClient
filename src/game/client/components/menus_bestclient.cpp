@@ -2856,7 +2856,8 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	const float RealHitboxColorHeight = g_Config.m_BcShowRealHitbox ? RealHitboxColorLineSize + RealHitboxColorLineSpacing : 0.0f;
 	const float AutoLockDelayHeight = g_Config.m_BcAutoTeamLock ? LineSize : 0.0f;
 	const float SpecMovedNotifyTextHeight = g_Config.m_BcSpecMovedNotify ? LineSize : 0.0f;
-	const float MiscBlockHeight = LineSize + MarginSmall + AutoUpdateHeight + 20.0f * LineSize + 2.5f + AutoLockDelayHeight + SpecMovedNotifyTextHeight + RealHitboxColorHeight;
+	const float CinematicCameraStrengthHeight = g_Config.m_BcCinematicCamera ? LineSize : 0.0f;
+	const float MiscBlockHeight = LineSize + MarginSmall + AutoUpdateHeight + 20.0f * LineSize + 2.5f + AutoLockDelayHeight + SpecMovedNotifyTextHeight + RealHitboxColorHeight + CinematicCameraStrengthHeight;
 	CUIRect MiscBlock;
 	Column.HSplitTop(MiscBlockHeight, &MiscBlock, &Column);
 
@@ -2886,6 +2887,11 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcSilentTyping, Localize("Silent typing"), &g_Config.m_BcSilentTyping, &MiscBlock, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatAltCommandLayout, Localize("Commands in other layout"), &g_Config.m_BcChatAltCommandLayout, &MiscBlock, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcCinematicCamera, Localize("Cinematic camera"), &g_Config.m_BcCinematicCamera, &MiscBlock, LineSize);
+	if(g_Config.m_BcCinematicCamera)
+	{
+		MiscBlock.HSplitTop(LineSize, &Button, &MiscBlock);
+		Ui()->DoScrollbarOption(&g_Config.m_BcCinematicCameraStrength, &g_Config.m_BcCinematicCameraStrength, &Button, Localize("Strength"), 0, 100, &CUi::ms_LinearScrollbarScale, 0, "%");
+	}
 	{
 		CUIRect BetterSpectateRow;
 		MiscBlock.HSplitTop(LineSize, &BetterSpectateRow, &MiscBlock);

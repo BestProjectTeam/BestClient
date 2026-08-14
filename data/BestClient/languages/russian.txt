@@ -1001,6 +1001,9 @@ Commands in other layout
 Cinematic camera
 == Кинематографическая камера
 
+Strength
+== Сила
+
 Use BestClient MasterServer
 == Использовать мастер-сервер BestClient
 
