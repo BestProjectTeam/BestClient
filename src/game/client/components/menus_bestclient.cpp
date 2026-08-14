@@ -2928,10 +2928,10 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	{
 		CUIRect BetterSpectateRow;
 		MiscBlock.HSplitTop(LineSize, &BetterSpectateRow, &MiscBlock);
-		DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &BetterSpectateRow, Localize("NEW"), 10.0f,
-			ColorRGBA(0.25f, 0.85f, 0.40f, 1.0f), ColorRGBA(0.10f, 0.60f, 0.25f, 1.0f), 4.0f);
-		DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &BetterSpectateRow, "E-Client", 10.0f,
-			ColorRGBA(0.95f, 0.80f, 0.20f, 1.0f), ColorRGBA(0.75f, 0.55f, 0.05f, 1.0f), 4.0f);
+		DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &BetterSpectateRow, Localize("NEW"), 12.0f,
+			ColorRGBA(0.25f, 0.85f, 0.40f, 1.0f), ColorRGBA(0.10f, 0.60f, 0.25f, 1.0f), MarginSmall);
+		DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &BetterSpectateRow, "E-Client", 12.0f,
+			ColorRGBA(0.95f, 0.80f, 0.20f, 1.0f), ColorRGBA(0.75f, 0.55f, 0.05f, 1.0f), MarginSmall);
 		if(DoButton_CheckBox(&g_Config.m_BcBetterSpectate, Localize("Better spectate"), g_Config.m_BcBetterSpectate, &BetterSpectateRow))
 		{
 			g_Config.m_BcBetterSpectate ^= 1;
