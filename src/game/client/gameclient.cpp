@@ -943,8 +943,6 @@ void CGameClient::UpdatePositions()
 				if(m_Snap.m_pLocalCharacter)
 					m_LocalCharacterPos = mix(m_PredictedPrevChar.m_Pos, m_PredictedChar.m_Pos, Client()->PredIntraGameTick(g_Config.m_ClDummy));
 			}
-			//		else
-			//			m_LocalCharacterPos = mix(m_PredictedPrevChar.m_Pos, m_PredictedChar.m_Pos, Client()->PredIntraGameTick(g_Config.m_ClDummy));
 		}
 	}
 	else if(m_Snap.m_pLocalCharacter && m_Snap.m_pLocalPrevCharacter)
@@ -4167,12 +4165,6 @@ bool CGameClient::GotWantedSkin7(bool Dummy)
 	}
 
 	// TODO: add name change ddnet extension to 0.7 protocol
-	// if(str_comp(m_aClients[m_aLocalIds[(int)Dummy]].m_aName, Dummy ? Client()->DummyName() : Client()->PlayerName()))
-	// 	return false;
-	// if(str_comp(m_aClients[m_aLocalIds[(int)Dummy]].m_aClan, Dummy ? g_Config.m_ClDummyClan : g_Config.m_PlayerClan))
-	// 	return false;
-	// if(m_aClients[m_aLocalIds[(int)Dummy]].m_Country != (Dummy ? g_Config.m_ClDummyCountry : g_Config.m_PlayerCountry))
-	// 	return false;
 
 	return true;
 }
@@ -5272,8 +5264,6 @@ vec2 CGameClient::GetFreezePos(int ClientId)
 
 		m_SmoothTick = SmoothTick;
 		m_SmoothIntraTick = SmoothIntra;
-		m_aCloudSmoothTick[0] = m_aCloudSmoothTick[1] = SmoothTick;
-		m_aCloudSmoothIntraTick[0] = m_aCloudSmoothIntraTick[1] = SmoothIntra;
 
 		m_CloudInput.ApplyOffset(*this, ClientId, SmoothTick, SmoothIntra);
 		m_CloudInput.TryGetPredPos(*this, ClientId, SmoothTick, SmoothIntra, Pos);
@@ -5314,8 +5304,6 @@ vec2 CGameClient::GetFreezePos(int ClientId)
 	}
 	if(g_Config.m_TcRemoveAnti && pChar && AdjustTicks > 0 && FreezeTime > 0)
 		MixAmount = mix(0.0f, 1.0f, 1.0f - AdjustTicks / (float)DelayTicks);
-	// else if(AdjustTicks == 0 && ClientId != m_Snap.m_LocalClientId)
-	//	MixAmount = 1.f - std::pow(1.f - TimePassed / (float)Len, 1.2f);
 	else // our tee when not frozen
 		MixAmount = 1.f;
 

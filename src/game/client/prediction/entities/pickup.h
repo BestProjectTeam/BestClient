@@ -20,7 +20,6 @@ public:
 	bool InDDNetTile() const { return m_IsCoreActive; }
 
 	int Type() const { return m_Type; }
-	int Subtype() const { return m_Subtype; }
 	int Flags() const { return m_Flags; }
 
 private:

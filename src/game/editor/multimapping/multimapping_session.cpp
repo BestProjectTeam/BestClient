@@ -608,7 +608,6 @@ void CMultiMappingSession::FlushTileEdits()
 {
 	if(m_Socket == nullptr || m_vPendingTileEdits.empty())
 		return;
-	m_LastTileEditSentTime = time_get();
 	for(const auto &Edit : m_vPendingTileEdits)
 	{
 		if(Edit.m_ExtraType == 0)
@@ -1047,13 +1046,6 @@ void CMultiMappingSession::HandleMessage(const uint8_t *pData, int Size)
 							pTiles->SetTileIgnoreHistory(TileX, TileY, Tile);
 						}
 						m_ApplyingRemote = false;
-						// measure e2e tile latency
-						if(m_LastTileEditSentTime != 0)
-						{
-							int64_t Elapsed = time_get() - m_LastTileEditSentTime;
-							int Ms = (int)(Elapsed * 1000 / time_freq());
-							m_TileRelayLatencyMs = Ms;
-						}
 					}
 				}
 			}

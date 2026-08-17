@@ -9,7 +9,6 @@
 #include <game/editor/mapitems/image.h>
 
 #include <algorithm>
-#include <array>
 #include <vector>
 
 CQuadArt::CQuadArt(CQuadArtParameters Parameters, CImageInfo &&Img) :
@@ -45,35 +44,6 @@ ivec2 CQuadArt::GetOptimizedQuadSize(const ColorRGBA &Pixel, const ivec2 &Pos)
 	MarkPixelAsVisited(Pos, OptimizedSize);
 	Size = OptimizedSize / ImgPixelSize;
 	return Size;
-}
-
-size_t CQuadArt::FindSuperPixelSize(const ColorRGBA &Pixel, const ivec2 &Pos, const size_t CurrentSize)
-{
-	ivec2 Size(CurrentSize, CurrentSize);
-	if(Pos.x + CurrentSize >= m_Img.m_Width || Pos.y + CurrentSize >= m_Img.m_Height)
-	{
-		MarkPixelAsVisited(Pos, Size);
-		return CurrentSize;
-	}
-
-	for(int i = 0; i < 2; i++)
-	{
-		for(size_t j = 0; j < CurrentSize + 1; j++)
-		{
-			ivec2 CurrentPos = Pos;
-			CurrentPos.x += i == 0 ? j : CurrentSize;
-			CurrentPos.y += i == 0 ? CurrentSize : j;
-
-			ColorRGBA CheckPixel = GetPixelClamped(CurrentPos);
-			if(CurrentPos.x >= (int)m_Img.m_Width || CurrentPos.y >= (int)m_Img.m_Height || Pixel != CheckPixel)
-			{
-				MarkPixelAsVisited(Pos, Size);
-				return CurrentSize;
-			}
-		}
-	}
-
-	return FindSuperPixelSize(Pixel, Pos, CurrentSize + 1);
 }
 
 ColorRGBA CQuadArt::GetPixelClamped(const ivec2 &Pos) const

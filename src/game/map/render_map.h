@@ -8,7 +8,6 @@
 
 #include <array>
 #include <chrono>
-#include <memory>
 
 enum
 {
@@ -43,9 +42,7 @@ class CMapBasedEnvelopePointAccess : public IEnvelopePointAccess
 public:
 	CMapBasedEnvelopePointAccess(class IMap *pMap);
 	void SetPointsRange(int StartPoint, int NumPoints);
-	int StartPoint() const;
 	int NumPoints() const override;
-	int NumPointsMax() const;
 	const CEnvPoint *GetPoint(int Index) const override;
 	const CEnvPointBezier *GetBezier(int Index) const override;
 };

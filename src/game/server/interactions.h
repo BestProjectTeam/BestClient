@@ -34,8 +34,6 @@ public:
 	bool CanSee(const CGameContext *pGameServer, int ClientId) const;
 	bool CanHit(const CGameContext *pGameServer, int ClientId) const;
 	CClientMask CanSeeMask(const CGameContext *pGameServer) const;
-	CClientMask CanHitMask(const CGameContext *pGameServer) const;
-	const CCharacter *OwnerCharacter(const CGameContext *pGameServer) const;
 };
 
 #endif

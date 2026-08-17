@@ -11,8 +11,6 @@
 #include <engine/console.h>
 #include <engine/shared/config.h>
 
-#include <game/client/components/chat.h>
-#include <game/client/components/console.h>
 #include <game/client/gameclient.h>
 
 static constexpr LOG_COLOR BIND_PRINT_COLOR{255, 255, 204};

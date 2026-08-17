@@ -1614,8 +1614,6 @@ void CNamePlates::OnRender()
 			// TClient
 			if(GameClient()->m_aClients[i].m_IsVolleyBall)
 				continue;
-			// if(g_Config.m_TcRenderNameplateSpec > 0)
-			//	continue;
 			const vec2 RenderPos = GameClient()->m_aClients[i].m_RenderPos;
 			if(!GameClient()->OptimizerAllowRenderPos(RenderPos))
 				continue;

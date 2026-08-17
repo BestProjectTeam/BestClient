@@ -8,6 +8,7 @@
 #include <engine/shared/json.h>
 #include <engine/textrender.h>
 
+#include <game/client/bc_ui_animations.h>
 #include <game/client/components/bestclient/version.h>
 #include <game/client/ui.h>
 
@@ -24,13 +25,6 @@ namespace
 	static constexpr ColorRGBA LYRICS_UPCOMING_COLOR(0.45f, 0.45f, 0.48f, 1.0f);
 	static constexpr int64_t LYRICS_OFFLINE_RETRY_MS = 15000;
 	static constexpr size_t LYRICS_CACHE_MAX = 64;
-
-	static float EaseOutCubic(float T)
-	{
-		T = std::clamp(T, 0.0f, 1.0f);
-		const float Inv = 1.0f - T;
-		return 1.0f - Inv * Inv * Inv;
-	}
 
 	static const char *JsonStringOrEmpty(const json_value *pValue)
 	{
@@ -853,7 +847,7 @@ void CMusicPlayerLyrics::Render(ITextRender *pTextRender, CUi *pUi, const CUIRec
 		TextStartX = ComputeTextStartX(Area.x, Area.w, CenterX, PlayheadX);
 	}
 
-	const float SlideT = EaseOutCubic(m_LineTransitionT);
+	const float SlideT = BCUiAnimations::EaseOutCubic(m_LineTransitionT);
 	const float BaseY = Area.y + (Area.h - FontSize) * 0.5f;
 	const float IncomingY = BaseY + (1.0f - SlideT) * Area.h;
 	const float OutgoingY = BaseY - SlideT * Area.h;

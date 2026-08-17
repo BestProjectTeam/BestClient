@@ -1,7 +1,6 @@
 /* Copyright © 2026 BestProject Team */
 #include "gif_bubbles.h"
 
-#include <base/color.h>
 #include <base/time.h>
 
 #include <engine/graphics.h>

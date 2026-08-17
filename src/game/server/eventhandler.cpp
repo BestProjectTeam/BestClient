@@ -5,7 +5,6 @@
 #include "entity.h"
 #include "gamecontext.h"
 
-#include <base/mem.h>
 #include <base/vmath.h>
 
 //////////////////////////////////////////////////

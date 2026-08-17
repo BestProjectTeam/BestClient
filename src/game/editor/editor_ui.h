@@ -32,7 +32,7 @@ namespace EditorButtonChecked
 
 namespace EditorFontSizes
 {
-	[[maybe_unused]] static constexpr float MENU = 10.0f;
+	static constexpr float MENU = 10.0f;
 }
 
 #endif

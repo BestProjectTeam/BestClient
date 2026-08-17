@@ -17,7 +17,6 @@ public:
 	virtual ~ITranslateBackend() = default;
 	virtual const char *EncodeSource(const char *pSource) const;
 	virtual const char *EncodeTarget(const char *pTarget) const;
-	virtual bool CompareTargets(const char *pA, const char *pB) const;
 	virtual const char *Name() const = 0;
 	virtual std::optional<bool> Update(CTranslateResponse &Out) = 0;
 };

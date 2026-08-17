@@ -1,7 +1,6 @@
 #include "physicball.h"
 
 #include <base/color.h>
-#include <base/log.h>
 #include <base/math.h>
 #include <base/time.h>
 #include <base/vmath.h>
@@ -24,10 +23,8 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdint>
 #include <cstdlib>
 #include <limits>
-#include <vector>
 
 constexpr float PhysicBallSize = 60.0f;
 
@@ -778,11 +775,6 @@ bool CPhysicBalls::GetNearestAirPos(vec2 Pos, vec2 PrevPos, vec2 *pOutPos, float
 	}
 
 	return false;
-}
-
-bool CPhysicBalls::HoldingHook() const
-{
-	return GameClient()->m_Controls.m_aInputData[g_Config.m_ClDummy].m_Hook == 1;
 }
 
 bool CPhysicBalls::HoldingFire() const

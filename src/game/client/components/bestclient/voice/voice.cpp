@@ -23,7 +23,6 @@
 
 #include <game/client/animstate.h>
 #include <game/client/bc_ui_animations.h>
-#include <game/client/components/countryflags.h>
 #include <game/client/components/hud_layout.h>
 #include <game/client/gameclient.h>
 #include <game/client/ui_scrollregion.h>

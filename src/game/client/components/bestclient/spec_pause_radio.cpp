@@ -24,8 +24,7 @@
 #include <game/client/ui_rect.h>
 
 #include <algorithm>
-#include <cstdlib>
-#include <cstring>
+#include <cmath>
 
 static constexpr const float RADIO_WIDTH = 240.0f;
 static constexpr const float RADIO_HEIGHT = 80.0f;

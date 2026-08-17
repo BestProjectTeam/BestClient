@@ -52,7 +52,6 @@ void CInteractions::FillOwnerDisconnected()
 {
 	m_OwnerAlive = false;
 	m_OwnerId = -1;
-	// m_UniqueOwnerId = 0; // TODO: yes no maybe?
 }
 
 bool CInteractions::CanSee(const CGameContext *pGameServer, int ClientId) const
@@ -149,32 +148,4 @@ CClientMask CInteractions::CanSeeMask(const CGameContext *pGameServer) const
 		}
 	}
 	return Mask;
-}
-
-CClientMask CInteractions::CanHitMask(const CGameContext *pGameServer) const
-{
-	if(m_DDRaceTeam == TEAM_SUPER)
-	{
-		return CClientMask().set();
-	}
-
-	CClientMask Mask;
-	for(int i = 0; i < MAX_CLIENTS; ++i)
-	{
-		if(CanHit(pGameServer, i))
-		{
-			Mask.set(i);
-		}
-	}
-	return Mask;
-}
-
-const CCharacter *CInteractions::OwnerCharacter(const CGameContext *pGameServer) const
-{
-	const CCharacter *pChr = pGameServer->GetPlayerChar(m_OwnerId);
-	if(!pChr)
-		return nullptr;
-	if(pChr->GetPlayer()->GetUniqueCid() != m_UniqueOwnerId)
-		return nullptr;
-	return pChr;
 }

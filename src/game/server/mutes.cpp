@@ -5,8 +5,6 @@
 #include <base/net.h>
 #include <base/time.h>
 
-#include <engine/shared/config.h>
-
 static NETADDR KeyAddress(NETADDR Addr)
 {
 	if(Addr.type == NETTYPE_WEBSOCKET_IPV4)

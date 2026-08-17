@@ -237,12 +237,6 @@ void *CGameClient::TranslateGameMsg(int *pMsgId, CUnpacker *pUnpacker, int Conn)
 			m_pClient->m_TranslationContext.m_aClients[pMsg7->m_ClientId].m_Team = pMsg7->m_Team;
 			if(m_aClients[pMsg7->m_ClientId].m_Active)
 				m_aClients[pMsg7->m_ClientId].UpdateRenderInfo();
-
-			// if(pMsg7->m_ClientId == m_LocalClientId)
-			// {
-			// 	m_TeamCooldownTick = pMsg7->m_CooldownTick;
-			// 	m_TeamChangeTime = Client()->LocalTime();
-			// }
 		}
 
 		if(Conn != g_Config.m_ClDummy)

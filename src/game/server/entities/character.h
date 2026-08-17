@@ -83,10 +83,8 @@ public:
 	void CancelSwapRequests();
 
 	bool Spawn(class CPlayer *pPlayer, vec2 Pos);
-	bool Remove();
 
 	bool IncreaseHealth(int Amount);
-	bool IncreaseArmor(int Amount);
 
 	void GiveWeapon(int Weapon, bool Remove = false);
 	void GiveNinja();
@@ -134,8 +132,6 @@ private:
 	int m_AttackTick;
 
 	int m_MoveRestrictions;
-
-	int m_DamageTaken;
 
 	int m_EmoteType;
 	int m_EmoteStop;
@@ -208,7 +204,6 @@ public:
 	bool Freeze(int Seconds);
 	bool Freeze();
 	bool Unfreeze();
-	void GiveAllWeapons();
 	void ResetPickups();
 	void ResetJumps();
 	ERaceState m_DDRaceState;

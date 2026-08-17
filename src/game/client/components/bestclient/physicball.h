@@ -78,7 +78,6 @@ class CPhysicBalls : public CComponent
 
 	int64_t m_LastPhysicsTime = 0;
 
-	bool HoldingHook() const;
 	bool HoldingFire() const;
 	bool PressedFire() const;
 	int CurrentWeapon() const;

@@ -6,8 +6,6 @@
 #include <game/map/envelope_extrema.h>
 #include <game/map/render_interfaces.h>
 
-#include <memory>
-
 class CEnvelopeManager
 {
 public:

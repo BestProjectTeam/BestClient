@@ -598,9 +598,6 @@ public:
 		vec2 m_ImprovedPredPos = vec2(0, 0);
 		vec2 m_PrevImprovedPredPos = vec2(0, 0);
 		bool m_ValidAntipingSmooth = false;
-		//vec2 m_DebugVector = vec2(0, 0);
-		//vec2 m_DebugVector2 = vec2(0, 0);
-		//vec2 m_DebugVector3 = vec2(0, 0);
 		float m_Uncertainty = 0.0f;
 		float m_VolleyBallAngle = 0.0f;
 		bool m_IsVolleyBall = false;
@@ -710,8 +707,6 @@ public:
 
 	CRenderTools m_RenderTools;
 	CRenderMap m_RenderMap;
-
-	bool m_BackButtonHandledKeyBind = false;
 
 	void OnReset();
 
@@ -1166,8 +1161,6 @@ public:
 	// TClient
 	int m_SmoothTick = 0;
 	float m_SmoothIntraTick = 0.0f;
-	int m_aCloudSmoothTick[2] = {};
-	float m_aCloudSmoothIntraTick[2] = {};
 	bool CheckNewInput() override;
 	bool IsSnapTapBlockedByCommunity() const;
 	bool IsAspectRatioBlockedByFng() const;

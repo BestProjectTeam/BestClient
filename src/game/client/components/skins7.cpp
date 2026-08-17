@@ -37,9 +37,6 @@ int unsigned *CSkins7::ms_apColorVariables[NUM_DUMMIES][protocol7::NUM_SKINPARTS
 
 #define SKINS_DIR "skins7"
 
-// TODO: uncomment
-// const float MIN_EYE_BODY_COLOR_DIST = 80.f; // between body and eyes (LAB color space)
-
 void CSkins7::CSkinPart::ApplyTo(CTeeRenderInfo::CSixup &SixupRenderInfo) const
 {
 	SixupRenderInfo.m_aOriginalTextures[m_Type] = m_OriginalTexture;

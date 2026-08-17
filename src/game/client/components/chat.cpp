@@ -4757,7 +4757,6 @@ void CChat::OnRender()
 
 	// TClient
 	float y = ChatLayout.m_Y;
-	// float y = 300.0f - 20.0f * FontSize() / 6.0f;
 
 	float ScaledFontSize = FontSize() * (8.0f / 6.0f);
 	const bool BcChatMessageAnimEnabled = BCUiAnimations::Enabled() && g_Config.m_BcChatAnimation != 0;

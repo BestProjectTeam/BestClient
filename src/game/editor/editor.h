@@ -12,7 +12,6 @@
 #include "map_view.h"
 #include "quad_art.h"
 
-#include <base/bezier.h>
 #include <base/fs.h>
 
 #include <engine/editor.h>

@@ -97,12 +97,3 @@ bool CKeyBinder::IsActive() const
 {
 	return m_TakeKey;
 }
-
-bool CKeyBinder::AbortPendingKey()
-{
-	if(m_pKeyReaderId == nullptr)
-		return false;
-	m_Key = CBindSlot(KEY_ESCAPE, KeyModifier::NONE);
-	m_TakeKey = false;
-	return true;
-}
