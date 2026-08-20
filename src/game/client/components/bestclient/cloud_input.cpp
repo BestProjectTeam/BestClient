@@ -6,7 +6,6 @@
 #include <game/client/components/controls.h>
 #include <game/client/gameclient.h>
 
-#include <algorithm>
 #include <cmath>
 
 bool CCloudInput::IsActive() const
@@ -110,23 +109,14 @@ bool CCloudInput::TryGetPredPos(const CGameClient &GameClient, int ClientId, int
 
 	const int TickOffset = GameClient.IsFastInputLocalClient(ClientId) ? SelfTickOffset() : OthersTickOffset();
 	const int MaxTick = GameClient.Client()->PredGameTick(g_Config.m_ClDummy) + TickOffset;
-	int SampleTick = std::min(Tick, MaxTick);
+	if(Tick > MaxTick ||
+		GameClient.m_aClients[ClientId].m_aPredTick[(Tick - 1) % 200] != Tick - 1 ||
+		GameClient.m_aClients[ClientId].m_aPredTick[Tick % 200] != Tick)
+		return false;
 
-	// Walk back to a contiguous PredPos pair. Old kernels often have gaps near GameTick;
-	// failing hard then falling back to FinalTickSelf cores causes a one-frame hitch.
-	while(SampleTick > 1)
-	{
-		if(GameClient.m_aClients[ClientId].m_aPredTick[(SampleTick - 1) % 200] == SampleTick - 1 &&
-			GameClient.m_aClients[ClientId].m_aPredTick[SampleTick % 200] == SampleTick)
-		{
-			const float SampleIntra = (SampleTick == Tick) ? Intra : 1.0f;
-			OutPos = mix(
-				GameClient.m_aClients[ClientId].m_aPredPos[(SampleTick - 1) % 200],
-				GameClient.m_aClients[ClientId].m_aPredPos[SampleTick % 200],
-				SampleIntra);
-			return true;
-		}
-		SampleTick--;
-	}
-	return false;
+	OutPos = mix(
+		GameClient.m_aClients[ClientId].m_aPredPos[(Tick - 1) % 200],
+		GameClient.m_aClients[ClientId].m_aPredPos[Tick % 200],
+		Intra);
+	return true;
 }
