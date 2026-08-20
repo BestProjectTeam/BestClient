@@ -582,6 +582,20 @@ void CMenus::RenderSettingsTClientSettings(CUIRect MainView)
 		}
 	}
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcMovingTilesEntities, TCLocalize("Show moving tiles in entities"), &g_Config.m_TcMovingTilesEntities, &Column, LineSize);
+	CUIRect EgoTilesAntiLagRow;
+	Column.HSplitTop(LineSize, &EgoTilesAntiLagRow, &Column);
+	const char *pBetaText = TCLocalize("BETA");
+	const float BetaWidth = TextRender()->TextWidth(12.0f, pBetaText) + 10.0f;
+	CUIRect EgoTilesAntiLagButton, BetaBadge;
+	EgoTilesAntiLagRow.VSplitRight(BetaWidth + MarginSmall, &EgoTilesAntiLagButton, &BetaBadge);
+	BetaBadge.VSplitLeft(MarginSmall, nullptr, &BetaBadge);
+	BetaBadge.HMargin(2.0f, &BetaBadge);
+	if(DoButton_CheckBox_Common(&g_Config.m_TcEgoTilesAntiLag, TCLocalize("Ego-Tiles AntiLag"), g_Config.m_TcEgoTilesAntiLag ? "X" : "", &EgoTilesAntiLagButton, BUTTONFLAG_LEFT))
+		g_Config.m_TcEgoTilesAntiLag ^= 1;
+	Graphics()->DrawRect4(BetaBadge.x, BetaBadge.y, BetaBadge.w, BetaBadge.h,
+		ColorRGBA(0.95f, 0.25f, 0.25f, 1.0f), ColorRGBA(0.75f, 0.08f, 0.08f, 1.0f),
+		ColorRGBA(0.95f, 0.25f, 0.25f, 1.0f), ColorRGBA(0.75f, 0.08f, 0.08f, 1.0f), IGraphics::CORNER_ALL, 5.0f);
+	Ui()->DoLabel(&BetaBadge, pBetaText, 12.0f, TEXTALIGN_MC);
 
 	Column.HSplitTop(MarginExtraSmall, nullptr, &Column);
 	s_SectionBoxes.back().h = Column.y - s_SectionBoxes.back().y;

@@ -3364,6 +3364,8 @@ void CGameClient::OnPredict()
 
 		ApplyPreInputs(Tick, false, m_PredictedWorld);
 
+		m_MovingTilesBackground.ApplyEgoTilesAntiLag(pLocalChar);
+
 		m_PredictedWorld.Tick();
 
 		// TClient
