@@ -6,6 +6,7 @@
 #include <game/client/components/controls.h>
 #include <game/client/gameclient.h>
 
+#include <algorithm>
 #include <cmath>
 
 bool CCloudInput::IsActive() const
@@ -109,14 +110,24 @@ bool CCloudInput::TryGetPredPos(const CGameClient &GameClient, int ClientId, int
 
 	const int TickOffset = GameClient.IsFastInputLocalClient(ClientId) ? SelfTickOffset() : OthersTickOffset();
 	const int MaxTick = GameClient.Client()->PredGameTick(g_Config.m_ClDummy) + TickOffset;
-	if(Tick > MaxTick ||
-		GameClient.m_aClients[ClientId].m_aPredTick[(Tick - 1) % 200] != Tick - 1 ||
-		GameClient.m_aClients[ClientId].m_aPredTick[Tick % 200] != Tick)
-		return false;
+	int SampleTick = std::min(Tick, MaxTick);
 
-	OutPos = mix(
-		GameClient.m_aClients[ClientId].m_aPredPos[(Tick - 1) % 200],
-		GameClient.m_aClients[ClientId].m_aPredPos[Tick % 200],
-		Intra);
-	return true;
+	// Keep the cloud-input feel stable when the prediction ring has a temporary gap.
+	// Use the closest contiguous pair instead of falling back to the regular prediction
+	// position. The requested tick is still capped by the correct local/others horizon.
+	while(SampleTick > 1)
+	{
+		if(GameClient.m_aClients[ClientId].m_aPredTick[(SampleTick - 1) % 200] == SampleTick - 1 &&
+			GameClient.m_aClients[ClientId].m_aPredTick[SampleTick % 200] == SampleTick)
+		{
+			const float SampleIntra = SampleTick == Tick ? Intra : 1.0f;
+			OutPos = mix(
+				GameClient.m_aClients[ClientId].m_aPredPos[(SampleTick - 1) % 200],
+				GameClient.m_aClients[ClientId].m_aPredPos[SampleTick % 200],
+				SampleIntra);
+			return true;
+		}
+		SampleTick--;
+	}
+	return false;
 }
