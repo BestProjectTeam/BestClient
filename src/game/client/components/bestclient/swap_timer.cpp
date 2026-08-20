@@ -734,51 +734,11 @@ void CSwapTimer::RenderHotkeyLayout(const SHotkeyLayout &Hotkeys, float X, float
 	RenderKey(FontIcon::EYE, s_PeekColor, Hotkeys.m_aPeekKey, 1.0f);
 }
 
-void CSwapTimer::FormatPlaceholders(const char *pFormat, int Seconds, const char *pSelf, const char *pOther, char *pBuf, int BufSize)
-{
-	char aNumber[16];
-	str_format(aNumber, sizeof(aNumber), "%d", Seconds);
-
-	int Out = 0;
-	bool Replaced = false;
-	for(const char *pCur = pFormat; *pCur && Out < BufSize - 1; pCur++)
-	{
-		const char *pValue = nullptr;
-		if(pCur[0] == '%')
-		{
-			if(!Replaced && pCur[1] == 'd')
-				pValue = aNumber;
-			else if(pCur[1] == 'y')
-				pValue = pSelf;
-			else if(pCur[1] == 'n')
-				pValue = pOther;
-		}
-
-		if(!pValue)
-		{
-			pBuf[Out++] = *pCur;
-			continue;
-		}
-
-		for(; *pValue && Out < BufSize - 1; pValue++)
-			pBuf[Out++] = *pValue;
-		Replaced |= pCur[1] == 'd';
-		pCur++;
-	}
-	pBuf[Out] = '\0';
-
-	if(!Replaced)
-		str_format(pBuf, BufSize, DEFAULT_MINIMAL_TEXT, Seconds);
-}
-
 void CSwapTimer::FormatMinimalText(const SSwapEntry &Entry, float Now, char *pBuf, int BufSize) const
 {
 	const bool OnCooldown = Now < Entry.m_CooldownEnd;
 	const float Target = OnCooldown ? Entry.m_CooldownEnd : Entry.m_ExpireTime;
-	const char *pConfigured = OnCooldown ? g_Config.m_BcSwapTimerWaitText : g_Config.m_BcSwapTimerLeftText;
-
-	FormatPlaceholders(pConfigured[0] ? pConfigured : DEFAULT_MINIMAL_TEXT, maximum(0, round_to_int(Target - Now)),
-		Localize("You"), DisplayName(Entry), pBuf, BufSize);
+	str_format(pBuf, BufSize, DEFAULT_MINIMAL_TEXT, maximum(0, round_to_int(Target - Now)));
 }
 
 void CSwapTimer::FormatStatusText(const SSwapEntry &Entry, float Now, char *pBuf, int BufSize) const

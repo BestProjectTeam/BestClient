@@ -166,8 +166,6 @@ MACRO_CONFIG_INT(BcHookComboSize, bc_hook_combo_size, 100, 50, 200, CFGFLAG_CLIE
 // Swap timer
 MACRO_CONFIG_INT(BcSwapTimer, bc_swap_timer, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show a HUD timer for pending swap requests")
 MACRO_CONFIG_INT(BcSwapTimerStyle, bc_swap_timer_style, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Swap timer style (0 = HUD, 1 = Nameplate)")
-MACRO_CONFIG_STR(BcSwapTimerWaitText, bc_swap_timer_wait_text, 32, "[%ds]", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Minimal nameplate cooldown text (%d seconds, %y your name, %n other name)")
-MACRO_CONFIG_STR(BcSwapTimerLeftText, bc_swap_timer_left_text, 32, "[%ds]", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Minimal nameplate remaining time text (%d seconds, %y your name, %n other name)")
 
 MACRO_CONFIG_INT(BcSwapTimerSize, bc_swap_timer_size, 100, 50, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Swap timer size")
 MACRO_CONFIG_INT(BcSwapTimerShowHotkeys, bc_swap_timer_show_hotkeys, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show accept and decline hotkeys in the swap timer")

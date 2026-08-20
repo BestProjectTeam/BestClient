@@ -99,7 +99,6 @@ class CSwapTimer : public CComponent
 
 	void FormatStatusText(const SSwapEntry &Entry, float Now, char *pBuf, int BufSize) const;
 	void FormatMinimalText(const SSwapEntry &Entry, float Now, char *pBuf, int BufSize) const;
-	static void FormatPlaceholders(const char *pFormat, int Seconds, const char *pSelf, const char *pOther, char *pBuf, int BufSize);
 
 	void UpdateTeeInfos(SSwapEntry &Entry, int Conn);
 	float TeeIconSize(float FontSize) const;
