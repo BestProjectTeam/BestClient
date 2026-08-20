@@ -2846,6 +2846,63 @@ void CMenus::RenderSettingsBestClientGameplay(CUIRect MainView)
 		Ui()->ClipDisable();
 	}
 
+	// Edge Info (right column block, from RushieClient)
+	RightColumn.HSplitTop(MarginBetweenViews, nullptr, &RightColumn);
+
+	const float EdgeInfoColorPickerLineSize = 25.0f;
+	const float EdgeInfoBlockHeight = LineSize + MarginSmall + LineSize + MarginSmall + 2.0f * (LineSize + MarginSmall) + 3.0f * (EdgeInfoColorPickerLineSize + MarginSmall);
+	CUIRect EdgeInfoBlock;
+	RightColumn.HSplitTop(EdgeInfoBlockHeight, &EdgeInfoBlock, &RightColumn);
+
+	CUIRect EdgeInfoBlockBg = EdgeInfoBlock;
+	EdgeInfoBlockBg.w += BlockPadding;
+	EdgeInfoBlockBg.h += BlockPadding;
+	EdgeInfoBlockBg.x -= BlockPadding * 0.5f;
+	EdgeInfoBlockBg.y -= BlockPadding * 0.5f;
+	EdgeInfoBlockBg.Draw(BlockColor, IGraphics::CORNER_ALL, 10.0f);
+
+	EdgeInfoBlock.HSplitTop(LineSize, &Label, &EdgeInfoBlock);
+	CUIRect EdgeInfoTitleLabel, EdgeInfoHudEditorButton;
+	Label.VSplitRight(LineSize + 8.0f, &EdgeInfoTitleLabel, &EdgeInfoHudEditorButton);
+	EdgeInfoTitleLabel.VSplitRight(MarginSmall, &EdgeInfoTitleLabel, nullptr);
+	static CButtonContainer s_EdgeInfoHudEditorButton;
+	const bool EdgeInfoCanOpenHudEditor = Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK;
+	const bool EdgeInfoHudEditorClicked = Ui()->DoButton_FontIcon(&s_EdgeInfoHudEditorButton, FontIcon::UP_RIGHT_AND_DOWN_LEFT_FROM_CENTER, EdgeInfoCanOpenHudEditor ? 0 : -1, &EdgeInfoHudEditorButton, BUTTONFLAG_LEFT);
+	GameClient()->m_Tooltips.DoToolTip(&s_EdgeInfoHudEditorButton, &EdgeInfoHudEditorButton, EdgeInfoCanOpenHudEditor ? Localize("Open in HUD editor") : Localize("Join a game first"));
+	GameClient()->m_Tooltips.SetFadeTime(&s_EdgeInfoHudEditorButton, 0.0f);
+	if(EdgeInfoHudEditorClicked && EdgeInfoCanOpenHudEditor)
+	{
+		SetActive(false);
+		GameClient()->m_HudEditor.Activate();
+	}
+	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &EdgeInfoTitleLabel, Localize("NEW"), 12.0f,
+		ColorRGBA(0.25f, 0.85f, 0.40f, 1.0f), ColorRGBA(0.10f, 0.60f, 0.25f, 1.0f), MarginSmall);
+	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &EdgeInfoTitleLabel, "R-Client", 12.0f,
+		ColorRGBA(0.30f, 0.55f, 0.95f, 1.0f), ColorRGBA(0.15f, 0.35f, 0.75f, 1.0f), MarginSmall);
+	Ui()->DoLabel(&EdgeInfoTitleLabel, Localize("Edge Info"), HeadlineFontSize, TEXTALIGN_ML);
+	EdgeInfoBlock.HSplitTop(MarginSmall, nullptr, &EdgeInfoBlock);
+
+	EdgeInfoBlock.HSplitTop(LineSize, &Label, &EdgeInfoBlock);
+	static CButtonContainer s_EdgeInfoBindReader;
+	static CButtonContainer s_EdgeInfoBindClear;
+	DoLine_KeyReader(Label, s_EdgeInfoBindReader, s_EdgeInfoBindClear, Localize("Show edge info"), "ri_toggle_edgeinfo");
+
+	EdgeInfoBlock.HSplitTop(MarginSmall, nullptr, &EdgeInfoBlock);
+	EdgeInfoBlock.HSplitTop(LineSize, &Content, &EdgeInfoBlock);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RiEdgeInfoCords, Localize("Show edge info about freeze"), &g_Config.m_RiEdgeInfoCords, &Content, LineSize);
+
+	EdgeInfoBlock.HSplitTop(MarginSmall, nullptr, &EdgeInfoBlock);
+	EdgeInfoBlock.HSplitTop(LineSize, &Content, &EdgeInfoBlock);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_RiEdgeInfoJump, Localize("Show edge info about jumps"), &g_Config.m_RiEdgeInfoJump, &Content, LineSize);
+
+	static CButtonContainer s_EdgeInfoFreezeColorButton;
+	static CButtonContainer s_EdgeInfoKillColorButton;
+	static CButtonContainer s_EdgeInfoSafeColorButton;
+	EdgeInfoBlock.HSplitTop(MarginSmall, nullptr, &EdgeInfoBlock);
+	DoLine_ColorPicker(&s_EdgeInfoFreezeColorButton, EdgeInfoColorPickerLineSize, 13.0f, MarginSmall, &EdgeInfoBlock, Localize("Color when over freeze"), &g_Config.m_RiEdgeInfoColorFreeze, color_cast<ColorRGBA>(ColorHSLA(DefaultConfig::RiEdgeInfoColorFreeze)), false);
+	DoLine_ColorPicker(&s_EdgeInfoKillColorButton, EdgeInfoColorPickerLineSize, 13.0f, MarginSmall, &EdgeInfoBlock, Localize("Color when over kill"), &g_Config.m_RiEdgeInfoColorKill, color_cast<ColorRGBA>(ColorHSLA(DefaultConfig::RiEdgeInfoColorKill)), false);
+	DoLine_ColorPicker(&s_EdgeInfoSafeColorButton, EdgeInfoColorPickerLineSize, 13.0f, MarginSmall, &EdgeInfoBlock, Localize("Color when falling safely"), &g_Config.m_RiEdgeInfoColorSafe, color_cast<ColorRGBA>(ColorHSLA(DefaultConfig::RiEdgeInfoColorSafe)), false);
+
 	const float RightColumnEndY = RightColumn.y;
 	CUIRect GameplayScrollContentRect;
 	GameplayScrollContentRect.x = MainView.x;

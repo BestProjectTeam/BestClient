@@ -91,6 +91,7 @@ class CSnapshotBuffer;
 #include "components/bestclient/cherry_gifs.h"
 #include "components/bestclient/chat_bubbles.h"
 #include "components/bestclient/cloud_input.h"
+#include "components/bestclient/edgehelper.h"
 #include "components/bestclient/physicball.h"
 #include "components/bestclient/process_priority.h"
 #include "components/bestclient/spec_pause_radio.h"
@@ -262,6 +263,7 @@ public:
 	CSpecPauseRadio m_SpecPauseRadio; // BestClient (from Entity-Client)
 	CFastPractice m_FastPractice; // BestClient
 	CCloudInput m_CloudInput; // BestClient
+	CEdgeHelper m_EdgeHelper; // BestClient (from RushieClient)
 	CBgDraw m_BgDraw;
 	CTClient m_TClient;
 	CTrails m_Trails;

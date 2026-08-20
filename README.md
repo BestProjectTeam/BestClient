@@ -501,7 +501,7 @@ Plain-text export: [docs/bc_config_list.txt](docs/bc_config_list.txt).
 Some BestClient features were adapted from other DDNet client forks:
 
 - **Entity-Client** ([FoxNet-DDNet/Entity-Client-DDNet](https://github.com/FoxNet-DDNet/Entity-Client-DDNet)) — Physic Balls, Better Spectate (`+specpause`), Chat Bubbles
-- **RushieClient** ([RushieClient/RushieClient-ddnet](https://github.com/RushieClient/RushieClient-ddnet)) — Chat Filter
+- **RushieClient** ([RushieClient/RushieClient-ddnet](https://github.com/RushieClient/RushieClient-ddnet)) — Chat Filter, Edge Info, Find Teleport, Find Finish
 
 ## License
 

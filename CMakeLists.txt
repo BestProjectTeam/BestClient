@@ -2973,6 +2973,8 @@ if(CLIENT)
     components/bestclient/chat_bubbles.h
     components/bestclient/cloud_input.cpp
     components/bestclient/cloud_input.h
+    components/bestclient/edgehelper.cpp
+    components/bestclient/edgehelper.h
     components/bestclient/physicball.cpp
     components/bestclient/physicball.h
     components/bestclient/process_priority.cpp
