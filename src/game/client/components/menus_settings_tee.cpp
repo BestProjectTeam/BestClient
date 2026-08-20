@@ -154,7 +154,7 @@ void CMenus::RenderSettingsTee(CUIRect MainView)
 	Checkboxes.HSplitTop(5.0f, nullptr, &Checkboxes);
 	Checkboxes.HSplitTop(QualitySliderHeight, &Button, &Checkboxes);
 	{
-		static const int s_aSkinQualityWidths[] = {256, 512, 1024, 2048, 4096, 8192};
+		static const int s_aSkinQualityWidths[] = {128, 256, 512, 1024, 2048, 4096, 8192};
 		int QualityIndex = 0;
 		for(int i = 0; i < (int)std::size(s_aSkinQualityWidths); i++)
 		{
