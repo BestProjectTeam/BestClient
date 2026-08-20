@@ -6,6 +6,7 @@
 #include <game/client/ui_rect.h>
 
 #include <atomic>
+#include <cstdint>
 #include <deque>
 #include <mutex>
 #include <string>
@@ -56,6 +57,7 @@ private:
 	EState m_State = EState::Disconnected;
 	char m_aChannel[MAX_CHANNEL_LENGTH] = "";
 	char m_aStatusText[MAX_STATUS_LENGTH] = "";
+	uint64_t m_ReceivedMessages = 0;
 	std::deque<SQueuedMessage> m_MessageQueue;
 
 	void SetStatus(const char *pMessage);
@@ -63,6 +65,7 @@ private:
 	void QueueChatMessage(const char *pName, const char *pText);
 	void FlushChatMessages();
 	void WorkerMain(std::string Channel);
+	bool RunConnection(const std::string &Channel, bool &ImmediateReconnect);
 	void HandleIrcLine(const char *pLine);
 
 	static bool ParseChannel(const char *pInput, char *pOut, int OutSize);

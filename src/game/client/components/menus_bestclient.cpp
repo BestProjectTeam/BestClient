@@ -2987,7 +2987,7 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 
 	// Twitch Chat Integration
 	const float TwitchLogLineSize = 14.0f;
-	const float TwitchChatBlockHeight = LineSize + MarginSmall + LineSize + MarginSmall + LineSize + MarginSmall + LineSize;
+	const float TwitchChatBlockHeight = LineSize + MarginSmall + LineSize + MarginSmall + LineSize;
 
 	CUIRect TwitchChatBlock;
 	Column.HSplitTop(TwitchChatBlockHeight, &TwitchChatBlock, &Column);
@@ -3018,8 +3018,9 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	TwitchChatBlock.HSplitTop(MarginSmall, nullptr, &TwitchChatBlock);
 
 	TwitchChatBlock.HSplitTop(LineSize, &Button, &TwitchChatBlock);
-	CUIRect TwitchStartButton;
-	Button.VSplitRight(100.0f, nullptr, &TwitchStartButton);
+	CUIRect TwitchLogRect, TwitchStartButton;
+	Button.VSplitRight(100.0f, &TwitchLogRect, &TwitchStartButton);
+	TwitchLogRect.VSplitRight(MarginSmall, &TwitchLogRect, nullptr);
 	static CButtonContainer s_TwitchStartButton;
 	const bool TwitchActive = GameClient()->m_TwitchChat.IsActive();
 	if(DoButton_Menu(&s_TwitchStartButton, TwitchActive ? Localize("Stop") : Localize("Start"), 0, &TwitchStartButton))
@@ -3029,10 +3030,6 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 		else
 			GameClient()->m_TwitchChat.Start();
 	}
-	TwitchChatBlock.HSplitTop(MarginSmall, nullptr, &TwitchChatBlock);
-
-	CUIRect TwitchLogRect;
-	TwitchChatBlock.HSplitTop(LineSize, &TwitchLogRect, &TwitchChatBlock);
 	char aTwitchStatus[128];
 	GameClient()->m_TwitchChat.GetStatusText(aTwitchStatus, sizeof(aTwitchStatus));
 	Ui()->DoLabel(&TwitchLogRect, aTwitchStatus, TwitchLogLineSize, TEXTALIGN_ML);

@@ -10,6 +10,7 @@
 #include <game/client/gameclient.h>
 
 #include <cctype>
+#include <cinttypes>
 #include <chrono>
 #include <cstring>
 
@@ -18,6 +19,9 @@ namespace
 constexpr ColorRGBA TWITCH_CHAT_COLOR = ColorRGBA(0.35f, 0.65f, 1.0f, 1.0f);
 constexpr const char *TWITCH_IRC_HOST = "irc.chat.twitch.tv";
 constexpr int TWITCH_IRC_PORT = 6667;
+constexpr int TWITCH_ANONYMOUS_SESSION_SECONDS = 20;
+constexpr int TWITCH_IDLE_PING_SECONDS = 240;
+constexpr int TWITCH_RESPONSE_TIMEOUT_SECONDS = 30;
 
 bool SendAll(NETSOCKET Socket, const char *pData, int Size)
 {
@@ -68,6 +72,8 @@ void CTwitchChat::GetStatusText(char *pBuf, int BufSize) const
 	std::lock_guard<std::mutex> Lock(m_Mutex);
 	if(m_aStatusText[0] == '\0')
 		str_copy(pBuf, "Not connected", BufSize);
+	else if(m_State == EState::Connected)
+		str_format(pBuf, BufSize, "%s | %" PRIu64 " msgs", m_aStatusText, m_ReceivedMessages);
 	else
 		str_copy(pBuf, m_aStatusText, BufSize);
 }
@@ -96,6 +102,7 @@ void CTwitchChat::QueueChatMessage(const char *pName, const char *pText)
 	if((int)m_MessageQueue.size() >= MAX_QUEUED_MESSAGES)
 		m_MessageQueue.pop_front();
 	m_MessageQueue.push_back({pName, pText});
+	++m_ReceivedMessages;
 }
 
 void CTwitchChat::FlushChatMessages()
@@ -220,6 +227,7 @@ void CTwitchChat::Start()
 		str_copy(m_aChannel, aChannel, sizeof(m_aChannel));
 		m_State = EState::Connecting;
 		m_aStatusText[0] = '\0';
+		m_ReceivedMessages = 0;
 		m_MessageQueue.clear();
 	}
 
@@ -245,14 +253,40 @@ void CTwitchChat::Stop()
 
 void CTwitchChat::WorkerMain(std::string Channel)
 {
+	while(!m_StopRequested.load(std::memory_order_relaxed))
+	{
+		bool ImmediateReconnect = false;
+		const bool Reconnect = RunConnection(Channel, ImmediateReconnect);
+		if(!Reconnect || m_StopRequested.load(std::memory_order_relaxed))
+			break;
+
+		SetState(EState::Connecting);
+		SetStatus(ImmediateReconnect ? "Refreshing connection..." : "Disconnected, reconnecting...");
+		if(!ImmediateReconnect)
+		{
+			for(int i = 0; i < 30 && !m_StopRequested.load(std::memory_order_relaxed); ++i)
+				std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		}
+	}
+
+	if(m_StopRequested.load(std::memory_order_relaxed))
+	{
+		SetState(EState::Disconnected);
+		SetStatus("Stopped");
+	}
+	m_WorkerRunning.store(false, std::memory_order_relaxed);
+}
+
+bool CTwitchChat::RunConnection(const std::string &Channel, bool &ImmediateReconnect)
+{
+	ImmediateReconnect = false;
 	NETADDR Addr;
 	mem_zero(&Addr, sizeof(Addr));
 	if(net_host_lookup(TWITCH_IRC_HOST, &Addr, NETTYPE_IPV4 | NETTYPE_IPV6) != 0)
 	{
 		SetState(EState::Error);
 		SetStatus("Failed to resolve irc.chat.twitch.tv");
-		m_WorkerRunning.store(false, std::memory_order_relaxed);
-		return;
+		return true;
 	}
 	Addr.port = TWITCH_IRC_PORT;
 
@@ -265,8 +299,7 @@ void CTwitchChat::WorkerMain(std::string Channel)
 	{
 		SetState(EState::Error);
 		SetStatus("Failed to create socket");
-		m_WorkerRunning.store(false, std::memory_order_relaxed);
-		return;
+		return true;
 	}
 
 	if(net_tcp_connect_timeout(Socket, &Addr, 8000) != 0)
@@ -274,8 +307,7 @@ void CTwitchChat::WorkerMain(std::string Channel)
 		net_tcp_close(Socket);
 		SetState(EState::Error);
 		SetStatus("Connection failed");
-		m_WorkerRunning.store(false, std::memory_order_relaxed);
-		return;
+		return true;
 	}
 
 	net_set_non_blocking(Socket);
@@ -298,21 +330,27 @@ void CTwitchChat::WorkerMain(std::string Channel)
 		net_tcp_close(Socket);
 		SetState(EState::Error);
 		SetStatus("Failed to send handshake");
-		m_WorkerRunning.store(false, std::memory_order_relaxed);
-		return;
+		return true;
 	}
 
 	char aRecvBuf[8192];
 	int RecvLen = 0;
 	bool Joined = false;
-	int64_t LastPing = time_get();
+	bool ConnectionLost = false;
+	bool Reconnect = true;
+	bool WaitingForResponse = false;
+	int64_t LastReceive = time_get();
+	int64_t PingSentAt = 0;
+	int64_t ConnectedAt = 0;
 
 	while(!m_StopRequested.load(std::memory_order_relaxed))
 	{
-		net_socket_read_wait(Socket, std::chrono::milliseconds(200));
-		const int Bytes = net_tcp_recv(Socket, aRecvBuf + RecvLen, (int)sizeof(aRecvBuf) - RecvLen - 1);
+		const int Ready = net_socket_read_wait(Socket, std::chrono::milliseconds(200));
+		const int Bytes = Ready > 0 ? net_tcp_recv(Socket, aRecvBuf + RecvLen, (int)sizeof(aRecvBuf) - RecvLen - 1) : -1;
 		if(Bytes > 0)
 		{
+			LastReceive = time_get();
+			WaitingForResponse = false;
 			RecvLen += Bytes;
 			aRecvBuf[RecvLen] = '\0';
 
@@ -327,22 +365,27 @@ void CTwitchChat::WorkerMain(std::string Channel)
 				if(pEnd > pStart && pEnd[-1] == '\r')
 					pEnd[-1] = '\0';
 
-				if(str_startswith(pStart, "PING "))
+				if(str_startswith(pStart, ":tmi.twitch.tv RECONNECT") || str_startswith(pStart, "RECONNECT"))
+				{
+					ConnectionLost = true;
+					break;
+				}
+				else if(str_startswith(pStart, "PING "))
 				{
 					char aPong[256];
 					str_format(aPong, sizeof(aPong), "PONG %s", pStart + 5);
 					if(!SendLine(Socket, aPong))
 					{
-						m_StopRequested.store(true, std::memory_order_relaxed);
+						ConnectionLost = true;
 						break;
 					}
-					LastPing = time_get();
 				}
 				else
 				{
 					if(!Joined && (str_find(pStart, " 001 ") || str_find(pStart, "JOIN #")))
 					{
 						Joined = true;
+						ConnectedAt = time_get();
 						SetState(EState::Connected);
 						char aMsg[128];
 						str_format(aMsg, sizeof(aMsg), "Connected to #%s", Channel.c_str());
@@ -352,7 +395,8 @@ void CTwitchChat::WorkerMain(std::string Channel)
 					{
 						SetState(EState::Error);
 						SetStatus("Authentication failed");
-						m_StopRequested.store(true, std::memory_order_relaxed);
+						Reconnect = false;
+						ConnectionLost = true;
 						break;
 					}
 					HandleIrcLine(pStart);
@@ -367,6 +411,15 @@ void CTwitchChat::WorkerMain(std::string Channel)
 			RecvLen = maximum(0, Remaining);
 			if(RecvLen >= (int)sizeof(aRecvBuf) - 1)
 				RecvLen = 0;
+			if(ConnectionLost)
+			{
+				if(Reconnect)
+				{
+					SetState(EState::Error);
+					SetStatus("Connection lost");
+				}
+				break;
+			}
 		}
 		else if(Bytes == 0)
 		{
@@ -374,8 +427,26 @@ void CTwitchChat::WorkerMain(std::string Channel)
 			SetStatus("Disconnected");
 			break;
 		}
+		else if(Ready > 0 && !net_would_block())
+		{
+			SetState(EState::Error);
+			SetStatus("Connection lost");
+			break;
+		}
 
-		if(time_get() - LastPing > time_freq() * 300)
+		const int64_t Now = time_get();
+		if(Joined && Now - ConnectedAt > time_freq() * TWITCH_ANONYMOUS_SESSION_SECONDS)
+		{
+			ImmediateReconnect = true;
+			break;
+		}
+		if(WaitingForResponse && Now - PingSentAt > time_freq() * TWITCH_RESPONSE_TIMEOUT_SECONDS)
+		{
+			SetState(EState::Error);
+			SetStatus("Connection timed out");
+			break;
+		}
+		if(!WaitingForResponse && Now - LastReceive > time_freq() * TWITCH_IDLE_PING_SECONDS)
 		{
 			if(!SendLine(Socket, "PING :tmi.twitch.tv"))
 			{
@@ -383,24 +454,19 @@ void CTwitchChat::WorkerMain(std::string Channel)
 				SetStatus("Connection lost");
 				break;
 			}
-			LastPing = time_get();
+			WaitingForResponse = true;
+			PingSentAt = Now;
 		}
 	}
 
 	net_tcp_close(Socket);
 
-	if(m_StopRequested.load(std::memory_order_relaxed))
-	{
-		SetState(EState::Disconnected);
-		SetStatus("Stopped");
-	}
-	else if(State() != EState::Error)
+	if(!m_StopRequested.load(std::memory_order_relaxed) && State() != EState::Error)
 	{
 		SetState(EState::Disconnected);
 		SetStatus("Disconnected");
 	}
-
-	m_WorkerRunning.store(false, std::memory_order_relaxed);
+	return Reconnect;
 }
 
 void CTwitchChat::HandleIrcLine(const char *pLine)
