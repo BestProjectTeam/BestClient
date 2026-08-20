@@ -104,7 +104,7 @@ MACRO_CONFIG_INT(BcChatBubbles, bc_chat_bubbles, 0, 0, 1, CFGFLAG_CLIENT | CFGFL
 MACRO_CONFIG_INT(BcChatBubblesSelf, bc_chat_bubbles_self, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show chat bubbles above yourself")
 MACRO_CONFIG_INT(BcChatBubblesDemo, bc_chat_bubbles_demo, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show chat bubbles in demo playback")
 MACRO_CONFIG_INT(BcChatBubbleSize, bc_chat_bubble_size, 20, 20, 30, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Size of chat bubbles")
-MACRO_CONFIG_INT(BcChatBubbleShowTime, bc_chat_bubble_showtime, 200, 200, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "How long to show chat bubbles (centiseconds)")
+MACRO_CONFIG_INT(BcChatBubbleShowTime, bc_chat_bubble_showtime, 500, 100, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "How long to show chat bubbles (centiseconds)")
 MACRO_CONFIG_INT(BcChatBubbleFadeOut, bc_chat_bubble_fadeout, 35, 15, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Chat bubble fade-out duration (centiseconds)")
 MACRO_CONFIG_INT(BcChatBubbleFadeIn, bc_chat_bubble_fadein, 15, 15, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Chat bubble fade-in duration (centiseconds)")
 MACRO_CONFIG_INT(BcChatBubbleAnimation, bc_chat_bubble_animation, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Animate chat bubble stacking movement")

@@ -272,7 +272,7 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 
 		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
 		MainView.HSplitTop(LineSize, &Button, &MainView);
-		DoSliderWithScaledValue(&g_Config.m_BcChatBubbleShowTime, &g_Config.m_BcChatBubbleShowTime, &Button, Localize("Show for"), 200, 1000, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "s");
+		DoSliderWithDividedValue(&g_Config.m_BcChatBubbleShowTime, &g_Config.m_BcChatBubbleShowTime, &Button, Localize("Show for"), 100, 1000, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_NOCLAMPVALUE, "s");
 
 		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
 		MainView.HSplitTop(LineSize, &Button, &MainView);
