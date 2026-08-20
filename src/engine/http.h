@@ -142,7 +142,7 @@ protected:
 	static const char *GetRequestType(REQUEST Type);
 
 	// Request
-	char m_aUrl[256] = "";
+	char m_aUrl[2048] = "";
 	REQUEST m_Type = REQUEST::GET;
 	unsigned char *m_pBody = nullptr;
 	size_t m_BodyLength = 0;

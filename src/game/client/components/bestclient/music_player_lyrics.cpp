@@ -358,7 +358,7 @@ void CMusicPlayerLyrics::StartRequest(IHttp *pHttp, const char *pTitle, const ch
 	}
 
 	m_pRequest = HttpGet(aUrl);
-	m_pRequest->Timeout(CTimeout{3000, 8000, 500, 5});
+	m_pRequest->Timeout(CTimeout{10000, 0, 500, 10});
 	m_pRequest->LogProgress(HTTPLOG::FAILURE);
 	m_pRequest->FailOnErrorStatus(false);
 	m_pRequest->HeaderString("Lrclib-Client", "BestClient/" BESTCLIENT_VERSION " (https://github.com/BestProjectTeam/BestClient)");
@@ -477,7 +477,7 @@ void CMusicPlayerLyrics::Update(IHttp *pHttp, const char *pTitle, const char *pA
 
 	m_TrackTitle = (pTitle != nullptr && pTitle[0] != '\0') ? pTitle : "";
 
-	const bool HasIdentity = (pTitle && pTitle[0] != '\0') || (pArtist && pArtist[0] != '\0');
+	const bool HasIdentity = pTitle && pTitle[0] != '\0' && pArtist && pArtist[0] != '\0';
 	if(!HasIdentity)
 	{
 		if(!m_ActiveKey.empty())

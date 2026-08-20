@@ -549,6 +549,7 @@ namespace
 
 		bool ParseMetadata(DBusMessageIter VariantIter, SNowPlayingSnapshot &Out) const
 		{
+			std::string AlbumArtist;
 			DBusMessageIter MetadataVariant;
 			dbus_message_iter_recurse(&VariantIter, &MetadataVariant);
 			if(dbus_message_iter_get_arg_type(&MetadataVariant) != DBUS_TYPE_ARRAY)
@@ -570,6 +571,10 @@ namespace
 					else if(str_comp(pKey, "xesam:artist") == 0)
 					{
 						VariantToJoinedStringArray(ValueVariantIter, Out.m_Artist);
+					}
+					else if(str_comp(pKey, "xesam:albumArtist") == 0)
+					{
+						VariantToJoinedStringArray(ValueVariantIter, AlbumArtist);
 					}
 					else if(str_comp(pKey, "xesam:album") == 0)
 					{
@@ -596,6 +601,8 @@ namespace
 				if(!dbus_message_iter_next(&MetadataArray))
 					break;
 			}
+			if(Out.m_Artist.empty())
+				Out.m_Artist = std::move(AlbumArtist);
 			return true;
 		}
 

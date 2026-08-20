@@ -72,6 +72,7 @@ jobs:
           libavformat-dev
           libavutil-dev
           libcurl4-openssl-dev
+          libdbus-1-dev
           libfreetype6-dev
           libglew-dev
           libnotify-dev
