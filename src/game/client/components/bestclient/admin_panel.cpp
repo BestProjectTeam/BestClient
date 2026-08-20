@@ -53,7 +53,7 @@ const CAdminPanel::SActionSpec s_aActionSpecs[] = {
 	{CAdminPanel::EAction::MUTE, "muteid", CAdminPanel::AUTH_FALLBACK_HELPER, true, CAdminPanel::EActionField::REASON_DURATION_SECONDS},
 	{CAdminPanel::EAction::BAN, "ban", CAdminPanel::AUTH_FALLBACK_MOD, true, CAdminPanel::EActionField::REASON_DURATION_MINUTES},
 	{CAdminPanel::EAction::KICK, "kick", CAdminPanel::AUTH_FALLBACK_MOD, true, CAdminPanel::EActionField::REASON},
-	{CAdminPanel::EAction::RESPAWN, "kill_pl", CAdminPanel::AUTH_FALLBACK_MOD, true, CAdminPanel::EActionField::REASON},
+	{CAdminPanel::EAction::RESPAWN, "respawn", CAdminPanel::AUTH_FALLBACK_MOD, true, CAdminPanel::EActionField::REASON},
 	{CAdminPanel::EAction::FORCE_PAUSE, "force_pause", CAdminPanel::AUTH_FALLBACK_MOD, true, CAdminPanel::EActionField::DURATION_SECONDS},
 };
 
@@ -337,7 +337,7 @@ bool CAdminPanel::TryBuildActionCommand(char *pBuffer, int BufferSize) const
 	}
 	if(m_ActionPopupType == EAction::RESPAWN)
 	{
-		str_format(pBuffer, BufferSize, "kill_pl %d %s", m_ActionPopupClientId, m_ActionReasonInput.IsEmpty() ? "Respawned by admin panel" : pReason);
+		str_format(pBuffer, BufferSize, "respawn %d %s", m_ActionPopupClientId, m_ActionReasonInput.IsEmpty() ? "Respawned by admin panel" : pReason);
 		return true;
 	}
 	if(m_ActionPopupType == EAction::FORCE_PAUSE)
