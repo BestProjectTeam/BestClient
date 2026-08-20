@@ -139,7 +139,7 @@ Demo playback only (Demo Player): **Camera Drift**, **Dynamic FOV**.
 
 - **Misc** — auto update, layout, silent typing, cinematic camera, better spectate (`+specpause` radio), spec moved notify, extend zoom, UI/wheel/scoreboard scale, and more
 - **Rollback Demo** — replay rollback with configurable length
-- **Browser Utils** — auto server list refresh, short KoG server names
+- **Browser Utils** — auto server list refresh, short EGO/KoG server names
 - **Chat Filter** — regex/censor list, player whitelist (from RushieClient)
 - **Voice Binds** — push-to-talk and voice moderation key
 - **Voice Chat** — Opus PTT/VAD, radius/team0, per-player volume/mute, voice mod tab in admin panel

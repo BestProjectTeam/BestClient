@@ -1025,8 +1025,8 @@ Browser Utils
 Auto server list refresh
 == Автообновление списка серверов
 
-Use short KoG server name
-== Использовать сокращённое имя KoG-серверов
+Short EGO/KoG server name
+== Сокращённое имя EGO/KoG-серверов
 
 Chat Media
 == Медиа в чате

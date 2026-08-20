@@ -351,7 +351,7 @@ MACRO_CONFIG_INT(BcSnapTapDelay, bc_snap_tap_delay, 0, 0, 200, CFGFLAG_CLIENT | 
 // Browser Utils
 MACRO_CONFIG_INT(BcAutoServerListRefresh, bc_auto_server_list_refresh, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically refresh the server browser list while a browser tab is open")
 MACRO_CONFIG_INT(BcAutoServerListRefreshSeconds, bc_auto_server_list_refresh_seconds, 10, 1, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Auto refresh interval for the server browser list in seconds")
-MACRO_CONFIG_INT(BcUseShortKogServerName, bc_use_short_kog_server_name, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use short name for KoG gores servers in browser list")
+MACRO_CONFIG_INT(BcUseShortKogServerName, bc_use_short_kog_server_name, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use short names for E-Gores and KoG servers in browser list")
 
 // Media background
 MACRO_CONFIG_INT(BcMenuMediaBackground, bc_menu_media_background, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable custom media background in offline menus")

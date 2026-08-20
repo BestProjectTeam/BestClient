@@ -3175,7 +3175,7 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 
 	BrowserUtilsBlock.HSplitTop(MarginSmall, nullptr, &BrowserUtilsBlock);
 	BrowserUtilsBlock.HSplitTop(LineSize, &Content, &BrowserUtilsBlock);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcUseShortKogServerName, Localize("Use short KoG server name"), &g_Config.m_BcUseShortKogServerName, &Content, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcUseShortKogServerName, Localize("Short EGO/KoG server name"), &g_Config.m_BcUseShortKogServerName, &Content, LineSize);
 
 	// Chat Filter
 	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
