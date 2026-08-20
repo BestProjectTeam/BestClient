@@ -553,7 +553,8 @@ namespace
 		if(W <= 0.0f || H <= 0.0f)
 			return;
 
-		const ColorRGBA Bg = Active ? ColorRGBA(1.0f, 1.0f, 1.0f, 0.92f) : ColorRGBA(0.0f, 0.0f, 0.0f, 0.55f);
+		const float PressedOpacity = std::clamp(g_Config.m_BcKeystrokesMcPressedOpacity / 100.0f, 0.0f, 1.0f);
+		const ColorRGBA Bg = Active ? ColorRGBA(1.0f, 1.0f, 1.0f, PressedOpacity) : ColorRGBA(0.0f, 0.0f, 0.0f, 0.55f);
 		pGraphics->DrawRect(X, Y, W, H, Bg, IGraphics::CORNER_NONE, 0.0f);
 
 		if(pLabel == nullptr)

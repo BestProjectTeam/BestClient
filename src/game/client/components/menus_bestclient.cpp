@@ -1389,7 +1389,7 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 
 	const float KeystrokesClassicPresetHeight = (MarginSmall + LineSize) * BCUiAnimations::EaseOutCubic(s_KeystrokesKeyboardRevealPhase);
 	const float KeystrokesMouseExpandedHeight = (MarginSmall + LineSize) * BCUiAnimations::EaseOutCubic(s_KeystrokesMouseRevealPhase);
-	const float KeystrokesMcOptionsRows = 1.0f + (g_Config.m_BcKeystrokesMcLayout == 1 ? 3.0f : 0.0f); // layout + LMB/RMB/Space for Only A/D
+	const float KeystrokesMcOptionsRows = 2.0f + (g_Config.m_BcKeystrokesMcLayout == 1 ? 3.0f : 0.0f); // layout + pressed opacity + LMB/RMB/Space for Only A/D
 	const float KeystrokesMinecraftExpandedHeight = (MarginSmall + LineSize) * KeystrokesMcOptionsRows * BCUiAnimations::EaseOutCubic(s_KeystrokesMinecraftRevealPhase);
 	const float KeystrokesClassicBodyHeight = LineSize + KeystrokesClassicPresetHeight + MarginSmall + LineSize + KeystrokesMouseExpandedHeight;
 	const float KeystrokesMinecraftBodyHeight = LineSize + KeystrokesMinecraftExpandedHeight;
@@ -1426,6 +1426,7 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		g_Config.m_BcKeystrokesMcShowLmb = DefaultConfig::BcKeystrokesMcShowLmb;
 		g_Config.m_BcKeystrokesMcShowRmb = DefaultConfig::BcKeystrokesMcShowRmb;
 		g_Config.m_BcKeystrokesMcShowSpace = DefaultConfig::BcKeystrokesMcShowSpace;
+		g_Config.m_BcKeystrokesMcPressedOpacity = DefaultConfig::BcKeystrokesMcPressedOpacity;
 	}
 	static CButtonContainer s_KeystrokesHudEditorButton;
 	const bool KeystrokesCanOpenHudEditor = Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK;
@@ -1523,6 +1524,10 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 			g_Config.m_BcKeystrokesMcLayout = 0;
 		if(DoButton_Menu(&s_McLayoutOnlyAd, Localize("Only A/D"), g_Config.m_BcKeystrokesMcLayout == 1, &McOnlyAdButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
 			g_Config.m_BcKeystrokesMcLayout = 1;
+
+		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+		MainView.HSplitTop(LineSize, &Button, &MainView);
+		Ui()->DoScrollbarOption(&g_Config.m_BcKeystrokesMcPressedOpacity, &g_Config.m_BcKeystrokesMcPressedOpacity, &Button, Localize("Pressed opacity"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
 
 		if(g_Config.m_BcKeystrokesMcLayout == 1)
 		{
