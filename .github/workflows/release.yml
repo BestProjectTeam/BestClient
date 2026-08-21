@@ -67,7 +67,7 @@ jobs:
       if: contains(matrix.os, 'ubuntu')
       run: |
         sudo apt-get update -y
-        sudo apt-get install pkg-config ninja-build libcurl4-openssl-dev libdbus-1-dev libfreetype6-dev libnotify-dev libogg-dev libopus-dev libopusfile-dev libsdl2-dev libsqlite3-dev libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev libx264-dev libpng-dev libvulkan-dev libglew-dev -y
+        sudo apt-get install pkg-config ninja-build libcurl4-openssl-dev libdbus-1-dev libfreetype6-dev libnotify-dev libogg-dev libopus-dev libopusfile-dev libsdl2-dev libsqlite3-dev libpng-dev libvulkan-dev libglew-dev -y
 
     - name: Install Vulkan SDK
       uses: humbletim/install-vulkan-sdk@v1.2

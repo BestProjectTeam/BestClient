@@ -72,8 +72,6 @@ bool CCloudInput::CheckNewInput(CControls &Controls)
 			NewInput[Dummy] = true;
 		if(m_aInput[Dummy].m_WantedWeapon != NextInput.m_WantedWeapon)
 			NewInput[Dummy] = true;
-		if(m_aInput[Dummy].m_TargetX != NextInput.m_TargetX || m_aInput[Dummy].m_TargetY != NextInput.m_TargetY)
-			NewInput[Dummy] = true;
 
 		m_aInput[Dummy] = NextInput;
 	}

@@ -6108,12 +6108,6 @@ CGameClient::CImageAsset CGameClient::LoadAssetFromPath(const char *pPath, bool 
 
 	Graphics()->LoadPng(LoadedAsset.m_ImageInfo, LoadedAsset.m_aPath, IStorage::TYPE_ALL);
 
-	if(!LoadedAsset.m_IsDefault && LoadedAsset.IsLoaded())
-	{
-		CImageInfo ImgDefaultInfo;
-		if(Graphics()->LoadPng(ImgDefaultInfo, g_pData->m_aImages[AssetId].m_pFilename, IStorage::TYPE_ALL))
-			LoadedAsset.m_FallbackImageInfo = std::move(ImgDefaultInfo);
-	}
 	return LoadedAsset;
 }
 
