@@ -106,7 +106,7 @@ void CEdgeHelper::RenderEdgeHelper(bool ForcePreview)
 {
 	const float HudHeight = HudLayout::CANVAS_HEIGHT;
 	const float HudWidth = HudHeight * Graphics()->ScreenAspect();
-	Graphics()->MapScreenToSize(HudWidth, HudHeight);
+	Graphics()->MapScreen(0.0f, 0.0f, HudWidth, HudHeight);
 
 	CUIRect Base = GetRect(ForcePreview);
 	if(Base.w <= 0.0f || Base.h <= 0.0f)

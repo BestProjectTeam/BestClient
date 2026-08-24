@@ -162,14 +162,15 @@ void CPhysicBalls::RenderBalls()
 	if(!pSkin)
 		return;
 
-	const CScreenRect ScreenRect = Graphics()->GetScreen();
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
 
 	m_vpVisibleBalls.clear();
 	for(const CBall &Ball : m_vBalls)
 	{
 		const float HalfSize = Ball.m_Size * 0.75f;
-		if(Ball.m_Pos.x + HalfSize < ScreenRect.m_TopLeft.x || Ball.m_Pos.x - HalfSize > ScreenRect.m_BottomRight.x ||
-			Ball.m_Pos.y + HalfSize < ScreenRect.m_TopLeft.y || Ball.m_Pos.y - HalfSize > ScreenRect.m_BottomRight.y)
+		if(Ball.m_Pos.x + HalfSize < ScreenX0 || Ball.m_Pos.x - HalfSize > ScreenX1 ||
+			Ball.m_Pos.y + HalfSize < ScreenY0 || Ball.m_Pos.y - HalfSize > ScreenY1)
 			continue;
 		m_vpVisibleBalls.push_back(&Ball);
 	}
