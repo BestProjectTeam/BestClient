@@ -3677,6 +3677,8 @@ void CMusicPlayer::RenderHudEditor(bool ForcePreview)
 void CMusicPlayer::OnUpdate()
 {
 	EnsureImpl();
+	// Migrate configurations from the removed translucent mode to cover colors.
+	g_Config.m_BcMusicPlayerColorMode = std::clamp(g_Config.m_BcMusicPlayerColorMode, 0, 1);
 	if(m_pImpl->m_LastAppliedColorMode != g_Config.m_BcMusicPlayerColorMode ||
 		m_pImpl->m_LastAppliedStaticColor != g_Config.m_BcMusicPlayerStaticColor)
 	{

@@ -1294,14 +1294,11 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		static CUi::SDropDownState s_MusicPlayerColorModeState;
 		static CScrollRegion s_MusicPlayerColorModeScrollRegion;
 		s_MusicPlayerColorModeState.m_SelectionPopupContext.m_pScrollRegion = &s_MusicPlayerColorModeScrollRegion;
-		const char *apMusicPlayerColorModes[3] = {
+		const char *apMusicPlayerColorModes[2] = {
 			Localize("Static"),
 			Localize("Cover"),
-			Localize("Translucent"),
 		};
-		if(g_Config.m_BcMusicPlayerColorMode > 2)
-			g_Config.m_BcMusicPlayerColorMode = 2;
-		g_Config.m_BcMusicPlayerColorMode = std::clamp(g_Config.m_BcMusicPlayerColorMode, 0, 2);
+		g_Config.m_BcMusicPlayerColorMode = std::clamp(g_Config.m_BcMusicPlayerColorMode, 0, 1);
 		g_Config.m_BcMusicPlayerColorMode = Ui()->DoDropDown(&MusicPlayerColorModeSelect, g_Config.m_BcMusicPlayerColorMode, apMusicPlayerColorModes, (int)std::size(apMusicPlayerColorModes), s_MusicPlayerColorModeState);
 
 		if(MusicPlayerShowStaticColor)

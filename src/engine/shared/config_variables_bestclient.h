@@ -261,7 +261,7 @@ MACRO_CONFIG_INT(BcMusicPlayerVisualizerMode, bc_music_player_visualizer_mode, 1
 MACRO_CONFIG_INT(BcMusicPlayerVisualizerSmoothing, bc_music_player_visualizer_smoothing, 50, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player visualizer smoothing in percent")
 MACRO_CONFIG_INT(BcMusicPlayerVisualizerRounding, bc_music_player_visualizer_rounding, 0, 0, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player visualizer rounding (0=cube, 200=soft)")
 MACRO_CONFIG_INT(BcMusicPlayerVisualizerColumns, bc_music_player_visualizer_columns, 5, 5, 10, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player visualizer bar count")
-MACRO_CONFIG_INT(BcMusicPlayerColorMode, bc_music_player_color_mode, 1, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player color mode (0=static visualizer, 1=cover visualizer, 2=translucent)")
+MACRO_CONFIG_INT(BcMusicPlayerColorMode, bc_music_player_color_mode, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player color mode (0=static visualizer, 1=cover visualizer)")
 MACRO_CONFIG_COL(BcMusicPlayerStaticColor, bc_music_player_static_color, 128, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Static color for the music player when static color mode is selected")
 MACRO_CONFIG_INT(BcMusicPlayerTextScale, bc_music_player_text_scale, 110, 70, 150, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player text scale in percent")
 MACRO_CONFIG_INT(BcMusicPlayerShowLyrics, bc_music_player_show_lyrics, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show synchronized song lyrics in the music player (BETA)")
