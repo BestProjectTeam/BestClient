@@ -124,6 +124,7 @@ private:
 	std::string m_LayoutText;
 	float m_LayoutFontSize = 0.0f;
 	std::vector<SCharMetric> m_vCharMetrics;
+	std::vector<STextColorSplit> m_vColorSplits;
 	float m_BaseLineWidth = 0.0f;
 	bool m_LayoutValid = false;
 };

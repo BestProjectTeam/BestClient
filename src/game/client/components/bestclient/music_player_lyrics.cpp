@@ -235,6 +235,7 @@ bool CMusicPlayerLyrics::ParseSyncedLyrics(const char *pSyncedLyrics, std::vecto
 		return false;
 
 	const char *p = pSyncedLyrics;
+	std::vector<int64_t> vTimestamps;
 	while(*p)
 	{
 		while(*p == '\r' || *p == '\n')
@@ -247,7 +248,7 @@ bool CMusicPlayerLyrics::ParseSyncedLyrics(const char *pSyncedLyrics, std::vecto
 			++p;
 		const char *pLineEnd = p;
 
-		std::vector<int64_t> vTimestamps;
+		vTimestamps.clear();
 		const char *pCursor = pLineStart;
 		while(pCursor < pLineEnd)
 		{
@@ -319,7 +320,6 @@ void CMusicPlayerLyrics::ApplyCacheEntry(const SCacheEntry &Entry)
 {
 	m_DisplayState = Entry.m_State;
 	m_vLines = Entry.m_vLines;
-	MergeConsecutiveIdenticalLines(m_vLines);
 	ClearLayoutState();
 	if(Entry.m_State == EDisplayState::NotFound)
 		m_NotFoundDisplayMs = 0.0f;
@@ -754,6 +754,8 @@ void CMusicPlayerLyrics::Render(ITextRender *pTextRender, CUi *pUi, const CUIRec
 {
 	if(pTextRender == nullptr || pUi == nullptr || Area.w <= 0.0f || Area.h <= 0.0f)
 		return;
+	if(m_vColorSplits.capacity() < 3)
+		m_vColorSplits.reserve(3);
 
 	const char *pStatusText = nullptr;
 	bool WhiteStatusText = false;
@@ -906,24 +908,24 @@ void CMusicPlayerLyrics::Render(ITextRender *pTextRender, CUi *pUi, const CUIRec
 		CUIRect Clip = Area;
 		pUi->ClipEnable(&Clip);
 
-		std::vector<STextColorSplit> vSplits;
+		m_vColorSplits.clear();
 		if(ColorMode == 1)
-			vSplits.emplace_back(0, -1, LYRICS_UPCOMING_COLOR.WithAlpha(Alpha));
+			m_vColorSplits.emplace_back(0, -1, LYRICS_UPCOMING_COLOR.WithAlpha(Alpha));
 		else if(ColorMode == 2)
-			vSplits.emplace_back(0, -1, LYRICS_PASSED_COLOR.WithAlpha(Alpha));
+			m_vColorSplits.emplace_back(0, -1, LYRICS_PASSED_COLOR.WithAlpha(Alpha));
 		else if(IsCountdownIndex(DrawIndex) && DrawIndex == m_CurrentLineIndex)
-			BuildColorSplits(ProgressCharsForColor, Alpha, vSplits);
+			BuildColorSplits(ProgressCharsForColor, Alpha, m_vColorSplits);
 		else if(IsCountdownIndex(DrawIndex) || IsFallbackIndex(DrawIndex))
-			vSplits.emplace_back(0, -1, LYRICS_PASSED_COLOR.WithAlpha(Alpha));
+			m_vColorSplits.emplace_back(0, -1, LYRICS_PASSED_COLOR.WithAlpha(Alpha));
 		else
-			BuildColorSplits(ProgressCharsForColor, Alpha, vSplits);
+			BuildColorSplits(ProgressCharsForColor, Alpha, m_vColorSplits);
 
 		auto DrawOnce = [&](float DrawX) {
 			CTextCursor Cursor;
 			Cursor.m_FontSize = FontSize;
 			Cursor.m_Flags = TEXTFLAG_RENDER;
 			Cursor.SetPosition(vec2(DrawX, Y));
-			Cursor.m_vColorSplits = vSplits;
+			Cursor.m_vColorSplits = m_vColorSplits;
 			pTextRender->TextColor(LYRICS_UPCOMING_COLOR.WithAlpha(Alpha));
 			pTextRender->TextEx(&Cursor, pText, -1);
 		};

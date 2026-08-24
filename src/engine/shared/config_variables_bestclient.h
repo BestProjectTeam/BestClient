@@ -296,7 +296,6 @@ MACRO_CONFIG_INT(BcKeystrokesKeyboardPreset, bc_keystrokes_keyboard_preset, 0, 0
 MACRO_CONFIG_INT(BcKeystrokesMouse, bc_keystrokes_mouse, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show mouse keystrokes HUD")
 MACRO_CONFIG_INT(BcKeystrokesMousePreset, bc_keystrokes_mouse_preset, 1, 1, 3, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Mouse keystrokes preset (1 = mouse-arrow, 2 = mouse-dot-dot, 3 = mouse-nothing)")
 MACRO_CONFIG_INT(BcKeystrokesMcLayout, bc_keystrokes_mc_layout, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Minecraft keystrokes layout (0 = Full, 1 = Only A/D)")
-MACRO_CONFIG_INT(BcKeystrokesMcShowWs, bc_keystrokes_mc_show_ws, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show W/S in Minecraft Full layout")
 MACRO_CONFIG_INT(BcKeystrokesMcShowLmb, bc_keystrokes_mc_show_lmb, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show LMB in Minecraft keystrokes")
 MACRO_CONFIG_INT(BcKeystrokesMcShowRmb, bc_keystrokes_mc_show_rmb, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show RMB in Minecraft keystrokes")
 MACRO_CONFIG_INT(BcKeystrokesMcShowSpace, bc_keystrokes_mc_show_space, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show Space in Minecraft keystrokes")

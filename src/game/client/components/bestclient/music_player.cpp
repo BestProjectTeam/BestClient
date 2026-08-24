@@ -1324,8 +1324,6 @@ namespace
 	struct SArtworkColorAnalysis
 	{
 		ColorRGBA m_Base = ColorRGBA(0.22f, 0.24f, 0.28f, 1.0f);
-		ColorRGBA m_Dominant = ColorRGBA(0.22f, 0.24f, 0.28f, 1.0f);
-		ColorRGBA m_Brightest = ColorRGBA(0.34f, 0.38f, 0.46f, 1.0f);
 		float m_Luminance = 0.22f;
 		float m_Saturation = 0.0f;
 		bool m_Valid = false;
@@ -2255,10 +2253,6 @@ namespace
 		if(TotalWeight <= 0.0f)
 			return SArtworkColorAnalysis();
 
-		const SBin *pDominantBin = nullptr;
-		float DominantScore = -1.0f;
-		const SBin *pBrightestBin = nullptr;
-		float BrightestScore = -1.0f;
 		const SBin *pBestBin = nullptr;
 		float BestScore = -1.0f;
 		const SBin *pBestVividBin = nullptr;
@@ -2273,22 +2267,6 @@ namespace
 			const float BinG = Bin.m_G / Bin.m_Weight;
 			const float BinB = Bin.m_B / Bin.m_Weight;
 			const float BinValue = maximum(BinR, maximum(BinG, BinB));
-			const float CommonScore = Bin.m_Weight * (0.96f + BinSaturation * 0.16f);
-			if(pDominantBin == nullptr || CommonScore > DominantScore)
-			{
-				pDominantBin = &Bin;
-				DominantScore = CommonScore;
-			}
-			float BrightScore = Bin.m_Weight * (0.22f + BinLuma * 1.75f + BinValue * 0.95f + BinSaturation * 0.90f);
-			if(BinSaturation < 0.06f)
-				BrightScore *= 0.45f;
-			if(BinValue < 0.12f)
-				BrightScore *= 0.18f;
-			if(pBrightestBin == nullptr || BrightScore > BrightestScore)
-			{
-				pBrightestBin = &Bin;
-				BrightestScore = BrightScore;
-			}
 			float Score = Bin.m_Weight * (0.60f + BinSaturation * 1.05f + BinValue * 0.22f + (1.0f - absolute(BinLuma - 0.30f)) * 0.20f);
 			if(BinValue < 0.10f)
 				Score *= 0.22f;
@@ -2322,22 +2300,6 @@ namespace
 		Analysis.m_Luminance = AvgLuma / TotalWeight;
 		Analysis.m_Saturation = AvgSaturation / TotalWeight;
 		Analysis.m_Valid = true;
-		if(pDominantBin != nullptr)
-		{
-			Analysis.m_Dominant = ColorRGBA(
-				pDominantBin->m_R / pDominantBin->m_Weight,
-				pDominantBin->m_G / pDominantBin->m_Weight,
-				pDominantBin->m_B / pDominantBin->m_Weight,
-				1.0f);
-		}
-		if(pBrightestBin != nullptr)
-		{
-			Analysis.m_Brightest = ColorRGBA(
-				pBrightestBin->m_R / pBrightestBin->m_Weight,
-				pBrightestBin->m_G / pBrightestBin->m_Weight,
-				pBrightestBin->m_B / pBrightestBin->m_Weight,
-				1.0f);
-		}
 
 		float SelectedScore = BestScore;
 		if(pBestVividBin != nullptr && (BestVividScore > TotalWeight * 0.018f || BestVividScore > BestScore * 0.18f))
@@ -2358,8 +2320,6 @@ namespace
 		}
 
 		Analysis.m_Base = ClampColor(Analysis.m_Base);
-		Analysis.m_Dominant = ClampColor(Analysis.m_Dominant);
-		Analysis.m_Brightest = ClampColor(Analysis.m_Brightest);
 		Analysis.m_Neutral = Analysis.m_Saturation < 0.11f;
 		if(Analysis.m_Neutral)
 		{
@@ -2759,20 +2719,6 @@ public:
 		m_DebugLastRenderPath.clear();
 		m_DebugNextRenderVerboseTick = 0;
 		m_Lyrics.ClearActiveTrack();
-	}
-
-	bool IsIdle() const
-	{
-		return !m_Snapshot.m_Valid &&
-		       m_LastSnapshotTick == 0 &&
-		       m_LastPollTick == 0 &&
-		       m_LastArtKey.empty() &&
-		       !m_pArtRequest &&
-		       !m_pArtDecodeJob &&
-		       !m_OptArtDecodedFrames.has_value() &&
-		       m_vArtFrames.empty() &&
-		       !m_HudReservation.m_Visible &&
-		       !m_HudReservation.m_Active;
 	}
 
 	void ResetPlaybackAnchor()
@@ -3308,11 +3254,10 @@ public:
 
 	float VisualPositionMs(float Delta)
 	{
-		const std::string TrackKey = BuildSnapshotTrackKey(m_Snapshot);
 		const float Target = (float)DisplayPositionMs();
-		if(TrackKey != m_VisualTrackKey)
+		if(m_PlaybackTrackKey != m_VisualTrackKey)
 		{
-			m_VisualTrackKey = TrackKey;
+			m_VisualTrackKey = m_PlaybackTrackKey;
 			m_VisualPositionMs = Target;
 		}
 		else if(m_Snapshot.m_PlaybackState == EMusicPlaybackState::PLAYING)

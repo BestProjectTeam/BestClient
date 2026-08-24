@@ -1424,7 +1424,6 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		g_Config.m_BcKeystrokesKeyboardPreset = DefaultConfig::BcKeystrokesKeyboardPreset;
 		g_Config.m_BcKeystrokesMousePreset = DefaultConfig::BcKeystrokesMousePreset;
 		g_Config.m_BcKeystrokesMcLayout = DefaultConfig::BcKeystrokesMcLayout;
-		g_Config.m_BcKeystrokesMcShowWs = DefaultConfig::BcKeystrokesMcShowWs;
 		g_Config.m_BcKeystrokesMcShowLmb = DefaultConfig::BcKeystrokesMcShowLmb;
 		g_Config.m_BcKeystrokesMcShowRmb = DefaultConfig::BcKeystrokesMcShowRmb;
 		g_Config.m_BcKeystrokesMcShowSpace = DefaultConfig::BcKeystrokesMcShowSpace;

@@ -552,7 +552,7 @@ namespace
 		if(W <= 0.0f || H <= 0.0f)
 			return;
 
-		const float PressedOpacity = std::clamp(g_Config.m_BcKeystrokesMcPressedOpacity / 100.0f, 0.0f, 1.0f);
+		const float PressedOpacity = std::clamp(g_Config.m_BcKeystrokesMcPressedOpacity * 0.01f, 0.0f, 1.0f);
 		const ColorRGBA Bg = Active ? ColorRGBA(1.0f, 1.0f, 1.0f, PressedOpacity) : ColorRGBA(0.0f, 0.0f, 0.0f, 0.55f);
 		pGraphics->DrawRect(X, Y, W, H, Bg, IGraphics::CORNER_NONE, 0.0f);
 
@@ -1677,10 +1677,11 @@ void CHud::RenderKeystrokesKeyboardInternal(bool ForcePreview, bool IgnoreModule
 	if(IsKeystrokesMinecraftStyle())
 	{
 		const int64_t Now = time_get();
+		const int64_t HighlightDuration = time_freq() * KEYSTROKES_WHEEL_HIGHLIGHT_MS / 1000;
 		if(!ForcePreview && HasTrackedPlayer && pTrackedInput == nullptr && pTrackedCharacter != nullptr && pPrevTrackedCharacter != nullptr &&
 			pPrevTrackedCharacter->m_AttackTick != pTrackedCharacter->m_AttackTick)
 		{
-			m_KeystrokesMouse1EndTime = Now + time_freq() * KEYSTROKES_WHEEL_HIGHLIGHT_MS / 1000;
+			m_KeystrokesMouse1EndTime = Now + HighlightDuration;
 		}
 
 		const auto McLayout = BuildKeystrokesMcLayout();
@@ -1769,6 +1770,7 @@ void CHud::RenderKeystrokesMouseInternal(bool ForcePreview, bool IgnoreModuleEna
 	const auto &Preset = GetKeystrokesMousePreset(g_Config.m_BcKeystrokesMousePreset);
 	const float Scale = GetKeystrokesScale(Layout);
 	const int64_t Now = time_get();
+	const int64_t HighlightDuration = time_freq() * KEYSTROKES_WHEEL_HIGHLIGHT_MS / 1000;
 	const int TrackedClientId = ForcePreview ? -1 : GetKeystrokesTrackedClientId();
 	const bool HasTrackedPlayer = TrackedClientId >= 0;
 	const CNetObj_PlayerInput *pTrackedInput = ForcePreview ? nullptr : GetKeystrokesTrackedInput();
@@ -1781,13 +1783,13 @@ void CHud::RenderKeystrokesMouseInternal(bool ForcePreview, bool IgnoreModuleEna
 	if(!ForcePreview)
 	{
 		if(!HasTrackedPlayer && pTrackedInput == nullptr && Input()->KeyPress(KEY_MOUSE_WHEEL_UP))
-			m_KeystrokesWheelUpEndTime = Now + time_freq() * KEYSTROKES_WHEEL_HIGHLIGHT_MS / 1000;
+			m_KeystrokesWheelUpEndTime = Now + HighlightDuration;
 		if(!HasTrackedPlayer && pTrackedInput == nullptr && Input()->KeyPress(KEY_MOUSE_WHEEL_DOWN))
-			m_KeystrokesWheelDownEndTime = Now + time_freq() * KEYSTROKES_WHEEL_HIGHLIGHT_MS / 1000;
+			m_KeystrokesWheelDownEndTime = Now + HighlightDuration;
 		if(HasTrackedPlayer && pTrackedInput == nullptr && pTrackedCharacter != nullptr && pPrevTrackedCharacter != nullptr &&
 			pPrevTrackedCharacter->m_AttackTick != pTrackedCharacter->m_AttackTick)
 		{
-			m_KeystrokesMouse1EndTime = Now + time_freq() * KEYSTROKES_WHEEL_HIGHLIGHT_MS / 1000;
+			m_KeystrokesMouse1EndTime = Now + HighlightDuration;
 		}
 	}
 
@@ -1850,7 +1852,7 @@ void CHud::RenderKeystrokesMouseInternal(bool ForcePreview, bool IgnoreModuleEna
 
 		if(Element.m_ActiveOnly && !Active)
 			continue;
-		if(Element.m_InputKind == EKeystrokesInputKind::WHEEL && !Element.m_ActiveOnly && !Active)
+		if(Element.m_InputKind == EKeystrokesInputKind::WHEEL && !Active)
 			continue;
 
 		int MapY = Element.m_MapY;
