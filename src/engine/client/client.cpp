@@ -2811,6 +2811,21 @@ void CClient::UpdateDemoIntraTimers()
 
 void CClient::Update()
 {
+	// BestClient: detect long frames to diagnose periodic hitches. Logs whole
+	// frame gaps above 250 ms (stall diagnostics, rare by design).
+	{
+		static int64_t s_LastFrameStart = time_get();
+		const int64_t FrameStart = time_get();
+		const int64_t FrameGap = FrameStart - s_LastFrameStart;
+		s_LastFrameStart = FrameStart;
+		if(FrameGap > (int64_t)(time_freq() / 4))
+		{
+			char aBuf[64];
+			str_format(aBuf, sizeof(aBuf), "long frame: %d ms (state=%d)", (int)(FrameGap * 1000 / time_freq()), (int)State());
+			m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "client/stall", aBuf);
+		}
+	}
+
 	PumpNetwork();
 
 	if(State() == IClient::STATE_DEMOPLAYBACK)

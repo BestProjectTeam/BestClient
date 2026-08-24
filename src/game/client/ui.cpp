@@ -17,6 +17,7 @@
 #include <game/client/components/bestclient/gradient.h>
 #include <game/localization.h>
 
+#include <algorithm>
 #include <limits>
 
 void CUIElement::Init(CUi *pUI, int RequestedRectCount)
@@ -1764,10 +1765,38 @@ void CUi::RenderPopupMenus()
 {
 	for(size_t i = 0; i < m_vPopupMenus.size(); ++i)
 	{
-		const SPopupMenu &PopupMenu = m_vPopupMenus[i];
+		SPopupMenu &PopupMenu = m_vPopupMenus[i];
 		const SPopupMenuId *pId = PopupMenu.m_pId;
 		const bool Inside = MouseInside(&PopupMenu.m_Rect);
 		const bool Active = i == m_vPopupMenus.size() - 1;
+
+		// Draggable popups: pressing the top handle area starts a move. While
+		// dragging, the popup follows the mouse and the release-outside-closes
+		// behavior is suppressed so the popup survives drags ending off-popup.
+		bool SkipActiveLogic = false;
+		if(PopupMenu.m_Props.m_Draggable)
+		{
+			CUIRect DragHandle = PopupMenu.m_Rect;
+			DragHandle.h = SPopupMenu::POPUP_BORDER + SPopupMenu::POPUP_MARGIN + SPopupMenu::POPUP_DRAG_HANDLE_HEIGHT;
+			if(PopupMenu.m_Dragging)
+			{
+				PopupMenu.m_Rect.x += MouseDeltaX();
+				PopupMenu.m_Rect.y += MouseDeltaY();
+				PopupMenu.m_Rect.x = std::clamp(PopupMenu.m_Rect.x, 0.0f, maximum(0.0f, Screen()->w - PopupMenu.m_Rect.w));
+				PopupMenu.m_Rect.y = std::clamp(PopupMenu.m_Rect.y, 0.0f, maximum(0.0f, Screen()->h - PopupMenu.m_Rect.h));
+				if(!MouseButton(0))
+				{
+					PopupMenu.m_Dragging = false;
+					SetActiveItem(nullptr);
+				}
+				SkipActiveLogic = true;
+			}
+			else if(MouseButtonClicked(0) && MouseInside(&DragHandle))
+			{
+				PopupMenu.m_Dragging = true;
+				SkipActiveLogic = true;
+			}
+		}
 
 		if(Active)
 		{
@@ -1775,23 +1804,26 @@ void CUi::RenderPopupMenus()
 			SetHotItem(pId);
 		}
 
-		if(CheckActiveItem(pId))
+		if(!SkipActiveLogic)
 		{
-			if(!MouseButton(0))
+			if(CheckActiveItem(pId))
 			{
-				if(!Inside)
+				if(!MouseButton(0))
 				{
-					ClosePopupMenu(pId);
-					--i;
-					continue;
+					if(!Inside)
+					{
+						ClosePopupMenu(pId);
+						--i;
+						continue;
+					}
+					SetActiveItem(nullptr);
 				}
-				SetActiveItem(nullptr);
 			}
-		}
-		else if(HotItem() == pId)
-		{
-			if(MouseButton(0))
-				SetActiveItem(pId);
+			else if(HotItem() == pId)
+			{
+				if(MouseButton(0))
+					SetActiveItem(pId);
+			}
 		}
 
 		if(Inside)
@@ -1805,6 +1837,15 @@ void CUi::RenderPopupMenus()
 		PopupRect.Margin(SPopupMenu::POPUP_BORDER, &PopupRect);
 		PopupRect.Draw(PopupMenu.m_Props.m_BackgroundColor, PopupMenu.m_Props.m_Corners, 3.0f);
 		PopupRect.Margin(SPopupMenu::POPUP_MARGIN, &PopupRect);
+		if(PopupMenu.m_Props.m_Draggable)
+		{
+			// Visual grip hint for the drag handle.
+			CUIRect DragHint = PopupRect;
+			DragHint.HSplitTop(SPopupMenu::POPUP_DRAG_HANDLE_HEIGHT, &DragHint, &PopupRect);
+			DragHint.Margin(2.0f, &DragHint);
+			DragHint.h = 2.0f;
+			DragHint.Draw(ColorRGBA(1.0f, 1.0f, 1.0f, 0.25f), IGraphics::CORNER_ALL, 1.0f);
+		}
 
 		// The popup render function can open/close popups, which may resize the vector and thus
 		// invalidate the variable PopupMenu. We therefore store pId in a separate variable.

@@ -3736,20 +3736,6 @@ void CEditor::RenderLayers(CUIRect LayersBox)
 
 		s_ScrollToSelectionNext = true;
 	}
-	if(Input()->ModifierIsPressed() && !Input()->ShiftIsPressed() && m_Dialog == DIALOG_NONE && !Ui()->IsPopupOpen() && CLineInput::GetActiveInput() == nullptr && s_Operation == OP_NONE)
-	{
-		if(Input()->KeyPress(KEY_MOUSE_WHEEL_DOWN))
-		{
-			Map()->SelectNextLayer();
-			s_ScrollToSelectionNext = true;
-		}
-		if(Input()->KeyPress(KEY_MOUSE_WHEEL_UP))
-		{
-			Map()->SelectPreviousLayer();
-			s_ScrollToSelectionNext = true;
-		}
-	}
-
 	CUIRect AddGroupButton, CollapseAllButton;
 	LayersBox.HSplitTop(RowHeight + 1.0f, &AddGroupButton, &LayersBox);
 	if(s_ScrollRegion.AddRect(AddGroupButton))

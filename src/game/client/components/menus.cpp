@@ -1225,7 +1225,10 @@ void CMenus::Render()
 	// community cache every tick, which caused noticeable stutter with a short
 	// refresh interval. Unchanged master payloads are skipped entirely by the
 	// serverbrowser HTTP layer; changed payloads are applied incrementally.
-	const bool BrowserPageActive = m_MenuPage >= PAGE_INTERNET && m_MenuPage <= PAGE_FAVORITE_COMMUNITY_5;
+	// Restricted to the main menu: m_MenuPage keeps its last browser value while
+	// connected, so an in-game check would wrongly keep refreshing there.
+	const bool BrowserPageActive = Client()->State() == IClient::STATE_OFFLINE &&
+		m_MenuPage >= PAGE_INTERNET && m_MenuPage <= PAGE_FAVORITE_COMMUNITY_5;
 	if(BrowserPageActive && g_Config.m_BcAutoServerListRefresh)
 	{
 		const bool BrowserBusy = ServerBrowser()->IsRefreshing() || ServerBrowser()->IsGettingServerlist();
@@ -2694,7 +2697,9 @@ void CMenus::OnShutdown()
 
 bool CMenus::OnCursorMove(float x, float y, IInput::ECursorType CursorType)
 {
-	if(!m_MenuActive && !s_AspectConfirmWantsInput)
+	// During demo playback the demo player navbar stays visible even when the
+	// menu is hidden, so it needs cursor updates for hover/click hit-testing.
+	if(!m_MenuActive && !s_AspectConfirmWantsInput && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return false;
 
 	Ui()->ConvertMouseMove(&x, &y, CursorType);
@@ -2706,16 +2711,10 @@ bool CMenus::OnCursorMove(float x, float y, IInput::ECursorType CursorType)
 bool CMenus::OnInput(const IInput::CEvent &Event)
 {
 	// Escape is always handled to activate/deactivate the menu.
-	// While a demo is playing with the navbar hidden, consume keyboard input so
-	// binds cannot steal demo hotkeys (pause/seek/speed) from RenderDemoPlayer.
-	// Leave mouse wheel alone when inactive so zoom binds still work.
-	const bool IsMouseWheel = Event.m_Key == KEY_MOUSE_WHEEL_UP || Event.m_Key == KEY_MOUSE_WHEEL_DOWN ||
-				  Event.m_Key == KEY_MOUSE_WHEEL_LEFT || Event.m_Key == KEY_MOUSE_WHEEL_RIGHT;
-	const bool DemoHotkeys = Client()->State() == IClient::STATE_DEMOPLAYBACK &&
-				 g_Config.m_ClDemoKeyboardShortcuts &&
-				 m_DemoPlayerState == DEMOPLAYER_NONE &&
-				 !IsMouseWheel;
-	if((Event.m_Flags & IInput::FLAG_PRESS && Event.m_Key == KEY_ESCAPE) || IsActive() || s_AspectConfirmWantsInput || DemoHotkeys)
+	// Demo hotkeys are NOT consumed here: the demo player navbar renders even
+	// when the menu is hidden and polls Input()->KeyPress directly, so keyboard
+	// binds (e.g. the spectator menu) keep working during demo playback.
+	if((Event.m_Flags & IInput::FLAG_PRESS && Event.m_Key == KEY_ESCAPE) || IsActive() || s_AspectConfirmWantsInput)
 	{
 		Ui()->OnInput(Event);
 		return true;
@@ -2913,7 +2912,7 @@ void CMenus::OnRender()
 	if(ShowAspectConfirmOverlay && IsActive())
 		Ui()->SetActiveItem(nullptr);
 
-	if(IsActive())
+	if(IsActive() || Client()->State() == IClient::STATE_DEMOPLAYBACK)
 		Render();
 
 	// After Render: discard buttons that became active, and suppress hot item next frame

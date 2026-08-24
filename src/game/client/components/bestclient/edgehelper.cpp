@@ -254,25 +254,24 @@ void CEdgeHelper::RenderEdgeHelperJumpInfo(CUIRect *pBase, float Scale)
 	CenterZone.VSplitLeft(CenterValueWidth, &CenterZone, &RightZone);
 	RightZone.VSplitLeft(SeparatorWidth, &RightSeparator, &RightZone);
 
-	const auto LowerIt = std::upper_bound(s_aEdgeInfoJumpPositions.begin(), s_aEdgeInfoJumpPositions.end(), m_PosX);
-	const auto UpperIt = std::lower_bound(s_aEdgeInfoJumpPositions.begin(), s_aEdgeInfoJumpPositions.end(), m_PosX);
-	const int Lower = LowerIt == s_aEdgeInfoJumpPositions.begin() ? std::numeric_limits<int>::min() : *std::prev(LowerIt);
-	const int Upper = UpperIt == s_aEdgeInfoJumpPositions.end() ? std::numeric_limits<int>::max() : *UpperIt;
+	const auto CurIt = std::lower_bound(s_aEdgeInfoJumpPositions.begin(), s_aEdgeInfoJumpPositions.end(), m_PosX);
+	const int Upper = CurIt == s_aEdgeInfoJumpPositions.end() ? std::numeric_limits<int>::max() : *CurIt;
+	const int Lower = CurIt == s_aEdgeInfoJumpPositions.begin() ? std::numeric_limits<int>::min() : *std::prev(CurIt);
+	// Highlight the right side only when standing exactly on a jump position:
+	// Lower is strictly below m_PosX, Upper is the first position at/after it.
+	const bool AtJump = CurIt != s_aEdgeInfoJumpPositions.end() && *CurIt == m_PosX;
 	const float ValueFontSize = 12.0f * JumpScale;
 
-	if(m_PosX == Lower || m_PosX == Upper)
-		TextRender()->TextColor(SEdgeHelperProperties::ActionActiveButtonColor());
 	Ui()->DoLabel(&LeftSeparator, "|", ValueFontSize, TEXTALIGN_MC);
-	TextRender()->TextColor(TextRender()->DefaultTextColor());
 
-	if(m_PosX == Upper)
+	if(AtJump)
 		TextRender()->TextColor(SEdgeHelperProperties::ActionActiveButtonColor());
 	Ui()->DoLabel(&RightSeparator, "|", ValueFontSize, TEXTALIGN_MC);
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
 
 	char aBuf[64];
 	str_format(aBuf, sizeof(aBuf), "%02i", m_PosX);
-	if(m_PosX == Lower)
+	if(AtJump)
 		TextRender()->TextColor(SEdgeHelperProperties::ActionActiveButtonColor());
 	Ui()->DoLabel(&CenterZone, aBuf, ValueFontSize, TEXTALIGN_MC);
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
@@ -281,16 +280,13 @@ void CEdgeHelper::RenderEdgeHelperJumpInfo(CUIRect *pBase, float Scale)
 		str_copy(aBuf, "-");
 	else
 		str_format(aBuf, sizeof(aBuf), "%d", Lower);
-	if(m_PosX == Lower || m_PosX == Upper)
-		TextRender()->TextColor(SEdgeHelperProperties::ActionActiveButtonColor());
 	Ui()->DoLabel(&LeftZone, aBuf, ValueFontSize, TEXTALIGN_MC);
-	TextRender()->TextColor(TextRender()->DefaultTextColor());
 
 	if(Upper == std::numeric_limits<int>::max())
 		str_copy(aBuf, "-");
 	else
 		str_format(aBuf, sizeof(aBuf), "%d", Upper);
-	if(m_PosX == Upper)
+	if(AtJump)
 		TextRender()->TextColor(SEdgeHelperProperties::ActionActiveButtonColor());
 	Ui()->DoLabel(&RightZone, aBuf, ValueFontSize, TEXTALIGN_MC);
 	TextRender()->TextColor(TextRender()->DefaultTextColor());

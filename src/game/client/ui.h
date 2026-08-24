@@ -301,6 +301,8 @@ struct SPopupMenuProperties
 	int m_Corners = IGraphics::CORNER_ALL;
 	ColorRGBA m_BorderColor = ColorRGBA(0.5f, 0.5f, 0.5f, 0.75f);
 	ColorRGBA m_BackgroundColor = ColorRGBA(0.0f, 0.0f, 0.0f, 0.75f);
+	// When true, the popup can be moved by dragging its top handle area.
+	bool m_Draggable = false;
 };
 
 class CUi
@@ -432,12 +434,14 @@ private:
 	{
 		static constexpr float POPUP_BORDER = 1.0f;
 		static constexpr float POPUP_MARGIN = 4.0f;
+		static constexpr float POPUP_DRAG_HANDLE_HEIGHT = 10.0f;
 
 		const SPopupMenuId *m_pId;
 		SPopupMenuProperties m_Props;
 		CUIRect m_Rect;
 		void *m_pContext;
 		FPopupMenuFunction m_pfnFunc;
+		bool m_Dragging = false;
 	};
 	std::vector<SPopupMenu> m_vPopupMenus;
 	FPopupMenuClosedCallback m_pfnPopupMenuClosedCallback = nullptr;
