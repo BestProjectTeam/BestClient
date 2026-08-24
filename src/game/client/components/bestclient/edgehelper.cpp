@@ -233,16 +233,21 @@ void CEdgeHelper::RenderEdgeHelperJumpInfo(CUIRect *pBase, float Scale)
 	LeftZone.Margin(SEdgeHelperProperties::ms_ItemSpacing * JumpScale, &LeftZone);
 	RightZone.Margin(SEdgeHelperProperties::ms_ItemSpacing * JumpScale, &RightZone);
 	const float ArrowFontSize = minimum(SEdgeHelperProperties::ms_ArrowsSize * JumpScale, minimum(LeftZone.h, RightZone.h));
-	const float SingleArrowFontSize = ArrowFontSize * 0.75f;
+	// Single-jump positions: like the original rushie implementation, cut off
+	// the top part of the arrow rect and draw the single chevron in the lower
+	// part, so it aligns with (and lights up) the LOWER chevron of the double
+	// arrow instead of appearing centered between the two chevrons.
 	DoIconButton(&RightZone, s_pEdgeInfoAnglesUp, ArrowFontSize, (m_PosX == 56 || m_PosX == 69 || m_PosX == 72 || m_PosX == 84) ? SEdgeHelperProperties::ActionWhiteButtonColor() : SEdgeHelperProperties::WindowColorMedium());
 	if(m_PosX == 62 || m_PosX == 63 || m_PosX == 66 || m_PosX == 81)
 	{
-		DoIconButton(&RightZone, s_pEdgeInfoAngleUp, SingleArrowFontSize, SEdgeHelperProperties::ActionWhiteButtonColor());
+		RightZone.HSplitTop(5.0f * JumpScale, nullptr, &RightZone);
+		DoIconButton(&RightZone, s_pEdgeInfoAngleUp, ArrowFontSize, SEdgeHelperProperties::ActionWhiteButtonColor());
 	}
 	DoIconButton(&LeftZone, s_pEdgeInfoAnglesUp, ArrowFontSize, (m_PosX == 13 || m_PosX == 25 || m_PosX == 28 || m_PosX == 41) ? SEdgeHelperProperties::ActionWhiteButtonColor() : SEdgeHelperProperties::WindowColorMedium());
 	if(m_PosX == 16 || m_PosX == 31)
 	{
-		DoIconButton(&LeftZone, s_pEdgeInfoAngleUp, SingleArrowFontSize, SEdgeHelperProperties::ActionWhiteButtonColor());
+		LeftZone.HSplitTop(5.0f * JumpScale, nullptr, &LeftZone);
+		DoIconButton(&LeftZone, s_pEdgeInfoAngleUp, ArrowFontSize, SEdgeHelperProperties::ActionWhiteButtonColor());
 	}
 
 	const float SeparatorWidth = minimum(4.0f * JumpScale, CenterZone.w * 0.1f);
