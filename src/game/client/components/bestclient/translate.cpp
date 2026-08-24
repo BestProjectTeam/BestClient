@@ -2,6 +2,7 @@
 #include "translate.h"
 
 #include <base/log.h>
+#include <base/time.h>
 
 #include <engine/shared/json.h>
 #include <engine/shared/jsonwriter.h>
@@ -482,6 +483,11 @@ protected:
 	}
 
 public:
+	bool IsRateLimited() const override
+	{
+		return m_pHttpRequest && m_pHttpRequest->StatusCode() == 429;
+	}
+
 	std::optional<bool> Update(CTranslateResponse &Out) override
 	{
 		dbg_assert(m_pHttpRequest != nullptr, "m_pHttpRequest is nullptr");
@@ -787,13 +793,13 @@ public:
 	CTranslateBackendGoogle(IHttp &Http, const char *pText, const char *pSourceLanguage, const char *pTargetLanguage)
 	{
 		char aBuf[4096];
-		const int PrefixLen = str_format(aBuf, sizeof(aBuf), "https://translate.googleapis.com/translate_a/single?client=gtx&sl=%s&tl=%s&dt=t&q=",
+		const int PrefixLen = str_format(aBuf, sizeof(aBuf), "https://translate.google.com/translate_a/single?client=gtx&sl=%s&tl=%s&dt=t&q=",
 			EncodeSource(pSourceLanguage), EncodeTarget(pTargetLanguage));
 		if(PrefixLen < 0 || PrefixLen >= (int)sizeof(aBuf) ||
 			!UrlEncode(pText, aBuf + PrefixLen, sizeof(aBuf) - PrefixLen))
 		{
 			log_error("translate", "Google Translate: failed to build request URL");
-			CreateHttpRequest(Http, "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=");
+			CreateHttpRequest(Http, "https://translate.google.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=");
 			return;
 		}
 		CreateHttpRequest(Http, aBuf);
@@ -944,6 +950,18 @@ bool CTranslate::HasPendingJobs() const
 	return !m_vJobs.empty();
 }
 
+bool CTranslate::CanStartRequest() const
+{
+	const int64_t Now = time();
+	if(Now < m_NextRequestTime || Now < m_RateLimitUntil)
+		return false;
+
+	int ActiveRequests = 0;
+	for(const CTranslateJob &Job : m_vJobs)
+		ActiveRequests += Job.m_pBackend != nullptr;
+	return ActiveRequests < 2;
+}
+
 void CTranslate::Translate(int Id, bool ShowProgress)
 {
 	if(Id < 0 || Id >= (int)std::size(GameClient()->m_aClients))
@@ -1019,7 +1037,7 @@ void CTranslate::Translate(CChat::CLine &Line, bool ShowProgress)
 
 void CTranslate::TranslateLine(CChat::CLine &Line, bool ShowProgress, bool RespectIgnoredIncomingLanguages)
 {
-	if(m_vJobs.size() > 15)
+	if(!CanStartRequest())
 	{
 		return;
 	}
@@ -1036,6 +1054,7 @@ void CTranslate::TranslateLine(CChat::CLine &Line, bool ShowProgress, bool Respe
 		GameClient()->m_Chat.Echo(Localize("Invalid translate backend"));
 		return;
 	}
+	m_NextRequestTime = time() + time_freq();
 
 	if(ShowProgress)
 	{
@@ -1057,8 +1076,11 @@ bool CTranslate::TryTranslateOutgoingChat(int Team, const char *pText)
 {
 	if(!ShouldTranslateOutgoingChat(pText))
 		return false;
-	if(m_vJobs.size() > 15)
-		return false;
+	if(m_vJobs.size() >= 16)
+	{
+		GameClient()->m_Chat.Echo(Localize("Translation queue is full"));
+		return true;
+	}
 
 	CTranslateJob Job;
 	Job.m_Type = CTranslateJob::EType::OUTGOING_CHAT;
@@ -1067,10 +1089,6 @@ bool CTranslate::TryTranslateOutgoingChat(int Team, const char *pText)
 	if(!ExtractOutgoingTranslatableText(*GameClient(), pText, Job.m_aOutgoingPrefix, sizeof(Job.m_aOutgoingPrefix), Job.m_aTextToTranslate, sizeof(Job.m_aTextToTranslate)))
 		str_copy(Job.m_aTextToTranslate, pText, sizeof(Job.m_aTextToTranslate));
 	Job.m_pTranslateResponse = std::make_shared<CTranslateResponse>();
-	Job.m_pBackend = CreateBackend(Job.m_aTextToTranslate, OutgoingSourceLanguage(), OutgoingTargetLanguage());
-	if(!Job.m_pBackend)
-		return false;
-
 	m_vJobs.emplace_back(std::move(Job));
 	return true;
 }
@@ -1085,31 +1103,54 @@ void CTranslate::OnRender()
 	auto ForEach = [&](CTranslateJob &Job) {
 		if(Job.m_Type == CTranslateJob::EType::CHAT_LINE && Job.m_pLine->m_pTranslateResponse != Job.m_pTranslateResponse)
 			return true; // Not the same line anymore
+		if(Job.m_Type == CTranslateJob::EType::OUTGOING_CHAT && !Job.m_pBackend)
+		{
+			if(!CanStartRequest())
+				return false;
+			Job.m_pBackend = CreateBackend(Job.m_aTextToTranslate, OutgoingSourceLanguage(), OutgoingTargetLanguage());
+			if(!Job.m_pBackend)
+			{
+				m_NextRequestTime = time() + time_freq();
+				return false;
+			}
+			m_NextRequestTime = time() + time_freq();
+		}
 		const std::optional<bool> Done = Job.m_pBackend->Update(*Job.m_pTranslateResponse);
 		if(!Done.has_value())
 			return false; // Keep ongoing tasks
 
 		if(Job.m_Type == CTranslateJob::EType::OUTGOING_CHAT)
 		{
-			const char *pTextToSend = Job.m_aOriginalText;
+			if(!*Done)
+			{
+				if(Job.m_pBackend->IsRateLimited())
+					m_RateLimitUntil = time() + time_freq() * 30;
+				else
+					m_NextRequestTime = time() + time_freq();
+				Job.m_pBackend.reset();
+				return false;
+			}
+
 			char aTranslated[MAX_LINE_LENGTH] = "";
 			char aPrefixedTranslated[MAX_LINE_LENGTH] = "";
-			if(*Done && Job.m_pTranslateResponse->m_Text[0] != '\0' && str_comp_nocase(Job.m_aTextToTranslate, Job.m_pTranslateResponse->m_Text) != 0 &&
-				SanitizeOutgoingTranslatedText(Job.m_aTextToTranslate, Job.m_pTranslateResponse->m_Text, aTranslated, sizeof(aTranslated)))
+			if(Job.m_pTranslateResponse->m_Text[0] == '\0' ||
+				!SanitizeOutgoingTranslatedText(Job.m_aTextToTranslate, Job.m_pTranslateResponse->m_Text, aTranslated, sizeof(aTranslated)))
 			{
-				if(Job.m_aOutgoingPrefix[0] != '\0')
-				{
-					str_copy(aPrefixedTranslated, Job.m_aOutgoingPrefix, sizeof(aPrefixedTranslated));
-					const int PrefixLen = str_length(aPrefixedTranslated);
-					str_append(aPrefixedTranslated, aTranslated, sizeof(aPrefixedTranslated));
-					// Only send if at least some of the translated body fit after the prefix.
-					if(str_length(aPrefixedTranslated) > PrefixLen)
-						pTextToSend = aPrefixedTranslated;
-				}
-				else
-				{
-					pTextToSend = aTranslated;
-				}
+				m_NextRequestTime = time() + time_freq();
+				Job.m_pBackend.reset();
+				return false;
+			}
+
+			const char *pTextToSend = aTranslated;
+			if(Job.m_aOutgoingPrefix[0] != '\0')
+			{
+				str_copy(aPrefixedTranslated, Job.m_aOutgoingPrefix, sizeof(aPrefixedTranslated));
+				const int PrefixLen = str_length(aPrefixedTranslated);
+				str_append(aPrefixedTranslated, aTranslated, sizeof(aPrefixedTranslated));
+				// Do not send a truncated translated command.
+				if(str_length(aPrefixedTranslated) <= PrefixLen)
+					return false;
+				pTextToSend = aPrefixedTranslated;
 			}
 			GameClient()->m_Chat.SendTranslatedChatQueued(Job.m_Team, pTextToSend);
 			return true;
@@ -1127,6 +1168,8 @@ void CTranslate::OnRender()
 		}
 		else
 		{
+			if(Job.m_pBackend->IsRateLimited())
+				m_RateLimitUntil = time() + time_freq() * 30;
 			char aBuf[sizeof(Job.m_pTranslateResponse->m_Text)];
 			str_format(aBuf, sizeof(aBuf), Localize("%s to %s failed: %s"), Job.m_pBackend->Name(), IncomingTargetLanguage(), Job.m_pTranslateResponse->m_Text);
 			Job.m_pTranslateResponse->m_Error = true;
