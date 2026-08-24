@@ -103,8 +103,6 @@ bc_dynamic_fov_amount
 bc_dynamic_fov_smoothness
 bc_enable_censor_list
 bc_extend_zoom
-bc_eye_comfort
-bc_eye_comfort_strength
 bc_f_input_amount
 bc_f_input_others
 bc_fast_actions
@@ -127,7 +125,6 @@ bc_gif_bubble_duration_ms
 bc_gif_bubble_offset_y
 bc_gores_mode
 bc_gores_mode_disable_weapons
-bc_hide_hud_in_settings
 bc_high_process_priority
 bc_hook_combo
 bc_hook_combo_mode
@@ -220,11 +217,9 @@ bc_regex_player_whitelist
 bc_saiko_input_amount
 bc_saiko_input_others
 bc_scoreboard_scale
-bc_scoreboard_team_gradients
 bc_self_time_cp
 bc_self_time_cp_color
 bc_self_time_cp_place_mode
-bc_settings_layout
 bc_show_blocked_word_in_console
 bc_show_correct_checkpoint
 bc_show_real_hitbox

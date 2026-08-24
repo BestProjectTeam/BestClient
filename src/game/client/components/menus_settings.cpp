@@ -1019,21 +1019,13 @@ void CMenus::RenderSettings(CUIRect MainView)
 	// Must short-circuit here, before any of the root/sub tab bar buttons below are given a
 	// chance to run their click logic this frame - otherwise clicks on the fullscreen editor
 	// can also land on whatever tab button used to be underneath it.
-	if(m_GifWheelEditorOpen)
-	{
-		RenderSettingsBestClientGifWheelFullscreen(*Ui()->Screen());
-		return;
-	}
 	if(m_AssetsEditorState.m_VisualsEditorOpen && m_AssetsEditorState.m_FullscreenOpen)
 	{
 		RenderAssetsEditorScreen(*Ui()->Screen());
 		return;
 	}
 
-	g_Config.m_BcSettingsLayout = minimum(maximum(g_Config.m_BcSettingsLayout, 0), 1);
-
-	if(g_Config.m_BcSettingsLayout == 0)
-	{
+	#if 0
 		const bool NeedRestart = m_NeedRestartGraphics || m_NeedRestartSound || m_NeedRestartUpdate;
 
 		auto RenderSettingsPage = [&](CUIRect PageView) {
@@ -1306,7 +1298,7 @@ void CMenus::RenderSettings(CUIRect MainView)
 		if(NeedRestart)
 			RenderRestartWarning(RestartBar);
 		return;
-	}
+	#endif
 
 	// render background
 	CUIRect Button, TabBar, RestartBar;

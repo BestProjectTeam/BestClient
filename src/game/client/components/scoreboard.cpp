@@ -825,24 +825,7 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 				if(NextDDTeam != DDTeam)
 					TeamRectCorners |= IGraphics::CORNER_B;
 
-				if(g_Config.m_BcScoreboardTeamGradients)
-				{
-					const ColorRGBA LeftColor(
-						std::clamp(TeamColor.r * 0.32f, 0.0f, 1.0f),
-						std::clamp(TeamColor.g * 0.32f, 0.0f, 1.0f),
-						std::clamp(TeamColor.b * 0.32f, 0.0f, 1.0f),
-						0.90f);
-					const ColorRGBA RightColor(
-						std::clamp(TeamColor.r * 0.75f + 0.22f, 0.0f, 1.0f),
-						std::clamp(TeamColor.g * 0.75f + 0.22f, 0.0f, 1.0f),
-						std::clamp(TeamColor.b * 0.75f + 0.22f, 0.0f, 1.0f),
-						0.90f);
-					RowAndSpacing.Draw4(LeftColor, RightColor, LeftColor, RightColor, TeamRectCorners, RoundRadius);
-				}
-				else
-				{
-					RowAndSpacing.Draw(TeamColor.WithAlpha(0.5f), TeamRectCorners, RoundRadius);
-				}
+				RowAndSpacing.Draw(TeamColor.WithAlpha(0.5f), TeamRectCorners, RoundRadius);
 
 				CurrentDDTeamSize++;
 

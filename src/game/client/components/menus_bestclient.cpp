@@ -16,6 +16,7 @@
 #include <game/client/components/media_decoder.h>
 #include <game/client/components/menus.h>
 #include <game/client/gameclient.h>
+#include <game/client/lineinput.h>
 #include <game/client/ui.h>
 #include <game/client/ui_scrollregion.h>
 #include <game/localization.h>
@@ -47,6 +48,80 @@ static void UpdateModuleRevealPhase(float &Phase, bool Expanded, float Dt)
 		Phase = Expanded ? 1.0f : 0.0f;
 }
 
+void CMenus::RenderSettingsBestClientChatMediaBlock(CUIRect &Column)
+{
+	const float LineSize = 20.0f;
+	const float MarginSmall = 5.0f;
+	const float HeadlineFontSize = 20.0f;
+	const float MarginBetweenViews = 30.0f;
+	const float BlockPadding = MarginBetweenViews * 0.6666f;
+	const ColorRGBA BlockColor = ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f);
+	static float RevealPhase = 0.0f;
+	const bool Expanded = g_Config.m_BcChatMediaPreview != 0;
+	UpdateModuleRevealPhase(RevealPhase, Expanded, Client()->RenderFrameTime());
+	const float HeaderHeight = 3.0f * LineSize + 2.0f * MarginSmall;
+	const float DomainsHeight = g_Config.m_BcChatMediaContentFilter ? 2.0f * (MarginSmall + LineSize) : 0.0f;
+	const float ExpandedHeight = (5.0f * (MarginSmall + LineSize) + DomainsHeight) * RevealPhase;
+
+	CUIRect Block;
+	Column.HSplitTop(HeaderHeight + ExpandedHeight, &Block, &Column);
+	CUIRect BlockBg = Block;
+	BlockBg.w += BlockPadding;
+	BlockBg.h += BlockPadding;
+	BlockBg.x -= BlockPadding * 0.5f;
+	BlockBg.y -= BlockPadding * 0.5f;
+	BlockBg.Draw(BlockColor, IGraphics::CORNER_ALL, 10.0f);
+
+	CUIRect Content, Label, Button;
+	Block.HSplitTop(LineSize, &Label, &Block);
+	Ui()->DoLabel(&Label, Localize("Chat Media"), HeadlineFontSize, TEXTALIGN_ML);
+	Block.HSplitTop(MarginSmall, nullptr, &Block);
+
+	CChat &Chat = GameClient()->m_Chat;
+	Block.HSplitTop(LineSize, &Content, &Block);
+	if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatMediaPreview, Localize("Render media previews from chat links"), &g_Config.m_BcChatMediaPreview, &Content, LineSize))
+		Chat.RebuildChat();
+
+	if(ExpandedHeight <= 0.5f)
+		return;
+
+	CUIRect Visible = Block;
+	Visible.h = ExpandedHeight;
+	Ui()->ClipEnable(&Visible);
+	const auto RebuildAfterToggle = [&](const char *pLabel, int *pValue) {
+		Block.HSplitTop(MarginSmall, nullptr, &Block);
+		Block.HSplitTop(LineSize, &Content, &Block);
+		if(DoButton_CheckBoxAutoVMarginAndSet(pValue, Localize(pLabel), pValue, &Content, LineSize))
+			Chat.RebuildChat();
+	};
+	RebuildAfterToggle("Show photos in chat media", &g_Config.m_BcChatMediaPhotos);
+	RebuildAfterToggle("Show GIFs in chat media", &g_Config.m_BcChatMediaGifs);
+	RebuildAfterToggle("Content filtering", &g_Config.m_BcChatMediaContentFilter);
+
+	if(g_Config.m_BcChatMediaContentFilter)
+	{
+		Block.HSplitTop(MarginSmall, nullptr, &Block);
+		Block.HSplitTop(LineSize, &Label, &Block);
+		Ui()->DoLabel(&Label, Localize("Allowed media domains"), 12.0f, TEXTALIGN_ML);
+		Block.HSplitTop(MarginSmall, nullptr, &Block);
+		Block.HSplitTop(LineSize, &Button, &Block);
+		static CLineInput DomainsInput(g_Config.m_BcChatMediaAllowedDomains, sizeof(g_Config.m_BcChatMediaAllowedDomains));
+		DomainsInput.SetEmptyText("tenor.com; imgur.com; giphy.com; gifs.teeworlds.xyz");
+		if(Ui()->DoClearableEditBox(&DomainsInput, &Button, 14.0f))
+			Chat.RebuildChat();
+	}
+
+	Block.HSplitTop(MarginSmall, nullptr, &Block);
+	Block.HSplitTop(LineSize, &Button, &Block);
+	if(Ui()->DoScrollbarOption(&g_Config.m_BcChatMediaPreviewMaxWidth, &g_Config.m_BcChatMediaPreviewMaxWidth, &Button, Localize("Media preview width"), 120, 400))
+		Chat.RebuildChat();
+	Block.HSplitTop(MarginSmall, nullptr, &Block);
+	Block.HSplitTop(LineSize, &Label, &Block);
+	static CButtonContainer HideMediaBindReader, HideMediaBindClear;
+	DoLine_KeyReader(Label, HideMediaBindReader, HideMediaBindClear, Localize("Hide media bind"), "toggle_chat_media_hidden");
+	Ui()->ClipDisable();
+}
+
 static void DrawBcMenuBadge(IGraphics *pGraphics, CUi *pUi, ITextRender *pTextRender, CUIRect *pRow, const char *pText, float FontSize, const ColorRGBA &Top, const ColorRGBA &Bottom, float Gap)
 {
 	const float BadgeWidth = pTextRender->TextWidth(FontSize, pText) + 10.0f;
@@ -68,6 +143,8 @@ enum
 	NUM_BESTCLIENT_TABS,
 };
 
+static int s_CurBestClientTab = BESTCLIENT_TAB_VISUALS;
+
 void CMenus::RenderSettingsBestClient(CUIRect MainView)
 {
 	// Match original old-layout: shift content up past the 20px margin so tab bar
@@ -75,7 +152,6 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 	MainView.y -= 20.0f;
 	MainView.h += 20.0f;
 
-	static int s_CurTab = BESTCLIENT_TAB_VISUALS;
 	static CButtonContainer s_aPageTabs[NUM_BESTCLIENT_TABS] = {};
 
 	MainView.HSplitTop(8.0f, nullptr, &MainView);
@@ -98,7 +174,7 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 	};
 
 	auto IsTabHidden = [&](int Tab) {
-		return Tab != BESTCLIENT_TAB_INFO && IsBestClientTabFlagSet(g_Config.m_BcBestClientSettingsTabs, Tab);
+		return (Tab == BESTCLIENT_TAB_FUN && s_CurBestClientTab != BESTCLIENT_TAB_FUN) || (Tab != BESTCLIENT_TAB_INFO && Tab != BESTCLIENT_TAB_FUN && IsBestClientTabFlagSet(g_Config.m_BcBestClientSettingsTabs, Tab));
 	};
 
 	int TabCount = 0;
@@ -114,13 +190,13 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 
 	if(FirstVisibleTab == -1)
 	{
-		s_CurTab = BESTCLIENT_TAB_INFO;
+		s_CurBestClientTab = BESTCLIENT_TAB_INFO;
 		FirstVisibleTab = BESTCLIENT_TAB_INFO;
 		TabCount = 1;
 	}
 
-	if(s_CurTab < BESTCLIENT_TAB_VISUALS || s_CurTab >= NUM_BESTCLIENT_TABS || IsTabHidden(s_CurTab))
-		s_CurTab = FirstVisibleTab;
+	if(s_CurBestClientTab < BESTCLIENT_TAB_VISUALS || s_CurBestClientTab >= NUM_BESTCLIENT_TABS || IsTabHidden(s_CurBestClientTab))
+		s_CurBestClientTab = FirstVisibleTab;
 
 	const float TabWidth = TabBar.w / (float)TabCount;
 	int VisibleIndex = 0;
@@ -131,22 +207,22 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 
 		TabBar.VSplitLeft(TabWidth, &TabButton, &TabBar);
 		const int Corners = VisibleIndex == 0 ? IGraphics::CORNER_L : (VisibleIndex == TabCount - 1 ? IGraphics::CORNER_R : IGraphics::CORNER_NONE);
-		if(DoButton_MenuTab(&s_aPageTabs[Tab], apTabNames[Tab], s_CurTab == Tab, &TabButton, Corners, nullptr, nullptr, nullptr, nullptr, 4.0f))
-			s_CurTab = Tab;
+		if(DoButton_MenuTab(&s_aPageTabs[Tab], apTabNames[Tab], s_CurBestClientTab == Tab, &TabButton, Corners, nullptr, nullptr, nullptr, nullptr, 4.0f))
+			s_CurBestClientTab = Tab;
 		VisibleIndex++;
 	}
 
 	MainView.HSplitTop(10.0f, nullptr, &MainView);
 
-	if(s_CurTab == BESTCLIENT_TAB_VISUALS)
+	if(s_CurBestClientTab == BESTCLIENT_TAB_VISUALS)
 		RenderSettingsBestClientVisuals(MainView);
-	else if(s_CurTab == BESTCLIENT_TAB_GAMEPLAY)
+	else if(s_CurBestClientTab == BESTCLIENT_TAB_GAMEPLAY)
 		RenderSettingsBestClientGameplay(MainView);
-	else if(s_CurTab == BESTCLIENT_TAB_OTHERS)
+	else if(s_CurBestClientTab == BESTCLIENT_TAB_OTHERS)
 		RenderSettingsBestClientOthers(MainView);
-	else if(s_CurTab == BESTCLIENT_TAB_FUN)
+	else if(s_CurBestClientTab == BESTCLIENT_TAB_FUN)
 		RenderSettingsBestClientFun(MainView);
-	else if(s_CurTab == BESTCLIENT_TAB_INFO)
+	else if(s_CurBestClientTab == BESTCLIENT_TAB_INFO)
 		RenderSettingsBestClientInfo(MainView);
 }
 
@@ -898,56 +974,6 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		TextRender()->TextColor(ColorRGBA(0.55f, 1.0f, 0.55f, 1.0f));
 	Ui()->DoLabel(&Button, pMediaStatusText, 11.0f, TEXTALIGN_ML);
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
-
-	// Eye comfort (left column block)
-	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
-
-	const bool EyeComfortExpanded = g_Config.m_BcEyeComfort != 0;
-	static float s_EyeComfortRevealPhase = 0.0f;
-	UpdateModuleRevealPhase(s_EyeComfortRevealPhase, EyeComfortExpanded, Client()->RenderFrameTime());
-	const float EyeComfortHeaderHeight = LineSize + MarginSmall + LineSize;
-	const float EyeComfortExpandedTargetHeight = MarginSmall + LineSize;
-	const float EyeComfortExpandedHeight = EyeComfortExpandedTargetHeight * BCUiAnimations::EaseOutCubic(s_EyeComfortRevealPhase);
-	const float EyeComfortBlockHeight = EyeComfortHeaderHeight + EyeComfortExpandedHeight;
-
-	CUIRect EyeComfortBlock;
-	Column.HSplitTop(EyeComfortBlockHeight, &EyeComfortBlock, &Column);
-
-	CUIRect EyeComfortBlockBg = EyeComfortBlock;
-	EyeComfortBlockBg.w += BlockPadding;
-	EyeComfortBlockBg.h += BlockPadding;
-	EyeComfortBlockBg.x -= BlockPadding * 0.5f;
-	EyeComfortBlockBg.y -= BlockPadding * 0.5f;
-	EyeComfortBlockBg.Draw(BlockColor, IGraphics::CORNER_ALL, 10.0f);
-
-	MainView = EyeComfortBlock;
-
-	MainView.HSplitTop(LineSize, &Label, &MainView);
-	CUIRect EyeComfortTitleLabel, EyeComfortResetButton;
-	Label.VSplitRight(LineSize + 8.0f, &EyeComfortTitleLabel, &EyeComfortResetButton);
-	static CButtonContainer s_EyeComfortResetButton;
-	const bool EyeComfortResetClicked = Ui()->DoButton_FontIcon(&s_EyeComfortResetButton, FontIcon::ARROW_ROTATE_LEFT, 0, &EyeComfortResetButton, BUTTONFLAG_LEFT);
-	GameClient()->m_Tooltips.DoToolTip(&s_EyeComfortResetButton, &EyeComfortResetButton, Localize("Reset to defaults"));
-	if(EyeComfortResetClicked)
-		g_Config.m_BcEyeComfortStrength = DefaultConfig::BcEyeComfortStrength;
-	Ui()->DoLabel(&EyeComfortTitleLabel, Localize("Eye Comfort"), HeadlineFontSize, TEXTALIGN_ML);
-	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
-
-	MainView.HSplitTop(LineSize, &Content, &MainView);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcEyeComfort, Localize("Enable Eye Comfort"), &g_Config.m_BcEyeComfort, &Content, LineSize);
-
-	if(EyeComfortExpandedHeight > 0.5f)
-	{
-		CUIRect Visible = MainView;
-		Visible.h = EyeComfortExpandedHeight;
-		Ui()->ClipEnable(&Visible);
-
-		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
-		MainView.HSplitTop(LineSize, &Button, &MainView);
-		Ui()->DoScrollbarOption(&g_Config.m_BcEyeComfortStrength, &g_Config.m_BcEyeComfortStrength, &Button, Localize("Comfort level"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
-
-		Ui()->ClipDisable();
-	}
 
 	// Sweat weapon (left column block)
 	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
@@ -1809,8 +1835,6 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 	MainView.HSplitTop(LineSize, &Label, &MainView);
 	CUIRect PhysicBallsTitleLabel = Label;
 	PhysicBallsTitleLabel.VSplitRight(MarginSmall, &PhysicBallsTitleLabel, nullptr);
-	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &PhysicBallsTitleLabel, Localize("NEW"), 12.0f,
-		ColorRGBA(0.25f, 0.85f, 0.40f, 1.0f), ColorRGBA(0.10f, 0.60f, 0.25f, 1.0f), MarginSmall);
 	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &PhysicBallsTitleLabel, "E-Client", 12.0f,
 		ColorRGBA(0.95f, 0.80f, 0.20f, 1.0f), ColorRGBA(0.75f, 0.55f, 0.05f, 1.0f), MarginSmall);
 	Ui()->DoLabel(&PhysicBallsTitleLabel, Localize("Physic Balls"), HeadlineFontSize, TEXTALIGN_ML);
@@ -2305,8 +2329,6 @@ void CMenus::RenderSettingsBestClientGameplay(CUIRect MainView)
 	MainView.HSplitTop(LineSize, &Label, &MainView);
 	CUIRect PerformanceTitleLabel = Label;
 	PerformanceTitleLabel.VSplitRight(MarginSmall, &PerformanceTitleLabel, nullptr);
-	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &PerformanceTitleLabel, Localize("NEW"), 12.0f,
-		ColorRGBA(0.25f, 0.85f, 0.40f, 1.0f), ColorRGBA(0.10f, 0.60f, 0.25f, 1.0f), MarginSmall);
 	Ui()->DoLabel(&PerformanceTitleLabel, Localize("Performance"), HeadlineFontSize, TEXTALIGN_ML);
 	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
 
@@ -2865,8 +2887,6 @@ void CMenus::RenderSettingsBestClientGameplay(CUIRect MainView)
 		SetActive(false);
 		GameClient()->m_HudEditor.Activate();
 	}
-	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &EdgeInfoTitleLabel, Localize("NEW"), 12.0f,
-		ColorRGBA(0.25f, 0.85f, 0.40f, 1.0f), ColorRGBA(0.10f, 0.60f, 0.25f, 1.0f), MarginSmall);
 	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &EdgeInfoTitleLabel, "R-Client", 12.0f,
 		ColorRGBA(0.30f, 0.55f, 0.95f, 1.0f), ColorRGBA(0.15f, 0.35f, 0.75f, 1.0f), MarginSmall);
 	Ui()->DoLabel(&EdgeInfoTitleLabel, Localize("Edge Info"), HeadlineFontSize, TEXTALIGN_ML);
@@ -2944,7 +2964,7 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	const float AutoLockDelayHeight = g_Config.m_BcAutoTeamLock ? LineSize : 0.0f;
 	const float SpecMovedNotifyTextHeight = g_Config.m_BcSpecMovedNotify ? LineSize : 0.0f;
 	const float CinematicCameraStrengthHeight = g_Config.m_BcCinematicCamera ? LineSize : 0.0f;
-	const float MiscBlockHeight = LineSize + MarginSmall + AutoUpdateHeight + 20.0f * LineSize + 2.5f + AutoLockDelayHeight + SpecMovedNotifyTextHeight + RealHitboxColorHeight + CinematicCameraStrengthHeight;
+	const float MiscBlockHeight = LineSize + MarginSmall + AutoUpdateHeight + 17.0f * LineSize + 2.5f + AutoLockDelayHeight + SpecMovedNotifyTextHeight + RealHitboxColorHeight + CinematicCameraStrengthHeight;
 	CUIRect MiscBlock;
 	Column.HSplitTop(MiscBlockHeight, &MiscBlock, &Column);
 
@@ -2965,19 +2985,12 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 #if defined(CONF_AUTOUPDATE)
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcAutoUpdate, Localize("Automatic update"), &g_Config.m_BcAutoUpdate, &MiscBlock, LineSize);
 #endif
-	static CButtonContainer s_SettingsLayoutButton;
-	int UseNewMenuLayout = g_Config.m_BcSettingsLayout == 0 ? 1 : 0;
-	DoButton_CheckBoxAutoVMarginAndSet(&s_SettingsLayoutButton, Localize("Use new menu layout"), &UseNewMenuLayout, &MiscBlock, LineSize);
-	g_Config.m_BcSettingsLayout = UseNewMenuLayout ? 0 : 1;
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcHideHudInSettings, Localize("Hide hud in settings"), &g_Config.m_BcHideHudInSettings, &MiscBlock, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatSaveDraft, Localize("Save unsent messages"), &g_Config.m_BcChatSaveDraft, &MiscBlock, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcSilentTyping, Localize("Silent typing"), &g_Config.m_BcSilentTyping, &MiscBlock, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatAltCommandLayout, Localize("Commands in other layout"), &g_Config.m_BcChatAltCommandLayout, &MiscBlock, LineSize);
 	{
 		CUIRect ConfirmQuitRow;
 		MiscBlock.HSplitTop(LineSize, &ConfirmQuitRow, &MiscBlock);
-		DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &ConfirmQuitRow, Localize("NEW"), 12.0f,
-			ColorRGBA(0.25f, 0.85f, 0.40f, 1.0f), ColorRGBA(0.10f, 0.60f, 0.25f, 1.0f), MarginSmall);
 		if(DoButton_CheckBox(&g_Config.m_BcConfirmQuit, Localize("Confirm before quitting"), g_Config.m_BcConfirmQuit, &ConfirmQuitRow))
 			g_Config.m_BcConfirmQuit ^= 1;
 	}
@@ -2990,8 +3003,6 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	{
 		CUIRect BetterSpectateRow;
 		MiscBlock.HSplitTop(LineSize, &BetterSpectateRow, &MiscBlock);
-		DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &BetterSpectateRow, Localize("NEW"), 12.0f,
-			ColorRGBA(0.25f, 0.85f, 0.40f, 1.0f), ColorRGBA(0.10f, 0.60f, 0.25f, 1.0f), MarginSmall);
 		DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &BetterSpectateRow, "E-Client", 12.0f,
 			ColorRGBA(0.95f, 0.80f, 0.20f, 1.0f), ColorRGBA(0.75f, 0.55f, 0.05f, 1.0f), MarginSmall);
 		if(DoButton_CheckBox(&g_Config.m_BcBetterSpectate, Localize("Better spectate"), g_Config.m_BcBetterSpectate, &BetterSpectateRow))
@@ -3012,7 +3023,6 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 		Ui()->DoLabel(&TextLabel, Localize("Notification text"), 14.0f, TEXTALIGN_ML);
 		Ui()->DoEditBox(&s_SpecMovedNotifyTextInput, &TextField, 14.0f);
 	}
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcScoreboardTeamGradients, Localize("Gradient team colors"), &g_Config.m_BcScoreboardTeamGradients, &MiscBlock, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowPointsInTab, Localize("Show points in tab"), &g_Config.m_BcShowPointsInTab, &MiscBlock, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcMastersrv, Localize("Use BestClient MasterServer"), &g_Config.m_BcMastersrv, &MiscBlock, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowhudDummyCoordIndicator, Localize("Show player below indicator"), &g_Config.m_BcShowhudDummyCoordIndicator, &MiscBlock, LineSize);
@@ -3056,8 +3066,6 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	TwitchChatBlock.HSplitTop(LineSize, &Label, &TwitchChatBlock);
 	CUIRect TwitchTitleLabel = Label;
 	TwitchTitleLabel.VSplitRight(MarginSmall, &TwitchTitleLabel, nullptr);
-	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &TwitchTitleLabel, Localize("NEW"), 12.0f,
-		ColorRGBA(0.25f, 0.85f, 0.40f, 1.0f), ColorRGBA(0.10f, 0.60f, 0.25f, 1.0f), MarginSmall);
 	Ui()->DoLabel(&TwitchTitleLabel, Localize("Twitch Chat"), HeadlineFontSize, TEXTALIGN_ML);
 	TwitchChatBlock.HSplitTop(MarginSmall, nullptr, &TwitchChatBlock);
 
@@ -3088,58 +3096,7 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	GameClient()->m_TwitchChat.GetStatusText(aTwitchStatus, sizeof(aTwitchStatus));
 	Ui()->DoLabel(&TwitchLogRect, aTwitchStatus, TwitchLogLineSize, TEXTALIGN_ML);
 
-	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
-
-	const bool RollbackExpanded = g_Config.m_ClReplays != 0;
-	static float s_RollbackRevealPhase = 0.0f;
-	UpdateModuleRevealPhase(s_RollbackRevealPhase, RollbackExpanded, Client()->RenderFrameTime());
-	const float HeaderHeight = LineSize + MarginSmall + LineSize;
-	const float ExpandedHeight = 2.0f * (MarginSmall + LineSize) * BCUiAnimations::EaseOutCubic(s_RollbackRevealPhase);
-	const float BlockHeight = HeaderHeight + ExpandedHeight;
-
-	CUIRect Block;
-	Column.HSplitTop(BlockHeight, &Block, &Column);
-
-	CUIRect BlockBg = Block;
-	BlockBg.w += BlockPadding;
-	BlockBg.h += BlockPadding;
-	BlockBg.x -= BlockPadding * 0.5f;
-	BlockBg.y -= BlockPadding * 0.5f;
-	BlockBg.Draw(BlockColor, IGraphics::CORNER_ALL, 10.0f);
-
-	Block.HSplitTop(LineSize, &Label, &Block);
-	Ui()->DoLabel(&Label, Localize("Rollback Demo"), HeadlineFontSize, TEXTALIGN_ML);
-	Block.HSplitTop(MarginSmall, nullptr, &Block);
-
-	Block.HSplitTop(LineSize, &Content, &Block);
-	if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClReplays, Localize("Enable rollback demo recording"), &g_Config.m_ClReplays, &Content, LineSize))
-	{
-		if(Client()->State() == IClient::STATE_ONLINE)
-			Client()->DemoRecorder_UpdateReplayRecorder();
-	}
-
-	if(ExpandedHeight > 0.5f)
-	{
-		CUIRect Visible = Block;
-		Visible.h = ExpandedHeight;
-		Ui()->ClipEnable(&Visible);
-
-		g_Config.m_ClReplayLength = std::clamp(g_Config.m_ClReplayLength, 10, 60);
-
-		Block.HSplitTop(MarginSmall, nullptr, &Block);
-		Block.HSplitTop(LineSize, &Button, &Block);
-		Ui()->DoScrollbarOption(&g_Config.m_ClReplayLength, &g_Config.m_ClReplayLength, &Button, Localize("Rollback length"), 10, 60, &CUi::ms_LinearScrollbarScale, 0, " s");
-
-		Block.HSplitTop(MarginSmall, nullptr, &Block);
-		Block.HSplitTop(LineSize, &Button, &Block);
-		static CButtonContainer s_RollbackBindReader;
-		static CButtonContainer s_RollbackBindClear;
-		DoLine_KeyReader(Button, s_RollbackBindReader, s_RollbackBindClear, Localize("Rollback bind"), "BC_save_rollback");
-
-		Ui()->ClipDisable();
-	}
-
-	// Browser Utils (below Rollback Demo)
+	// Browser Utils
 	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
 
 	const float BrowserUtilsBlockHeight = 4.0f * LineSize + 3.0f * MarginSmall;
@@ -3300,8 +3257,6 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 		GameClient()->m_HudEditor.Activate();
 	}
 	SwapTimerTitleLabel.VSplitRight(MarginSmall, &SwapTimerTitleLabel, nullptr);
-	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &SwapTimerTitleLabel, Localize("NEW"), 12.0f,
-		ColorRGBA(0.25f, 0.85f, 0.40f, 1.0f), ColorRGBA(0.10f, 0.60f, 0.25f, 1.0f), MarginSmall);
 	Ui()->DoLabel(&SwapTimerTitleLabel, Localize("Swap timer"), HeadlineFontSize, TEXTALIGN_ML);
 	SwapView.HSplitTop(MarginSmall, nullptr, &SwapView);
 
@@ -3638,6 +3593,13 @@ void CMenus::RenderSettingsBestClientInfo(CUIRect MainView)
 	LeftView.VSplitLeft(MarginSmall, nullptr, &LeftView);
 	RightView.VSplitRight(MarginSmall, &RightView, nullptr);
 	LeftView.HSplitMid(&LeftView, &LowerLeftView, 0.0f);
+
+	static CButtonContainer s_GamesButton;
+	CUIRect GamesButton;
+	LeftView.HSplitTop(LineSize * 2.0f, &GamesButton, &LeftView);
+	if(DoButtonLineSize_Menu(&s_GamesButton, Localize("Games"), 0, &GamesButton, LineSize, false, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+		s_CurBestClientTab = BESTCLIENT_TAB_FUN;
+	LeftView.HSplitTop(MarginBetweenViews, nullptr, &LeftView);
 
 	// ── BestClient Links ───────────────────────────────────────────────────
 	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);

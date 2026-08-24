@@ -3102,30 +3102,19 @@ void CClient::Update()
 			if(pJob->State() == IJob::STATE_DONE)
 			{
 				char aBuf[IO_MAX_PATH_LENGTH + 64];
-				const bool IsRollbackReplay = str_startswith(pJob->Destination(), "demos/rollback/") != nullptr;
 				if(pJob->Success())
 				{
 					str_format(aBuf, sizeof(aBuf), "Successfully saved the replay to '%s'!", pJob->Destination());
 					m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "replay", aBuf);
 
-					if(IsRollbackReplay)
-					{
-						char aBroadcast[64];
-						str_format(aBroadcast, sizeof(aBroadcast), Localize("Rollback saved: %ds"), pJob->LengthSeconds());
-						GameClient()->Broadcast(aBroadcast);
-					}
-					else
-						GameClient()->Echo(Localize("Successfully saved the replay!"));
+					GameClient()->Echo(Localize("Successfully saved the replay!"));
 				}
 				else
 				{
 					str_format(aBuf, sizeof(aBuf), "Failed saving the replay to '%s'...", pJob->Destination());
 					m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "replay", aBuf);
 
-					if(IsRollbackReplay)
-						GameClient()->Broadcast(Localize("Rollback save failed!"));
-					else
-						GameClient()->Echo(Localize("Failed saving the replay!"));
+					GameClient()->Echo(Localize("Failed saving the replay!"));
 				}
 				m_EditJobs.pop_front();
 			}
@@ -4057,10 +4046,7 @@ void CClient::SaveReplay(const int Length, const char *pFilename)
 		}
 		else
 		{
-			if(str_startswith(pFilename, "rollback/"))
-				str_format(aFilename, sizeof(aFilename), "demos/%s.demo", pFilename);
-			else
-				str_format(aFilename, sizeof(aFilename), "demos/replays/%s.demo", pFilename);
+			str_format(aFilename, sizeof(aFilename), "demos/replays/%s.demo", pFilename);
 			IOHANDLE Handle = m_pStorage->OpenFile(aFilename, IOFLAG_WRITE, IStorage::TYPE_SAVE);
 			if(!Handle)
 			{

@@ -260,7 +260,6 @@ void CGameClient::OnConsoleInit()
 					      &m_CherryGifs, // BestClient
 					      &m_HookCombo, // BestClient
 					      &m_3DParticles, // BestClient
-					      &m_RollbackDemo, // BestClient
 					      &m_QuickBinds, // BestClient
 					      &m_Ghost,
 					      &m_TClient, // TClient (Must be before chat and players)
@@ -298,7 +297,6 @@ void CGameClient::OnConsoleInit()
 					      &m_BindChat, // TClient
 					      &m_BindWheel, // TClient
 					      &m_FastActions, // BestClient
-					      &m_GifWheel, // BestClient
 					      &m_WarList, // TClient
 					      &m_StatusBar, // TClient
 					      &m_InfoMessages,
@@ -336,7 +334,6 @@ void CGameClient::OnConsoleInit()
 						  &m_SpecPauseRadio, // BestClient (from Entity-Client)
 						  &m_BindWheel, // TClient
 						  &m_FastActions, // BestClient
-						  &m_GifWheel, // BestClient
 						  &m_Emoticon,
 						  &m_ImportantAlert,
 						  &m_AdminPanel, // BestClient
@@ -1080,7 +1077,6 @@ void CGameClient::OnRender()
 	Input()->Clear();
 
 	CLineInput::RenderCandidates();
-	RenderEyeComfortOverlay(); // BestClient
 
 	const bool WasNewTick = m_NewTick;
 
@@ -1160,32 +1156,6 @@ void CGameClient::OnRender()
 	}
 
 	UpdateManagedTeeRenderInfos();
-}
-
-void CGameClient::RenderEyeComfortOverlay() // BestClient
-{
-	if(!g_Config.m_BcEyeComfort)
-		return;
-
-	const float Strength = std::clamp(g_Config.m_BcEyeComfortStrength / 100.0f, 0.0f, 1.0f);
-	if(Strength <= 0.0f)
-		return;
-
-	const CUIRect Screen = *Ui()->Screen();
-	const float Brightness = std::clamp(1.0f - Strength * 0.43f, 0.57f, 1.0f);
-
-	Ui()->MapScreen();
-	Graphics()->TextureClear();
-	Graphics()->BlendNormal();
-
-	const ColorRGBA WarmOverlayColor(1.0f, 0.93f, 0.74f, 0.34f * Strength);
-	Graphics()->DrawRect(Screen.x, Screen.y, Screen.w, Screen.h, WarmOverlayColor, IGraphics::CORNER_ALL, 0.0f);
-
-	if(Brightness < 1.0f)
-	{
-		const ColorRGBA BrightnessOverlayColor(0.0f, 0.0f, 0.0f, 1.0f - Brightness);
-		Graphics()->DrawRect(Screen.x, Screen.y, Screen.w, Screen.h, BrightnessOverlayColor, IGraphics::CORNER_ALL, 0.0f);
-	}
 }
 
 void CGameClient::OnDummyDisconnect()

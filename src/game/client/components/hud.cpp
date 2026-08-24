@@ -4120,7 +4120,7 @@ void CHud::OnRender()
 	{
 		const bool IngameGamePage = GameClient()->m_Menus.IsIngameGamePage();
 		const bool IngameSettingsPage = GameClient()->m_Menus.IsIngameSettingsPage();
-		if(!IngameGamePage && (!IngameSettingsPage || g_Config.m_BcHideHudInSettings))
+		if(!IngameGamePage && !IngameSettingsPage)
 			return;
 	}
 

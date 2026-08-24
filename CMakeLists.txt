@@ -2759,7 +2759,6 @@ if(CLIENT)
     components/menus_clans.cpp
     components/menus_demo.cpp
     components/menus_games.cpp
-    components/menus_gif_wheel.cpp
     components/menus_ingame.cpp
     components/menus_ingame_touch_controls.cpp
     components/menus_ingame_touch_controls.h
@@ -2868,8 +2867,6 @@ if(CLIENT)
     components/bestclient/fast_practice.h
     components/bestclient/gif_bubbles.cpp
     components/bestclient/gif_bubbles.h
-    components/bestclient/gif_wheel.cpp
-    components/bestclient/gif_wheel.h
     components/bestclient/gradient.cpp
     components/bestclient/gradient.h
     components/bestclient/hookcombo.cpp
@@ -2887,8 +2884,6 @@ if(CLIENT)
     components/bestclient/quick_binds.h
     components/bestclient/r_jelly.cpp
     components/bestclient/r_jelly.h
-    components/bestclient/rollback_demo.cpp
-    components/bestclient/rollback_demo.h
     components/bestclient/self_time_cp.cpp
     components/bestclient/self_time_cp.h
     components/bestclient/show_points.cpp

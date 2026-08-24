@@ -26,8 +26,6 @@ MACRO_CONFIG_STR(BcBlockedContentPartialReplacementChar, bc_blocked_content_part
 MACRO_CONFIG_INT(BcAutoUpdate, bc_auto_update, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically download and apply updates on startup")
 
 // General visuals
-MACRO_CONFIG_INT(BcSettingsLayout, bc_settings_layout, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Settings layout (0 = new, 1 = old)")
-MACRO_CONFIG_INT(BcHideHudInSettings, bc_hide_hud_in_settings, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide HUD while settings page is open")
 MACRO_CONFIG_INT(BcChatSaveDraft, bc_chat_save_draft, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Keep unfinished chat input when closing chat")
 MACRO_CONFIG_INT(BcSilentTyping, bc_silent_typing, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide PLAYERFLAG_CHATTING from others while typing")
 MACRO_CONFIG_INT(BcChatAltCommandLayout, bc_chat_alt_command_layout, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Interpret slash chat commands typed in the Russian keyboard layout")
@@ -64,7 +62,6 @@ MACRO_CONFIG_COL(BcNameplateGradientColor4, bc_nameplate_gradient_color4, 0xFFFF
 MACRO_CONFIG_INT(BcNameplateGradientSkin, bc_nameplate_gradient_skin, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Apply gradient colors to player skin body and feet")
 MACRO_CONFIG_INT(BcNameplateGradientEverything, bc_nameplate_gradient_everything, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Apply gradient to all rendered text")
 MACRO_CONFIG_INT(BcNameplateGradientAnimateSpeed, bc_nameplate_gradient_animate_speed, 35, 1, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Speed of the animated gradient sweep, in percent")
-MACRO_CONFIG_INT(BcScoreboardTeamGradients, bc_scoreboard_team_gradients, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Render scoreboard team colors with a left-to-right gradient")
 MACRO_CONFIG_INT(BcShowPointsInTab, bc_show_points_in_tab, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show player points in the scoreboard on DDNet and EGO servers")
 MACRO_CONFIG_INT(BcShowhudDummyCoordIndicator, bc_showhud_dummy_coord_indicator, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show player-below indicator when aligned above another player")
 MACRO_CONFIG_INT(BcShowCorrectCheckpoint, bc_show_correct_checkpoint, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show current tele checkpoint in movement information")
@@ -80,7 +77,7 @@ MACRO_CONFIG_INT(BcMastersrv, bc_mastersrv, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SA
 
 // Independent UI scale
 MACRO_CONFIG_INT(BcScoreboardScale, bc_scoreboard_scale, 100, 50, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Scoreboard scale in percent, independent of UI scale")
-MACRO_CONFIG_INT(BcWheelScale, bc_wheel_scale, 100, 50, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Bind/emote/gif wheel scale in percent, independent of UI scale")
+MACRO_CONFIG_INT(BcWheelScale, bc_wheel_scale, 100, 50, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Bind/emote wheel scale in percent, independent of UI scale")
 
 // Chat media
 MACRO_CONFIG_INT(BcChatMediaPreview, bc_chat_media_preview, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Render media previews from chat links")
@@ -154,8 +151,6 @@ MACRO_CONFIG_INT(BcCasinoBalance, bc_casino_balance, 500, 0, 9999999, CFGFLAG_CL
 MACRO_CONFIG_INT(BcCasinoLastClaim, bc_casino_last_claim, 0, 0, 2147483647, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Unix timestamp of last casino free claim")
 
 // Eye comfort
-MACRO_CONFIG_INT(BcEyeComfort, bc_eye_comfort, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Render a warm yellow screen overlay to reduce eye strain")
-MACRO_CONFIG_INT(BcEyeComfortStrength, bc_eye_comfort_strength, 35, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Eye comfort intensity in percent; increases warmth and lowers brightness together")
 
 // HookCombo
 MACRO_CONFIG_INT(BcHookCombo, bc_hook_combo, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show hook combo popups with combo sounds")

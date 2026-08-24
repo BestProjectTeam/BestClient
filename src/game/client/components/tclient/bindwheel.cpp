@@ -26,7 +26,7 @@ void CBindWheel::ConOpenBindwheel(IConsole::IResult *pResult, void *pUserData)
 	CBindWheel *pThis = (CBindWheel *)pUserData;
 	if(pThis->Client()->State() != IClient::STATE_DEMOPLAYBACK)
 	{
-		if(pThis->GameClient()->m_Emoticon.IsActive() || pThis->GameClient()->m_GifWheel.IsActive())
+		if(pThis->GameClient()->m_Emoticon.IsActive())
 			pThis->m_Active = false;
 		else
 			pThis->m_Active = pResult->GetInteger(0) != 0;

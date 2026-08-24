@@ -4,6 +4,6 @@
 
 #define BESTCLIENT_BUILD_DATE "28.05 00:00"
 #define BESTCLIENT_VERSIONNR 100
-#define BESTCLIENT_VERSION "2.2.1 stable-beta"
+#define BESTCLIENT_VERSION "2.3 closed-beta"
 
 #endif

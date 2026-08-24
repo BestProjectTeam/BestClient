@@ -947,10 +947,6 @@ private:
 	// found in menus_games.cpp
 	void RenderSettingsBestClientFun(CUIRect MainView);
 
-	// found in menus_gif_wheel.cpp
-	bool m_GifWheelEditorOpen = false;
-	void RenderSettingsBestClientGifWheel(CUIRect MainView);
-	void RenderSettingsBestClientGifWheelFullscreen(CUIRect Screen);
 	void RenderSettingsBestClientChatMediaBlock(CUIRect &Column);
 
 public:

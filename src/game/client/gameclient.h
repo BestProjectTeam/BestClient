@@ -95,13 +95,11 @@
 #include "components/bestclient/fast_actions.h"
 #include "components/bestclient/fast_practice.h"
 #include "components/bestclient/gif_bubbles.h"
-#include "components/bestclient/gif_wheel.h"
 #include "components/bestclient/gradient.h"
 #include "components/bestclient/hookcombo.h"
 #include "components/bestclient/hud_editor.h"
 #include "components/bestclient/music_player.h"
 #include "components/bestclient/quick_binds.h"
-#include "components/bestclient/rollback_demo.h"
 #include "components/bestclient/self_time_cp.h"
 #include "components/bestclient/show_points.h"
 #include "components/bestclient/swap_timer.h"
@@ -249,7 +247,6 @@ public:
 	CBindWheel m_BindWheel;
 	CFastActions m_FastActions; // BestClient
 	CCherryGifs m_CherryGifs; // BestClient
-	CGifWheel m_GifWheel; // BestClient
 	CGifBubbles m_GifBubbles; // BestClient
 	CChatBubbles m_ChatBubbles; // BestClient
 	CPhysicBalls m_PhysicBalls; // BestClient (from Entity-Client)
@@ -265,7 +262,6 @@ public:
 	CHookCombo m_HookCombo;
 	CBcGradient m_BcGradient;
 	C3DParticles m_3DParticles;
-	CRollbackDemo m_RollbackDemo; // BestClient
 	CQuickBinds m_QuickBinds; // BestClient
 	CSelfTimeCp m_SelfTimeCp; // BestClient
 	CShowPoints m_ShowPoints; // BestClient
@@ -1074,7 +1070,6 @@ private:
 	void UpdateRenderedCharacters();
 	void HandlePredictedEvents(int Tick);
 
-	void RenderEyeComfortOverlay(); // BestClient
 
 	// BestClient: optimizer
 	void RenderOptimizerFpsFogRect();
