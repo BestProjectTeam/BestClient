@@ -1309,14 +1309,6 @@ void CCharacter::GiveWeapon(int Weapon, bool Remove)
 	m_Core.m_aWeapons[Weapon].m_Got = !Remove;
 }
 
-void CCharacter::GiveAllWeapons()
-{
-	for(int i = WEAPON_GUN; i < NUM_WEAPONS - 1; i++)
-	{
-		GiveWeapon(i);
-	}
-}
-
 void CCharacter::ResetVelocity()
 {
 	m_Core.m_Vel = vec2(0, 0);

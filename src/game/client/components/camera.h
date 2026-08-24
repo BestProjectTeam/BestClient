@@ -106,6 +106,8 @@ public:
 	void SetView(ivec2 Pos, bool Relative = false);
 	void GotoSwitch(int Number, int Offset = -1);
 	void GotoTele(int Number, int Offset = -1);
+	void GotoTeleCursor();
+	void GotoFinishCursor();
 
 	void SetZoom(float Target, int Smoothness, bool IsUser);
 	bool ZoomAllowed() const;
@@ -131,6 +133,8 @@ private:
 	static void ConSetViewRelative(IConsole::IResult *pResult, void *pUserData);
 	static void ConGotoSwitch(IConsole::IResult *pResult, void *pUserData);
 	static void ConGotoTele(IConsole::IResult *pResult, void *pUserData);
+	static void ConGotoTeleCursor(IConsole::IResult *pResult, void *pUserData);
+	static void ConGotoFinishCursor(IConsole::IResult *pResult, void *pUserData);
 	static void ConToggleCinematicCamera(IConsole::IResult *pResult, void *pUserData);
 
 	bool m_ForceFreeview;

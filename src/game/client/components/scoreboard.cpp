@@ -1190,17 +1190,6 @@ void CScoreboard::OnRender()
 	if(GameClient()->m_Motd.IsActive())
 		GameClient()->m_Motd.Clear();
 
-	// Render the whole scoreboard (including its popups and cursor below) through a locally
-	// scaled screen so bc_scoreboard_scale can grow/shrink it independently of ui_scale, while
-	// keeping click/hover hit-testing aligned with what is drawn.
-	const CUIRect GlobalScreen = *Ui()->Screen();
-	const float ScoreboardScale = std::clamp(g_Config.m_BcScoreboardScale / 100.0f, 0.5f, 2.0f);
-	const CUIRect Screen = {0.0f, 0.0f, GlobalScreen.w / ScoreboardScale, GlobalScreen.h / ScoreboardScale};
-	Graphics()->MapScreen(Screen.x, Screen.y, Screen.w, Screen.h);
-	const vec2 RealMousePos = Ui()->MousePos();
-	const vec2 WindowSize = vec2(Graphics()->WindowWidth(), Graphics()->WindowHeight());
-	Ui()->SetMousePos(Ui()->UpdatedMousePos() * vec2(Screen.w, Screen.h) / WindowSize);
-
 	const CNetObj_GameInfo *pGameInfoObj = GameClient()->m_Snap.m_pGameInfoObj;
 	const bool Teams = GameClient()->IsTeamPlay();
 	const auto &aTeamSize = GameClient()->m_Snap.m_aTeamSize;
@@ -1226,6 +1215,21 @@ void CScoreboard::OnRender()
 	const float ScoreboardWidthBase = !Teams && NumPlayers <= 16 ? ScoreboardSmallWidth : 750.0f;
 	const float ScoreboardWidth = ScoreboardWidthBase + (ShowPoints ? NumScoreboardColumns * PointsColumnExtra : 0.0f);
 	const float TitleHeight = 30.0f;
+
+	// Render the whole scoreboard (including its popups and cursor below) through a locally
+	// scaled screen so bc_scoreboard_scale can grow/shrink it independently of ui_scale, while
+	// keeping click/hover hit-testing aligned with what is drawn.
+	// Auto-shrink when the board (e.g. Show Points + many columns) would exceed the screen width.
+	const CUIRect GlobalScreen = *Ui()->Screen();
+	const float UserScale = std::clamp(g_Config.m_BcScoreboardScale / 100.0f, 0.5f, 2.0f);
+	const float HorizontalMargin = 40.0f;
+	const float FitScale = ScoreboardWidth > 0.0f ? GlobalScreen.w / (ScoreboardWidth + HorizontalMargin * 2.0f) : UserScale;
+	const float ScoreboardScale = std::clamp(minimum(UserScale, FitScale), 0.25f, 2.0f);
+	const CUIRect Screen = {0.0f, 0.0f, GlobalScreen.w / ScoreboardScale, GlobalScreen.h / ScoreboardScale};
+	Graphics()->MapScreen(Screen.x, Screen.y, Screen.w, Screen.h);
+	const vec2 RealMousePos = Ui()->MousePos();
+	const vec2 WindowSize = vec2(Graphics()->WindowWidth(), Graphics()->WindowHeight());
+	Ui()->SetMousePos(Ui()->UpdatedMousePos() * vec2(Screen.w, Screen.h) / WindowSize);
 
 	CUIRect Scoreboard = {(Screen.w - ScoreboardWidth) / 2.0f, 75.0f, ScoreboardWidth, 355.0f + TitleHeight};
 	CScoreboardRenderState RenderState{};

@@ -12,6 +12,7 @@
 MACRO_CONFIG_INT(BcBestClientSettingsTabs, bc_bestclient_settings_tabs, 0, 0, 65536, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Bit flags to disable BestClient settings tabs")
 
 // Chat Filter
+MACRO_CONFIG_INT(BcChatOnlyTagsAndWhispers, bc_chat_only_tags_and_whispers, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show only highlighted and private chat messages")
 MACRO_CONFIG_INT(BcShowBlockedWordInConsole, bc_show_blocked_word_in_console, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show blocked word with regex in console")
 MACRO_CONFIG_COL(BcBlockedWordConsoleColor, bc_blocked_word_console_color, 0x99ffff, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Color of blocked word messages in console")
 MACRO_CONFIG_INT(BcEnableCensorList, bc_enable_censor_list, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable chat filter")
@@ -30,7 +31,9 @@ MACRO_CONFIG_INT(BcHideHudInSettings, bc_hide_hud_in_settings, 0, 0, 1, CFGFLAG_
 MACRO_CONFIG_INT(BcChatSaveDraft, bc_chat_save_draft, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Keep unfinished chat input when closing chat")
 MACRO_CONFIG_INT(BcSilentTyping, bc_silent_typing, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide PLAYERFLAG_CHATTING from others while typing")
 MACRO_CONFIG_INT(BcChatAltCommandLayout, bc_chat_alt_command_layout, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Interpret slash chat commands typed in the Russian keyboard layout")
+MACRO_CONFIG_INT(BcConfirmQuit, bc_confirm_quit, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show a confirmation dialog before quitting the game")
 MACRO_CONFIG_INT(BcCinematicCamera, bc_cinematic_camera, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable smooth cinematic camera movement in spectator freeview")
+MACRO_CONFIG_INT(BcCinematicCameraStrength, bc_cinematic_camera_strength, 50, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Strength of cinematic camera smoothing (0 = mild, 100 = strong)")
 MACRO_CONFIG_INT(BcSpecMovedNotify, bc_spec_moved_notify, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show 'moved in game' warning when someone hooks/hits your character while you are in spectator")
 MACRO_CONFIG_STR(BcSpecMovedNotifyText, bc_spec_moved_notify_text, 128, "moved in game", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Text shown when someone hooks/hits your character while you are in spectator")
 
@@ -62,9 +65,9 @@ MACRO_CONFIG_INT(BcNameplateGradientSkin, bc_nameplate_gradient_skin, 0, 0, 1, C
 MACRO_CONFIG_INT(BcNameplateGradientEverything, bc_nameplate_gradient_everything, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Apply gradient to all rendered text")
 MACRO_CONFIG_INT(BcNameplateGradientAnimateSpeed, bc_nameplate_gradient_animate_speed, 35, 1, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Speed of the animated gradient sweep, in percent")
 MACRO_CONFIG_INT(BcScoreboardTeamGradients, bc_scoreboard_team_gradients, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Render scoreboard team colors with a left-to-right gradient")
-MACRO_CONFIG_INT(BcShowPointsInTab, bc_show_points_in_tab, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show player points in the scoreboard on DDNet and EGO servers")
+MACRO_CONFIG_INT(BcShowPointsInTab, bc_show_points_in_tab, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show player points in the scoreboard on DDNet and EGO servers")
 MACRO_CONFIG_INT(BcShowhudDummyCoordIndicator, bc_showhud_dummy_coord_indicator, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show player-below indicator when aligned above another player")
-MACRO_CONFIG_INT(BcShowCorrectCheckpoint, bc_show_correct_checkpoint, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show the last touched time checkpoint in movement information")
+MACRO_CONFIG_INT(BcShowCorrectCheckpoint, bc_show_correct_checkpoint, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show current tele checkpoint in movement information")
 
 // SelfTimeCp
 MACRO_CONFIG_INT(BcSelfTimeCp, bc_self_time_cp, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable personal time checkpoints")
@@ -102,7 +105,7 @@ MACRO_CONFIG_INT(BcChatBubbles, bc_chat_bubbles, 0, 0, 1, CFGFLAG_CLIENT | CFGFL
 MACRO_CONFIG_INT(BcChatBubblesSelf, bc_chat_bubbles_self, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show chat bubbles above yourself")
 MACRO_CONFIG_INT(BcChatBubblesDemo, bc_chat_bubbles_demo, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show chat bubbles in demo playback")
 MACRO_CONFIG_INT(BcChatBubbleSize, bc_chat_bubble_size, 20, 20, 30, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Size of chat bubbles")
-MACRO_CONFIG_INT(BcChatBubbleShowTime, bc_chat_bubble_showtime, 200, 200, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "How long to show chat bubbles (centiseconds)")
+MACRO_CONFIG_INT(BcChatBubbleShowTime, bc_chat_bubble_showtime, 500, 100, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "How long to show chat bubbles (centiseconds)")
 MACRO_CONFIG_INT(BcChatBubbleFadeOut, bc_chat_bubble_fadeout, 35, 15, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Chat bubble fade-out duration (centiseconds)")
 MACRO_CONFIG_INT(BcChatBubbleFadeIn, bc_chat_bubble_fadein, 15, 15, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Chat bubble fade-in duration (centiseconds)")
 MACRO_CONFIG_INT(BcChatBubbleAnimation, bc_chat_bubble_animation, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Animate chat bubble stacking movement")
@@ -164,8 +167,6 @@ MACRO_CONFIG_INT(BcHookComboSize, bc_hook_combo_size, 100, 50, 200, CFGFLAG_CLIE
 // Swap timer
 MACRO_CONFIG_INT(BcSwapTimer, bc_swap_timer, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show a HUD timer for pending swap requests")
 MACRO_CONFIG_INT(BcSwapTimerStyle, bc_swap_timer_style, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Swap timer style (0 = HUD, 1 = Nameplate)")
-MACRO_CONFIG_STR(BcSwapTimerWaitText, bc_swap_timer_wait_text, 32, "[%ds]", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Minimal nameplate cooldown text (%d seconds, %y your name, %n other name)")
-MACRO_CONFIG_STR(BcSwapTimerLeftText, bc_swap_timer_left_text, 32, "[%ds]", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Minimal nameplate remaining time text (%d seconds, %y your name, %n other name)")
 
 MACRO_CONFIG_INT(BcSwapTimerSize, bc_swap_timer_size, 100, 50, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Swap timer size")
 MACRO_CONFIG_INT(BcSwapTimerShowHotkeys, bc_swap_timer_show_hotkeys, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show accept and decline hotkeys in the swap timer")
@@ -244,6 +245,7 @@ MACRO_CONFIG_INT(BcCrystalLaser, bc_crystal_laser, 0, 0, 1, CFGFLAG_CLIENT | CFG
 
 // Flying name plates
 MACRO_CONFIG_INT(BcFlyingNamePlates, bc_flying_name_plates, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Render name plates like flying kites attached to players")
+MACRO_CONFIG_INT(BcFlyingNamePlatesHideLine, bc_flying_name_plates_hide_line, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide the line between players and flying name plates")
 MACRO_CONFIG_INT(BcFlyingNamePlatesLift, bc_flying_name_plates_lift, 28, 0, 120, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Extra vertical lift for flying name plates")
 MACRO_CONFIG_INT(BcFlyingNamePlatesDrag, bc_flying_name_plates_drag, 52, 0, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "How far flying name plates trail behind movement")
 MACRO_CONFIG_INT(BcFlyingNamePlatesFollow, bc_flying_name_plates_follow, 40, 1, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "How quickly flying name plates catch up to their target position")
@@ -255,20 +257,13 @@ MACRO_CONFIG_INT(BcMotionBlurStrength, bc_motion_blur_strength, 50, 0, 95, CFGFL
 // Music player
 MACRO_CONFIG_INT(BcMusicPlayer, bc_music_player, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable Music Player HUD element")
 MACRO_CONFIG_INT(BcMusicPlayerShowWhenPaused, bc_music_player_show_when_paused, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Keep Music Player visible while playback is paused")
-MACRO_CONFIG_INT(BcMusicPlayerVisualizer, bc_music_player_visualizer, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable music player visualizer")
 MACRO_CONFIG_INT(BcMusicPlayerVisualizerMode, bc_music_player_visualizer_mode, 1, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player visualizer mode (0=bottom, 1=center, 2=up)")
-MACRO_CONFIG_INT(BcMusicPlayerVisualizerSensitivity, bc_music_player_visualizer_sensitivity, 300, 50, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Legacy music player visualizer sensitivity (unused)")
-MACRO_CONFIG_INT(BcMusicPlayerVisualizerSmoothing, bc_music_player_visualizer_smoothing, 50, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Legacy music player visualizer smoothing (unused)")
+MACRO_CONFIG_INT(BcMusicPlayerVisualizerSmoothing, bc_music_player_visualizer_smoothing, 50, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player visualizer smoothing in percent")
 MACRO_CONFIG_INT(BcMusicPlayerVisualizerRounding, bc_music_player_visualizer_rounding, 0, 0, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player visualizer rounding (0=cube, 200=soft)")
 MACRO_CONFIG_INT(BcMusicPlayerVisualizerColumns, bc_music_player_visualizer_columns, 5, 5, 10, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player visualizer bar count")
-MACRO_CONFIG_INT(BcMusicPlayerVisualizerColumnWidth, bc_music_player_visualizer_column_width, 100, 50, 250, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player visualizer column width in percent")
-MACRO_CONFIG_INT(BcMusicPlayerVisualizerGap, bc_music_player_visualizer_gap, 100, 0, 250, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player visualizer gap in percent")
 MACRO_CONFIG_INT(BcMusicPlayerColorMode, bc_music_player_color_mode, 1, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player color mode (0=static visualizer, 1=cover visualizer, 2=translucent)")
 MACRO_CONFIG_COL(BcMusicPlayerStaticColor, bc_music_player_static_color, 128, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Static color for the music player when static color mode is selected")
-MACRO_CONFIG_INT(BcMusicPlayerSizeMode, bc_music_player_size_mode, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Legacy music player size mode (unused, always mini)")
 MACRO_CONFIG_INT(BcMusicPlayerTextScale, bc_music_player_text_scale, 110, 70, 150, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player text scale in percent")
-MACRO_CONFIG_INT(BcMusicPlayerAnimationMs, bc_music_player_animation_ms, 180, 50, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Music player animation duration in milliseconds")
-MACRO_CONFIG_INT(BcMusicPlayerShowCover, bc_music_player_show_cover, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show cover art in the music player")
 MACRO_CONFIG_INT(BcMusicPlayerShowLyrics, bc_music_player_show_lyrics, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show synchronized song lyrics in the music player (BETA)")
 MACRO_CONFIG_INT(BcMusicPlayerShowCurrentTime, bc_music_player_show_current_time, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show current time tab under lyrics in the music player")
 MACRO_CONFIG_INT(BcMusicPlayerUseColorForHud, bc_music_player_use_color_for_hud, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use the Music Player color for HUD rectangles in hud.cpp")
@@ -305,6 +300,7 @@ MACRO_CONFIG_INT(BcKeystrokesMcShowWs, bc_keystrokes_mc_show_ws, 1, 0, 1, CFGFLA
 MACRO_CONFIG_INT(BcKeystrokesMcShowLmb, bc_keystrokes_mc_show_lmb, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show LMB in Minecraft keystrokes")
 MACRO_CONFIG_INT(BcKeystrokesMcShowRmb, bc_keystrokes_mc_show_rmb, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show RMB in Minecraft keystrokes")
 MACRO_CONFIG_INT(BcKeystrokesMcShowSpace, bc_keystrokes_mc_show_space, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show Space in Minecraft keystrokes")
+MACRO_CONFIG_INT(BcKeystrokesMcPressedOpacity, bc_keystrokes_mc_pressed_opacity, 92, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Pressed key opacity in Minecraft keystrokes")
 
 // Finish prediction
 MACRO_CONFIG_INT(BcFinishPrediction, bc_finish_prediction, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable finish prediction")
@@ -316,6 +312,15 @@ MACRO_CONFIG_INT(BcFinishPredictionShowMillis, bc_finish_prediction_show_millis,
 
 // Fast Actions
 MACRO_CONFIG_INT(BcFastActions, bc_fast_actions, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable the Fast Actions quick command selector")
+
+// Edge Info (from RushieClient)
+MACRO_CONFIG_COL(RiEdgeInfoColorFreeze, ri_edge_info_color_freeze, 9930605, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Freeze color in edge info")
+MACRO_CONFIG_COL(RiEdgeInfoColorKill, ri_edge_info_color_kill, 65461, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Kill color in edge info")
+MACRO_CONFIG_COL(RiEdgeInfoColorSafe, ri_edge_info_color_safe, 5594535, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Safe color in edge info")
+MACRO_CONFIG_INT(RiEdgeInfoCords, ri_edge_info_cords, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show upper panel of edge info")
+MACRO_CONFIG_INT(RiEdgeInfoJump, ri_edge_info_jump, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show lower panel of edge info")
+MACRO_CONFIG_INT(RiEdgeInfoPosX, ri_edge_info_pos_x, 50, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Change edge info pos x")
+MACRO_CONFIG_INT(RiEdgeInfoPosY, ri_edge_info_pos_y, 56, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Change edge info pos y")
 
 // Quick binds (45 degrees / small sens)
 MACRO_CONFIG_INT(BcPrevMouseMaxDistance45Degrees, bc_prev_mouse_max_distance_45_degrees, 400, 0, 5000, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_INSENSITIVE, "Previous maximum cursor distance for 45 degrees")
@@ -346,7 +351,7 @@ MACRO_CONFIG_INT(BcSnapTapDelay, bc_snap_tap_delay, 0, 0, 200, CFGFLAG_CLIENT | 
 // Browser Utils
 MACRO_CONFIG_INT(BcAutoServerListRefresh, bc_auto_server_list_refresh, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically refresh the server browser list while a browser tab is open")
 MACRO_CONFIG_INT(BcAutoServerListRefreshSeconds, bc_auto_server_list_refresh_seconds, 10, 1, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Auto refresh interval for the server browser list in seconds")
-MACRO_CONFIG_INT(BcUseShortKogServerName, bc_use_short_kog_server_name, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use short name for KoG gores servers in browser list")
+MACRO_CONFIG_INT(BcUseShortKogServerName, bc_use_short_kog_server_name, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use short names for E-Gores and KoG servers in browser list")
 
 // Media background
 MACRO_CONFIG_INT(BcMenuMediaBackground, bc_menu_media_background, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable custom media background in offline menus")
@@ -358,12 +363,15 @@ MACRO_CONFIG_INT(BcGameMediaBackgroundOffset, bc_game_media_background_offset, 0
 MACRO_CONFIG_INT(BcOptimizer, bc_optimizer, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable optimizer features")
 MACRO_CONFIG_INT(BcOptimizerDisableParticles, bc_optimizer_disable_particles, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Disable rendering/updating all particles")
 MACRO_CONFIG_INT(BcOptimizerFpsFog, bc_optimizer_fps_fog, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Cull non-map rendering outside a distance limit around the camera")
-MACRO_CONFIG_INT(BcOptimizerDdnetPriorityHigh, bc_optimizer_ddnet_priority_high, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Set DDNet process priority to High while enabled")
 MACRO_CONFIG_INT(BcOptimizerFpsFogMode, bc_optimizer_fps_fog_mode, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "FPS fog mode (0=manual radius tiles, 1=by zoom percent)")
 MACRO_CONFIG_INT(BcOptimizerFpsFogRadiusTiles, bc_optimizer_fps_fog_radius_tiles, 40, 5, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "FPS fog manual radius in tiles (tile=32 units)")
 MACRO_CONFIG_INT(BcOptimizerFpsFogZoomPercent, bc_optimizer_fps_fog_zoom_percent, 70, 10, 120, CFGFLAG_CLIENT | CFGFLAG_SAVE, "FPS fog visible area percent in zoom mode")
 MACRO_CONFIG_INT(BcOptimizerFpsFogRenderRect, bc_optimizer_fps_fog_render_rect, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Render an outline rectangle showing the FPS fog area")
 MACRO_CONFIG_INT(BcOptimizerFpsFogCullMapTiles, bc_optimizer_fps_fog_cull_map_tiles, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Cull map tile rendering outside the FPS fog area")
+
+// Process priority (from Entity-Client)
+MACRO_CONFIG_INT(BcHighProcessPriority, bc_high_process_priority, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Set DDNets process priority to high")
+MACRO_CONFIG_INT(BcDiscordNormalProcessPriority, bc_discord_normal_process_priority, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Set Discord process priority to normal")
 
 // Focus Mode Settings
 MACRO_CONFIG_INT(ClFocusMode, p_focus_mode, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable focus mode to minimize visual distractions")
@@ -396,6 +404,16 @@ MACRO_CONFIG_STR(BcClientIndicatorTokenUrl, bc_client_indicator_token_url, 256, 
 MACRO_CONFIG_STR(BcClientIndicatorSharedToken, bc_client_indicator_shared_token, 256, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Client indicator shared token for signed UDP packets")
 MACRO_CONFIG_STR(BcClientIndicatorSecretKey, bc_client_indicator_secret_key, 256, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Client indicator developer secret key")
 MACRO_CONFIG_INT(BrFilterBestclient, br_filter_bestclient, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Filter out servers with no BestClient users")
+
+// Twitch chat integration
+MACRO_CONFIG_STR(BcTwitchChatNick, bc_twitch_chat_nick, 64, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Twitch channel nick for chat integration")
+
+// Physic Balls (from Entity-Client)
+MACRO_CONFIG_STR(BcPhysicBallsSkin, bc_physic_balls_skin, 24, "volleyball", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Base skin for physic balls")
+
+// Better Spectate / Spec Pause Radio (from Entity-Client)
+MACRO_CONFIG_INT(BcBetterSpectate, bc_better_spectate, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Replace say /pause bind (default Q) with +specpause radio menu")
+MACRO_CONFIG_INT(BcSpecPauseShowDelay, bc_spec_pause_show_delay, 0, 0, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Delay before the spec pause radio becomes visible (ms)")
 
 // Clans
 MACRO_CONFIG_INT(BcClansEnabled, bc_clans_enabled, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable Clans menu page")

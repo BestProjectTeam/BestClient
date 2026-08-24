@@ -896,6 +896,30 @@ void CChat::Echo(const char *pString)
 	AddLine(CLIENT_MSG, 0, pString);
 }
 
+void CChat::AddColoredLine(const char *pLine, ColorRGBA Color)
+{
+	if(!pLine || pLine[0] == '\0')
+		return;
+
+	const int PrevShowChatClient = g_Config.m_TcShowChatClient;
+	g_Config.m_TcShowChatClient = 1;
+	AddLine(CLIENT_MSG, 0, pLine);
+	g_Config.m_TcShowChatClient = PrevShowChatClient;
+
+	CLine &Line = m_aLines[m_CurrentLine];
+	if(!Line.m_Initialized || Line.m_ClientId != CLIENT_MSG)
+		return;
+
+	Line.m_CustomColor = Color;
+	Line.m_aName[0] = '\0';
+	TextRender()->DeleteTextContainer(Line.m_TextContainerIndex);
+	Graphics()->DeleteQuadContainer(Line.m_QuadContainerIndex);
+	Line.m_TextContainerIndex.Reset();
+	Line.m_QuadContainerIndex = -1;
+	Line.m_aYOffset[0] = -1.0f;
+	Line.m_aYOffset[1] = -1.0f;
+}
+
 void CChat::OnConsoleInit()
 {
 	// Migration: the default chat media allowlist gained gifs.teeworlds.xyz. Only upgrade users
@@ -3922,6 +3946,26 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 	if(ClientId == CLIENT_MSG)
 		CustomColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageClientColor));
 
+	// Check for highlighted name before deciding whether to keep this message.
+	if(Client()->State() != IClient::STATE_DEMOPLAYBACK)
+	{
+		if(ClientId >= 0 && ClientId != GameClient()->m_aLocalIds[0] && ClientId != GameClient()->m_aLocalIds[1])
+		{
+			for(int LocalId : GameClient()->m_aLocalIds)
+			{
+				Highlighted |= LocalId >= 0 && LineShouldHighlight(pLine, GameClient()->m_aClients[LocalId].m_aName);
+			}
+		}
+	}
+	else
+	{
+		// On demo playback use local id from snap directly, since m_aLocalIds isn't valid there.
+		Highlighted |= GameClient()->m_Snap.m_LocalClientId >= 0 && LineShouldHighlight(pLine, GameClient()->m_aClients[GameClient()->m_Snap.m_LocalClientId].m_aName);
+	}
+
+	if(g_Config.m_BcChatOnlyTagsAndWhispers && !Highlighted && Team < 2)
+		return;
+
 	CLine &PreviousLine = m_aLines[m_CurrentLine];
 
 	// Team Number:
@@ -3962,23 +4006,6 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 	CurrentLine.m_NameColor = -2;
 	CurrentLine.m_CustomColor = CustomColor;
 
-	// check for highlighted name
-	if(Client()->State() != IClient::STATE_DEMOPLAYBACK)
-	{
-		if(ClientId >= 0 && ClientId != GameClient()->m_aLocalIds[0] && ClientId != GameClient()->m_aLocalIds[1])
-		{
-			for(int LocalId : GameClient()->m_aLocalIds)
-			{
-				Highlighted |= LocalId >= 0 && LineShouldHighlight(pLine, GameClient()->m_aClients[LocalId].m_aName);
-			}
-		}
-	}
-	else
-	{
-		// on demo playback use local id from snap directly,
-		// since m_aLocalIds isn't valid there
-		Highlighted |= GameClient()->m_Snap.m_LocalClientId >= 0 && LineShouldHighlight(pLine, GameClient()->m_aClients[GameClient()->m_Snap.m_LocalClientId].m_aName);
-	}
 	CurrentLine.m_Highlighted = Highlighted;
 
 	str_copy(CurrentLine.m_aText, pLine);
@@ -4723,7 +4750,6 @@ void CChat::OnRender()
 
 	// TClient
 	float y = ChatLayout.m_Y;
-	// float y = 300.0f - 20.0f * FontSize() / 6.0f;
 
 	float ScaledFontSize = FontSize() * (8.0f / 6.0f);
 	const bool BcChatMessageAnimEnabled = BCUiAnimations::Enabled() && g_Config.m_BcChatAnimation != 0;

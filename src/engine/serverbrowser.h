@@ -327,13 +327,14 @@ public:
 	class CServerEntry
 	{
 	public:
-		int64_t m_RequestTime;
-		bool m_RequestIgnoreInfo;
-		int m_GotInfo;
+		int64_t m_RequestTime = 0;
+		bool m_RequestIgnoreInfo = false;
+		int m_GotInfo = 0;
+		int m_RefreshGeneration = 0;
 		CServerInfo m_Info;
 
-		CServerEntry *m_pPrevReq; // request list
-		CServerEntry *m_pNextReq;
+		CServerEntry *m_pPrevReq = nullptr; // request list
+		CServerEntry *m_pNextReq = nullptr;
 	};
 
 	struct CBestClientPlayerEntry

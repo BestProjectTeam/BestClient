@@ -417,8 +417,10 @@ void CMenus::RenderSettingsBestClientChatMediaBlock(CUIRect &Column)
 
 	ChatMediaBlock.HSplitTop(ChatMediaLineSize, &Button, &ChatMediaBlock);
 	static CButtonContainer s_OpenGifWheelButton;
-	if(DoButton_Menu(&s_OpenGifWheelButton, Localize("Gif Wheel"), 0, &Button))
-		m_GifWheelEditorOpen = true;
+	// Temporarily unavailable: Checked=-1 greys the button and blocks click success.
+	DoButton_Menu(&s_OpenGifWheelButton, Localize("Gif Wheel"), -1, &Button);
+	GameClient()->m_Tooltips.DoToolTip(&s_OpenGifWheelButton, &Button, Localize("Temporarily unavailable"), -1.0f, ColorRGBA(1.0f, 0.25f, 0.25f, 1.0f));
+	GameClient()->m_Tooltips.SetFadeTime(&s_OpenGifWheelButton, 0.0f);
 	ChatMediaBlock.HSplitTop(ChatMediaMarginSmall, nullptr, &ChatMediaBlock);
 
 	CChat &ChatMediaChat = GameClient()->m_Chat;

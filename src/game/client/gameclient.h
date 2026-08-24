@@ -88,6 +88,10 @@
 #include "components/bestclient/cherry_gifs.h"
 #include "components/bestclient/chat_bubbles.h"
 #include "components/bestclient/cloud_input.h"
+#include "components/bestclient/edgehelper.h"
+#include "components/bestclient/physicball.h"
+#include "components/bestclient/process_priority.h"
+#include "components/bestclient/spec_pause_radio.h"
 #include "components/bestclient/fast_actions.h"
 #include "components/bestclient/fast_practice.h"
 #include "components/bestclient/gif_bubbles.h"
@@ -102,6 +106,7 @@
 #include "components/bestclient/show_points.h"
 #include "components/bestclient/swap_timer.h"
 #include "components/bestclient/translate.h"
+#include "components/bestclient/twitch_chat.h"
 #include "components/bestclient/voice/voice.h"
 #include "components/bestclient/clans/clans.h"
 #include "components/tclient/warlist.h"
@@ -247,8 +252,12 @@ public:
 	CGifWheel m_GifWheel; // BestClient
 	CGifBubbles m_GifBubbles; // BestClient
 	CChatBubbles m_ChatBubbles; // BestClient
+	CPhysicBalls m_PhysicBalls; // BestClient (from Entity-Client)
+	CProcessPriority m_ProcessPriority; // BestClient (from Entity-Client)
+	CSpecPauseRadio m_SpecPauseRadio; // BestClient (from Entity-Client)
 	CFastPractice m_FastPractice; // BestClient
 	CCloudInput m_CloudInput; // BestClient
+	CEdgeHelper m_EdgeHelper; // BestClient (from RushieClient)
 	CBgDraw m_BgDraw;
 	CTClient m_TClient;
 	CTrails m_Trails;
@@ -265,6 +274,7 @@ public:
 	CAdminPanel m_AdminPanel; // BestClient
 	CBcAutoMargin m_BcAutoMargin; // BestClient
 	CVoiceChat m_VoiceChat; // BestClient
+	CTwitchChat m_TwitchChat; // BestClient
 	CClans m_Clans; // BestClient
 	CHudEditor m_HudEditor; // BestClient
 	CSwapTimer m_SwapTimer; // BestClient
@@ -341,6 +351,7 @@ private:
 	static void ConchainSpecialInfoupdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainSpecialDummyInfoupdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainRefreshSkins(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
+	static void ConchainRefreshSkinMaxWidth(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainRefreshEventSkins(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainSpecialDummy(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 
@@ -578,9 +589,6 @@ public:
 		vec2 m_ImprovedPredPos = vec2(0, 0);
 		vec2 m_PrevImprovedPredPos = vec2(0, 0);
 		bool m_ValidAntipingSmooth = false;
-		//vec2 m_DebugVector = vec2(0, 0);
-		//vec2 m_DebugVector2 = vec2(0, 0);
-		//vec2 m_DebugVector3 = vec2(0, 0);
 		float m_Uncertainty = 0.0f;
 		float m_VolleyBallAngle = 0.0f;
 		bool m_IsVolleyBall = false;
@@ -1027,6 +1035,7 @@ public:
 	vec2 GetSmoothPos(int ClientId);
 	vec2 GetFreezePos(int ClientId);
 	vec2 GetFastInputPos(int ClientId);
+	vec2 BcGetCursorWorldPos() const;
 
 	int m_MultiViewTeam;
 	float m_MultiViewPersonalZoom;
@@ -1068,11 +1077,8 @@ private:
 	void RenderEyeComfortOverlay(); // BestClient
 
 	// BestClient: optimizer
-	void OptimizerUpdateProcessPriorities();
 	void RenderOptimizerFpsFogRect();
-	unsigned long m_OptimizerDdnetPrevPriorityClass = 0;
-	unsigned long m_OptimizerDdnetLastSetPriorityClass = 0;
-	bool m_OptimizerDdnetPriorityHighActive = false;
+	int m_WasWindowActive = 1;
 
 	int m_aLastUpdateTick[MAX_CLIENTS] = {0};
 	void DetectStrongHook();
@@ -1132,8 +1138,6 @@ public:
 	// TClient
 	int m_SmoothTick = 0;
 	float m_SmoothIntraTick = 0.0f;
-	int m_aCloudSmoothTick[2] = {};
-	float m_aCloudSmoothIntraTick[2] = {};
 	bool CheckNewInput() override;
 	bool IsSnapTapBlockedByCommunity() const;
 	bool IsAspectRatioBlockedByFng() const;

@@ -671,9 +671,6 @@ void CCharacter::GiveNinja()
 	if(m_Core.m_ActiveWeapon != WEAPON_NINJA)
 		m_LastWeapon = m_Core.m_ActiveWeapon;
 	m_Core.m_ActiveWeapon = WEAPON_NINJA;
-
-	// not used on ddrace
-	// GameServer()->CreateSound(m_Pos, SOUND_PICKUP_NINJA, TeamMask());
 }
 
 void CCharacter::RemoveNinja()
@@ -972,14 +969,6 @@ bool CCharacter::IncreaseHealth(int Amount)
 	if(m_Health >= 10)
 		return false;
 	m_Health = std::clamp(m_Health + Amount, 0, 10);
-	return true;
-}
-
-bool CCharacter::IncreaseArmor(int Amount)
-{
-	if(m_Armor >= 10)
-		return false;
-	m_Armor = std::clamp(m_Armor + Amount, 0, 10);
 	return true;
 }
 
@@ -2388,14 +2377,6 @@ void CCharacter::GiveWeapon(int Weapon, bool Remove)
 	}
 
 	m_Core.m_aWeapons[Weapon].m_Got = !Remove;
-}
-
-void CCharacter::GiveAllWeapons()
-{
-	for(int i = WEAPON_GUN; i < NUM_WEAPONS - 1; i++)
-	{
-		GiveWeapon(i);
-	}
 }
 
 void CCharacter::ResetPickups()

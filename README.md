@@ -14,7 +14,7 @@
 BestClient is a customized DDNet client built around native BestClient systems instead of a thin reskin.
 The project adds its own rendering stack, input tools, social systems, editors, and UI modules while staying compatible with DDNet servers.
 
-The client currently ships with **278** `bc_*` config variables, five BestClient settings tabs, integrated voice chat, a live HUD editor, clans, collaborative multimapping, Fast Practice, and a Fun tab with mini-games.
+The client currently ships with **281** `bc_*` config variables, five BestClient settings tabs, integrated voice chat, a live HUD editor, clans, collaborative multimapping, Fast Practice, and a Fun tab with mini-games.
 
 ## Links
 
@@ -118,7 +118,8 @@ The client currently ships with **278** `bc_*` config variables, five BestClient
 - **Music Player** — HUD player with visualizer and cover colors
 - **Keystrokes** — Classic / Minecraft keyboard and mouse HUD
 - **Custom Aspect Ratio** — presets and arbitrary num:den input
-- **Chat Bubbles** — bubbles above players
+- **Chat Bubbles** — bubbles above players (from Entity-Client)
+- **Physic Balls** — spawn physics balls with map/player collisions (from Entity-Client)
 
 Demo playback only (Demo Player): **Camera Drift**, **Dynamic FOV**.
 
@@ -136,10 +137,10 @@ Demo playback only (Demo Player): **Camera Drift**, **Dynamic FOV**.
 
 ### Others
 
-- **Misc** — auto update, layout, silent typing, cinematic camera, spec moved notify, extend zoom, UI/wheel/scoreboard scale, and more
+- **Misc** — auto update, layout, silent typing, cinematic camera, better spectate (`+specpause` radio), spec moved notify, extend zoom, UI/wheel/scoreboard scale, and more
 - **Rollback Demo** — replay rollback with configurable length
-- **Browser Utils** — auto server list refresh, short KoG server names
-- **Chat Filter** — regex/censor list, player whitelist
+- **Browser Utils** — auto server list refresh, short EGO/KoG server names
+- **Chat Filter** — regex/censor list, player whitelist (from RushieClient)
 - **Voice Binds** — push-to-talk and voice moderation key
 - **Voice Chat** — Opus PTT/VAD, radius/team0, per-player volume/mute, voice mod tab in admin panel
 - **Client Indicator** — BestClient icon in nameplates/scoreboard + browser filter
@@ -200,7 +201,7 @@ cmake --build headless --target run_tests
 
 ## Full `bc_*` config list
 
-Source: `src/engine/shared/config_variables_bestclient.h` (278 variables).
+Source: `src/engine/shared/config_variables_bestclient.h` (281 variables).
 
 <details>
 <summary>Expand full list</summary>
@@ -238,6 +239,7 @@ bc_best_input_latency_comp
 bc_best_input_others
 bc_best_input_smoothing
 bc_bestclient_settings_tabs
+bc_better_spectate
 bc_blocked_content_partial_replacement_char
 bc_blocked_content_replacement_char
 bc_blocked_word_console_color
@@ -278,6 +280,7 @@ bc_chat_typing_animation_ms
 bc_cherrygifs_show_nsfw
 bc_cherrygifs_sort_top
 bc_cinematic_camera
+bc_cinematic_camera_strength
 bc_clans_allow_local_dev
 bc_clans_api_url
 bc_clans_enabled
@@ -303,6 +306,7 @@ bc_custom_aspect_ratio_mode
 bc_custom_aspect_ratio_num
 bc_delta_input_amount
 bc_delta_input_others
+bc_discord_normal_process_priority
 bc_dynamic_fov
 bc_dynamic_fov_amount
 bc_dynamic_fov_smoothness
@@ -333,6 +337,7 @@ bc_gif_bubble_offset_y
 bc_gores_mode
 bc_gores_mode_disable_weapons
 bc_hide_hud_in_settings
+bc_high_process_priority
 bc_hook_combo
 bc_hook_combo_mode
 bc_hook_combo_reset_time
@@ -416,15 +421,14 @@ bc_nameplate_gradient_skin
 bc_nameplate_voice_offset_x
 bc_nameplate_voice_offset_y
 bc_optimizer
-bc_optimizer_ddnet_priority_high
 bc_optimizer_disable_particles
-bc_optimizer_discord_priority_below_normal
 bc_optimizer_fps_fog
 bc_optimizer_fps_fog_cull_map_tiles
 bc_optimizer_fps_fog_mode
 bc_optimizer_fps_fog_radius_tiles
 bc_optimizer_fps_fog_render_rect
 bc_optimizer_fps_fog_zoom_percent
+bc_physic_balls_skin
 bc_prev_inp_mousesens_45_degrees
 bc_prev_inp_mousesens_small_sens
 bc_prev_mouse_max_distance_45_degrees
@@ -447,6 +451,7 @@ bc_snap_tap
 bc_snap_tap_delay
 bc_spec_moved_notify
 bc_spec_moved_notify_text
+bc_spec_pause_show_delay
 bc_speedrun_timer
 bc_speedrun_timer_auto_disable
 bc_speedrun_timer_hours
@@ -489,6 +494,13 @@ bc_wheel_scale
 </details>
 
 Plain-text export: [docs/bc_config_list.txt](docs/bc_config_list.txt).
+
+## Credits / borrowed features
+
+Some BestClient features were adapted from other DDNet client forks:
+
+- **Entity-Client** ([FoxNet-DDNet/Entity-Client-DDNet](https://github.com/FoxNet-DDNet/Entity-Client-DDNet)) — Physic Balls, Better Spectate (`+specpause`), Chat Bubbles
+- **RushieClient** ([RushieClient/RushieClient-ddnet](https://github.com/RushieClient/RushieClient-ddnet)) — Chat Filter, Edge Info, Find Teleport, Find Finish
 
 ## License
 

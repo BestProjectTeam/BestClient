@@ -9,7 +9,6 @@
 #include <game/mapitems.h>
 
 #include <memory>
-#include <optional>
 
 class CQuadArtParameters
 {
@@ -31,8 +30,6 @@ public:
 private:
 	ivec2 GetOptimizedQuadSize(const ColorRGBA &Pixel, const ivec2 &Pos);
 	void MarkPixelAsVisited(const ivec2 &Pos, const ivec2 &Size);
-
-	size_t FindSuperPixelSize(const ColorRGBA &Pixel, const ivec2 &Pos, size_t CurrentSize);
 
 	ColorRGBA GetPixelClamped(const ivec2 &Pos) const;
 	bool IsPixelOptimizable(const ivec2 &Pos, const ColorRGBA &Pixel) const;

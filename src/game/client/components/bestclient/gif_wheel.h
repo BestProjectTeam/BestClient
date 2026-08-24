@@ -38,11 +38,6 @@ public:
 		bool m_ThumbnailRequested = false;
 		bool m_ThumbnailFailed = false;
 		std::shared_ptr<CHttpRequest> m_pThumbnailRequest;
-
-		bool operator==(const CSlot &Other) const
-		{
-			return str_comp(m_aGifId, Other.m_aGifId) == 0 && str_comp(m_aUrl, Other.m_aUrl) == 0;
-		}
 	};
 
 	std::vector<CSlot> m_vSlots;

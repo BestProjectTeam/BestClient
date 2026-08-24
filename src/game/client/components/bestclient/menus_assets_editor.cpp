@@ -1,4 +1,5 @@
 /* Copyright © 2026 BestProject Team */
+#include <base/color.h>
 #include <base/math.h>
 #include <base/system.h>
 #include <base/types.h>
@@ -63,7 +64,39 @@ struct SAssetsEditorImageCacheEntry
 	CImageInfo m_Image;
 };
 
+struct SAssetsEditorColorPopupContext : public SPopupMenuId
+{
+	CMenus *m_pMenus = nullptr;
+	int m_SlotIndex = -1;
+	CButtonContainer m_DoneButton;
+	CButtonContainer m_ClearButton;
+	CButtonContainer m_aBlendButtons[CMenus::ASSETS_EDITOR_COLOR_BLEND_COUNT];
+	char m_OpacityScrollbarId = 0;
+};
+
 static std::vector<SAssetsEditorImageCacheEntry> gs_vAssetsEditorImageCache;
+static SAssetsEditorColorPopupContext gs_AssetsEditorColorPopup;
+static CUi::SSelectionPopupContext gs_AssetsEditorContextMenu;
+static CScrollRegion gs_AssetsEditorContextMenuScroll;
+
+static const char *AssetsEditorColorBlendModeName(int Mode)
+{
+	switch(Mode)
+	{
+	case CMenus::ASSETS_EDITOR_COLOR_BLEND_TEELIKE: return Localize("TeeLike");
+	case CMenus::ASSETS_EDITOR_COLOR_BLEND_SCREEN: return Localize("Screen");
+	case CMenus::ASSETS_EDITOR_COLOR_BLEND_MULTIPLY: return Localize("Multiply");
+	case CMenus::ASSETS_EDITOR_COLOR_BLEND_OVERLAY: return Localize("Overlay");
+	default: return Localize("TeeLike");
+	}
+}
+
+static float AssetsEditorOverlayChannel(float Base, float Blend)
+{
+	if(Base < 0.5f)
+		return 2.0f * Base * Blend;
+	return 1.0f - 2.0f * (1.0f - Base) * (1.0f - Blend);
+}
 
 static int AssetsEditorFindSpriteIdByName(const char *pName, int ImageId)
 {
@@ -458,6 +491,8 @@ void CMenus::AssetsEditorClearAssets()
 	m_AssetsEditorState.m_HoverCyclePositionY = -1;
 	m_AssetsEditorState.m_HoverCycleCandidateCursor = 0;
 	m_AssetsEditorState.m_vHoverCycleCandidates.clear();
+	m_AssetsEditorState.m_ContextMenuSlotIndex = -1;
+	m_AssetsEditorState.m_ColorEditSlotIndex = -1;
 	AssetsEditorClearImageCache();
 }
 
@@ -917,6 +952,196 @@ bool CMenus::AssetsEditorCopyRectScaledNearest(CImageInfo &Dst, const CImageInfo
 	return true;
 }
 
+void CMenus::AssetsEditorColorizeRect(CImageInfo &Image, int X, int Y, int W, int H, const SAssetsEditorPartSlot &Slot) const
+{
+	if(Image.m_pData == nullptr || Image.m_Format != CImageInfo::FORMAT_RGBA)
+		return;
+	if(W <= 0 || H <= 0 || X < 0 || Y < 0)
+		return;
+	if(X + W > (int)Image.m_Width || Y + H > (int)Image.m_Height)
+		return;
+
+	const ColorRGBA Tint = color_cast<ColorRGBA>(ColorHSLA(Slot.m_CustomColor).UnclampLighting(ColorHSLA::DARKEST_LGT));
+	const float Opacity = std::clamp(Slot.m_ColorOpacity, 0, 100) / 100.0f;
+	if(Opacity <= 0.0f)
+		return;
+
+	const int BlendMode = std::clamp(Slot.m_ColorBlendMode, 0, ASSETS_EDITOR_COLOR_BLEND_COUNT - 1);
+	uint8_t *pData = static_cast<uint8_t *>(Image.m_pData);
+
+	for(int Py = 0; Py < H; ++Py)
+	{
+		for(int Px = 0; Px < W; ++Px)
+		{
+			const int Off = ((Y + Py) * (int)Image.m_Width + (X + Px)) * 4;
+			if(pData[Off + 3] == 0)
+				continue;
+
+			const float SrcR = pData[Off + 0] / 255.0f;
+			const float SrcG = pData[Off + 1] / 255.0f;
+			const float SrcB = pData[Off + 2] / 255.0f;
+			float OutR = SrcR;
+			float OutG = SrcG;
+			float OutB = SrcB;
+
+			switch(BlendMode)
+			{
+			case ASSETS_EDITOR_COLOR_BLEND_TEELIKE:
+			{
+				// Same approach as skin coloring: grayscale luma * tint color.
+				const float Luma = 0.2126f * SrcR + 0.7152f * SrcG + 0.0722f * SrcB;
+				OutR = Luma * Tint.r;
+				OutG = Luma * Tint.g;
+				OutB = Luma * Tint.b;
+				break;
+			}
+			case ASSETS_EDITOR_COLOR_BLEND_SCREEN:
+				OutR = 1.0f - (1.0f - SrcR) * (1.0f - Tint.r);
+				OutG = 1.0f - (1.0f - SrcG) * (1.0f - Tint.g);
+				OutB = 1.0f - (1.0f - SrcB) * (1.0f - Tint.b);
+				break;
+			case ASSETS_EDITOR_COLOR_BLEND_MULTIPLY:
+				OutR = SrcR * Tint.r;
+				OutG = SrcG * Tint.g;
+				OutB = SrcB * Tint.b;
+				break;
+			case ASSETS_EDITOR_COLOR_BLEND_OVERLAY:
+				OutR = AssetsEditorOverlayChannel(SrcR, Tint.r);
+				OutG = AssetsEditorOverlayChannel(SrcG, Tint.g);
+				OutB = AssetsEditorOverlayChannel(SrcB, Tint.b);
+				break;
+			default:
+				break;
+			}
+
+			OutR = mix(SrcR, OutR, Opacity);
+			OutG = mix(SrcG, OutG, Opacity);
+			OutB = mix(SrcB, OutB, Opacity);
+			pData[Off + 0] = (uint8_t)std::clamp(round_to_int(OutR * 255.0f), 0, 255);
+			pData[Off + 1] = (uint8_t)std::clamp(round_to_int(OutG * 255.0f), 0, 255);
+			pData[Off + 2] = (uint8_t)std::clamp(round_to_int(OutB * 255.0f), 0, 255);
+		}
+	}
+}
+
+void CMenus::AssetsEditorClearSlotCustomColor(int SlotIndex)
+{
+	if(SlotIndex < 0 || SlotIndex >= (int)m_AssetsEditorState.m_vPartSlots.size())
+		return;
+	SAssetsEditorPartSlot &Slot = m_AssetsEditorState.m_vPartSlots[SlotIndex];
+	Slot.m_UseCustomColor = false;
+	Slot.m_ColorBlendMode = ASSETS_EDITOR_COLOR_BLEND_TEELIKE;
+	Slot.m_ColorOpacity = 100;
+	m_AssetsEditorState.m_DirtyPreview = true;
+	m_AssetsEditorState.m_HasUnsavedChanges = true;
+}
+
+void CMenus::AssetsEditorOpenColorPopup(int SlotIndex, float X, float Y)
+{
+	if(SlotIndex < 0 || SlotIndex >= (int)m_AssetsEditorState.m_vPartSlots.size())
+		return;
+
+	SAssetsEditorPartSlot &Slot = m_AssetsEditorState.m_vPartSlots[SlotIndex];
+	Slot.m_UseCustomColor = true;
+	Slot.m_ColorOpacity = std::clamp(Slot.m_ColorOpacity, 0, 100);
+	Slot.m_ColorBlendMode = std::clamp(Slot.m_ColorBlendMode, 0, ASSETS_EDITOR_COLOR_BLEND_COUNT - 1);
+
+	gs_AssetsEditorColorPopup.m_pMenus = this;
+	gs_AssetsEditorColorPopup.m_SlotIndex = SlotIndex;
+	m_AssetsEditorState.m_ColorEditSlotIndex = SlotIndex;
+	m_AssetsEditorState.m_DirtyPreview = true;
+	m_AssetsEditorState.m_HasUnsavedChanges = true;
+
+	if(Ui()->IsPopupOpen(&gs_AssetsEditorColorPopup))
+		Ui()->ClosePopupMenu(&gs_AssetsEditorColorPopup);
+
+	constexpr float PopupWidth = 300.0f;
+	constexpr float PopupHeight = 285.0f;
+	Ui()->DoPopupMenu(&gs_AssetsEditorColorPopup, X, Y, PopupWidth, PopupHeight, &gs_AssetsEditorColorPopup, AssetsEditorPopupColorEditor);
+}
+
+CUi::EPopupMenuFunctionResult CMenus::AssetsEditorPopupColorEditor(void *pContext, CUIRect View, bool Active)
+{
+	SAssetsEditorColorPopupContext *pPopup = static_cast<SAssetsEditorColorPopupContext *>(pContext);
+	CMenus *pMenus = pPopup->m_pMenus;
+	if(pMenus == nullptr)
+		return CUi::POPUP_CLOSE_CURRENT;
+
+	if(pPopup->m_SlotIndex < 0 || pPopup->m_SlotIndex >= (int)pMenus->m_AssetsEditorState.m_vPartSlots.size())
+		return CUi::POPUP_CLOSE_CURRENT;
+
+	SAssetsEditorPartSlot &Slot = pMenus->m_AssetsEditorState.m_vPartSlots[pPopup->m_SlotIndex];
+	const unsigned PrevColor = Slot.m_CustomColor;
+	const int PrevBlend = Slot.m_ColorBlendMode;
+	const int PrevOpacity = Slot.m_ColorOpacity;
+	const bool PrevUse = Slot.m_UseCustomColor;
+
+	CUIRect Title, Colors, OpacityRow, Buttons;
+	View.HSplitTop(LineSize, &Title, &View);
+	pMenus->Ui()->DoLabel(&Title, Localize("Custom color"), FontSize, TEXTALIGN_ML);
+
+	View.HSplitTop(MarginExtraSmall, nullptr, &View);
+	View.HSplitTop(95.0f, &Colors, &View);
+	pMenus->RenderHslaScrollbars(&Colors, &Slot.m_CustomColor, false, ColorHSLA::DARKEST_LGT);
+
+	View.HSplitTop(MarginSmall, nullptr, &View);
+	CUIRect BlendLabelRow, BlendRow1, BlendRow2;
+	View.HSplitTop(LineSize * 0.9f, &BlendLabelRow, &View);
+	pMenus->Ui()->DoLabel(&BlendLabelRow, Localize("Blend mode"), FontSize * 0.9f, TEXTALIGN_ML);
+	View.HSplitTop(MarginExtraSmall, nullptr, &View);
+	View.HSplitTop(LineSize, &BlendRow1, &View);
+	View.HSplitTop(MarginExtraSmall, nullptr, &View);
+	View.HSplitTop(LineSize, &BlendRow2, &View);
+
+	auto DrawBlendButtonRow = [&](CUIRect Row, int ModeLeft, int ModeRight) {
+		CUIRect LeftButton, RightButton;
+		Row.VSplitMid(&LeftButton, &RightButton, 2.0f);
+		if(pMenus->DoButton_Menu(&pPopup->m_aBlendButtons[ModeLeft], AssetsEditorColorBlendModeName(ModeLeft), Slot.m_ColorBlendMode == ModeLeft, &LeftButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 3.0f, 0.0f,
+			   Slot.m_ColorBlendMode == ModeLeft ? ColorRGBA(1.0f, 1.0f, 1.0f, 0.65f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.35f)))
+		{
+			Slot.m_ColorBlendMode = ModeLeft;
+		}
+		if(pMenus->DoButton_Menu(&pPopup->m_aBlendButtons[ModeRight], AssetsEditorColorBlendModeName(ModeRight), Slot.m_ColorBlendMode == ModeRight, &RightButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 3.0f, 0.0f,
+			   Slot.m_ColorBlendMode == ModeRight ? ColorRGBA(1.0f, 1.0f, 1.0f, 0.65f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.35f)))
+		{
+			Slot.m_ColorBlendMode = ModeRight;
+		}
+	};
+	DrawBlendButtonRow(BlendRow1, ASSETS_EDITOR_COLOR_BLEND_TEELIKE, ASSETS_EDITOR_COLOR_BLEND_SCREEN);
+	DrawBlendButtonRow(BlendRow2, ASSETS_EDITOR_COLOR_BLEND_MULTIPLY, ASSETS_EDITOR_COLOR_BLEND_OVERLAY);
+
+	View.HSplitTop(MarginSmall, nullptr, &View);
+	View.HSplitTop(LineSize, &OpacityRow, &View);
+	Slot.m_ColorOpacity = std::clamp(Slot.m_ColorOpacity, 0, 100);
+	pMenus->Ui()->DoScrollbarOption(&pPopup->m_OpacityScrollbarId, &Slot.m_ColorOpacity, &OpacityRow, Localize("Opacity"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
+
+	View.HSplitTop(MarginSmall, nullptr, &View);
+	View.HSplitBottom(LineSize, nullptr, &Buttons);
+	CUIRect ClearButton, DoneButton;
+	Buttons.VSplitMid(&ClearButton, &DoneButton, MarginSmall);
+	if(pMenus->DoButton_Menu(&pPopup->m_ClearButton, Localize("Clear"), 0, &ClearButton))
+	{
+		pMenus->AssetsEditorClearSlotCustomColor(pPopup->m_SlotIndex);
+		pMenus->m_AssetsEditorState.m_ColorEditSlotIndex = -1;
+		return CUi::POPUP_CLOSE_CURRENT;
+	}
+	if(pMenus->DoButton_Menu(&pPopup->m_DoneButton, Localize("Done"), 0, &DoneButton) || (Active && pMenus->Ui()->ConsumeHotkey(CUi::HOTKEY_ENTER)))
+	{
+		pMenus->m_AssetsEditorState.m_ColorEditSlotIndex = -1;
+		return CUi::POPUP_CLOSE_CURRENT;
+	}
+
+	if(PrevColor != Slot.m_CustomColor || PrevBlend != Slot.m_ColorBlendMode || PrevOpacity != Slot.m_ColorOpacity || PrevUse != Slot.m_UseCustomColor)
+	{
+		Slot.m_UseCustomColor = true;
+		pMenus->m_AssetsEditorState.m_DirtyPreview = true;
+		pMenus->m_AssetsEditorState.m_HasUnsavedChanges = true;
+		pMenus->AssetsEditorUpdatePreviewIfDirty();
+	}
+
+	return CUi::POPUP_KEEP_OPEN;
+}
+
 bool CMenus::AssetsEditorComposeImage(CImageInfo &OutputImage)
 {
 	const auto &vAssets = m_AssetsEditorState.m_avAssets[m_AssetsEditorState.m_Type];
@@ -983,23 +1208,15 @@ bool CMenus::AssetsEditorComposeImage(CImageInfo &OutputImage)
 
 	for(const auto &Slot : m_AssetsEditorState.m_vPartSlots)
 	{
-		if(str_comp(Slot.m_aSourceAsset, MainAsset.m_aName) == 0 &&
+		const bool NeedsCopy = !(str_comp(Slot.m_aSourceAsset, MainAsset.m_aName) == 0 &&
 			Slot.m_SrcX == Slot.m_DstX && Slot.m_SrcY == Slot.m_DstY &&
-			Slot.m_SrcW == Slot.m_DstW && Slot.m_SrcH == Slot.m_DstH)
+			Slot.m_SrcW == Slot.m_DstW && Slot.m_SrcH == Slot.m_DstH);
+		if(!NeedsCopy && !Slot.m_UseCustomColor)
 			continue;
-
-		const CImageInfo *pDonorImage = GetPreparedDonor(Slot.m_aSourceAsset);
-		if(pDonorImage == nullptr)
-		{
-			++SkippedSlots;
-			continue;
-		}
 
 		const int DestGridW = OutputImage.m_Width / GridX;
 		const int DestGridH = OutputImage.m_Height / GridY;
-		const int SrcGridW = pDonorImage->m_Width / GridX;
-		const int SrcGridH = pDonorImage->m_Height / GridY;
-		if(DestGridW <= 0 || DestGridH <= 0 || SrcGridW <= 0 || SrcGridH <= 0 || Slot.m_DstW <= 0 || Slot.m_DstH <= 0 || Slot.m_SrcW <= 0 || Slot.m_SrcH <= 0)
+		if(DestGridW <= 0 || DestGridH <= 0 || Slot.m_DstW <= 0 || Slot.m_DstH <= 0)
 		{
 			++SkippedSlots;
 			continue;
@@ -1009,21 +1226,48 @@ bool CMenus::AssetsEditorComposeImage(CImageInfo &OutputImage)
 		const int DestY = Slot.m_DstY * DestGridH;
 		const int DestW = Slot.m_DstW * DestGridW;
 		const int DestH = Slot.m_DstH * DestGridH;
-		const int SrcX = Slot.m_SrcX * SrcGridW;
-		const int SrcY = Slot.m_SrcY * SrcGridH;
-		const int SrcW = Slot.m_SrcW * SrcGridW;
-		const int SrcH = Slot.m_SrcH * SrcGridH;
-		if(DestW <= 0 || DestH <= 0 || SrcW <= 0 || SrcH <= 0)
+		if(DestW <= 0 || DestH <= 0)
 		{
 			++SkippedSlots;
 			continue;
 		}
 
-		if(!AssetsEditorCopyRectScaledNearest(OutputImage, *pDonorImage, DestX, DestY, DestW, DestH, SrcX, SrcY, SrcW, SrcH))
+		if(NeedsCopy)
 		{
-			++SkippedSlots;
-			continue;
+			const CImageInfo *pDonorImage = GetPreparedDonor(Slot.m_aSourceAsset);
+			if(pDonorImage == nullptr)
+			{
+				++SkippedSlots;
+				continue;
+			}
+
+			const int SrcGridW = pDonorImage->m_Width / GridX;
+			const int SrcGridH = pDonorImage->m_Height / GridY;
+			if(SrcGridW <= 0 || SrcGridH <= 0 || Slot.m_SrcW <= 0 || Slot.m_SrcH <= 0)
+			{
+				++SkippedSlots;
+				continue;
+			}
+
+			const int SrcX = Slot.m_SrcX * SrcGridW;
+			const int SrcY = Slot.m_SrcY * SrcGridH;
+			const int SrcW = Slot.m_SrcW * SrcGridW;
+			const int SrcH = Slot.m_SrcH * SrcGridH;
+			if(SrcW <= 0 || SrcH <= 0)
+			{
+				++SkippedSlots;
+				continue;
+			}
+
+			if(!AssetsEditorCopyRectScaledNearest(OutputImage, *pDonorImage, DestX, DestY, DestW, DestH, SrcX, SrcY, SrcW, SrcH))
+			{
+				++SkippedSlots;
+				continue;
+			}
 		}
+
+		if(Slot.m_UseCustomColor)
+			AssetsEditorColorizeRect(OutputImage, DestX, DestY, DestW, DestH, Slot);
 	}
 
 	for(auto &Prepared : vPreparedDonors)
@@ -1127,6 +1371,10 @@ void CMenus::AssetsEditorRequestClose()
 
 void CMenus::AssetsEditorCloseNow()
 {
+	if(Ui()->IsPopupOpen(&gs_AssetsEditorColorPopup))
+		Ui()->ClosePopupMenu(&gs_AssetsEditorColorPopup);
+	if(Ui()->IsPopupOpen(&gs_AssetsEditorContextMenu))
+		Ui()->ClosePopupMenu(&gs_AssetsEditorContextMenu);
 	m_AssetsEditorState.m_VisualsEditorOpen = false;
 	m_AssetsEditorState.m_PendingCloseRequest = false;
 	m_AssetsEditorState.m_ShowExitConfirm = false;
@@ -1406,6 +1654,8 @@ void CMenus::AssetsEditorRenderCanvas(const CUIRect &Rect, IGraphics::CTextureHa
 		const bool IsHighlighted = (int)SlotIndex == HighlightSlot;
 		if(IsHighlighted)
 			Graphics()->SetColor(1.0f, 0.85f, 0.2f, 0.95f);
+		else if(Slot.m_UseCustomColor)
+			Graphics()->SetColor(0.55f, 0.85f, 1.0f, ShowGrid ? 0.55f : 0.7f);
 		else
 			Graphics()->SetColor(1.0f, 1.0f, 1.0f, ShowGrid ? 0.16f : 0.24f);
 
@@ -1623,26 +1873,68 @@ void CMenus::RenderAssetsEditorScreen(CUIRect MainView)
 	if(HasTargetFitted)
 		m_AssetsEditorState.m_HoveredTargetSlotIndex = AssetsEditorResolveHoveredSlotWithCycle(TargetFittedRect, m_AssetsEditorState.m_Type, m_AssetsEditorState.m_vPartSlots, MousePos, false, m_AssetsEditorState.m_ActiveDraggedSlotIndex);
 
-	if(!m_AssetsEditorState.m_ShowExitConfirm && !m_AssetsEditorState.m_DragActive && ClickedRmb && m_AssetsEditorState.m_HoveredTargetSlotIndex >= 0)
+	if(!m_AssetsEditorState.m_ShowExitConfirm && !m_AssetsEditorState.m_DragActive && ClickedRmb && m_AssetsEditorState.m_HoveredTargetSlotIndex >= 0 && !Ui()->IsPopupOpen())
 	{
-		auto ResetSlotToMain = [&](int SlotIndex) {
-			if(SlotIndex < 0 || SlotIndex >= (int)m_AssetsEditorState.m_vPartSlots.size())
-				return;
-			SAssetsEditorPartSlot &Slot = m_AssetsEditorState.m_vPartSlots[SlotIndex];
-			str_copy(Slot.m_aSourceAsset, pMainName);
-			Slot.m_SourceSpriteId = Slot.m_SpriteId;
-			Slot.m_SrcX = Slot.m_DstX;
-			Slot.m_SrcY = Slot.m_DstY;
-			Slot.m_SrcW = Slot.m_DstW;
-			Slot.m_SrcH = Slot.m_DstH;
+		m_AssetsEditorState.m_ContextMenuSlotIndex = m_AssetsEditorState.m_HoveredTargetSlotIndex;
+		gs_AssetsEditorContextMenu.Reset();
+		gs_AssetsEditorContextMenu.m_pScrollRegion = &gs_AssetsEditorContextMenuScroll;
+		gs_AssetsEditorContextMenu.m_Width = 190.0f;
+		gs_AssetsEditorContextMenu.m_EntryHeight = 18.0f;
+		gs_AssetsEditorContextMenu.m_FontSize = 12.0f;
+		gs_AssetsEditorContextMenu.m_vEntries = {
+			Localize("Custom color"),
+			Localize("Clear custom color"),
+			Localize("Reset part to main"),
 		};
-		ResetSlotToMain(m_AssetsEditorState.m_HoveredTargetSlotIndex);
-		AssetsEditorCancelDrag();
-		m_AssetsEditorState.m_DirtyPreview = true;
-		m_AssetsEditorState.m_HasUnsavedChanges = true;
-		str_copy(m_AssetsEditorState.m_aStatusMessage, Localize("Part reset to main asset."));
-		m_AssetsEditorState.m_StatusIsError = false;
+		Ui()->ShowPopupSelection(Ui()->MouseX(), Ui()->MouseY(), &gs_AssetsEditorContextMenu);
 	}
+
+	if(gs_AssetsEditorContextMenu.m_SelectionIndex >= 0 && m_AssetsEditorState.m_ContextMenuSlotIndex >= 0)
+	{
+		const int SlotIndex = m_AssetsEditorState.m_ContextMenuSlotIndex;
+		const int Selection = gs_AssetsEditorContextMenu.m_SelectionIndex;
+		gs_AssetsEditorContextMenu.m_SelectionIndex = -1;
+		gs_AssetsEditorContextMenu.m_pSelection = nullptr;
+		m_AssetsEditorState.m_ContextMenuSlotIndex = -1;
+
+		if(SlotIndex >= 0 && SlotIndex < (int)m_AssetsEditorState.m_vPartSlots.size())
+		{
+			if(Selection == 0)
+			{
+				AssetsEditorOpenColorPopup(SlotIndex, Ui()->MouseX(), Ui()->MouseY());
+				str_copy(m_AssetsEditorState.m_aStatusMessage, Localize("Custom color enabled for part."));
+				m_AssetsEditorState.m_StatusIsError = false;
+			}
+			else if(Selection == 1)
+			{
+				AssetsEditorClearSlotCustomColor(SlotIndex);
+				str_copy(m_AssetsEditorState.m_aStatusMessage, Localize("Custom color cleared."));
+				m_AssetsEditorState.m_StatusIsError = false;
+			}
+			else if(Selection == 2)
+			{
+				SAssetsEditorPartSlot &Slot = m_AssetsEditorState.m_vPartSlots[SlotIndex];
+				str_copy(Slot.m_aSourceAsset, pMainName);
+				Slot.m_SourceSpriteId = Slot.m_SpriteId;
+				Slot.m_SrcX = Slot.m_DstX;
+				Slot.m_SrcY = Slot.m_DstY;
+				Slot.m_SrcW = Slot.m_DstW;
+				Slot.m_SrcH = Slot.m_DstH;
+				AssetsEditorCancelDrag();
+				m_AssetsEditorState.m_DirtyPreview = true;
+				m_AssetsEditorState.m_HasUnsavedChanges = true;
+				str_copy(m_AssetsEditorState.m_aStatusMessage, Localize("Part reset to main asset."));
+				m_AssetsEditorState.m_StatusIsError = false;
+			}
+		}
+	}
+	else if(m_AssetsEditorState.m_ContextMenuSlotIndex >= 0 && !Ui()->IsPopupOpen(&gs_AssetsEditorContextMenu))
+	{
+		m_AssetsEditorState.m_ContextMenuSlotIndex = -1;
+	}
+
+	if(m_AssetsEditorState.m_ColorEditSlotIndex >= 0 && !Ui()->IsPopupOpen(&gs_AssetsEditorColorPopup))
+		m_AssetsEditorState.m_ColorEditSlotIndex = -1;
 
 	const bool SingleCandidateUnderCursor = m_AssetsEditorState.m_vHoverCycleCandidates.size() <= 1;
 	const bool StartDragNow = Ui()->MouseButton(0) && (!ClickedLmb || SingleCandidateUnderCursor);
@@ -1823,7 +2115,7 @@ void CMenus::RenderAssetsEditorScreen(CUIRect MainView)
 		m_AssetsEditorState.m_ShowExitConfirm = false;
 		AssetsEditorResetPartSlots();
 	}
-	const char *pHintMessage = m_AssetsEditorState.m_DragActive ? Localize("Drop on right canvas to replace one part.") : Localize("Drag from left to right. Right-click a Frankenstein part to reset it.");
+	const char *pHintMessage = m_AssetsEditorState.m_DragActive ? Localize("Drop on right canvas to replace one part.") : Localize("Drag from left to right. Right-click a part for color/reset.");
 	static CButtonContainer s_ResetAllPartsButton;
 	if(DoButton_Menu(&s_ResetAllPartsButton, Localize("Reset All"), 0, &ResetAllButton))
 	{
@@ -1835,6 +2127,9 @@ void CMenus::RenderAssetsEditorScreen(CUIRect MainView)
 			Slot.m_SrcY = Slot.m_DstY;
 			Slot.m_SrcW = Slot.m_DstW;
 			Slot.m_SrcH = Slot.m_DstH;
+			Slot.m_UseCustomColor = false;
+			Slot.m_ColorBlendMode = ASSETS_EDITOR_COLOR_BLEND_TEELIKE;
+			Slot.m_ColorOpacity = 100;
 		}
 		AssetsEditorCancelDrag();
 		m_AssetsEditorState.m_DirtyPreview = true;

@@ -32,9 +32,6 @@ int unsigned *CSkins7::ms_apColorVariables[NUM_DUMMIES][protocol7::NUM_SKINPARTS
 
 #define SKINS_DIR "skins7"
 
-// TODO: uncomment
-// const float MIN_EYE_BODY_COLOR_DIST = 80.f; // between body and eyes (LAB color space)
-
 void CSkins7::CSkinPart::ApplyTo(CTeeRenderInfo::CSixup &SixupRenderInfo) const
 {
 	SixupRenderInfo.m_aOriginalTextures[m_Type] = m_OriginalTexture;
@@ -141,6 +138,21 @@ bool CSkins7::LoadSkinPart(int PartType, const char *pName, int DirType)
 		log_error("skins7", "Failed to load skin part '%s/%s': must be RGBA format", CSkins7::ms_apSkinPartNames[PartType], pName);
 		Info.Free();
 		return false;
+	}
+
+	// Same VRAM guard as 0.6 skins: downscale oversized custom parts.
+	const size_t MaxWidth = (size_t)g_Config.m_ClSkinMaxWidth;
+	if(Info.m_Width > MaxWidth)
+	{
+		size_t NewWidth = MaxWidth;
+		size_t NewHeight = (NewWidth * Info.m_Height) / Info.m_Width;
+		if(NewWidth < 1)
+			NewWidth = 1;
+		if(NewHeight < 1)
+			NewHeight = 1;
+		log_info("skins7", "Downscaling skin part '%s/%s' from %" PRIzu "x%" PRIzu " to %" PRIzu "x%" PRIzu,
+			CSkins7::ms_apSkinPartNames[PartType], pName, Info.m_Width, Info.m_Height, NewWidth, NewHeight);
+		ResizeImage(Info, NewWidth, NewHeight);
 	}
 
 	CSkinPart Part;

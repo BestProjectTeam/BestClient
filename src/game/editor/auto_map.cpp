@@ -12,7 +12,6 @@
 #include <game/editor/mapitems/map.h>
 #include <game/mapitems.h>
 
-#include <cinttypes>
 #include <cstdio> // sscanf
 
 // Based on triple32inc from https://github.com/skeeto/hash-prospector/tree/79a6074062a84907df6e45b756134b74e2956760
@@ -156,9 +155,7 @@ void CAutoMapper::Load(const char *pTileName)
 				{
 					Value = CPosRule::NOTINDEX;
 					CIndexInfo NewIndexInfo1 = {0, 0, false};
-					// CIndexInfo NewIndexInfo2 = {-1, 0};
 					vNewIndexList.push_back(NewIndexInfo1);
-					// vNewIndexList.push_back(NewIndexInfo2);
 				}
 				else if(!str_comp(aValue, "INDEX") || !str_comp(aValue, "NOTINDEX"))
 				{

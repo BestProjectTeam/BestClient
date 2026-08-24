@@ -76,17 +76,13 @@ int BcInputs::PredictionTicks(float OffsetTicks)
 {
 	if(OffsetTicks <= 0.0f)
 		return 0;
-	if(g_Config.m_BcInputs == BC_INPUTS_SAIKO)
-		return (int)std::ceil(OffsetTicks + 1.0f);
+	// Saiko previously used ceil(offset+1) for an old FinalTickSelf display path; keep the
+	// horizon aligned with ApplyOffset so fallback cores are not ~1 tick ahead of the sample.
 	return (int)std::ceil(OffsetTicks);
 }
 
 int BcInputs::PredictionTicksOthers(float OffsetTicks)
 {
-	if(OffsetTicks <= 0.0f)
-		return 0;
-	if(g_Config.m_BcInputs == BC_INPUTS_SAIKO)
-		return (int)std::ceil(OffsetTicks);
 	return PredictionTicks(OffsetTicks);
 }
 

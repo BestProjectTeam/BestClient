@@ -1199,38 +1199,6 @@ int CCollision::IntersectNoLaserNoWalls(vec2 Pos0, vec2 Pos1, vec2 *pOutCollisio
 	return 0;
 }
 
-int CCollision::IntersectAir(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2 *pOutBeforeCollision) const
-{
-	float Distance = distance(Pos0, Pos1);
-	vec2 Last = Pos0;
-
-	const int DistanceRounded = std::ceil(Distance);
-	for(int i = 0; i < DistanceRounded; i++)
-	{
-		float a = (float)i / Distance;
-		vec2 Pos = mix(Pos0, Pos1, a);
-		if(IsSolid(round_to_int(Pos.x), round_to_int(Pos.y)) || (!GetTile(round_to_int(Pos.x), round_to_int(Pos.y)) && !GetFrontTile(round_to_int(Pos.x), round_to_int(Pos.y))))
-		{
-			if(pOutCollision)
-				*pOutCollision = Pos;
-			if(pOutBeforeCollision)
-				*pOutBeforeCollision = Last;
-			if(!GetTile(round_to_int(Pos.x), round_to_int(Pos.y)) && !GetFrontTile(round_to_int(Pos.x), round_to_int(Pos.y)))
-				return -1;
-			else if(!GetTile(round_to_int(Pos.x), round_to_int(Pos.y)))
-				return GetTile(round_to_int(Pos.x), round_to_int(Pos.y));
-			else
-				return GetFrontTile(round_to_int(Pos.x), round_to_int(Pos.y));
-		}
-		Last = Pos;
-	}
-	if(pOutCollision)
-		*pOutCollision = Pos1;
-	if(pOutBeforeCollision)
-		*pOutBeforeCollision = Pos1;
-	return 0;
-}
-
 int CCollision::IsTimeCheckpoint(int Index) const
 {
 	if(Index < 0)

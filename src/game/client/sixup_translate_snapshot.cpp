@@ -220,8 +220,6 @@ int CGameClient::TranslateSnap(CSnapshot *pSnapDstSix, CSnapshot *pSnapSrcSeven,
 			// used for blinking the flags in the hud
 			// but that already works the 0.6 way
 			// and is covered by the NETOBJTYPE_GAMEDATA translation
-			// pFlag7->m_FlagDropTickRed;
-			// pFlag7->m_FlagDropTickBlue;
 		}
 		else if(pItem7->Type() == protocol7::NETOBJTYPE_CHARACTER)
 		{

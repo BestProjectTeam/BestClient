@@ -24,8 +24,6 @@ class CEditorSound;
 class CLayerFront;
 class CLayerGroup;
 class CLayerGame;
-class CLayerImage;
-class CLayerSound;
 class CLayerSpeedup;
 class CLayerSwitch;
 class CLayerTele;

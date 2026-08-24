@@ -3,7 +3,6 @@
 
 #include "editor.h"
 
-#include "auto_map.h"
 #include "editor_actions.h"
 
 #include <base/color.h>
@@ -28,7 +27,6 @@
 #include <game/client/gameclient.h>
 #include <game/client/lineinput.h>
 #include <game/client/ui.h>
-#include <game/client/ui_listbox.h>
 #include <game/client/ui_scrollregion.h>
 #include <game/editor/editor_history.h>
 #include <game/editor/explanations.h>
@@ -37,7 +35,6 @@
 #include <game/localization.h>
 
 #include <algorithm>
-#include <chrono>
 #include <iterator>
 #include <limits>
 #include <type_traits>
@@ -3739,6 +3736,19 @@ void CEditor::RenderLayers(CUIRect LayersBox)
 
 		s_ScrollToSelectionNext = true;
 	}
+	if(Input()->ModifierIsPressed() && !Input()->ShiftIsPressed() && m_Dialog == DIALOG_NONE && !Ui()->IsPopupOpen() && CLineInput::GetActiveInput() == nullptr && State.m_Operation == ELayerOperation::NONE)
+	{
+		if(Input()->KeyPress(KEY_MOUSE_WHEEL_DOWN))
+		{
+			Map()->SelectNextLayer();
+			State.m_ScrollToSelectionNext = true;
+		}
+		if(Input()->KeyPress(KEY_MOUSE_WHEEL_UP))
+		{
+			Map()->SelectPreviousLayer();
+			State.m_ScrollToSelectionNext = true;
+		}
+	}
 
 	CUIRect AddGroupButton, CollapseAllButton;
 	LayersBox.HSplitTop(RowHeight + 1.0f, &AddGroupButton, &LayersBox);
@@ -6759,7 +6769,7 @@ void CEditor::Render()
 				MapView()->ResetZoom();
 		}
 
-		if(m_pBrush->IsEmpty() || !Input()->ShiftIsPressed())
+		if(!Input()->ModifierIsPressed() && (m_pBrush->IsEmpty() || !Input()->ShiftIsPressed()))
 		{
 			if(Input()->KeyPress(KEY_MOUSE_WHEEL_DOWN))
 				MapView()->Zoom()->ChangeValue(20.0f);

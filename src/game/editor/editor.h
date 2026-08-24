@@ -13,7 +13,6 @@
 #include "quad_art.h"
 #include "smooth_value.h"
 
-#include <base/bezier.h>
 #include <base/fs.h>
 
 #include <engine/editor.h>

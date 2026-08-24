@@ -44,7 +44,6 @@ void CEffects::AirJump(vec2 Pos, float Alpha, float Volume)
 	p.m_Rotspeed = pi * 2.0f;
 	p.m_Gravity = 500.0f;
 	p.m_Friction = 0.7f;
-	p.m_FlowAffected = 0.0f;
 	p.m_Color.a = Alpha;
 	p.m_StartAlpha = Alpha;
 	GameClient()->m_Particles.Add(CParticles::GROUP_GENERAL, &p);
@@ -78,7 +77,6 @@ void CEffects::PowerupShine(vec2 Pos, vec2 Size, float Alpha)
 	p.m_Rotspeed = pi * 2.0f;
 	p.m_Gravity = 500.0f;
 	p.m_Friction = 0.9f;
-	p.m_FlowAffected = 0.0f;
 	p.m_Color.a = Alpha;
 	p.m_StartAlpha = Alpha;
 	GameClient()->m_Particles.Add(CParticles::GROUP_GENERAL, &p);
@@ -107,7 +105,6 @@ void CEffects::FreezingFlakes(vec2 Pos, vec2 Size, float Alpha)
 	p.m_Rotspeed = pi;
 	p.m_Gravity = random_float(250.0f);
 	p.m_Friction = 0.9f;
-	p.m_FlowAffected = 0.0f;
 	p.m_Collides = false;
 	p.m_Color.a = Alpha;
 	p.m_StartAlpha = Alpha;
@@ -399,6 +396,8 @@ void CEffects::Explosion(vec2 Pos, float Alpha)
 		p.m_StartAlpha = p.m_Color.a;
 		GameClient()->m_Particles.Add(CParticles::GROUP_GENERAL, &p);
 	}
+
+	GameClient()->m_PhysicBalls.OnExplosion(Pos, Alpha == 1.0f);
 }
 
 void CEffects::HammerHit(vec2 Pos, float Alpha, float Volume, bool OtherPlayer)

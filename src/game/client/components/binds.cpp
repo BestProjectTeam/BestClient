@@ -9,8 +9,6 @@
 #include <engine/console.h>
 #include <engine/shared/config.h>
 
-#include <game/client/components/chat.h>
-#include <game/client/components/console.h>
 #include <game/client/gameclient.h>
 
 static constexpr LOG_COLOR BIND_PRINT_COLOR{255, 255, 204};
@@ -323,8 +321,8 @@ void CBinds::SetDefaults()
 
 	Bind(KEY_K, "kill");
 	Bind(KEY_J, "toggle_admin_panel");
-	Bind(KEY_Q, "say /spec");
-	Bind(KEY_P, "say /pause");
+	Bind(KEY_Q, "say /pause");
+	Bind(KEY_P, "say /spec");
 
 	g_Config.m_ClDDRaceBindsSet = 0;
 	SetDDRaceBinds(false);

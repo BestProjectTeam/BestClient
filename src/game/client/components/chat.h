@@ -367,6 +367,8 @@ public:
 
 	bool IsActive() const { return m_Mode != MODE_NONE; }
 	void AddLine(int ClientId, int Team, const char *pLine);
+	// Client-side colored chat line without the "— " prefix (e.g. Twitch relay).
+	void AddColoredLine(const char *pLine, ColorRGBA Color);
 	const char *FilterText(const char *pMessage, int ClientId = -2, bool IsChat = false);
 	void EnableMode(int Team);
 	void DisableMode();

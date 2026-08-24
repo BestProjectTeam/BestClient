@@ -806,6 +806,5 @@ void CLineInputNumber::SetFloat(float Number)
 
 float CLineInputNumber::GetFloat() const
 {
-	// return str_tofloat(GetString());
 	return (float)te_interp(GetString(), nullptr);
 }

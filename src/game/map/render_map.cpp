@@ -8,8 +8,6 @@
 #include <engine/graphics.h>
 #include <engine/map.h>
 #include <engine/shared/config.h>
-#include <engine/shared/datafile.h>
-#include <engine/shared/map.h>
 #include <engine/textrender.h>
 
 #include <generated/client_data.h>
@@ -111,19 +109,9 @@ void CMapBasedEnvelopePointAccess::SetPointsRange(int StartPoint, int NumPoints)
 	m_NumPoints = std::clamp(NumPoints, 0, maximum(m_NumPointsMax - StartPoint, 0));
 }
 
-int CMapBasedEnvelopePointAccess::StartPoint() const
-{
-	return m_StartPoint;
-}
-
 int CMapBasedEnvelopePointAccess::NumPoints() const
 {
 	return m_NumPoints;
-}
-
-int CMapBasedEnvelopePointAccess::NumPointsMax() const
-{
-	return m_NumPointsMax;
 }
 
 const CEnvPoint *CMapBasedEnvelopePointAccess::GetPoint(int Index) const

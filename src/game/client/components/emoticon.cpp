@@ -15,8 +15,7 @@
 
 #include <algorithm>
 
-// Hit radius (and dead zone for emote/eye-emote selection) for the switch-to-gif-wheel button in
-// the middle of the wheel. Must match the s_InnerMouseLimitRadius used below in OnRender.
+// Dead zone radius in the middle of the wheel (no emote / eye-emote selection).
 static constexpr float EMOTICON_CENTER_RADIUS = 40.0f;
 
 CEmoticon::CEmoticon()
@@ -48,12 +47,8 @@ void CEmoticon::ConKeyEmoticon(IConsole::IResult *pResult, void *pUserData)
 	if(pSelf->GameClient()->m_BindWheel.IsActive() || pSelf->GameClient()->m_GifWheel.IsActive())
 		return;
 
-	// Remember which wheel was showing last time and open straight into it again, instead of
-	// always starting on emotes.
-	if(pSelf->m_PreferGifWheel)
-		pSelf->GameClient()->m_GifWheel.Activate();
-	else
-		pSelf->m_Active = true;
+	pSelf->m_PreferGifWheel = false;
+	pSelf->m_Active = true;
 }
 
 void CEmoticon::ConEmote(IConsole::IResult *pResult, void *pUserData)
@@ -103,17 +98,6 @@ bool CEmoticon::OnInput(const IInput::CEvent &Event)
 
 	if(Event.m_Flags & IInput::FLAG_PRESS && Event.m_Key == KEY_ESCAPE)
 	{
-		OnRelease();
-		return true;
-	}
-
-	// Aiming at dead center (no emote/eye-emote selected either way) and clicking switches to
-	// the gif wheel, staying within the same held-key session.
-	const float WheelScale = std::clamp(g_Config.m_BcWheelScale / 100.0f, 0.5f, 2.0f);
-	if(Event.m_Flags & IInput::FLAG_PRESS && Event.m_Key == KEY_MOUSE_1 && length(m_SelectorMouse) < EMOTICON_CENTER_RADIUS * WheelScale)
-	{
-		m_PreferGifWheel = true;
-		GameClient()->m_GifWheel.Activate();
 		OnRelease();
 		return true;
 	}
@@ -321,22 +305,6 @@ void CEmoticon::OnRender()
 	}
 	else
 		m_SelectedEyeEmote = -1;
-
-	// Switch-to-gif-wheel button, dead center - drawn on top of the eye wheel's own small
-	// center circle when that's shown, or standalone when it's not.
-	{
-		const float ButtonRadius = 22.0f * WheelScale;
-		Graphics()->TextureClear();
-		Graphics()->QuadsBegin();
-		Graphics()->SetColor(0.0f, 0.0f, 0.0f, 0.6f * aAnimationPhase[0]);
-		Graphics()->DrawCircle(ScreenCenter.x, ScreenCenter.y, ButtonRadius * aAnimationPhase[0], 32);
-		Graphics()->QuadsEnd();
-
-		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.95f * aAnimationPhase[0]);
-		CUIRect CenterButtonRect{ScreenCenter.x - ButtonRadius, ScreenCenter.y - 7.0f * WheelScale, ButtonRadius * 2.0f, 14.0f * WheelScale};
-		Ui()->DoLabel(&CenterButtonRect, "GIF", 12.0f * WheelScale * aAnimationPhase[0], TEXTALIGN_MC);
-		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
-	}
 
 	RenderTools()->RenderCursor(ScreenCenter + m_SelectorMouse, 24.0f * WheelScale, aAnimationPhase[0]);
 }

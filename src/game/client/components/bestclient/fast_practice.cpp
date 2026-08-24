@@ -959,13 +959,14 @@ void CFastPractice::StoreInput(const CNetObj_PlayerInput &Input, bool Dummy)
 const CNetObj_PlayerInput *CFastPractice::GetStoredInput(int Tick, bool Dummy) const
 {
 	const int Index = Dummy ? 1 : 0;
+	const SStoredInput *pBest = nullptr;
 	for(int i = 0; i < INPUT_HISTORY_SIZE; i++)
 	{
 		const SStoredInput &Slot = m_aaStoredInputs[Index][i];
-		if(Slot.m_Tick == Tick)
-			return &Slot.m_Input;
+		if(Slot.m_Tick >= 0 && Slot.m_Tick <= Tick && (!pBest || pBest->m_Tick < Slot.m_Tick))
+			pBest = &Slot;
 	}
-	return nullptr;
+	return pBest ? &pBest->m_Input : nullptr;
 }
 
 void CFastPractice::BuildLiveInput(CNetObj_PlayerInput &OutInput, bool Dummy) const
@@ -1365,20 +1366,16 @@ void CFastPractice::TickPracticeWorld()
 
 		if(pDummyChar && g_Config.m_ClDummyHammer)
 		{
-			// Match vanilla hammerfly: reuse m_HammerInput (Fire only advances in OnSnapInput
-			// every ~25 sends). Applying the same Fire value across ticks/repredicts does not
-			// create new CountInput presses — unlike inventing Tick%25 edges on fast-input
-			// overrun ticks, which were replayed every frame then discarded on restore, so the
-			// dummy looked like it was spamming hammer without actually flying.
-			DummyNeutralizedInput = GameClient()->m_HammerInput;
-			DummyNeutralizedInput.m_WantedWeapon = WEAPON_HAMMER + 1;
-			DummyNeutralizedInput.m_PlayerFlags = PLAYERFLAG_PLAYING;
+			// Keep the tick-local hammer input from the vanilla send cadence. The input
+			// history uses carry-forward semantics, so sparse dummy packets do not turn
+			// into repeated fire edges during fast-input prediction.
+			DummyNeutralizedInput = pDummyInputData ? *pDummyInputData : CNetObj_PlayerInput{};
+			pDummyInputData = &DummyNeutralizedInput;
 			const vec2 Dir = pLocalChar->Core()->m_Pos - pDummyChar->Core()->m_Pos;
 			DummyNeutralizedInput.m_TargetX = (int)Dir.x;
 			DummyNeutralizedInput.m_TargetY = (int)Dir.y;
 			if(DummyNeutralizedInput.m_TargetX == 0 && DummyNeutralizedInput.m_TargetY == 0)
 				DummyNeutralizedInput.m_TargetY = -1;
-			pDummyInputData = &DummyNeutralizedInput;
 		}
 
 		const bool DummyFirst = pInputData && pDummyInputData && pDummyChar && pDummyChar->GetCid() < pLocalChar->GetCid();

@@ -2949,6 +2949,9 @@ void CClient::Update()
 					(g_Config.m_BcInputs == BC_INPUTS_DELTA && g_Config.m_BcDeltaInputAmount > 0) ||
 					(g_Config.m_BcInputs == BC_INPUTS_F && g_Config.m_BcFInputAmount > 0) ||
 					(g_Config.m_BcInputs == BC_INPUTS_CLOUD && g_Config.m_BcCloudInputAmount > 0);
+				// Saiko/Cloud: always repredict so mid-tick aim/hooks stay live.
+				// Safe for cloud again: ClAntiPingSmooth is skipped while cloud is active, so the
+				// old every-frame repredict + smooth feedback loop (snap-rate visuals) cannot return.
 				if(HasFastInput && (g_Config.m_BcInputs == BC_INPUTS_SAIKO || g_Config.m_BcInputs == BC_INPUTS_CLOUD))
 				{
 					GameClient()->CheckNewInput();
@@ -4893,6 +4896,17 @@ int main(int argc, const char **argv)
 	dbg_assert_set_handler([MainThreadId, pClient](const char *pMsg) {
 		if(MainThreadId != std::this_thread::get_id())
 			return;
+
+		// Auto-reset skin quality on Out of VRAM so the next launch does not crash again.
+		const bool OutOfVram = str_find_nocase(pMsg, "Out of VRAM") != nullptr;
+		const bool ResetSkinQuality = OutOfVram && g_Config.m_ClSkinMaxWidth > 1024 && pClient->ConfigManager() != nullptr;
+		if(ResetSkinQuality)
+		{
+			log_error("client", "Out of VRAM with cl_skin_max_width=%d, resetting to 1024", g_Config.m_ClSkinMaxWidth);
+			g_Config.m_ClSkinMaxWidth = 1024;
+			pClient->ConfigManager()->Save();
+		}
+
 		char aOsVersionString[128];
 		if(!os_version_str(aOsVersionString, sizeof(aOsVersionString)))
 		{
@@ -4909,6 +4923,7 @@ int main(int argc, const char **argv)
 #endif
 			" which you should find in the 'dumps' folder in your config directory.\n\n"
 			"%s\n\n"
+			"%s"
 			"Platform: %s (%s)\n"
 			"Configuration: base"
 #if defined(CONF_AUTOUPDATE)
@@ -4934,6 +4949,7 @@ int main(int argc, const char **argv)
 			"OS version: %s\n\n"
 			"%s", // GPU info
 			pMsg,
+			ResetSkinQuality ? "Skin quality was reset to 1024px to prevent this crash on the next launch.\n\n" : "",
 			CONF_PLATFORM_STRING, CONF_ARCH_ENDIAN_STRING,
 			GAME_NAME, GAME_RELEASE_VERSION, GIT_SHORTREV_HASH != nullptr ? GIT_SHORTREV_HASH : "",
 			aOsVersionString,

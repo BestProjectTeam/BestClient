@@ -21,7 +21,6 @@
 #include <game/mapitems.h>
 
 #include <algorithm>
-#include <utility>
 
 //////////////////////////////////////////////////
 // game world
@@ -297,28 +296,6 @@ CEntity *CGameWorld::IntersectEntity(vec2 Pos0, vec2 Pos1, float Radius, int Typ
 	}
 
 	return pClosest;
-}
-
-std::vector<CCharacter *> CGameWorld::IntersectedCharacters(vec2 Pos0, vec2 Pos1, float Radius, const CEntity *pNotThis)
-{
-	std::vector<CCharacter *> vpCharacters;
-	CCharacter *pChr = (CCharacter *)FindFirst(CGameWorld::ENTTYPE_CHARACTER);
-	for(; pChr; pChr = (CCharacter *)pChr->TypeNext())
-	{
-		if(pChr == pNotThis)
-			continue;
-
-		vec2 IntersectPos;
-		if(closest_point_on_line(Pos0, Pos1, pChr->m_Pos, IntersectPos))
-		{
-			float Len = distance(pChr->m_Pos, IntersectPos);
-			if(Len < pChr->m_ProximityRadius + Radius)
-			{
-				vpCharacters.push_back(pChr);
-			}
-		}
-	}
-	return vpCharacters;
 }
 
 void CGameWorld::ReleaseHooked(int ClientId)

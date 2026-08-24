@@ -20,6 +20,11 @@ public:
 
 	virtual bool GetBestUrl(const char **pBestUrl) const = 0;
 
+	// True when the latest completed refresh produced a new server list payload
+	// that should be applied. Unchanged responses (same SHA-256) stay false so
+	// the browser can skip expensive rebuilds on auto-refresh.
+	virtual bool ServersDataChanged() const = 0;
+
 	virtual int NumServers() const = 0;
 	virtual const CServerInfo &Server(int Index) const = 0;
 };

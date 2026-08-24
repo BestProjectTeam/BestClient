@@ -6,9 +6,8 @@
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
 
-#include <game/client/animstate.h>
+#include <game/client/bc_ui_animations.h>
 #include <game/client/gameclient.h>
-#include <game/client/render.h>
 #include <game/client/ui.h>
 #include <game/localization.h>
 
@@ -300,14 +299,6 @@ void CFastActions::OnRender()
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return;
 
-	static const auto QuadEaseInOut = [](float t) -> float {
-		if(t == 0.0f)
-			return 0.0f;
-		if(t == 1.0f)
-			return 1.0f;
-		return (t < 0.5f) ? (2.0f * t * t) : (1.0f - std::pow(-2.0f * t + 2.0f, 2) / 2.0f);
-	};
-
 	static const float s_FontSize = 16.0f;
 
 	const float AnimationTime = (float)g_Config.m_TcAnimateWheelTime / 1000.0f;
@@ -352,7 +343,7 @@ void CFastActions::OnRender()
 			return;
 
 		const float Progress = std::clamp(m_AnimationTime / AnimationTime, 0.0f, 1.0f);
-		aAnimationPhase[0] = QuadEaseInOut(Progress);
+		aAnimationPhase[0] = BCUiAnimations::EaseInOutQuad(Progress);
 		aAnimationPhase[1] = aAnimationPhase[0] * aAnimationPhase[0];
 	}
 

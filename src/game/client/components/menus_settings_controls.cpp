@@ -104,6 +104,8 @@ void CMenusSettingsControls::OnInterfacesInit(CGameClient *pClient)
 		{EBindOptionGroup::BEST_CLIENT, Localizable("Accept swap"), "bc_swap_accept"},
 		{EBindOptionGroup::BEST_CLIENT, Localizable("Decline/dismiss swap"), "bc_swap_decline"},
 		{EBindOptionGroup::BEST_CLIENT, Localizable("Peek swap partner"), "+bc_swap_peek"},
+		{EBindOptionGroup::BEST_CLIENT, Localizable("Find teleport"), "bc_goto_tele_cursor"},
+		{EBindOptionGroup::BEST_CLIENT, Localizable("Find finish"), "bc_goto_finish_cursor"},
 		{EBindOptionGroup::BEST_CLIENT_PRACTICE, Localizable("say /r"), "say /r"},
 		{EBindOptionGroup::BEST_CLIENT_PRACTICE, Localizable("say /invincible"), "say /invincible"},
 		{EBindOptionGroup::BEST_CLIENT_PRACTICE, Localizable("say /telecursor"), "say /telecursor"},

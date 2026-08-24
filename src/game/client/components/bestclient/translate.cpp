@@ -8,7 +8,6 @@
 #include <engine/shared/protocol.h>
 
 #include <game/client/gameclient.h>
-#include <game/client/lineinput.h>
 #include <game/localization.h>
 
 #include <algorithm>
@@ -462,17 +461,6 @@ const char *ITranslateBackend::EncodeTarget(const char *pTarget) const
 	if(!pTarget || pTarget[0] == '\0')
 		return DefaultConfig::TcTranslateTarget;
 	return pTarget;
-}
-
-bool ITranslateBackend::CompareTargets(const char *pA, const char *pB) const
-{
-	if(pA == pB) // if(!pA && !pB)
-		return true;
-	if(!pA || !pB)
-		return false;
-	if(str_comp_nocase(EncodeTarget(pA), EncodeTarget(pB)) == 0)
-		return true;
-	return false;
 }
 
 class ITranslateBackendHttp : public ITranslateBackend

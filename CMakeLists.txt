@@ -639,6 +639,9 @@ if(CLIENT AND VIDEORECORDER)
     set(FFMPEG_LIBRARIES "")
     set(FFMPEG_INCLUDE_DIRS "")
   endif()
+  if(TARGET_OS STREQUAL "linux" AND FFMPEG_FOUND AND FFMPEG_BUNDLED)
+    message(WARNING "Using bundled Linux FFmpeg without GIF decoding support. Install the FFmpeg development packages and configure with -DPREFER_BUNDLED_LIBS=OFF to enable GIF decoding in a local build.")
+  endif()
 endif()
 find_package(Freetype)
 if(DOWNLOAD_GTEST)
@@ -667,6 +670,9 @@ find_package(SQLite3)
 if(UNIX AND NOT APPLE AND PKG_CONFIG_FOUND)
   pkg_check_modules(DBUS QUIET dbus-1)
   pkg_check_modules(PULSE_SIMPLE QUIET libpulse-simple)
+endif()
+if(TARGET_OS STREQUAL "linux" AND CLIENT AND NOT DBUS_FOUND)
+  message(WARNING "DBus development files not found. Linux now-playing detection and track lyrics will be disabled (install libdbus-1-dev).")
 endif()
 if(DISCORD)
   find_package(DiscordSdk)
@@ -2758,10 +2764,11 @@ if(CLIENT)
     components/menus_ingame_touch_controls.cpp
     components/menus_ingame_touch_controls.h
     components/menus_settings.cpp
-    components/menus_settings7.cpp
     components/menus_settings_assets.cpp
     components/menus_settings_controls.cpp
     components/menus_settings_controls.h
+    components/menus_settings_tee.cpp
+    components/menus_settings_tee7.cpp
     components/menus_start.cpp
     components/menus_start.h
     components/motd.cpp
@@ -2847,6 +2854,14 @@ if(CLIENT)
     components/bestclient/chat_bubbles.h
     components/bestclient/cloud_input.cpp
     components/bestclient/cloud_input.h
+    components/bestclient/edgehelper.cpp
+    components/bestclient/edgehelper.h
+    components/bestclient/physicball.cpp
+    components/bestclient/physicball.h
+    components/bestclient/process_priority.cpp
+    components/bestclient/process_priority.h
+    components/bestclient/spec_pause_radio.cpp
+    components/bestclient/spec_pause_radio.h
     components/bestclient/fast_actions.cpp
     components/bestclient/fast_actions.h
     components/bestclient/fast_practice.cpp
@@ -2883,6 +2898,8 @@ if(CLIENT)
     components/bestclient/swap_timer.h
     components/bestclient/translate.cpp
     components/bestclient/translate.h
+    components/bestclient/twitch_chat.cpp
+    components/bestclient/twitch_chat.h
     components/bestclient/version.h
     components/bestclient/visualizer/analyzer.cpp
     components/bestclient/visualizer/analyzer.h

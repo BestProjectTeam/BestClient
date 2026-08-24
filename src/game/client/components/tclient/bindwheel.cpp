@@ -176,7 +176,6 @@ void CBindWheel::OnRender()
 	const float s_OuterMouseLimitRadius = 170.0f * WheelScale;
 	const float s_OuterItemRadius = 140.0f * WheelScale; // 10.0f less than emoticons for extra text space
 	const float s_OuterCircleRadius = 190.0f * WheelScale;
-	// static const float s_InnerCircleRadius = 100.0f;
 	const float s_FontSize = 12.0f * WheelScale;
 	const float s_FontSizeSelected = 18.0f * WheelScale;
 
@@ -308,13 +307,6 @@ void CBindWheel::OnRender()
 	}
 	TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
 	Graphics()->WrapNormal();
-
-	// For future middle circle usage
-	// Graphics()->TextureClear();
-	// Graphics()->QuadsBegin();
-	// Graphics()->SetColor(1.0f, 1.0f, 1.0f, 0.3f * AnimationPhase3);
-	// DrawCircle(Screen.w / 2.0f, Screen.h / 2.0f, s_InnerCircleRadius * AnimationPhase3, 64);
-	// Graphics()->QuadsEnd();
 
 	RenderTools()->RenderCursor(GameClient()->m_Emoticon.m_SelectorMouse + vec2(Screen.w, Screen.h) / 2.0f, 24.0f * WheelScale, aAnimationPhase[0]);
 }

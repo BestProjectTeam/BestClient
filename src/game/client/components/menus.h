@@ -981,6 +981,15 @@ public:
 		bool m_IsDefault = false;
 	};
 
+	enum
+	{
+		ASSETS_EDITOR_COLOR_BLEND_TEELIKE = 0,
+		ASSETS_EDITOR_COLOR_BLEND_SCREEN,
+		ASSETS_EDITOR_COLOR_BLEND_MULTIPLY,
+		ASSETS_EDITOR_COLOR_BLEND_OVERLAY,
+		ASSETS_EDITOR_COLOR_BLEND_COUNT,
+	};
+
 	struct SAssetsEditorPartSlot
 	{
 		int m_SpriteId = -1;
@@ -996,6 +1005,10 @@ public:
 		int m_SrcH = 0;
 		char m_aFamilyKey[64] = {0};
 		char m_aSourceAsset[64] = {0};
+		bool m_UseCustomColor = false;
+		unsigned m_CustomColor = 65408; // default matches player_color_body
+		int m_ColorBlendMode = ASSETS_EDITOR_COLOR_BLEND_TEELIKE;
+		int m_ColorOpacity = 100; // 0-100
 	};
 
 private:
@@ -1035,6 +1048,8 @@ private:
 		int m_ComposedPreviewHeight = 0;
 		std::vector<SAssetsEditorAssetEntry> m_avAssets[ASSETS_EDITOR_TYPE_COUNT];
 		std::vector<SAssetsEditorPartSlot> m_vPartSlots;
+		int m_ContextMenuSlotIndex = -1;
+		int m_ColorEditSlotIndex = -1;
 	};
 
 	SAssetsEditorState m_AssetsEditorState;
@@ -1060,6 +1075,10 @@ private:
 	void AssetsEditorRenderExitConfirm(const CUIRect &Rect);
 	void AssetsEditorBuildFamilyKey(int Type, const CDataSprite *pSprite, char *pOut, int OutSize);
 	bool AssetsEditorCopyRectScaledNearest(CImageInfo &Dst, const CImageInfo &Src, int DstX, int DstY, int DstW, int DstH, int SrcX, int SrcY, int SrcW, int SrcH);
+	void AssetsEditorColorizeRect(CImageInfo &Image, int X, int Y, int W, int H, const SAssetsEditorPartSlot &Slot) const;
+	void AssetsEditorOpenColorPopup(int SlotIndex, float X, float Y);
+	void AssetsEditorClearSlotCustomColor(int SlotIndex);
+	static CUi::EPopupMenuFunctionResult AssetsEditorPopupColorEditor(void *pContext, CUIRect View, bool Active);
 
 	// found in menus_tclient.cpp
 	void RenderSettingsTClient(CUIRect MainView);
