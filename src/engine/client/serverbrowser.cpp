@@ -1351,14 +1351,6 @@ void CServerBrowser::UpdateFromHttp()
 			vKept.push_back(pEntry);
 		}
 		m_vpServerlist = std::move(vKept);
-
-		// Drop zombie entries left in storage after removals so memory does not
-		// grow without bound across many auto-refreshes.
-		if(m_ServerlistStorage.size() > m_vpServerlist.size() + 256 &&
-			m_ServerlistStorage.size() > m_vpServerlist.size() * 5 / 4)
-		{
-			CompactServerlistStorage();
-		}
 	}
 
 	RequestResort();
@@ -1376,32 +1368,6 @@ void CServerBrowser::CleanUp()
 	m_pLastReqServer = nullptr;
 	m_NumRequests = 0;
 	m_CurrentMaxRequests = g_Config.m_BrMaxRequests;
-}
-
-void CServerBrowser::CompactServerlistStorage()
-{
-	std::deque<CServerEntry> NewStorage;
-	std::vector<CServerEntry *> NewList;
-	NewList.reserve(m_vpServerlist.size());
-	m_ByAddr.clear();
-	m_pFirstReqServer = nullptr;
-	m_pLastReqServer = nullptr;
-	m_NumRequests = 0;
-
-	for(CServerEntry *pOld : m_vpServerlist)
-	{
-		NewStorage.push_back(*pOld);
-		CServerEntry *pNew = &NewStorage.back();
-		pNew->m_pPrevReq = nullptr;
-		pNew->m_pNextReq = nullptr;
-		pNew->m_Info.m_ServerIndex = (int)NewList.size();
-		for(int AddressIndex = 0; AddressIndex < pNew->m_Info.m_NumAddresses; AddressIndex++)
-			m_ByAddr[pNew->m_Info.m_aAddresses[AddressIndex]] = pNew->m_Info.m_ServerIndex;
-		NewList.push_back(pNew);
-	}
-
-	m_ServerlistStorage = std::move(NewStorage);
-	m_vpServerlist = std::move(NewList);
 }
 
 void CServerBrowser::Update()

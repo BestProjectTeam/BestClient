@@ -396,7 +396,6 @@ private:
 	int SortHash() const;
 
 	void CleanUp();
-	void CompactServerlistStorage();
 
 	int DetermineOwnLocation() const;
 	void UpdateServerLatency(CServerInfo *pInfo, int OwnLocation) const;
