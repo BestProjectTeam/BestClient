@@ -1057,7 +1057,7 @@ void CMenus::AssetsEditorOpenColorPopup(int SlotIndex, float X, float Y)
 
 	constexpr float PopupWidth = 300.0f;
 	constexpr float PopupHeight = 295.0f;
-	CUi::SPopupMenuProperties PopupProps;
+	SPopupMenuProperties PopupProps;
 	PopupProps.m_Draggable = true;
 	Ui()->DoPopupMenu(&gs_AssetsEditorColorPopup, X, Y, PopupWidth, PopupHeight, &gs_AssetsEditorColorPopup, AssetsEditorPopupColorEditor, PopupProps);
 }
