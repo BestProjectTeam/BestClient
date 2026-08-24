@@ -1225,10 +1225,13 @@ void CMenus::Render()
 	// community cache every tick, which caused noticeable stutter with a short
 	// refresh interval. Unchanged master payloads are skipped entirely by the
 	// serverbrowser HTTP layer; changed payloads are applied incrementally.
-	// Restricted to the main menu: m_MenuPage keeps its last browser value while
-	// connected, so an in-game check would wrongly keep refreshing there.
-	const bool BrowserPageActive = Client()->State() == IClient::STATE_OFFLINE &&
-		m_MenuPage >= PAGE_INTERNET && m_MenuPage <= PAGE_FAVORITE_COMMUNITY_5;
+	// Restricted to actual browser pages: main menu browser tabs, and the
+	// in-game Browser tab (PAGE_NETWORK). m_MenuPage keeps its last browser
+	// value while connected, so checking it in-game would wrongly keep
+	// refreshing on every other menu page.
+	const bool BrowserPageActive = (Client()->State() == IClient::STATE_OFFLINE &&
+		m_MenuPage >= PAGE_INTERNET && m_MenuPage <= PAGE_FAVORITE_COMMUNITY_5) ||
+		(Client()->State() == IClient::STATE_ONLINE && m_GamePage == PAGE_NETWORK);
 	if(BrowserPageActive && g_Config.m_BcAutoServerListRefresh)
 	{
 		const bool BrowserBusy = ServerBrowser()->IsRefreshing() || ServerBrowser()->IsGettingServerlist();
@@ -1339,7 +1342,12 @@ void CMenus::Render()
 				dbg_assert_failed("Invalid m_MenuPage: %d", m_MenuPage);
 			}
 
-			RenderMenubar(TabBar, ClientState);
+			// The fullscreen assets editor exit confirmation covers the whole
+			// screen; the tab bar must not draw on top of it.
+			const bool AssetsEditorConfirmOpen = m_AssetsEditorState.m_VisualsEditorOpen &&
+				m_AssetsEditorState.m_FullscreenOpen && m_AssetsEditorState.m_ShowExitConfirm;
+			if(!AssetsEditorConfirmOpen)
+				RenderMenubar(TabBar, ClientState);
 		}
 		break;
 
@@ -1395,7 +1403,12 @@ void CMenus::Render()
 				dbg_assert_failed("Invalid m_GamePage: %d", m_GamePage);
 			}
 
-			RenderMenubar(TabBar, ClientState);
+			// The fullscreen assets editor exit confirmation covers the whole
+			// screen; the tab bar must not draw on top of it.
+			const bool AssetsEditorConfirmOpen = m_AssetsEditorState.m_VisualsEditorOpen &&
+				m_AssetsEditorState.m_FullscreenOpen && m_AssetsEditorState.m_ShowExitConfirm;
+			if(!AssetsEditorConfirmOpen)
+				RenderMenubar(TabBar, ClientState);
 		}
 		break;
 
