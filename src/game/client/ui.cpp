@@ -1780,8 +1780,11 @@ void CUi::RenderPopupMenus()
 			DragHandle.h = SPopupMenu::POPUP_BORDER + SPopupMenu::POPUP_MARGIN + SPopupMenu::POPUP_DRAG_HANDLE_HEIGHT;
 			if(PopupMenu.m_Dragging)
 			{
-				PopupMenu.m_Rect.x += MouseDeltaX();
-				PopupMenu.m_Rect.y += MouseDeltaY();
+				// MouseDelta is in window pixels; convert to gui screen space so
+				// the popup follows the cursor 1:1 regardless of ui scale.
+				const vec2 GuiScale = vec2(Screen()->w, Screen()->h) / vec2(Graphics()->WindowWidth(), Graphics()->WindowHeight());
+				PopupMenu.m_Rect.x += MouseDeltaX() * GuiScale.x;
+				PopupMenu.m_Rect.y += MouseDeltaY() * GuiScale.y;
 				PopupMenu.m_Rect.x = std::clamp(PopupMenu.m_Rect.x, 0.0f, maximum(0.0f, Screen()->w - PopupMenu.m_Rect.w));
 				PopupMenu.m_Rect.y = std::clamp(PopupMenu.m_Rect.y, 0.0f, maximum(0.0f, Screen()->h - PopupMenu.m_Rect.h));
 				if(!MouseButton(0))

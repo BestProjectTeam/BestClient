@@ -271,10 +271,7 @@ void CEdgeHelper::RenderEdgeHelperJumpInfo(CUIRect *pBase, float Scale)
 
 	char aBuf[64];
 	str_format(aBuf, sizeof(aBuf), "%02i", m_PosX);
-	if(AtJump)
-		TextRender()->TextColor(SEdgeHelperProperties::ActionActiveButtonColor());
 	Ui()->DoLabel(&CenterZone, aBuf, ValueFontSize, TEXTALIGN_MC);
-	TextRender()->TextColor(TextRender()->DefaultTextColor());
 
 	if(Lower == std::numeric_limits<int>::min())
 		str_copy(aBuf, "-");
@@ -286,10 +283,7 @@ void CEdgeHelper::RenderEdgeHelperJumpInfo(CUIRect *pBase, float Scale)
 		str_copy(aBuf, "-");
 	else
 		str_format(aBuf, sizeof(aBuf), "%d", Upper);
-	if(AtJump)
-		TextRender()->TextColor(SEdgeHelperProperties::ActionActiveButtonColor());
 	Ui()->DoLabel(&RightZone, aBuf, ValueFontSize, TEXTALIGN_MC);
-	TextRender()->TextColor(TextRender()->DefaultTextColor());
 }
 
 void CEdgeHelper::DoIconButton(CUIRect *pRect, const char *pIcon, float TextSize, ColorRGBA IconColor) const

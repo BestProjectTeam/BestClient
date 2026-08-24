@@ -1240,7 +1240,10 @@ void CMenus::Render()
 				m_LastServerBrowserRefreshTick = Now;
 			else if(RefreshInterval > 0 && Now - m_LastServerBrowserRefreshTick >= RefreshInterval)
 			{
-				ServerBrowser()->Refresh(ServerBrowser()->GetCurrentType());
+				// Forced refresh: rebuilds the list from the current HTTP payload
+				// immediately so the update is always visible, even when the
+				// master returns an identical payload (SHA-skip would hide it).
+				ServerBrowser()->Refresh(ServerBrowser()->GetCurrentType(), true);
 				m_LastServerBrowserRefreshTick = Now;
 			}
 		}

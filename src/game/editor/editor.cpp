@@ -6755,7 +6755,7 @@ void CEditor::Render()
 				MapView()->ResetZoom();
 		}
 
-		if(!Input()->ModifierIsPressed() && (m_pBrush->IsEmpty() || !Input()->ShiftIsPressed()))
+		if(m_pBrush->IsEmpty() || !Input()->ShiftIsPressed())
 		{
 			if(Input()->KeyPress(KEY_MOUSE_WHEEL_DOWN))
 				MapView()->Zoom()->ChangeValue(20.0f);

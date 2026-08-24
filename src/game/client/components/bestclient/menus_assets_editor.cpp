@@ -1073,6 +1073,12 @@ CUi::EPopupMenuFunctionResult CMenus::AssetsEditorPopupColorEditor(void *pContex
 		return CUi::POPUP_CLOSE_CURRENT;
 
 	SAssetsEditorPartSlot &Slot = pMenus->m_AssetsEditorState.m_vPartSlots[pPopup->m_SlotIndex];
+
+	// Explicit ESC handling: guarantees the popup closes even if the generic
+	// popup hotkey check misses (e.g. while a popup drag is in progress).
+	if(Active && pMenus->Ui()->ConsumeHotkey(CUi::HOTKEY_ESCAPE))
+		return CUi::POPUP_CLOSE_CURRENT;
+
 	const unsigned PrevColor = Slot.m_CustomColor;
 	const int PrevBlend = Slot.m_ColorBlendMode;
 	const int PrevOpacity = Slot.m_ColorOpacity;
@@ -1867,8 +1873,11 @@ void CMenus::RenderAssetsEditorScreen(CUIRect MainView)
 	CUIRect TargetFittedRect;
 	const bool HasTargetFitted = AssetsEditorCalcFittedRect(RightCanvas, m_AssetsEditorState.m_ComposedPreviewWidth, m_AssetsEditorState.m_ComposedPreviewHeight, TargetFittedRect);
 	const vec2 MousePos = Ui()->MousePos();
-	const bool ClickedLmb = Ui()->MouseButtonClicked(0);
-	const bool ClickedRmb = Ui()->MouseButtonClicked(1);
+	// Ignore clicks while any popup menu is open: the popup captures the mouse,
+	// clicks must not leak into asset slots below (e.g. while dragging the popup).
+	const bool PopupMenuOpen = Ui()->IsPopupOpen();
+	const bool ClickedLmb = !PopupMenuOpen && Ui()->MouseButtonClicked(0);
+	const bool ClickedRmb = !PopupMenuOpen && Ui()->MouseButtonClicked(1);
 
 	if(HasDonorFitted)
 		m_AssetsEditorState.m_HoveredDonorSlotIndex = AssetsEditorResolveHoveredSlotWithCycle(DonorFittedRect, m_AssetsEditorState.m_Type, m_AssetsEditorState.m_vPartSlots, MousePos, ClickedLmb, -1);
@@ -1939,7 +1948,7 @@ void CMenus::RenderAssetsEditorScreen(CUIRect MainView)
 		m_AssetsEditorState.m_ColorEditSlotIndex = -1;
 
 	const bool SingleCandidateUnderCursor = m_AssetsEditorState.m_vHoverCycleCandidates.size() <= 1;
-	const bool StartDragNow = Ui()->MouseButton(0) && (!ClickedLmb || SingleCandidateUnderCursor);
+	const bool StartDragNow = !PopupMenuOpen && Ui()->MouseButton(0) && (!ClickedLmb || SingleCandidateUnderCursor);
 	if(!m_AssetsEditorState.m_ShowExitConfirm && !m_AssetsEditorState.m_DragActive && StartDragNow && m_AssetsEditorState.m_HoveredDonorSlotIndex >= 0)
 	{
 		m_AssetsEditorState.m_HoverCycleSlotIndex = -1;
