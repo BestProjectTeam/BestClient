@@ -5,6 +5,7 @@
 #include <engine/external/regex.h>
 #include <engine/shared/console.h>
 #include <engine/shared/http.h>
+#include <engine/shared/protocol.h>
 
 #include <generated/protocol.h>
 
