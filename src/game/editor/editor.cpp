@@ -3736,17 +3736,17 @@ void CEditor::RenderLayers(CUIRect LayersBox)
 
 		s_ScrollToSelectionNext = true;
 	}
-	if(Input()->ModifierIsPressed() && !Input()->ShiftIsPressed() && m_Dialog == DIALOG_NONE && !Ui()->IsPopupOpen() && CLineInput::GetActiveInput() == nullptr && State.m_Operation == ELayerOperation::NONE)
+	if(Input()->ModifierIsPressed() && !Input()->ShiftIsPressed() && m_Dialog == DIALOG_NONE && !Ui()->IsPopupOpen() && CLineInput::GetActiveInput() == nullptr && s_Operation == OP_NONE)
 	{
 		if(Input()->KeyPress(KEY_MOUSE_WHEEL_DOWN))
 		{
 			Map()->SelectNextLayer();
-			State.m_ScrollToSelectionNext = true;
+			s_ScrollToSelectionNext = true;
 		}
 		if(Input()->KeyPress(KEY_MOUSE_WHEEL_UP))
 		{
 			Map()->SelectPreviousLayer();
-			State.m_ScrollToSelectionNext = true;
+			s_ScrollToSelectionNext = true;
 		}
 	}
 
