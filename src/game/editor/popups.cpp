@@ -4,6 +4,8 @@
 #include "editor.h"
 #include "editor_actions.h"
 
+#include <engine/gfx/image_loader.h>
+
 #include <base/color.h>
 
 #include <engine/font_icons.h>
@@ -24,9 +26,19 @@ CUi::EPopupMenuFunctionResult CEditor::PopupMenuFile(void *pContext, CUIRect Vie
 {
 	CEditor *pEditor = static_cast<CEditor *>(pContext);
 
+	static int s_NewMapButton = 0;
+	static int s_SaveButton = 0;
+	static int s_SaveAsButton = 0;
+	static int s_SaveCopyButton = 0;
+	static int s_OpenButton = 0;
+	static int s_OpenCurrentMapButton = 0;
+	static int s_AppendButton = 0;
+	static int s_TestMapLocallyButton = 0;
+	static int s_ExitButton = 0;
+
 	CUIRect Slot;
 	View.HSplitTop(12.0f, &Slot, &View);
-	if(pEditor->DoButton_MenuItem(&pEditor->m_QuickActionNewMap, "New", 0, &Slot, BUTTONFLAG_LEFT, pEditor->m_QuickActionNewMap.Description()))
+	if(pEditor->DoButton_MenuItem(&s_NewMapButton, "New", 0, &Slot, BUTTONFLAG_LEFT, "[Ctrl+N] Create a new map."))
 	{
 		auto &MultiMapping = pEditor->m_MultiMappingSession;
 		if(MultiMapping.m_State >= CMultiMappingSession::STATE_CONNECTING)
@@ -39,53 +51,71 @@ CUi::EPopupMenuFunctionResult CEditor::PopupMenuFile(void *pContext, CUIRect Vie
 			else
 			{
 				MultiMapping.m_OwnerLoadingMap = true;
-				pEditor->m_QuickActionNewMap.Call();
+				pEditor->Reset();
 				MultiMapping.m_OwnerLoadingMap = false;
 				MultiMapping.SendMapNew();
 			}
 		}
+		else if(pEditor->HasUnsavedData())
+		{
+			pEditor->m_PopupEventType = POPEVENT_NEW;
+			pEditor->m_PopupEventActivated = true;
+		}
 		else
 		{
-			pEditor->m_QuickActionNewMap.Call();
+			pEditor->Reset();
 		}
 		return CUi::POPUP_CLOSE_CURRENT;
 	}
 
 	View.HSplitTop(10.0f, nullptr, &View);
 	View.HSplitTop(12.0f, &Slot, &View);
-	if(pEditor->DoButton_MenuItem(&pEditor->m_QuickActionLoadMap, "Load", 0, &Slot, BUTTONFLAG_LEFT, pEditor->m_QuickActionLoadMap.Description()))
+	if(pEditor->DoButton_MenuItem(&s_OpenButton, "Load", 0, &Slot, BUTTONFLAG_LEFT, "[Ctrl+L] Open a map for editing."))
 	{
-		pEditor->m_QuickActionLoadMap.Call();
+		if(pEditor->HasUnsavedData())
+		{
+			pEditor->m_PopupEventType = POPEVENT_LOAD;
+			pEditor->m_PopupEventActivated = true;
+		}
+		else
+			pEditor->m_FileBrowser.ShowFileDialog(IStorage::TYPE_ALL, CFileBrowser::EFileType::MAP, "Load map", "Load", "maps", "", CallbackOpenMap, pEditor);
 		return CUi::POPUP_CLOSE_CURRENT;
 	}
 
 	View.HSplitTop(2.0f, nullptr, &View);
 	View.HSplitTop(12.0f, &Slot, &View);
-	if(pEditor->DoButton_MenuItem(&pEditor->m_QuickActionLoadIngameMap, pEditor->m_QuickActionLoadIngameMap.Label(), pEditor->m_QuickActionLoadIngameMap.Disabled() ? -1 : 0, &Slot, BUTTONFLAG_LEFT, pEditor->m_QuickActionLoadIngameMap.Description()))
+	if(pEditor->DoButton_MenuItem(&s_OpenCurrentMapButton, pEditor->m_QuickActionLoadCurrentMap.Label(), pEditor->m_QuickActionLoadCurrentMap.Disabled() ? -1 : 0, &Slot, BUTTONFLAG_LEFT, pEditor->m_QuickActionLoadCurrentMap.Description()))
 	{
-		pEditor->m_QuickActionLoadIngameMap.Call();
+		pEditor->m_QuickActionLoadCurrentMap.Call();
 		return CUi::POPUP_CLOSE_CURRENT;
 	}
 
 	View.HSplitTop(10.0f, nullptr, &View);
 	View.HSplitTop(12.0f, &Slot, &View);
-	if(pEditor->DoButton_MenuItem(&pEditor->m_QuickActionAppendMap, "Append", 0, &Slot, BUTTONFLAG_LEFT, pEditor->m_QuickActionAppendMap.Description()))
+	if(pEditor->DoButton_MenuItem(&s_AppendButton, "Append", 0, &Slot, BUTTONFLAG_LEFT, "[Ctrl+A] Open a map and add everything from that map to the current one."))
 	{
-		pEditor->m_QuickActionAppendMap.Call();
+		pEditor->m_FileBrowser.ShowFileDialog(IStorage::TYPE_ALL, CFileBrowser::EFileType::MAP, "Append map", "Append", "maps", "", CallbackAppendMap, pEditor);
 		return CUi::POPUP_CLOSE_CURRENT;
 	}
 
 	View.HSplitTop(10.0f, nullptr, &View);
 	View.HSplitTop(12.0f, &Slot, &View);
-	if(pEditor->DoButton_MenuItem(&pEditor->m_QuickActionSave, pEditor->m_QuickActionSave.Label(), 0, &Slot, BUTTONFLAG_LEFT, pEditor->m_QuickActionSave.Description()))
+	if(pEditor->DoButton_MenuItem(&s_SaveButton, "Save", 0, &Slot, BUTTONFLAG_LEFT, "[Ctrl+S] Save the current map."))
 	{
-		pEditor->m_QuickActionSave.Call();
+		if(pEditor->Map()->m_aFilename[0] != '\0' && pEditor->Map()->m_ValidSaveFilename)
+		{
+			CallbackSaveMap(pEditor->Map()->m_aFilename, IStorage::TYPE_SAVE, pEditor);
+		}
+		else
+		{
+			pEditor->m_FileBrowser.ShowFileDialog(IStorage::TYPE_SAVE, CFileBrowser::EFileType::MAP, "Save map", "Save", "maps", "", CallbackSaveMap, pEditor);
+		}
 		return CUi::POPUP_CLOSE_CURRENT;
 	}
 
 	View.HSplitTop(2.0f, nullptr, &View);
 	View.HSplitTop(12.0f, &Slot, &View);
-	if(pEditor->DoButton_MenuItem(&pEditor->m_QuickActionSaveAs, pEditor->m_QuickActionSaveAs.Label(), 0, &Slot, BUTTONFLAG_LEFT, pEditor->m_QuickActionSaveAs.Description()))
+	if(pEditor->DoButton_MenuItem(&s_SaveAsButton, pEditor->m_QuickActionSaveAs.Label(), 0, &Slot, BUTTONFLAG_LEFT, pEditor->m_QuickActionSaveAs.Description()))
 	{
 		pEditor->m_QuickActionSaveAs.Call();
 		return CUi::POPUP_CLOSE_CURRENT;
@@ -93,9 +123,11 @@ CUi::EPopupMenuFunctionResult CEditor::PopupMenuFile(void *pContext, CUIRect Vie
 
 	View.HSplitTop(2.0f, nullptr, &View);
 	View.HSplitTop(12.0f, &Slot, &View);
-	if(pEditor->DoButton_MenuItem(&pEditor->m_QuickActionSaveCopy, pEditor->m_QuickActionSaveCopy.Label(), 0, &Slot, BUTTONFLAG_LEFT, pEditor->m_QuickActionSaveCopy.Description()))
+	if(pEditor->DoButton_MenuItem(&s_SaveCopyButton, "Save copy", 0, &Slot, BUTTONFLAG_LEFT, "[Ctrl+Shift+Alt+S] Save a copy of the current map under a new name."))
 	{
-		pEditor->m_QuickActionSaveCopy.Call();
+		char aDefaultName[IO_MAX_PATH_LENGTH];
+		fs_split_file_extension(fs_filename(pEditor->Map()->m_aFilename), aDefaultName, sizeof(aDefaultName));
+		pEditor->m_FileBrowser.ShowFileDialog(IStorage::TYPE_SAVE, CFileBrowser::EFileType::MAP, "Save map", "Save copy", "maps", aDefaultName, CallbackSaveCopyMap, pEditor);
 		return CUi::POPUP_CLOSE_CURRENT;
 	}
 
@@ -109,7 +141,7 @@ CUi::EPopupMenuFunctionResult CEditor::PopupMenuFile(void *pContext, CUIRect Vie
 
 	View.HSplitTop(2.0f, nullptr, &View);
 	View.HSplitTop(12.0f, &Slot, &View);
-	if(pEditor->DoButton_MenuItem(&pEditor->m_QuickActionTestMapLocally, pEditor->m_QuickActionTestMapLocally.Label(), 0, &Slot, BUTTONFLAG_LEFT, pEditor->m_QuickActionTestMapLocally.Description()))
+	if(pEditor->DoButton_MenuItem(&s_TestMapLocallyButton, pEditor->m_QuickActionTestMapLocally.Label(), 0, &Slot, BUTTONFLAG_LEFT, pEditor->m_QuickActionTestMapLocally.Description()))
 	{
 		pEditor->m_QuickActionTestMapLocally.Call();
 		return CUi::POPUP_CLOSE_CURRENT;
@@ -117,17 +149,18 @@ CUi::EPopupMenuFunctionResult CEditor::PopupMenuFile(void *pContext, CUIRect Vie
 
 	View.HSplitTop(10.0f, nullptr, &View);
 	View.HSplitTop(12.0f, &Slot, &View);
-	if(pEditor->DoButton_MenuItem(&pEditor->m_QuickActionCloseMap, pEditor->m_QuickActionCloseMap.Label(), 0, &Slot, BUTTONFLAG_LEFT, pEditor->m_QuickActionCloseMap.Description()))
+	if(pEditor->DoButton_MenuItem(&s_ExitButton, "Exit", 0, &Slot, BUTTONFLAG_LEFT, "[Escape] Exit from the editor."))
 	{
-		pEditor->m_QuickActionCloseMap.Call();
-		return CUi::POPUP_CLOSE_CURRENT;
-	}
-
-	View.HSplitTop(10.0f, nullptr, &View);
-	View.HSplitTop(12.0f, &Slot, &View);
-	if(pEditor->DoButton_MenuItem(&pEditor->m_QuickActionExit, pEditor->m_QuickActionExit.Label(), 0, &Slot, BUTTONFLAG_LEFT, pEditor->m_QuickActionExit.Description()))
-	{
-		pEditor->m_QuickActionExit.Call();
+		if(pEditor->HasUnsavedData())
+		{
+			pEditor->m_PopupEventType = POPEVENT_EXIT;
+			pEditor->m_PopupEventActivated = true;
+		}
+		else
+		{
+			pEditor->OnClose();
+			g_Config.m_ClEditor = 0;
+		}
 		return CUi::POPUP_CLOSE_CURRENT;
 	}
 
@@ -150,7 +183,10 @@ CUi::EPopupMenuFunctionResult CEditor::PopupMenuTools(void *pContext, CUIRect Vi
 		pEditor->Ui()->ShowPopupConfirm(Slot.x + Slot.w, Slot.y, &s_ConfirmPopupContext);
 	}
 	if(s_ConfirmPopupContext.m_Result == CUi::SConfirmPopupContext::CONFIRMED)
+	{
 		pEditor->Map()->RemoveUnusedEnvelopes();
+		pEditor->m_MultiMappingSession.StartMapTransfer();
+	}
 	if(s_ConfirmPopupContext.m_Result != CUi::SConfirmPopupContext::UNSET)
 	{
 		s_ConfirmPopupContext.Reset();
@@ -174,11 +210,13 @@ CUi::EPopupMenuFunctionResult CEditor::PopupMenuTools(void *pContext, CUIRect Vi
 		}
 	}
 
+	static int s_GotoButton = 0;
 	View.HSplitTop(2.0f, nullptr, &View);
 	View.HSplitTop(12.0f, &Slot, &View);
-	if(pEditor->DoButton_MenuItem(&pEditor->m_QuickActionGotoPosition, pEditor->m_QuickActionGotoPosition.Label(), 0, &Slot, BUTTONFLAG_LEFT, pEditor->m_QuickActionGotoPosition.Description()))
+	if(pEditor->DoButton_MenuItem(&s_GotoButton, "Goto position", 0, &Slot, BUTTONFLAG_LEFT, "Go to a specified coordinate point on the map."))
 	{
-		pEditor->m_QuickActionGotoPosition.Call();
+		static SPopupMenuId s_PopupGotoId;
+		pEditor->Ui()->DoPopupMenu(&s_PopupGotoId, Slot.x, Slot.y + Slot.h, 120, 52, pEditor, PopupGoto);
 	}
 
 	static int s_TileArtButton = 0;
@@ -250,10 +288,12 @@ CUi::EPopupMenuFunctionResult CEditor::PopupMenuSettings(void *pContext, CUIRect
 		if(pEditor->DoButton_Ex(&s_ButtonNo, "No", !pEditor->m_BrushColorEnabled, &No, BUTTONFLAG_LEFT, "Disable brush coloring.", IGraphics::CORNER_L))
 		{
 			pEditor->m_BrushColorEnabled = false;
+			pEditor->m_MultiMappingSession.NotifyEditorSettings();
 		}
 		if(pEditor->DoButton_Ex(&s_ButtonYes, "Yes", pEditor->m_BrushColorEnabled, &Yes, BUTTONFLAG_LEFT, "Enable brush coloring.", IGraphics::CORNER_R))
 		{
 			pEditor->m_BrushColorEnabled = true;
+			pEditor->m_MultiMappingSession.NotifyEditorSettings();
 		}
 	}
 
@@ -275,10 +315,12 @@ CUi::EPopupMenuFunctionResult CEditor::PopupMenuSettings(void *pContext, CUIRect
 			if(pEditor->DoButton_Ex(&s_ButtonNo, "No", pEditor->m_AllowPlaceUnusedTiles == EUnusedEntities::NOT_ALLOWED, &No, BUTTONFLAG_LEFT, "[Ctrl+U] Disallow placing unused tiles.", IGraphics::CORNER_L))
 			{
 				pEditor->m_AllowPlaceUnusedTiles = EUnusedEntities::NOT_ALLOWED;
+				pEditor->m_MultiMappingSession.NotifyEditorSettings();
 			}
 			if(pEditor->DoButton_Ex(&s_ButtonYes, "Yes", pEditor->m_AllowPlaceUnusedTiles == EUnusedEntities::ALLOWED_EXPLICIT, &Yes, BUTTONFLAG_LEFT, "[Ctrl+U] Allow placing unused tiles.", IGraphics::CORNER_R))
 			{
 				pEditor->m_AllowPlaceUnusedTiles = EUnusedEntities::ALLOWED_EXPLICIT;
+				pEditor->m_MultiMappingSession.NotifyEditorSettings();
 			}
 		}
 	}
@@ -302,16 +344,19 @@ CUi::EPopupMenuFunctionResult CEditor::PopupMenuSettings(void *pContext, CUIRect
 		if(pEditor->DoButton_Ex(&s_ButtonOff, pAction->LabelShort(), pAction->Active(), &Off, BUTTONFLAG_LEFT, pAction->Description(), IGraphics::CORNER_L))
 		{
 			pAction->Call();
+			pEditor->m_MultiMappingSession.NotifyEditorSettings();
 		}
 		pAction = &pEditor->m_QuickActionShowInfoDec;
 		if(pEditor->DoButton_Ex(&s_ButtonDec, pAction->LabelShort(), pAction->Active(), &Dec, BUTTONFLAG_LEFT, pAction->Description(), IGraphics::CORNER_NONE))
 		{
 			pAction->Call();
+			pEditor->m_MultiMappingSession.NotifyEditorSettings();
 		}
 		pAction = &pEditor->m_QuickActionShowInfoHex;
 		if(pEditor->DoButton_Ex(&s_ButtonHex, pAction->LabelShort(), pAction->Active(), &Hex, BUTTONFLAG_LEFT, pAction->Description(), IGraphics::CORNER_R))
 		{
 			pAction->Call();
+			pEditor->m_MultiMappingSession.NotifyEditorSettings();
 		}
 	}
 
@@ -333,11 +378,13 @@ CUi::EPopupMenuFunctionResult CEditor::PopupMenuSettings(void *pContext, CUIRect
 		{
 			pEditor->m_ShowEnvelopePreview = false;
 			pEditor->m_ActiveEnvelopePreview = EEnvelopePreview::NONE;
+			pEditor->m_MultiMappingSession.NotifyEditorSettings();
 		}
 		if(pEditor->DoButton_Ex(&s_ButtonYes, "Yes", pEditor->m_ShowEnvelopePreview, &Yes, BUTTONFLAG_LEFT, "Preview the paths of quads with a position envelope when a quad layer is selected.", IGraphics::CORNER_R))
 		{
 			pEditor->m_ShowEnvelopePreview = true;
 			pEditor->m_ActiveEnvelopePreview = EEnvelopePreview::NONE;
+			pEditor->m_MultiMappingSession.NotifyEditorSettings();
 		}
 	}
 
@@ -358,10 +405,12 @@ CUi::EPopupMenuFunctionResult CEditor::PopupMenuSettings(void *pContext, CUIRect
 		if(pEditor->DoButton_Ex(&s_ButtonNo, "No", !g_Config.m_EdAlignQuads, &No, BUTTONFLAG_LEFT, "Do not perform quad alignment to other quads/points when moving quads.", IGraphics::CORNER_L))
 		{
 			g_Config.m_EdAlignQuads = false;
+			pEditor->m_MultiMappingSession.NotifyEditorSettings();
 		}
 		if(pEditor->DoButton_Ex(&s_ButtonYes, "Yes", g_Config.m_EdAlignQuads, &Yes, BUTTONFLAG_LEFT, "Allow quad alignment to other quads/points when moving quads.", IGraphics::CORNER_R))
 		{
 			g_Config.m_EdAlignQuads = true;
+			pEditor->m_MultiMappingSession.NotifyEditorSettings();
 		}
 	}
 
@@ -382,10 +431,12 @@ CUi::EPopupMenuFunctionResult CEditor::PopupMenuSettings(void *pContext, CUIRect
 		if(pEditor->DoButton_Ex(&s_ButtonNo, "No", !g_Config.m_EdShowQuadsRect, &No, BUTTONFLAG_LEFT, "Do not show quad bounds when moving quads.", IGraphics::CORNER_L))
 		{
 			g_Config.m_EdShowQuadsRect = false;
+			pEditor->m_MultiMappingSession.NotifyEditorSettings();
 		}
 		if(pEditor->DoButton_Ex(&s_ButtonYes, "Yes", g_Config.m_EdShowQuadsRect, &Yes, BUTTONFLAG_LEFT, "Show quad bounds when moving quads.", IGraphics::CORNER_R))
 		{
 			g_Config.m_EdShowQuadsRect = true;
+			pEditor->m_MultiMappingSession.NotifyEditorSettings();
 		}
 	}
 
@@ -406,10 +457,12 @@ CUi::EPopupMenuFunctionResult CEditor::PopupMenuSettings(void *pContext, CUIRect
 		if(pEditor->DoButton_Ex(&s_ButtonNo, "No", !g_Config.m_EdAutoMapReload, &No, BUTTONFLAG_LEFT, "Do not run 'hot_reload' on the local server while rcon authed on map save.", IGraphics::CORNER_L))
 		{
 			g_Config.m_EdAutoMapReload = false;
+			pEditor->m_MultiMappingSession.NotifyEditorSettings();
 		}
 		if(pEditor->DoButton_Ex(&s_ButtonYes, "Yes", g_Config.m_EdAutoMapReload, &Yes, BUTTONFLAG_LEFT, "Run 'hot_reload' on the local server while rcon authed on map save.", IGraphics::CORNER_R))
 		{
 			g_Config.m_EdAutoMapReload = true;
+			pEditor->m_MultiMappingSession.NotifyEditorSettings();
 		}
 	}
 
@@ -430,10 +483,12 @@ CUi::EPopupMenuFunctionResult CEditor::PopupMenuSettings(void *pContext, CUIRect
 		if(pEditor->DoButton_Ex(&s_ButtonNo, "No", !g_Config.m_EdLayerSelector, &No, BUTTONFLAG_LEFT, "Do not select layers when ctrl+right clicking on a tile.", IGraphics::CORNER_L))
 		{
 			g_Config.m_EdLayerSelector = false;
+			pEditor->m_MultiMappingSession.NotifyEditorSettings();
 		}
 		if(pEditor->DoButton_Ex(&s_ButtonYes, "Yes", g_Config.m_EdLayerSelector, &Yes, BUTTONFLAG_LEFT, "Select layers when ctrl+right clicking on a tile.", IGraphics::CORNER_R))
 		{
 			g_Config.m_EdLayerSelector = true;
+			pEditor->m_MultiMappingSession.NotifyEditorSettings();
 		}
 	}
 
@@ -454,85 +509,13 @@ CUi::EPopupMenuFunctionResult CEditor::PopupMenuSettings(void *pContext, CUIRect
 		if(pEditor->DoButton_Ex(&s_ButtonNo, "No", !g_Config.m_EdShowIngameEntities, &No, BUTTONFLAG_LEFT, "Do not show how weapons, shields, hearts and flags appear ingame.", IGraphics::CORNER_L))
 		{
 			g_Config.m_EdShowIngameEntities = false;
+			pEditor->m_MultiMappingSession.NotifyEditorSettings();
 		}
 		if(pEditor->DoButton_Ex(&s_ButtonYes, "Yes", g_Config.m_EdShowIngameEntities, &Yes, BUTTONFLAG_LEFT, "Show how weapons, shields, hearts and flags appear ingame.", IGraphics::CORNER_R))
 		{
 			g_Config.m_EdShowIngameEntities = true;
+			pEditor->m_MultiMappingSession.NotifyEditorSettings();
 		}
-	}
-
-	return CUi::POPUP_KEEP_OPEN;
-}
-
-CUi::EPopupMenuFunctionResult CEditor::CPopupMapTab::Render(void *pContext, CUIRect View, bool Active)
-{
-	CPopupMapTab *pPopupMapTab = static_cast<CPopupMapTab *>(pContext);
-	CEditor *pEditor = pPopupMapTab->m_pEditor;
-
-	const size_t SelectedMapIndex = pPopupMapTab->m_SelectedMap;
-	const auto &pSelectedMap = pEditor->m_vpMaps[SelectedMapIndex];
-	const bool Saving = pEditor->IsSaving(pSelectedMap->m_aFilename);
-	const bool Saved = pSelectedMap->m_aFilename[0] != '\0';
-
-	CUIRect Slot;
-	View.HSplitTop(12.0f, &Slot, &View);
-	if(pEditor->DoButton_MenuItem(&pPopupMapTab->m_CloseButtonId, "Close", Saving ? -1 : 0, &Slot, BUTTONFLAG_LEFT, "Close this map."))
-	{
-		pEditor->CloseMap(SelectedMapIndex, true);
-		return CUi::POPUP_CLOSE_CURRENT;
-	}
-
-	View.HSplitTop(10.0f, nullptr, &View);
-	View.HSplitTop(12.0f, &Slot, &View);
-	if(pEditor->DoButton_MenuItem(&pPopupMapTab->m_CopyNameButtonId, "Copy name", Saved ? 0 : -1, &Slot, BUTTONFLAG_LEFT, "Copy the name of this map to the clipboard."))
-	{
-		char aFilename[IO_MAX_PATH_LENGTH];
-		fs_split_file_extension(fs_filename(pSelectedMap->m_aFilename), aFilename, sizeof(aFilename));
-		pEditor->Input()->SetClipboardText(aFilename);
-		return CUi::POPUP_CLOSE_CURRENT;
-	}
-
-	View.HSplitTop(2.0f, nullptr, &View);
-	View.HSplitTop(12.0f, &Slot, &View);
-	if(pEditor->DoButton_MenuItem(&pPopupMapTab->m_CopyPathButtonId, "Copy path", Saved ? 0 : -1, &Slot, BUTTONFLAG_LEFT, "Copy the path of this map to the clipboard."))
-	{
-		pEditor->Input()->SetClipboardText(pSelectedMap->m_aFilename);
-		return CUi::POPUP_CLOSE_CURRENT;
-	}
-
-	View.HSplitTop(10.0f, nullptr, &View);
-	View.HSplitTop(12.0f, &Slot, &View);
-	if(pEditor->DoButton_MenuItem(&pPopupMapTab->m_ShowFileButtonId, "Show file", Saved ? 0 : -1, &Slot, BUTTONFLAG_LEFT, "Show this map in the file browser."))
-	{
-		bool FoundMap = false;
-		for(int CheckStorageType = IStorage::TYPE_SAVE; CheckStorageType < pEditor->Storage()->NumPaths(); ++CheckStorageType)
-		{
-			if(pEditor->Storage()->FileExists(pSelectedMap->m_aFilename, CheckStorageType))
-			{
-				// TODO: Select the map file directly instead of opening the parent folder. See https://github.com/ddnet/ddnet/issues/11334
-				char aParentDirectory[IO_MAX_PATH_LENGTH];
-				str_copy(aParentDirectory, pSelectedMap->m_aFilename);
-				if(fs_parent_dir(aParentDirectory) != 0)
-				{
-					pEditor->ShowFileDialogError("Failed to determine parent folder for map file '%s'.", pSelectedMap->m_aFilename);
-					FoundMap = true;
-					break;
-				}
-				char aCompletePath[IO_MAX_PATH_LENGTH];
-				pEditor->Storage()->GetCompletePath(CheckStorageType, aParentDirectory, aCompletePath, sizeof(aCompletePath));
-				if(!pEditor->Client()->ViewFile(aCompletePath))
-				{
-					pEditor->ShowFileDialogError("Failed to open the folder '%s'.", aCompletePath);
-				}
-				FoundMap = true;
-				break;
-			}
-		}
-		if(!FoundMap)
-		{
-			pEditor->ShowFileDialogError("The map file '%s' could not be found.", pSelectedMap->m_aFilename);
-		}
-		return CUi::POPUP_CLOSE_CURRENT;
 	}
 
 	return CUi::POPUP_KEEP_OPEN;
@@ -552,9 +535,11 @@ CUi::EPopupMenuFunctionResult CEditor::PopupGroup(void *pContext, CUIRect View, 
 	{
 		if(pEditor->DoButton_Editor(&s_DeleteButton, "Delete group", 0, &Button, BUTTONFLAG_LEFT, "Delete the group."))
 		{
+			int DelGroup = pEditor->Map()->m_SelectedGroup;
+			pEditor->m_MultiMappingSession.NotifyDelGroup(DelGroup);
 			pEditor->Map()->m_EditorHistory.RecordAction(std::make_shared<CEditorActionGroup>(pEditor->Map(), pEditor->Map()->m_SelectedGroup, true));
 			pEditor->Map()->DeleteGroup(pEditor->Map()->m_SelectedGroup);
-			pEditor->Map()->m_SelectedGroup = std::max(0, pEditor->Map()->m_SelectedGroup - 1);
+			pEditor->Map()->m_SelectedGroup = maximum(0, pEditor->Map()->m_SelectedGroup - 1);
 			return CUi::POPUP_CLOSE_CURRENT;
 		}
 	}
@@ -718,7 +703,10 @@ CUi::EPopupMenuFunctionResult CEditor::PopupGroup(void *pContext, CUIRect View, 
 		static CLineInput s_NameInput;
 		s_NameInput.SetBuffer(pEditor->Map()->m_vpGroups[pEditor->Map()->m_SelectedGroup]->m_aName, sizeof(pEditor->Map()->m_vpGroups[pEditor->Map()->m_SelectedGroup]->m_aName));
 		if(pEditor->DoEditBox(&s_NameInput, &Button, 10.0f))
+		{
 			pEditor->Map()->OnModify();
+			pEditor->m_MultiMappingSession.NotifyRenameGroup(pEditor->Map()->m_SelectedGroup, pEditor->Map()->m_vpGroups[pEditor->Map()->m_SelectedGroup]->m_aName);
+		}
 	}
 
 	CProperty aProps[] = {
@@ -856,7 +844,10 @@ CUi::EPopupMenuFunctionResult CEditor::PopupLayer(void *pContext, CUIRect View, 
 		static CLineInput s_NameInput;
 		s_NameInput.SetBuffer(pCurrentLayer->m_aName, sizeof(pCurrentLayer->m_aName));
 		if(pEditor->DoEditBox(&s_NameInput, &EditBox, 10.0f))
+		{
 			pEditor->Map()->OnModify();
+			pEditor->m_MultiMappingSession.NotifyRenameLayer(pEditor->Map()->m_SelectedGroup, pEditor->Map()->m_vSelectedLayers[0], pCurrentLayer->m_aName);
+		}
 	}
 
 	// spacing if any button was rendered
@@ -1082,7 +1073,9 @@ CUi::EPopupMenuFunctionResult CEditor::PopupQuad(void *pContext, CUIRect View, b
 	static int s_SliceButton = 0;
 	if(pEditor->DoButton_Editor(&s_SliceButton, "Slice", 0, &Button, BUTTONFLAG_LEFT, "Enable quad knife mode."))
 	{
-		pEditor->m_QuadKnife.Activate(pQuadPopupContext->m_SelectedQuadIndex);
+		pEditor->Map()->m_QuadKnife.m_Active = true;
+		pEditor->Map()->m_QuadKnife.m_Count = 0;
+		pEditor->Map()->m_QuadKnife.m_SelectedQuadIndex = pQuadPopupContext->m_SelectedQuadIndex;
 		return CUi::POPUP_CLOSE_CURRENT;
 	}
 
@@ -1113,6 +1106,11 @@ CUi::EPopupMenuFunctionResult CEditor::PopupQuad(void *pContext, CUIRect View, b
 	if(Prop == EQuadProp::ORDER && pLayer)
 	{
 		const int QuadIndex = pLayer->SwapQuads(pEditor->Map()->m_vSelectedQuads[pQuadPopupContext->m_SelectedQuadIndex], NewVal);
+		pEditor->m_MultiMappingSession.NotifyQuadProp(
+			pEditor->Map()->m_SelectedGroup,
+			pEditor->Map()->m_vSelectedLayers[0],
+			pEditor->Map()->m_vSelectedQuads[pQuadPopupContext->m_SelectedQuadIndex],
+			(int)EQuadProp::ORDER, NewVal);
 		pEditor->Map()->m_vSelectedQuads[pQuadPopupContext->m_SelectedQuadIndex] = QuadIndex;
 	}
 
@@ -1177,6 +1175,25 @@ CUi::EPopupMenuFunctionResult CEditor::PopupQuad(void *pContext, CUIRect View, b
 
 	if(Prop != EQuadProp::NONE && (State == EEditState::END || State == EEditState::ONE_GO))
 	{
+		const int GroupIdx = pEditor->Map()->m_SelectedGroup;
+		const int LayerIdx = pEditor->Map()->m_vSelectedLayers[0];
+		const auto &vSelQuads = pEditor->Map()->m_vSelectedQuads;
+		for(int k = 0; k < (int)vpQuads.size() && k < (int)vSelQuads.size(); k++)
+		{
+			int QuadIdx = vSelQuads[k];
+			CQuad *pQ = vpQuads[k];
+			if(Prop == EQuadProp::POS_X || Prop == EQuadProp::POS_Y)
+				pEditor->m_MultiMappingSession.NotifyQuadPoints(GroupIdx, LayerIdx, QuadIdx, pQ->m_aPoints);
+			else if(Prop == EQuadProp::COLOR)
+				pEditor->m_MultiMappingSession.NotifyQuadColors(GroupIdx, LayerIdx, QuadIdx, pQ->m_aColors);
+			else
+				pEditor->m_MultiMappingSession.NotifyQuadProp(GroupIdx, LayerIdx, QuadIdx, (int)Prop, [&]() -> int {
+					if(Prop == EQuadProp::POS_ENV)        return pQ->m_PosEnv;
+					if(Prop == EQuadProp::POS_ENV_OFFSET) return pQ->m_PosEnvOffset;
+					if(Prop == EQuadProp::COLOR_ENV)      return pQ->m_ColorEnv;
+					return pQ->m_ColorEnvOffset;
+				}());
+		}
 		pEditor->Map()->m_QuadTracker.EndQuadPropTrack(Prop);
 		pEditor->Map()->OnModify();
 	}
@@ -1447,8 +1464,313 @@ CUi::EPopupMenuFunctionResult CEditor::PopupPoint(void *pContext, CUIRect View, 
 
 	if(Prop != EQuadPointProp::NONE && (State == EEditState::END || State == EEditState::ONE_GO))
 	{
+		const int GroupIdx = pEditor->Map()->m_SelectedGroup;
+		const int LayerIdx = pEditor->Map()->m_vSelectedLayers[0];
+		const auto &vSelQuads = pEditor->Map()->m_vSelectedQuads;
+		for(int k = 0; k < (int)vpQuads.size() && k < (int)vSelQuads.size(); k++)
+		{
+			int QuadIdx = vSelQuads[k];
+			CQuad *pQ = vpQuads[k];
+			if(Prop == EQuadPointProp::POS_X || Prop == EQuadPointProp::POS_Y)
+				pEditor->m_MultiMappingSession.NotifyQuadPoints(GroupIdx, LayerIdx, QuadIdx, pQ->m_aPoints);
+			else if(Prop == EQuadPointProp::COLOR)
+				pEditor->m_MultiMappingSession.NotifyQuadColors(GroupIdx, LayerIdx, QuadIdx, pQ->m_aColors);
+			else
+			{
+				for(int v = 0; v < 4; v++)
+				{
+					if(!pEditor->Map()->IsQuadCornerSelected(v))
+						continue;
+					int Val = (Prop == EQuadPointProp::TEX_U) ? pQ->m_aTexcoords[v].x : pQ->m_aTexcoords[v].y;
+					pEditor->m_MultiMappingSession.NotifyQuadPointProp(GroupIdx, LayerIdx, QuadIdx, v, (int)Prop, Val);
+				}
+			}
+		}
 		pEditor->Map()->m_QuadTracker.EndQuadPointPropTrack(Prop);
 		pEditor->Map()->OnModify();
+	}
+
+	return CUi::POPUP_KEEP_OPEN;
+}
+
+CUi::EPopupMenuFunctionResult CEditor::PopupEnvPoint(void *pContext, CUIRect View, bool Active)
+{
+	CEditor *pEditor = static_cast<CEditor *>(pContext);
+	if(pEditor->Map()->m_SelectedEnvelope < 0 || pEditor->Map()->m_SelectedEnvelope >= (int)pEditor->Map()->m_vpEnvelopes.size())
+		return CUi::POPUP_CLOSE_CURRENT;
+
+	const float RowHeight = 12.0f;
+	CUIRect Row, Label, EditBox;
+
+	pEditor->m_ActiveEnvelopePreview = EEnvelopePreview::SELECTED;
+
+	std::shared_ptr<CEnvelope> pEnvelope = pEditor->Map()->m_vpEnvelopes[pEditor->Map()->m_SelectedEnvelope];
+
+	if(pEnvelope->GetChannels() == 4 && !pEditor->Map()->IsTangentSelected())
+	{
+		View.HSplitTop(RowHeight, &Row, &View);
+		View.HSplitTop(4.0f, nullptr, &View);
+		Row.VSplitLeft(60.0f, &Label, &Row);
+		Row.VSplitLeft(10.0f, nullptr, &EditBox);
+		pEditor->Ui()->DoLabel(&Label, "Color:", RowHeight - 2.0f, TEXTALIGN_ML);
+
+		const auto SelectedPoint = pEditor->Map()->m_vSelectedEnvelopePoints.front();
+		const int SelectedIndex = SelectedPoint.first;
+		auto *pValues = pEnvelope->m_vPoints[SelectedIndex].m_aValues;
+		const ColorRGBA Color = pEnvelope->m_vPoints[SelectedIndex].ColorValue();
+		const auto &&SetColor = [&](ColorRGBA NewColor) {
+			if(Color == NewColor && pEditor->m_ColorPickerPopupContext.m_State == EEditState::EDITING)
+				return;
+
+			static int s_Values[4];
+
+			if(pEditor->m_ColorPickerPopupContext.m_State == EEditState::START || pEditor->m_ColorPickerPopupContext.m_State == EEditState::ONE_GO)
+			{
+				for(int Channel = 0; Channel < 4; ++Channel)
+					s_Values[Channel] = pValues[Channel];
+			}
+
+			pEnvelope->m_vPoints[SelectedIndex].SetColorValue(NewColor);
+
+			if(pEditor->m_ColorPickerPopupContext.m_State == EEditState::END || pEditor->m_ColorPickerPopupContext.m_State == EEditState::ONE_GO)
+			{
+				std::vector<std::shared_ptr<IEditorAction>> vpActions(4);
+
+				for(int Channel = 0; Channel < 4; ++Channel)
+				{
+					vpActions[Channel] = std::make_shared<CEditorActionEnvelopeEditPoint>(pEditor->Map(), pEditor->Map()->m_SelectedEnvelope, SelectedIndex, Channel, CEditorActionEnvelopeEditPoint::EEditType::VALUE, s_Values[Channel], f2fx(NewColor[Channel]));
+				}
+
+				char aDisplay[256];
+				str_format(aDisplay, sizeof(aDisplay), "Edit color of point %d of envelope %d", SelectedIndex, pEditor->Map()->m_SelectedEnvelope);
+				pEditor->Map()->m_EnvelopeEditorHistory.RecordAction(std::make_shared<CEditorActionBulk>(pEditor->Map(), vpActions, aDisplay));
+			}
+
+			pEditor->Map()->m_UpdateEnvPointInfo = true;
+			pEditor->Map()->OnModify();
+		};
+		static char s_ColorPickerButton;
+		pEditor->DoColorPickerButton(&s_ColorPickerButton, &EditBox, Color, SetColor);
+	}
+
+	static CLineInputNumber s_CurValueInput;
+	static CLineInputNumber s_CurTimeInput;
+
+	static float s_CurrentTime = 0;
+	static float s_CurrentValue = 0;
+
+	if(pEditor->Map()->m_UpdateEnvPointInfo)
+	{
+		pEditor->Map()->m_UpdateEnvPointInfo = false;
+
+		const auto &[CurrentTime, CurrentValue] = pEditor->Map()->SelectedEnvelopeTimeAndValue();
+
+		// update displayed text
+		s_CurValueInput.SetFloat(fx2f(CurrentValue));
+		s_CurTimeInput.SetFloat(CurrentTime.AsSeconds());
+
+		s_CurrentTime = s_CurTimeInput.GetFloat();
+		s_CurrentValue = s_CurValueInput.GetFloat();
+	}
+
+	View.HSplitTop(RowHeight, &Row, &View);
+	Row.VSplitLeft(60.0f, &Label, &Row);
+	Row.VSplitLeft(10.0f, nullptr, &EditBox);
+	pEditor->Ui()->DoLabel(&Label, "Value:", RowHeight - 2.0f, TEXTALIGN_ML);
+	pEditor->DoEditBox(&s_CurValueInput, &EditBox, RowHeight - 2.0f, IGraphics::CORNER_ALL, "The value of the selected envelope point.");
+
+	View.HSplitTop(4.0f, nullptr, &View);
+	View.HSplitTop(RowHeight, &Row, &View);
+	Row.VSplitLeft(60.0f, &Label, &Row);
+	Row.VSplitLeft(10.0f, nullptr, &EditBox);
+	pEditor->Ui()->DoLabel(&Label, "Time (in s):", RowHeight - 2.0f, TEXTALIGN_ML);
+	pEditor->DoEditBox(&s_CurTimeInput, &EditBox, RowHeight - 2.0f, IGraphics::CORNER_ALL, "The time of the selected envelope point.");
+
+	if(pEditor->Input()->KeyIsPressed(KEY_RETURN) || pEditor->Input()->KeyIsPressed(KEY_KP_ENTER))
+	{
+		float CurrentTime = s_CurTimeInput.GetFloat();
+		float CurrentValue = s_CurValueInput.GetFloat();
+		if(!(absolute(CurrentTime - s_CurrentTime) < 0.0001f && absolute(CurrentValue - s_CurrentValue) < 0.0001f))
+		{
+			const auto &[OldTime, OldValue] = pEditor->Map()->SelectedEnvelopeTimeAndValue();
+
+			if(pEditor->Map()->IsTangentInSelected())
+			{
+				auto [SelectedIndex, SelectedChannel] = pEditor->Map()->m_SelectedTangentInPoint;
+
+				pEditor->Map()->m_EnvelopeEditorHistory.Execute(std::make_shared<CEditorActionEditEnvelopePointValue>(pEditor->Map(), pEditor->Map()->m_SelectedEnvelope, SelectedIndex, SelectedChannel, CEditorActionEditEnvelopePointValue::EType::TANGENT_IN, OldTime, OldValue, CFixedTime::FromSeconds(CurrentTime), f2fx(CurrentValue)));
+				CurrentTime = (pEnvelope->m_vPoints[SelectedIndex].m_Time + pEnvelope->m_vPoints[SelectedIndex].m_Bezier.m_aInTangentDeltaX[SelectedChannel]).AsSeconds();
+			}
+			else if(pEditor->Map()->IsTangentOutSelected())
+			{
+				auto [SelectedIndex, SelectedChannel] = pEditor->Map()->m_SelectedTangentOutPoint;
+
+				pEditor->Map()->m_EnvelopeEditorHistory.Execute(std::make_shared<CEditorActionEditEnvelopePointValue>(pEditor->Map(), pEditor->Map()->m_SelectedEnvelope, SelectedIndex, SelectedChannel, CEditorActionEditEnvelopePointValue::EType::TANGENT_OUT, OldTime, OldValue, CFixedTime::FromSeconds(CurrentTime), f2fx(CurrentValue)));
+				CurrentTime = (pEnvelope->m_vPoints[SelectedIndex].m_Time + pEnvelope->m_vPoints[SelectedIndex].m_Bezier.m_aOutTangentDeltaX[SelectedChannel]).AsSeconds();
+			}
+			else
+			{
+				auto [SelectedIndex, SelectedChannel] = pEditor->Map()->m_vSelectedEnvelopePoints.front();
+				pEditor->Map()->m_EnvelopeEditorHistory.Execute(std::make_shared<CEditorActionEditEnvelopePointValue>(pEditor->Map(), pEditor->Map()->m_SelectedEnvelope, SelectedIndex, SelectedChannel, CEditorActionEditEnvelopePointValue::EType::POINT, OldTime, OldValue, CFixedTime::FromSeconds(CurrentTime), f2fx(CurrentValue)));
+
+				if(SelectedIndex != 0)
+				{
+					CurrentTime = pEnvelope->m_vPoints[SelectedIndex].m_Time.AsSeconds();
+				}
+				else
+				{
+					CurrentTime = 0.0f;
+					pEnvelope->m_vPoints[SelectedIndex].m_Time = CFixedTime(0);
+				}
+			}
+
+			s_CurTimeInput.SetFloat(CFixedTime::FromSeconds(CurrentTime).AsSeconds());
+			s_CurValueInput.SetFloat(fx2f(f2fx(CurrentValue)));
+
+			s_CurrentTime = s_CurTimeInput.GetFloat();
+			s_CurrentValue = s_CurValueInput.GetFloat();
+		}
+	}
+
+	View.HSplitTop(6.0f, nullptr, &View);
+	View.HSplitTop(RowHeight, &Row, &View);
+	static int s_DeleteButtonId = 0;
+	const char *pButtonText = pEditor->Map()->IsTangentSelected() ? "Reset" : "Delete";
+	const char *pTooltip = pEditor->Map()->IsTangentSelected() ? "Reset tangent point to default value." : "Delete current envelope point in all channels.";
+	if(pEditor->DoButton_Editor(&s_DeleteButtonId, pButtonText, 0, &Row, BUTTONFLAG_LEFT, pTooltip))
+	{
+		if(pEditor->Map()->IsTangentInSelected())
+		{
+			auto [SelectedIndex, SelectedChannel] = pEditor->Map()->m_SelectedTangentInPoint;
+			const auto &[OldTime, OldValue] = pEditor->Map()->SelectedEnvelopeTimeAndValue();
+			pEditor->Map()->m_EnvelopeEditorHistory.Execute(std::make_shared<CEditorActionResetEnvelopePointTangent>(pEditor->Map(), pEditor->Map()->m_SelectedEnvelope, SelectedIndex, SelectedChannel, true, OldTime, OldValue));
+		}
+		else if(pEditor->Map()->IsTangentOutSelected())
+		{
+			auto [SelectedIndex, SelectedChannel] = pEditor->Map()->m_SelectedTangentOutPoint;
+			const auto &[OldTime, OldValue] = pEditor->Map()->SelectedEnvelopeTimeAndValue();
+			pEditor->Map()->m_EnvelopeEditorHistory.Execute(std::make_shared<CEditorActionResetEnvelopePointTangent>(pEditor->Map(), pEditor->Map()->m_SelectedEnvelope, SelectedIndex, SelectedChannel, false, OldTime, OldValue));
+		}
+		else
+		{
+			auto [SelectedIndex, SelectedChannel] = pEditor->Map()->m_vSelectedEnvelopePoints.front();
+			pEditor->Map()->m_EnvelopeEditorHistory.Execute(std::make_shared<CEditorActionDeleteEnvelopePoint>(pEditor->Map(), pEditor->Map()->m_SelectedEnvelope, SelectedIndex));
+		}
+
+		return CUi::POPUP_CLOSE_CURRENT;
+	}
+
+	return CUi::POPUP_KEEP_OPEN;
+}
+
+CUi::EPopupMenuFunctionResult CEditor::PopupEnvPointMulti(void *pContext, CUIRect View, bool Active)
+{
+	CEditor *pEditor = static_cast<CEditor *>(pContext);
+	const float RowHeight = 12.0f;
+
+	static int s_CurveButtonId = 0;
+	CUIRect CurveButton;
+	View.HSplitTop(RowHeight, &CurveButton, &View);
+	if(pEditor->DoButton_Editor(&s_CurveButtonId, "Project onto", 0, &CurveButton, BUTTONFLAG_LEFT, "Project all selected envelopes onto the curve between the first and last selected envelope."))
+	{
+		static SPopupMenuId s_PopupCurveTypeId;
+		pEditor->Ui()->DoPopupMenu(&s_PopupCurveTypeId, pEditor->Ui()->MouseX(), pEditor->Ui()->MouseY(), 80, 80, pEditor, PopupEnvPointCurveType);
+	}
+
+	return CUi::POPUP_KEEP_OPEN;
+}
+
+CUi::EPopupMenuFunctionResult CEditor::PopupEnvPointCurveType(void *pContext, CUIRect View, bool Active)
+{
+	CEditor *pEditor = static_cast<CEditor *>(pContext);
+	const float RowHeight = 14.0f;
+
+	int CurveType = -1;
+
+	static int s_ButtonLinearId;
+	CUIRect ButtonLinear;
+	View.HSplitTop(RowHeight, &ButtonLinear, &View);
+	if(pEditor->DoButton_MenuItem(&s_ButtonLinearId, "Linear", 0, &ButtonLinear))
+		CurveType = CURVETYPE_LINEAR;
+
+	static int s_ButtonSlowId;
+	CUIRect ButtonSlow;
+	View.HSplitTop(RowHeight, &ButtonSlow, &View);
+	if(pEditor->DoButton_MenuItem(&s_ButtonSlowId, "Slow", 0, &ButtonSlow))
+		CurveType = CURVETYPE_SLOW;
+
+	static int s_ButtonFastId;
+	CUIRect ButtonFast;
+	View.HSplitTop(RowHeight, &ButtonFast, &View);
+	if(pEditor->DoButton_MenuItem(&s_ButtonFastId, "Fast", 0, &ButtonFast))
+		CurveType = CURVETYPE_FAST;
+
+	static int s_ButtonStepId;
+	CUIRect ButtonStep;
+	View.HSplitTop(RowHeight, &ButtonStep, &View);
+	if(pEditor->DoButton_MenuItem(&s_ButtonStepId, "Step", 0, &ButtonStep))
+		CurveType = CURVETYPE_STEP;
+
+	static int s_ButtonSmoothId;
+	CUIRect ButtonSmooth;
+	View.HSplitTop(RowHeight, &ButtonSmooth, &View);
+	if(pEditor->DoButton_MenuItem(&s_ButtonSmoothId, "Smooth", 0, &ButtonSmooth))
+		CurveType = CURVETYPE_SMOOTH;
+
+	std::vector<std::shared_ptr<IEditorAction>> vpActions;
+
+	if(CurveType >= 0)
+	{
+		std::shared_ptr<CEnvelope> pEnvelope = pEditor->Map()->m_vpEnvelopes.at(pEditor->Map()->m_SelectedEnvelope);
+
+		for(int c = 0; c < pEnvelope->GetChannels(); c++)
+		{
+			int FirstSelectedIndex = pEnvelope->m_vPoints.size();
+			int LastSelectedIndex = -1;
+			for(auto [SelectedIndex, SelectedChannel] : pEditor->Map()->m_vSelectedEnvelopePoints)
+			{
+				if(SelectedChannel == c)
+				{
+					FirstSelectedIndex = minimum(FirstSelectedIndex, SelectedIndex);
+					LastSelectedIndex = maximum(LastSelectedIndex, SelectedIndex);
+				}
+			}
+
+			if(FirstSelectedIndex < (int)pEnvelope->m_vPoints.size() && LastSelectedIndex >= 0 && FirstSelectedIndex != LastSelectedIndex)
+			{
+				CEnvPoint FirstPoint = pEnvelope->m_vPoints[FirstSelectedIndex];
+				CEnvPoint LastPoint = pEnvelope->m_vPoints[LastSelectedIndex];
+
+				CEnvelope HelperEnvelope(1);
+				HelperEnvelope.AddPoint(FirstPoint.m_Time, {FirstPoint.m_aValues[c], 0, 0, 0});
+				HelperEnvelope.AddPoint(LastPoint.m_Time, {LastPoint.m_aValues[c], 0, 0, 0});
+				HelperEnvelope.m_vPoints[0].m_Curvetype = CurveType;
+
+				for(auto [SelectedIndex, SelectedChannel] : pEditor->Map()->m_vSelectedEnvelopePoints)
+				{
+					if(SelectedChannel == c)
+					{
+						if(SelectedIndex != FirstSelectedIndex && SelectedIndex != LastSelectedIndex)
+						{
+							CEnvPoint &CurrentPoint = pEnvelope->m_vPoints[SelectedIndex];
+							ColorRGBA Channels = ColorRGBA(0.0f, 0.0f, 0.0f, 0.0f);
+							HelperEnvelope.Eval(CurrentPoint.m_Time.AsSeconds(), Channels, 1);
+							int PrevValue = CurrentPoint.m_aValues[c];
+							CurrentPoint.m_aValues[c] = f2fx(Channels.r);
+							vpActions.push_back(std::make_shared<CEditorActionEnvelopeEditPoint>(pEditor->Map(), pEditor->Map()->m_SelectedEnvelope, SelectedIndex, SelectedChannel, CEditorActionEnvelopeEditPoint::EEditType::VALUE, PrevValue, CurrentPoint.m_aValues[c]));
+						}
+					}
+				}
+			}
+		}
+
+		if(!vpActions.empty())
+		{
+			pEditor->Map()->m_EnvelopeEditorHistory.RecordAction(std::make_shared<CEditorActionBulk>(pEditor->Map(), vpActions, "Project points"));
+		}
+
+		pEditor->Map()->OnModify();
+		return CUi::POPUP_CLOSE_CURRENT;
 	}
 
 	return CUi::POPUP_KEEP_OPEN;
@@ -1507,6 +1829,10 @@ CUi::EPopupMenuFunctionResult CEditor::PopupImage(void *pContext, CUIRect View, 
 				pEditor->ShowFileDialogError("Embedding is not possible because the image could not be loaded.");
 				return CUi::POPUP_KEEP_OPEN;
 			}
+			int ImgIdx = pEditor->Map()->m_SelectedImage;
+			CByteBufferWriter PngWriter;
+			if(CImageLoader::SavePng(PngWriter, *pImg))
+				pEditor->m_MultiMappingSession.NotifyEmbedImage(ImgIdx, PngWriter.Data(), (int)PngWriter.Size());
 			pImg->m_External = 0;
 			return CUi::POPUP_CLOSE_CURRENT;
 		}
@@ -1517,6 +1843,7 @@ CUi::EPopupMenuFunctionResult CEditor::PopupImage(void *pContext, CUIRect View, 
 	{
 		if(pEditor->DoButton_MenuItem(&s_ExternalButton, "Make external", 0, &Slot, BUTTONFLAG_LEFT, "Remove the image from the map file."))
 		{
+			pEditor->m_MultiMappingSession.NotifyExternImage(pEditor->Map()->m_SelectedImage);
 			pImg->m_External = 1;
 			return CUi::POPUP_CLOSE_CURRENT;
 		}
@@ -1578,6 +1905,7 @@ CUi::EPopupMenuFunctionResult CEditor::PopupImage(void *pContext, CUIRect View, 
 		}
 		else
 		{
+			pEditor->m_MultiMappingSession.NotifyDelImage(pEditor->Map()->m_SelectedImage);
 			pEditor->Map()->m_vpImages.erase(pEditor->Map()->m_vpImages.begin() + pEditor->Map()->m_SelectedImage);
 			pEditor->Map()->ModifyImageIndex(gs_ModifyIndexDeleted(pEditor->Map()->m_SelectedImage));
 		}
@@ -1687,6 +2015,7 @@ CUi::EPopupMenuFunctionResult CEditor::PopupSound(void *pContext, CUIRect View, 
 		}
 		else
 		{
+			pEditor->m_MultiMappingSession.NotifyDelSound(pEditor->Map()->m_SelectedSound);
 			pEditor->Map()->m_vpSounds.erase(pEditor->Map()->m_vpSounds.begin() + pEditor->Map()->m_SelectedSound);
 			pEditor->Map()->ModifySoundIndex(gs_ModifyIndexDeleted(pEditor->Map()->m_SelectedSound));
 			pEditor->m_ToolbarPreviewSound = -1;
@@ -1791,17 +2120,21 @@ CUi::EPopupMenuFunctionResult CEditor::PopupEvent(void *pContext, CUIRect View, 
 
 	const char *pTitle;
 	const char *pMessage;
-	char aMessageBuf[128 + IO_MAX_PATH_LENGTH];
+	char aMessageBuf[128];
 	if(pEditor->m_PopupEventType == POPEVENT_EXIT)
 	{
 		pTitle = "Exit the editor";
 		pMessage = "The map contains unsaved data, you might want to save it before you exit the editor.\n\nContinue anyway?";
 	}
-	else if(pEditor->m_PopupEventType == POPEVENT_CLOSE_MAP)
+	else if(pEditor->m_PopupEventType == POPEVENT_LOAD || pEditor->m_PopupEventType == POPEVENT_LOADCURRENT || pEditor->m_PopupEventType == POPEVENT_LOADDROP)
 	{
-		pTitle = "Save changes?";
-		str_format(aMessageBuf, sizeof(aMessageBuf), "Do you want to save your changes to '%s'?\n\nYour changes will be lost if you do not save them.", pEditor->Map()->m_aDisplayName);
-		pMessage = aMessageBuf;
+		pTitle = "Load map";
+		pMessage = "The map contains unsaved data, you might want to save it before you load a new map.\n\nContinue anyway?";
+	}
+	else if(pEditor->m_PopupEventType == POPEVENT_NEW)
+	{
+		pTitle = "New map";
+		pMessage = "The map contains unsaved data, you might want to save it before you create a new map.\n\nContinue anyway?";
 	}
 	else if(pEditor->m_PopupEventType == POPEVENT_LARGELAYER)
 	{
@@ -1928,17 +2261,14 @@ CUi::EPopupMenuFunctionResult CEditor::PopupEvent(void *pContext, CUIRect View, 
 		static int s_CancelButton = 0;
 		if(pEditor->DoButton_Editor(&s_CancelButton, "Cancel", 0, &Button, BUTTONFLAG_LEFT, nullptr))
 		{
-			if(pEditor->m_PopupEventType == POPEVENT_MULTIMAPPING_LOAD)
+			if(pEditor->m_PopupEventType == POPEVENT_LOADDROP || pEditor->m_PopupEventType == POPEVENT_MULTIMAPPING_LOAD)
 				pEditor->m_aFilenamePendingLoad[0] = 0;
 
-			if(pEditor->m_PopupEventType == POPEVENT_TILE_ART_BIG_IMAGE || pEditor->m_PopupEventType == POPEVENT_TILE_ART_MANY_COLORS)
-			{
+			else if(pEditor->m_PopupEventType == POPEVENT_TILE_ART_BIG_IMAGE || pEditor->m_PopupEventType == POPEVENT_TILE_ART_MANY_COLORS)
 				pEditor->m_TileArtImageInfo.Free();
-			}
+
 			else if(pEditor->m_PopupEventType == POPEVENT_QUAD_ART_BIG_IMAGE)
-			{
 				pEditor->m_QuadArtImageInfo.Free();
-			}
 
 			pEditor->m_PopupEventWasActivated = false;
 			return CUi::POPUP_CLOSE_CURRENT;
@@ -1948,7 +2278,7 @@ CUi::EPopupMenuFunctionResult CEditor::PopupEvent(void *pContext, CUIRect View, 
 	if(pEditor->m_PopupEventType == POPEVENT_RESTARTING_SERVER)
 		return CUi::POPUP_KEEP_OPEN;
 
-	// POPEVENT_MULTIMAPPING_NOT_OWNER: custom buttons - Cancel / Disconnect
+	// POPEVENT_MULTIMAPPING_NOT_OWNER: custom buttons вЂ” Cancel / Disconnect
 	if(pEditor->m_PopupEventType == POPEVENT_MULTIMAPPING_NOT_OWNER)
 	{
 		ButtonBar.VSplitRight(110.0f, &ButtonBar, &Button);
@@ -1962,7 +2292,7 @@ CUi::EPopupMenuFunctionResult CEditor::PopupEvent(void *pContext, CUIRect View, 
 		return CUi::POPUP_KEEP_OPEN;
 	}
 
-	// POPEVENT_MULTIMAPPING_NEW: custom buttons - Cancel / Disconnect
+	// POPEVENT_MULTIMAPPING_NEW: custom buttons вЂ” Cancel / Disconnect
 	if(pEditor->m_PopupEventType == POPEVENT_MULTIMAPPING_NEW)
 	{
 		ButtonBar.VSplitRight(110.0f, &ButtonBar, &Button);
@@ -1979,20 +2309,31 @@ CUi::EPopupMenuFunctionResult CEditor::PopupEvent(void *pContext, CUIRect View, 
 
 	ButtonBar.VSplitRight(110.0f, &ButtonBar, &Button);
 	static int s_ConfirmButton = 0;
-	const char *pConfirmLabel = pEditor->m_PopupEventType == POPEVENT_CLOSE_MAP ? "Save changes" : "Confirm";
-	const int ConfirmChecked = pEditor->m_PopupEventType == POPEVENT_CLOSE_MAP ? EditorButtonChecked::POSITIVE_ACTION : 0;
-	if(pEditor->DoButton_Editor(&s_ConfirmButton, pConfirmLabel, ConfirmChecked, &Button, BUTTONFLAG_LEFT, nullptr) ||
-		(Active && pEditor->Ui()->ConsumeHotkey(CUi::HOTKEY_ENTER)))
+	if(pEditor->DoButton_Editor(&s_ConfirmButton, "Confirm", 0, &Button, BUTTONFLAG_LEFT, nullptr) || (Active && pEditor->Ui()->ConsumeHotkey(CUi::HOTKEY_ENTER)))
 	{
 		if(pEditor->m_PopupEventType == POPEVENT_EXIT)
 		{
 			pEditor->OnClose();
 			g_Config.m_ClEditor = 0;
 		}
-		else if(pEditor->m_PopupEventType == POPEVENT_CLOSE_MAP)
+		else if(pEditor->m_PopupEventType == POPEVENT_LOAD)
 		{
-			pEditor->Map()->m_CloseOnSave = true;
-			pEditor->m_QuickActionSave.Call();
+			pEditor->m_FileBrowser.ShowFileDialog(IStorage::TYPE_ALL, CFileBrowser::EFileType::MAP, "Load map", "Load", "maps", "", CallbackOpenMap, pEditor);
+		}
+		else if(pEditor->m_PopupEventType == POPEVENT_LOADCURRENT)
+		{
+			pEditor->LoadCurrentMap();
+		}
+		else if(pEditor->m_PopupEventType == POPEVENT_LOADDROP)
+		{
+			int Result = pEditor->Load(pEditor->m_aFilenamePendingLoad, IStorage::TYPE_ALL_OR_ABSOLUTE);
+			if(!Result)
+				dbg_msg("editor", "editing passed map file '%s' failed", pEditor->m_aFilenamePendingLoad);
+			pEditor->m_aFilenamePendingLoad[0] = 0;
+		}
+		else if(pEditor->m_PopupEventType == POPEVENT_NEW)
+		{
+			pEditor->Reset();
 		}
 		else if(pEditor->m_PopupEventType == POPEVENT_PLACE_BORDER_TILES)
 		{
@@ -2005,15 +2346,13 @@ CUi::EPopupMenuFunctionResult CEditor::PopupEvent(void *pContext, CUIRect View, 
 		}
 		else if(pEditor->m_PopupEventType == POPEVENT_TILE_ART_MANY_COLORS)
 		{
-			pEditor->Map()->AddTileArt(std::move(pEditor->m_TileArtImageInfo), pEditor->m_aTileArtFilename, false);
+			pEditor->AddTileArt();
 			pEditor->m_MultiMappingSession.StartMapTransfer();
-			pEditor->OnDialogClose();
 		}
 		else if(pEditor->m_PopupEventType == POPEVENT_QUAD_ART_BIG_IMAGE)
 		{
-			pEditor->Map()->AddQuadArt(std::move(pEditor->m_QuadArtImageInfo), pEditor->m_QuadArtParameters, false);
+			pEditor->AddQuadArt();
 			pEditor->m_MultiMappingSession.StartMapTransfer();
-			pEditor->OnDialogClose();
 		}
 		else if(pEditor->m_PopupEventType == POPEVENT_REMOVE_USED_IMAGE)
 		{
@@ -2045,16 +2384,6 @@ CUi::EPopupMenuFunctionResult CEditor::PopupEvent(void *pContext, CUIRect View, 
 		}
 		pEditor->m_PopupEventWasActivated = false;
 		return CUi::POPUP_CLOSE_CURRENT;
-	}
-
-	if(pEditor->m_PopupEventType == POPEVENT_CLOSE_MAP)
-	{
-		static int s_DiscardButton = 0;
-		ButtonBar.VMargin((ButtonBar.w - 110.0f) / 2.0f, &Button);
-		if(pEditor->DoButton_Editor(&s_DiscardButton, "Discard changes", EditorButtonChecked::DANGEROUS_ACTION, &Button, BUTTONFLAG_LEFT, nullptr))
-		{
-			pEditor->CloseMap(pEditor->m_SelectedMap, false);
-		}
 	}
 
 	return CUi::POPUP_KEEP_OPEN;
@@ -2109,10 +2438,11 @@ CUi::EPopupMenuFunctionResult CEditor::PopupSelectImage(void *pContext, CUIRect 
 			ImageView.w = ImageView.h;
 		else
 			ImageView.h = ImageView.w;
-		float Max = std::max(pEditor->Map()->m_vpImages[ShowImage]->m_Width, pEditor->Map()->m_vpImages[ShowImage]->m_Height);
+		float Max = (float)(maximum(pEditor->Map()->m_vpImages[ShowImage]->m_Width, pEditor->Map()->m_vpImages[ShowImage]->m_Height));
 		ImageView.w *= pEditor->Map()->m_vpImages[ShowImage]->m_Width / Max;
 		ImageView.h *= pEditor->Map()->m_vpImages[ShowImage]->m_Height / Max;
 		pEditor->Graphics()->TextureSet(pEditor->Map()->m_vpImages[ShowImage]->m_Texture);
+		pEditor->Graphics()->BlendNormal();
 		pEditor->Graphics()->WrapClamp();
 		pEditor->Graphics()->QuadsBegin();
 		IGraphics::CQuadItem QuadItem(ImageView.x, ImageView.y, ImageView.w, ImageView.h);
@@ -2250,46 +2580,27 @@ int CEditor::PopupSelectGameTileOpResult()
 	return Result;
 }
 
-static int s_AutomapperConfigSelected = -100;
-static int s_AutomapperConfigCurrent = -100;
+static int s_AutoMapConfigSelected = -100;
+static int s_AutoMapConfigCurrent = -100;
 
-CUi::EPopupMenuFunctionResult CEditor::PopupSelectAutomapperConfig(void *pContext, CUIRect View, bool Active)
+CUi::EPopupMenuFunctionResult CEditor::PopupSelectConfigAutoMap(void *pContext, CUIRect View, bool Active)
 {
 	CEditor *pEditor = static_cast<CEditor *>(pContext);
 	std::shared_ptr<CLayerTiles> pLayer = std::static_pointer_cast<CLayerTiles>(pEditor->Map()->SelectedLayer(0));
-	CAutomapper *pAutomapper = &pEditor->Map()->m_vpImages[pLayer->m_Image]->m_Automapper;
+	CAutoMapper *pAutoMapper = &pEditor->Map()->m_vpImages[pLayer->m_Image]->m_AutoMapper;
 
 	const float ButtonHeight = 12.0f;
 	const float ButtonMargin = 2.0f;
 
-	CUIRect Button;
-	View.HSplitBottom(ButtonHeight, &View, &Button);
-	static char s_ShowDirectoryButton;
-	if(pEditor->DoButton_MenuItem(&s_ShowDirectoryButton, "Show directory", 0, &Button, BUTTONFLAG_LEFT, "Open the directory for automapper rules in the file browser."))
-	{
-		char aPath[IO_MAX_PATH_LENGTH];
-		pEditor->Storage()->GetCompletePath(IStorage::TYPE_SAVE, "editor/automap", aPath, sizeof(aPath));
-		pEditor->Storage()->CreateFolder("editor", IStorage::TYPE_SAVE);
-		pEditor->Storage()->CreateFolder("editor/automap", IStorage::TYPE_SAVE);
-		pEditor->Client()->ViewFile(aPath);
-	}
-
-	View.HSplitBottom(5.0f, &View, &Button);
-	IGraphics::CLineItem LineItem(Button.x, Button.y + Button.h / 2, Button.x + Button.w, Button.y + Button.h / 2);
-	pEditor->Graphics()->TextureClear();
-	pEditor->Graphics()->LinesBegin();
-	pEditor->Graphics()->LinesDraw(&LineItem, 1);
-	pEditor->Graphics()->LinesEnd();
-
 	static CListBox s_ListBox;
-	s_ListBox.DoStart(ButtonHeight, pAutomapper->ConfigNamesNum() + 1, 1, 4, s_AutomapperConfigCurrent + 1, &View, false);
+	s_ListBox.DoStart(ButtonHeight, pAutoMapper->ConfigNamesNum() + 1, 1, 4, s_AutoMapConfigCurrent + 1, &View, false);
 	s_ListBox.SetScrollbarWidth(15.0f);
 	s_ListBox.DoAutoSpacing(ButtonMargin);
 
-	for(int i = 0; i < pAutomapper->ConfigNamesNum() + 1; i++)
+	for(int i = 0; i < pAutoMapper->ConfigNamesNum() + 1; i++)
 	{
 		static int s_NoneButton = 0;
-		CListboxItem Item = s_ListBox.DoNextItem(i == 0 ? (void *)&s_NoneButton : pAutomapper->GetConfigName(i - 1), (i - 1) == s_AutomapperConfigCurrent, 3.0f);
+		CListboxItem Item = s_ListBox.DoNextItem(i == 0 ? (void *)&s_NoneButton : pAutoMapper->GetConfigName(i - 1), (i - 1) == s_AutoMapConfigCurrent, 3.0f);
 		if(!Item.m_Visible)
 			continue;
 
@@ -2299,55 +2610,56 @@ CUi::EPopupMenuFunctionResult CEditor::PopupSelectAutomapperConfig(void *pContex
 		SLabelProperties Props;
 		Props.m_MaxWidth = Label.w;
 		Props.m_EllipsisAtEnd = true;
-		pEditor->Ui()->DoLabel(&Label, i == 0 ? "None" : pAutomapper->GetConfigName(i - 1), EditorFontSizes::MENU, TEXTALIGN_ML, Props);
+		pEditor->Ui()->DoLabel(&Label, i == 0 ? "None" : pAutoMapper->GetConfigName(i - 1), EditorFontSizes::MENU, TEXTALIGN_ML, Props);
 	}
 
 	int NewSelected = s_ListBox.DoEnd() - 1;
-	if(NewSelected != s_AutomapperConfigCurrent)
-		s_AutomapperConfigSelected = NewSelected;
+	if(NewSelected != s_AutoMapConfigCurrent)
+		s_AutoMapConfigSelected = NewSelected;
 
 	return CUi::POPUP_KEEP_OPEN;
 }
 
-void CEditor::PopupSelectAutomapperConfigInvoke(int Current, float x, float y)
+void CEditor::PopupSelectConfigAutoMapInvoke(int Current, float x, float y)
 {
-	static SPopupMenuId s_PopupSelectAutomapperConfigId;
-	s_AutomapperConfigSelected = -100;
-	s_AutomapperConfigCurrent = Current;
+	static SPopupMenuId s_PopupSelectConfigAutoMapId;
+	s_AutoMapConfigSelected = -100;
+	s_AutoMapConfigCurrent = Current;
 	std::shared_ptr<CLayerTiles> pLayer = std::static_pointer_cast<CLayerTiles>(Map()->SelectedLayer(0));
-	const int ItemCount = std::min(Map()->m_vpImages[pLayer->m_Image]->m_Automapper.ConfigNamesNum() + 1, 10); // +1 for None-entry
+	const int ItemCount = minimum(Map()->m_vpImages[pLayer->m_Image]->m_AutoMapper.ConfigNamesNum() + 1, 10); // +1 for None-entry
 	// Width for buttons is 120, 15 is the scrollbar width, 2 is the margin between both.
-	Ui()->DoPopupMenu(&s_PopupSelectAutomapperConfigId, x, y, 120.0f + 15.0f + 2.0f, 10.0f + 12.0f * ItemCount + 2.0f * (ItemCount - 1) + 5.0f + 12.0f, this, PopupSelectAutomapperConfig);
+	Ui()->DoPopupMenu(&s_PopupSelectConfigAutoMapId, x, y, 120.0f + 15.0f + 2.0f, 10.0f + 12.0f * ItemCount + 2.0f * (ItemCount - 1) + CScrollRegion::HEIGHT_MAGIC_FIX, this, PopupSelectConfigAutoMap);
 }
 
-int CEditor::PopupSelectAutomapperConfigResult()
+int CEditor::PopupSelectConfigAutoMapResult()
 {
-	if(s_AutomapperConfigSelected == -100)
+	if(s_AutoMapConfigSelected == -100)
 		return -100;
 
-	s_AutomapperConfigCurrent = s_AutomapperConfigSelected;
-	s_AutomapperConfigSelected = -100;
-	return s_AutomapperConfigCurrent;
+	s_AutoMapConfigCurrent = s_AutoMapConfigSelected;
+	s_AutoMapConfigSelected = -100;
+	return s_AutoMapConfigCurrent;
 }
 
-static int s_AutomapperReferenceSelected = -100;
-static int s_AutomapperReferenceCurrent = -100;
+static int s_AutoMapReferenceSelected = -100;
+static int s_AutoMapReferenceCurrent = -100;
 
-CUi::EPopupMenuFunctionResult CEditor::PopupSelectAutomapperReference(void *pContext, CUIRect View, bool Active)
+CUi::EPopupMenuFunctionResult CEditor::PopupSelectAutoMapReference(void *pContext, CUIRect View, bool Active)
 {
 	CEditor *pEditor = static_cast<CEditor *>(pContext);
+	std::shared_ptr<CLayerTiles> pLayer = std::static_pointer_cast<CLayerTiles>(pEditor->Map()->SelectedLayer(0));
 
 	const float ButtonHeight = 12.0f;
 	const float ButtonMargin = 2.0f;
 
 	static CListBox s_ListBox;
-	s_ListBox.DoStart(ButtonHeight, std::size(AUTOMAP_REFERENCE_NAMES) + 1, 1, 4, s_AutomapperReferenceCurrent + 1, &View, false);
+	s_ListBox.DoStart(ButtonHeight, std::size(AUTOMAP_REFERENCE_NAMES) + 1, 1, 4, s_AutoMapReferenceCurrent + 1, &View, false);
 	s_ListBox.DoAutoSpacing(ButtonMargin);
 
 	for(int i = 0; i < static_cast<int>(std::size(AUTOMAP_REFERENCE_NAMES)) + 1; i++)
 	{
 		static int s_NoneButton = 0;
-		CListboxItem Item = s_ListBox.DoNextItem(i == 0 ? (void *)&s_NoneButton : AUTOMAP_REFERENCE_NAMES[i - 1], (i - 1) == s_AutomapperReferenceCurrent, 3.0f);
+		CListboxItem Item = s_ListBox.DoNextItem(i == 0 ? (void *)&s_NoneButton : AUTOMAP_REFERENCE_NAMES[i - 1], (i - 1) == s_AutoMapReferenceCurrent, 3.0f);
 		if(!Item.m_Visible)
 			continue;
 
@@ -2361,29 +2673,30 @@ CUi::EPopupMenuFunctionResult CEditor::PopupSelectAutomapperReference(void *pCon
 	}
 
 	int NewSelected = s_ListBox.DoEnd() - 1;
-	if(NewSelected != s_AutomapperReferenceCurrent)
-		s_AutomapperReferenceSelected = NewSelected;
+	if(NewSelected != s_AutoMapReferenceCurrent)
+		s_AutoMapReferenceSelected = NewSelected;
 
 	return CUi::POPUP_KEEP_OPEN;
 }
 
-void CEditor::PopupSelectAutomapperReferenceInvoke(int Current, float x, float y)
+void CEditor::PopupSelectAutoMapReferenceInvoke(int Current, float x, float y)
 {
-	static SPopupMenuId s_PopupSelectAutomapperReferenceId;
-	s_AutomapperReferenceSelected = -100;
-	s_AutomapperReferenceCurrent = Current;
+	static SPopupMenuId s_PopupSelectAutoMapReferenceId;
+	s_AutoMapReferenceSelected = -100;
+	s_AutoMapReferenceCurrent = Current;
+	std::shared_ptr<CLayerTiles> pLayer = std::static_pointer_cast<CLayerTiles>(Map()->SelectedLayer(0));
 	// Width for buttons is 120, 15 is the scrollbar width, 2 is the margin between both.
-	Ui()->DoPopupMenu(&s_PopupSelectAutomapperReferenceId, x, y, 120.0f + 15.0f + 2.0f, 26.0f + 14.0f * std::size(AUTOMAP_REFERENCE_NAMES) + 1, this, PopupSelectAutomapperReference);
+	Ui()->DoPopupMenu(&s_PopupSelectAutoMapReferenceId, x, y, 120.0f + 15.0f + 2.0f, 26.0f + 14.0f * std::size(AUTOMAP_REFERENCE_NAMES) + 1, this, PopupSelectAutoMapReference);
 }
 
-int CEditor::PopupSelectAutomapperReferenceResult()
+int CEditor::PopupSelectAutoMapReferenceResult()
 {
-	if(s_AutomapperReferenceSelected == -100)
+	if(s_AutoMapReferenceSelected == -100)
 		return -100;
 
-	s_AutomapperReferenceCurrent = s_AutomapperReferenceSelected;
-	s_AutomapperReferenceSelected = -100;
-	return s_AutomapperReferenceCurrent;
+	s_AutoMapReferenceCurrent = s_AutoMapReferenceSelected;
+	s_AutoMapReferenceSelected = -100;
+	return s_AutoMapReferenceCurrent;
 }
 
 // DDRace
@@ -2421,7 +2734,7 @@ CUi::EPopupMenuFunctionResult CEditor::PopupTele(void *pContext, CUIRect View, b
 		pEd->Map()->m_pTeleLayer->GetPos(pEd->m_ViewTeleNumber, -1, TeleX, TeleY);
 		if(TeleX != -1 && TeleY != -1)
 		{
-			pEd->MapView()->SetWorldOffset({32.0f * (TeleX + 0.5f), 32.0f * (TeleY + 0.5f)});
+			pEd->MapView()->SetWorldOffset({32.0f * TeleX + 0.5f, 32.0f * TeleY + 0.5f});
 			return true;
 		}
 		return false;
@@ -2452,7 +2765,7 @@ CUi::EPopupMenuFunctionResult CEditor::PopupTele(void *pContext, CUIRect View, b
 			if(TeleNumber != -1)
 			{
 				pEditor->m_TeleNumber = TeleNumber;
-				pEditor->AdjustBrushSpecialTiles(false, 0, 0);
+				pEditor->AdjustBrushSpecialTiles(false);
 			}
 		}
 
@@ -2464,7 +2777,7 @@ CUi::EPopupMenuFunctionResult CEditor::PopupTele(void *pContext, CUIRect View, b
 			if(CheckpointNumber != -1)
 			{
 				pEditor->m_TeleCheckpointNumber = CheckpointNumber;
-				pEditor->AdjustBrushSpecialTiles(false, 0, 0);
+				pEditor->AdjustBrushSpecialTiles(false);
 			}
 		}
 
@@ -2492,12 +2805,12 @@ CUi::EPopupMenuFunctionResult CEditor::PopupTele(void *pContext, CUIRect View, b
 		if(Prop == PROP_TELE)
 		{
 			pEditor->m_TeleNumber = (NewVal - 1 + 255) % 255 + 1;
-			pEditor->AdjustBrushSpecialTiles(false, 0, 0);
+			pEditor->AdjustBrushSpecialTiles(false);
 		}
 		else if(Prop == PROP_TELE_CP)
 		{
 			pEditor->m_TeleCheckpointNumber = (NewVal - 1 + 255) % 255 + 1;
-			pEditor->AdjustBrushSpecialTiles(false, 0, 0);
+			pEditor->AdjustBrushSpecialTiles(false);
 		}
 		else if(Prop == PROP_TELE_VIEW)
 			pEditor->m_ViewTeleNumber = (NewVal - 1 + 255) % 255 + 1;
@@ -2553,7 +2866,7 @@ CUi::EPopupMenuFunctionResult CEditor::PopupSpeedup(void *pContext, CUIRect View
 	else if(Prop == PROP_ANGLE)
 	{
 		pEditor->m_SpeedupAngle = std::clamp(NewVal, 0, 359);
-		pEditor->AdjustBrushSpecialTiles(false, 0, 0);
+		pEditor->AdjustBrushSpecialTiles(false);
 	}
 
 	return CUi::POPUP_KEEP_OPEN;
@@ -2584,7 +2897,7 @@ CUi::EPopupMenuFunctionResult CEditor::PopupSwitch(void *pContext, CUIRect View,
 		pEditor->Map()->m_pSwitchLayer->GetPos(pEditor->m_ViewSwitch, -1, SwitchPos);
 		if(SwitchPos != ivec2(-1, -1))
 		{
-			pEditor->MapView()->SetWorldOffset({32.0f * (SwitchPos.x + 0.5f), 32.0f * (SwitchPos.y + 0.5f)});
+			pEditor->MapView()->SetWorldOffset({32.0f * SwitchPos.x + 0.5f, 32.0f * SwitchPos.y + 0.5f});
 			return true;
 		}
 		return false;
@@ -2686,7 +2999,7 @@ CUi::EPopupMenuFunctionResult CEditor::PopupTune(void *pContext, CUIRect View, b
 
 		if(TunePos != ivec2(-1, -1))
 		{
-			pEditor->MapView()->SetWorldOffset({32.0f * (TunePos.x + 0.5f), 32.0f * (TunePos.y + 0.5f)});
+			pEditor->MapView()->SetWorldOffset({32.0f * TunePos.x + 0.5f, 32.0f * TunePos.y + 0.5f});
 			return true;
 		}
 		return false;
@@ -2796,7 +3109,7 @@ CUi::EPopupMenuFunctionResult CEditor::PopupGoto(void *pContext, CUIRect View, b
 	static int s_Button;
 	if(pEditor->DoButton_Editor(&s_Button, "Go", 0, &Button, BUTTONFLAG_LEFT, nullptr))
 	{
-		pEditor->MapView()->SetWorldOffset({32.0f * (s_GotoPos.x + 0.5f), 32.0f * (s_GotoPos.y + 0.5f)});
+		pEditor->MapView()->SetWorldOffset({32.0f * s_GotoPos.x + 0.5f, 32.0f * s_GotoPos.y + 0.5f});
 	}
 
 	return CUi::POPUP_KEEP_OPEN;
@@ -2830,7 +3143,7 @@ CUi::EPopupMenuFunctionResult CEditor::PopupEntities(void *pContext, CUIRect Vie
 
 				char aBuf[IO_MAX_PATH_LENGTH];
 				str_format(aBuf, sizeof(aBuf), "editor/entities/%s.png", pName);
-				pEditor->m_EntitiesTexture = pEditor->Graphics()->LoadTexture(aBuf, IStorage::TYPE_ALL, pEditor->Graphics()->TextureLoadFlags());
+				pEditor->m_EntitiesTexture = pEditor->Graphics()->LoadTexture(aBuf, IStorage::TYPE_ALL, pEditor->GetTextureUsageFlag());
 				return CUi::POPUP_CLOSE_CURRENT;
 			}
 		}
@@ -2867,7 +3180,6 @@ CUi::EPopupMenuFunctionResult CEditor::PopupProofMode(void *pContext, CUIRect Vi
 CUi::EPopupMenuFunctionResult CEditor::PopupAnimateSettings(void *pContext, CUIRect View, bool Active)
 {
 	CEditor *pEditor = static_cast<CEditor *>(pContext);
-	CMapEnvelopeEvaluator &EnvelopeEvaluator = pEditor->Map()->m_EnvelopeEvaluator;
 
 	static constexpr float MIN_ANIM_SPEED = 0.001f;
 	static constexpr float MAX_ANIM_SPEED = 1000000.0f;
@@ -2881,53 +3193,168 @@ CUi::EPopupMenuFunctionResult CEditor::PopupAnimateSettings(void *pContext, CUIR
 	View.HSplitBottom(12.0f, &View, &ButtonReset);
 	pEditor->Ui()->DoLabel(&Label, "Speed", 10.0f, TEXTALIGN_ML);
 
-	const float OldAnimateSpeed = EnvelopeEvaluator.m_AnimateSpeed;
-
 	static char s_DecreaseButton;
 	if(pEditor->DoButton_FontIcon(&s_DecreaseButton, FontIcon::MINUS, 0, &ButtonDecrease, BUTTONFLAG_LEFT, "Decrease animation speed.", IGraphics::CORNER_L, 7.0f))
 	{
-		EnvelopeEvaluator.m_AnimateSpeed -= EnvelopeEvaluator.m_AnimateSpeed <= 1.0f ? 0.1f : 0.5f;
-		EnvelopeEvaluator.m_AnimateSpeed = std::max(EnvelopeEvaluator.m_AnimateSpeed, MIN_ANIM_SPEED);
-		EnvelopeEvaluator.m_AnimateUpdatePopup = true;
+		pEditor->m_AnimateSpeed -= pEditor->m_AnimateSpeed <= 1.0f ? 0.1f : 0.5f;
+		pEditor->m_AnimateSpeed = maximum(pEditor->m_AnimateSpeed, MIN_ANIM_SPEED);
+		pEditor->m_AnimateUpdatePopup = true;
 	}
 
 	static char s_IncreaseButton;
 	if(pEditor->DoButton_FontIcon(&s_IncreaseButton, FontIcon::PLUS, 0, &ButtonIncrease, BUTTONFLAG_LEFT, "Increase animation speed.", IGraphics::CORNER_R, 7.0f))
 	{
-		if(EnvelopeEvaluator.m_AnimateSpeed < 0.1f)
-			EnvelopeEvaluator.m_AnimateSpeed = 0.1f;
+		if(pEditor->m_AnimateSpeed < 0.1f)
+			pEditor->m_AnimateSpeed = 0.1f;
 		else
-			EnvelopeEvaluator.m_AnimateSpeed += EnvelopeEvaluator.m_AnimateSpeed < 1.0f ? 0.1f : 0.5f;
-		EnvelopeEvaluator.m_AnimateSpeed = std::min(EnvelopeEvaluator.m_AnimateSpeed, MAX_ANIM_SPEED);
-		EnvelopeEvaluator.m_AnimateUpdatePopup = true;
+			pEditor->m_AnimateSpeed += pEditor->m_AnimateSpeed < 1.0f ? 0.1f : 0.5f;
+		pEditor->m_AnimateSpeed = minimum(pEditor->m_AnimateSpeed, MAX_ANIM_SPEED);
+		pEditor->m_AnimateUpdatePopup = true;
 	}
 
 	static char s_DefaultButton;
 	if(pEditor->DoButton_Ex(&s_DefaultButton, "Default", 0, &ButtonReset, BUTTONFLAG_LEFT, "Reset to normal animation speed.", IGraphics::CORNER_ALL))
 	{
-		EnvelopeEvaluator.m_AnimateSpeed = 1.0f;
-		EnvelopeEvaluator.m_AnimateUpdatePopup = true;
+		pEditor->m_AnimateSpeed = 1.0f;
+		pEditor->m_AnimateUpdatePopup = true;
 	}
 
 	static CLineInputNumber s_SpeedInput;
-	if(EnvelopeEvaluator.m_AnimateUpdatePopup)
+	if(pEditor->m_AnimateUpdatePopup)
 	{
-		s_SpeedInput.SetFloat(EnvelopeEvaluator.m_AnimateSpeed);
-		EnvelopeEvaluator.m_AnimateUpdatePopup = false;
+		s_SpeedInput.SetFloat(pEditor->m_AnimateSpeed);
+		pEditor->m_AnimateUpdatePopup = false;
 	}
 
 	if(pEditor->DoEditBox(&s_SpeedInput, &EditBox, 10.0f, IGraphics::CORNER_NONE, "The animation speed."))
 	{
-		EnvelopeEvaluator.m_AnimateSpeed = std::clamp(s_SpeedInput.GetFloat(), MIN_ANIM_SPEED, MAX_ANIM_SPEED);
+		pEditor->m_AnimateSpeed = std::clamp(s_SpeedInput.GetFloat(), MIN_ANIM_SPEED, MAX_ANIM_SPEED);
 	}
 
-	// adjust start time to avoid jumps in animation
-	float AnimateSpeedRatio = OldAnimateSpeed / EnvelopeEvaluator.m_AnimateSpeed;
-	float Time = pEditor->Client()->GlobalTime();
-	EnvelopeEvaluator.m_AnimateStart = Time + (EnvelopeEvaluator.m_AnimateStart - Time) * AnimateSpeedRatio;
-	if(!EnvelopeEvaluator.m_Animate)
+	return CUi::POPUP_KEEP_OPEN;
+}
+
+CUi::EPopupMenuFunctionResult CEditor::PopupEnvelopeCurvetype(void *pContext, CUIRect View, bool Active)
+{
+	CEditor *pEditor = static_cast<CEditor *>(pContext);
+
+	if(pEditor->Map()->m_SelectedEnvelope < 0 || pEditor->Map()->m_SelectedEnvelope >= (int)pEditor->Map()->m_vpEnvelopes.size())
 	{
-		EnvelopeEvaluator.m_AnimateTime *= AnimateSpeedRatio;
+		return CUi::POPUP_CLOSE_CURRENT;
+	}
+	std::shared_ptr<CEnvelope> pEnvelope = pEditor->Map()->m_vpEnvelopes[pEditor->Map()->m_SelectedEnvelope];
+
+	if(pEditor->m_PopupEnvelopeSelectedPoint < 0 || pEditor->m_PopupEnvelopeSelectedPoint >= (int)pEnvelope->m_vPoints.size())
+	{
+		return CUi::POPUP_CLOSE_CURRENT;
+	}
+	CEnvPoint_runtime &SelectedPoint = pEnvelope->m_vPoints[pEditor->m_PopupEnvelopeSelectedPoint];
+
+	static const char *const TYPE_NAMES[NUM_CURVETYPES] = {"Step", "Linear", "Slow", "Fast", "Smooth", "Bezier"};
+	static char s_aButtonIds[NUM_CURVETYPES] = {0};
+
+	for(int Type = 0; Type < NUM_CURVETYPES; Type++)
+	{
+		CUIRect Button;
+		View.HSplitTop(14.0f, &Button, &View);
+
+		if(pEditor->DoButton_MenuItem(&s_aButtonIds[Type], TYPE_NAMES[Type], Type == SelectedPoint.m_Curvetype, &Button))
+		{
+			const int PrevCurve = SelectedPoint.m_Curvetype;
+			if(PrevCurve != Type)
+			{
+				SelectedPoint.m_Curvetype = Type;
+				pEditor->Map()->m_EnvelopeEditorHistory.RecordAction(std::make_shared<CEditorActionEnvelopeEditPoint>(pEditor->Map(),
+					pEditor->Map()->m_SelectedEnvelope, pEditor->m_PopupEnvelopeSelectedPoint, 0, CEditorActionEnvelopeEditPoint::EEditType::CURVE_TYPE, PrevCurve, SelectedPoint.m_Curvetype));
+				pEditor->Map()->OnModify();
+				return CUi::POPUP_CLOSE_CURRENT;
+			}
+		}
+	}
+
+	return CUi::POPUP_KEEP_OPEN;
+}
+
+CUi::EPopupMenuFunctionResult CEditor::PopupQuadArt(void *pContext, CUIRect View, bool Active)
+{
+	CEditor *pEditor = static_cast<CEditor *>(pContext);
+
+	enum
+	{
+		PROP_IMAGE_PIXELSIZE = 0,
+		PROP_QUAD_PIXELSIZE,
+		PROP_OPTIMIZE,
+		PROP_CENTRALIZE,
+		NUM_PROPS,
+	};
+
+	CProperty aProps[] = {
+		{"Image pixelsize", pEditor->m_QuadArtParameters.m_ImagePixelSize, PROPTYPE_INT, 1, 1024},
+		{"Quad pixelsize", pEditor->m_QuadArtParameters.m_QuadPixelSize, PROPTYPE_INT, 1, 1024},
+		{"Optimize", pEditor->m_QuadArtParameters.m_Optimize, PROPTYPE_BOOL, false, true},
+		{"Centralize", pEditor->m_QuadArtParameters.m_Centralize, PROPTYPE_BOOL, false, true},
+		{nullptr},
+	};
+
+	static int s_aIds[NUM_PROPS] = {0};
+	int NewVal = 0;
+
+	// Title
+	CUIRect Label;
+	View.HSplitTop(20.0f, &Label, &View);
+	pEditor->Ui()->DoLabel(&Label, "Configure quad art", 20.0f, TEXTALIGN_MC);
+	View.HSplitTop(10.0f, nullptr, &View);
+
+	// Properties
+	int Prop = pEditor->DoProperties(&View, aProps, s_aIds, &NewVal);
+
+	if(Prop == PROP_IMAGE_PIXELSIZE)
+	{
+		pEditor->m_QuadArtParameters.m_ImagePixelSize = NewVal;
+	}
+	else if(Prop == PROP_QUAD_PIXELSIZE)
+	{
+		pEditor->m_QuadArtParameters.m_QuadPixelSize = NewVal;
+	}
+	else if(Prop == PROP_OPTIMIZE)
+	{
+		pEditor->m_QuadArtParameters.m_Optimize = (bool)NewVal;
+	}
+	else if(Prop == PROP_CENTRALIZE)
+	{
+		pEditor->m_QuadArtParameters.m_Centralize = (bool)NewVal;
+	}
+
+	// Buttons
+	CUIRect BottomBar, Left, Right;
+	View.HSplitBottom(20.f, &View, &BottomBar);
+	BottomBar.VSplitLeft(110.f, &Left, &BottomBar);
+
+	static int s_Cancel;
+	if(pEditor->DoButton_Editor(&s_Cancel, "Cancel", 0, &Left, BUTTONFLAG_LEFT, nullptr))
+	{
+		pEditor->m_QuadArtImageInfo.Free();
+		return CUi::POPUP_CLOSE_CURRENT;
+	}
+
+	BottomBar.VSplitRight(110.f, &BottomBar, &Right);
+	static int s_Confirm;
+	constexpr int MaximumQuadThreshold = 100'000;
+	if(pEditor->DoButton_Editor(&s_Confirm, "Confirm", 0, &Right, BUTTONFLAG_LEFT, nullptr))
+	{
+		size_t MaximumQuadNumber = (pEditor->m_QuadArtImageInfo.m_Width / pEditor->m_QuadArtParameters.m_ImagePixelSize) *
+					   (pEditor->m_QuadArtImageInfo.m_Height / pEditor->m_QuadArtParameters.m_ImagePixelSize);
+		if(MaximumQuadNumber > MaximumQuadThreshold)
+		{
+			pEditor->m_PopupEventType = CEditor::POPEVENT_QUAD_ART_BIG_IMAGE;
+			pEditor->m_PopupEventActivated = true;
+		}
+		else
+		{
+			pEditor->AddQuadArt();
+			pEditor->m_MultiMappingSession.StartMapTransfer();
+		}
+		return CUi::POPUP_CLOSE_CURRENT;
 	}
 
 	return CUi::POPUP_KEEP_OPEN;

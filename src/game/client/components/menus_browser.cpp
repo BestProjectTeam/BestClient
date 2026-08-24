@@ -307,8 +307,6 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 		NUM_UI_ELEMS,
 	};
 
-	constexpr float ClickableIconSpace = 20.0f;
-
 	static SColumn s_aCols[] = {
 		{-1, -1, "", -1, 2.0f, {0}},
 		{COL_FLAG_LOCK, -1, "", -1, 14.0f, {0}},
@@ -319,7 +317,7 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 		{COL_MAP, IServerBrowser::SORT_MAP, Localizable("Map"), 1, 120.0f + (Headers.w - 480) / 8, {0}},
 		{COL_BESTCLIENT_DEV, -1, "", 1, 20.0f, {0}},
 		{COL_BESTCLIENT, IServerBrowser::SORT_NUMBESTCLIENT, "", 1, 20.0f, {0}},
-		{COL_FRIENDS, IServerBrowser::SORT_NUMFRIENDS, "", 1, ClickableIconSpace, {0}},
+		{COL_FRIENDS, IServerBrowser::SORT_NUMFRIENDS, "", 1, 20.0f, {0}},
 		{COL_PLAYERS, IServerBrowser::SORT_NUMPLAYERS, Localizable("Players"), 1, 60.0f, {0}},
 		{-1, -1, "", 1, 4.0f, {0}},
 		{COL_PING, IServerBrowser::SORT_PING, Localizable("Ping"), 1, 40.0f, {0}},
@@ -1048,7 +1046,7 @@ void CMenus::RenderServerbrowserFilters(CUIRect View)
 		CUIRect TabContents, CountriesTab, TypesTab;
 		View.HSplitTop(6.0f, nullptr, &View);
 		View.HSplitTop(19.0f, &Button, &View);
-		View.HSplitTop(minimum(4.0f * 22.0f + 1.0f, View.h), &TabContents, &View);
+		View.HSplitTop(minimum(4.0f * 22.0f + CScrollRegion::HEIGHT_MAGIC_FIX, View.h), &TabContents, &View);
 		Button.VSplitMid(&CountriesTab, &TypesTab);
 		TabContents.Draw(ColorActive, IGraphics::CORNER_B, 4.0f);
 
@@ -1136,10 +1134,12 @@ void CMenus::RenderServerbrowserDDNetFilter(CUIRect View,
 
 	vec2 ScrollOffset(0.0f, 0.0f);
 	CScrollRegionParams ScrollParams;
-	ScrollParams.m_ScrollbarThickness = 10.0f;
+	ScrollParams.m_ScrollbarWidth = 10.0f;
 	ScrollParams.m_ScrollbarMargin = 3.0f;
 	ScrollParams.m_ScrollUnit = 2.0f * ItemHeight;
-	ScrollRegion.Begin(&View, &ScrollParams);
+	ScrollRegion.Begin(&View, &ScrollOffset, &ScrollParams);
+	View.y += ScrollOffset.y;
+
 	CUIRect Row;
 	int ColumnIndex = 0;
 	for(int ItemIndex = 0; ItemIndex < MaxItems; ++ItemIndex)
@@ -1532,11 +1532,11 @@ void CMenus::RenderServerbrowserInfoScoreboard(CUIRect View, const CServerInfo *
 	s_ListBox.DoAutoSpacing(2.0f);
 	s_ListBox.SetScrollbarWidth(16.0f);
 	s_ListBox.SetScrollbarMargin(5.0f);
-	s_ListBox.DoStart(25.0f, (int)pSelectedServer->m_vClients.size(), 1, 3, -1, &View, false, IGraphics::CORNER_NONE, true);
+	s_ListBox.DoStart(25.0f, pSelectedServer->m_NumReceivedClients, 1, 3, -1, &View, false, IGraphics::CORNER_NONE, true);
 
-	for(int i = 0; i < (int)pSelectedServer->m_vClients.size(); i++)
+	for(int i = 0; i < pSelectedServer->m_NumReceivedClients; i++)
 	{
-		const CServerInfo::CClient &CurrentClient = pSelectedServer->m_vClients[i];
+		const CServerInfo::CClient &CurrentClient = pSelectedServer->m_aClients[i];
 		const CListboxItem Item = s_ListBox.DoNextItem(&CurrentClient);
 		if(!Item.m_Visible)
 			continue;
@@ -1665,7 +1665,7 @@ void CMenus::RenderServerbrowserInfoScoreboard(CUIRect View, const CServerInfo *
 	const int NewSelected = s_ListBox.DoEnd();
 	if(s_ListBox.WasItemSelected())
 	{
-		const CServerInfo::CClient &SelectedClient = pSelectedServer->m_vClients[NewSelected];
+		const CServerInfo::CClient &SelectedClient = pSelectedServer->m_aClients[NewSelected];
 		if(SelectedClient.m_FriendState == IFriends::FRIEND_PLAYER)
 			GameClient()->Friends()->RemoveFriend(SelectedClient.m_aName, SelectedClient.m_aClan);
 		else
@@ -1834,10 +1834,10 @@ void CMenus::RenderServerbrowserBestClient(CUIRect View)
 	}
 
 	std::vector<int> vBestClientIndexes;
-	vBestClientIndexes.reserve((int)pSelectedServer->m_vClients.size());
-	for(int i = 0; i < (int)pSelectedServer->m_vClients.size(); ++i)
+	vBestClientIndexes.reserve(pSelectedServer->m_NumReceivedClients);
+	for(int i = 0; i < pSelectedServer->m_NumReceivedClients; ++i)
 	{
-		if(pSelectedServer->m_vClients[i].m_BestClient)
+		if(pSelectedServer->m_aClients[i].m_BestClient)
 			vBestClientIndexes.push_back(i);
 	}
 
@@ -1849,7 +1849,7 @@ void CMenus::RenderServerbrowserBestClient(CUIRect View)
 
 	for(size_t i = 0; i < vBestClientIndexes.size(); ++i)
 	{
-		const CServerInfo::CClient &Client = pSelectedServer->m_vClients[vBestClientIndexes[i]];
+		const CServerInfo::CClient &Client = pSelectedServer->m_aClients[vBestClientIndexes[i]];
 		const CListboxItem Item = s_ListBox.DoNextItem(&Client);
 		if(!Item.m_Visible)
 			continue;
@@ -1945,7 +1945,7 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 
 		for(int ClientIndex = 0; ClientIndex < pEntry->m_NumClients; ++ClientIndex)
 		{
-			const CServerInfo::CClient &CurrentClient = pEntry->m_vClients[ClientIndex];
+			const CServerInfo::CClient &CurrentClient = pEntry->m_aClients[ClientIndex];
 			if(CurrentClient.m_FriendState == IFriends::FRIEND_NO)
 				continue;
 
@@ -1964,10 +1964,13 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 	static CScrollRegion s_ScrollRegion;
 	vec2 ScrollOffset(0.0f, 0.0f);
 	CScrollRegionParams ScrollParams;
-	ScrollParams.m_ScrollbarThickness = 16.0f;
+	ScrollParams.m_ScrollbarWidth = 16.0f;
 	ScrollParams.m_ScrollbarMargin = 5.0f;
 	ScrollParams.m_ScrollUnit = 80.0f;
-	s_ScrollRegion.Begin(&List, &ScrollParams);
+	ScrollParams.m_Flags = CScrollRegionParams::FLAG_CONTENT_STATIC_WIDTH;
+	s_ScrollRegion.Begin(&List, &ScrollOffset, &ScrollParams);
+	List.y += ScrollOffset.y;
+
 	char aBuf[256];
 	for(size_t FriendType = 0; FriendType < NUM_FRIEND_TYPES; ++FriendType)
 	{
@@ -2221,7 +2224,7 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 				const CServerInfo *pServerEntry = ServerBrowser()->Get(ServerIndex);
 				for(int ClientIndex = 0; ClientIndex < pServerEntry->m_NumClients; ++ClientIndex)
 				{
-					const CServerInfo::CClient &CurrentClient = pServerEntry->m_vClients[ClientIndex];
+					const CServerInfo::CClient &CurrentClient = pServerEntry->m_aClients[ClientIndex];
 					const auto NameIt = WarEntriesByName.find(CurrentClient.m_aName);
 					if(NameIt == WarEntriesByName.end())
 						continue;
@@ -2589,7 +2592,7 @@ void CMenus::RenderServerbrowser(CUIRect MainView)
 	if(g_Config.m_UiPage == PAGE_INTERNET || g_Config.m_UiPage == PAGE_FAVORITES)
 	{
 		CUIRect CommunityFilter;
-		ToolBox.HSplitTop(19.0f + 4.0f * 17.0f + 1.0f, &CommunityFilter, &ToolBox);
+		ToolBox.HSplitTop(19.0f + 4.0f * 17.0f + CScrollRegion::HEIGHT_MAGIC_FIX, &CommunityFilter, &ToolBox);
 		ToolBox.HSplitTop(8.0f, nullptr, &ToolBox);
 		RenderServerbrowserCommunitiesFilter(CommunityFilter);
 	}

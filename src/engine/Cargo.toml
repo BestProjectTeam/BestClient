@@ -2,7 +2,6 @@
 name = "ddnet-engine"
 version = "0.0.1"
 edition = "2021"
-rust-version = "1.85"
 publish = false
 license = "Zlib"
 
@@ -12,7 +11,7 @@ path = "lib.rs"
 [dependencies]
 ddnet-base = { path = "../base" }
 
-cxx = { workspace = true }
+cxx = "1.0"
 
 [dev-dependencies]
 ddnet-engine-shared = { path = "shared" }

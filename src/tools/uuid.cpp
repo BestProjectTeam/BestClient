@@ -1,9 +1,8 @@
-#include <base/dbg.h>
 #include <base/logger.h>
 #include <base/os.h>
+#include <base/system.h>
 
 #include <engine/shared/uuid_manager.h>
-
 int main(int argc, const char **argv)
 {
 	CCmdlineFix CmdlineFix(&argc, &argv);

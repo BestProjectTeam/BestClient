@@ -95,7 +95,7 @@ bool CPlasma::HitCharacter(CCharacter *pTarget)
 	}
 
 	// Super player should not be able to stop the plasma bullets
-	if(pHitPlayer->Team() == pHitPlayer->TeamsCore()->TeamSuper())
+	if(pHitPlayer->Team() == TEAM_SUPER)
 	{
 		return false;
 	}

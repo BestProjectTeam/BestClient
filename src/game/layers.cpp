@@ -11,7 +11,7 @@ CLayers::CLayers()
 	Unload();
 }
 
-void CLayers::Init(IMap *pMap, bool GameOnly, bool InitializeTilemapSkip)
+void CLayers::Init(IMap *pMap, bool GameOnly)
 {
 	Unload();
 
@@ -115,10 +115,7 @@ void CLayers::Init(IMap *pMap, bool GameOnly, bool InitializeTilemapSkip)
 		}
 	}
 
-	if(InitializeTilemapSkip)
-	{
-		InitTilemapSkip(GameOnly);
-	}
+	InitTilemapSkip();
 }
 
 void CLayers::Unload()
@@ -139,7 +136,7 @@ void CLayers::Unload()
 	m_pTuneLayer = nullptr;
 }
 
-void CLayers::InitTilemapSkip(bool GameOnly)
+void CLayers::InitTilemapSkip()
 {
 	for(int GroupIndex = 0; GroupIndex < NumGroups(); GroupIndex++)
 	{
@@ -151,16 +148,7 @@ void CLayers::InitTilemapSkip(bool GameOnly)
 				continue;
 
 			const CMapItemLayerTilemap *pTilemap = reinterpret_cast<const CMapItemLayerTilemap *>(pLayer);
-			if(GameOnly && (pTilemap->m_Flags & (TILESLAYERFLAG_TELE | TILESLAYERFLAG_SPEEDUP | TILESLAYERFLAG_FRONT | TILESLAYERFLAG_SWITCH | TILESLAYERFLAG_TUNE)) != 0)
-				continue;
-
 			CTile *pTiles = static_cast<CTile *>(m_pMap->GetData(pTilemap->m_Data));
-			if(pTiles == nullptr || pTilemap->m_Width < 0 || pTilemap->m_Height < 0 ||
-				(int64_t)pTilemap->m_Width * pTilemap->m_Height > m_pMap->GetDataSize(pTilemap->m_Data) / (int)sizeof(CTile))
-			{
-				continue;
-			}
-
 			for(int y = 0; y < pTilemap->m_Height; y++)
 			{
 				for(int x = 1; x < pTilemap->m_Width;)

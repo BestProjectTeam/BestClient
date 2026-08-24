@@ -1,8 +1,20 @@
-#include <base/mem.h>
-#include <base/net.h>
-#include <base/secure.h>
+#include <base/system.h>
 
 #include <gtest/gtest.h>
+
+static bool mem_is_null(const void *block, size_t size)
+{
+	const unsigned char *bytes = (const unsigned char *)block;
+	size_t i;
+	for(i = 0; i < size; i++)
+	{
+		if(bytes[i] != 0)
+		{
+			return false;
+		}
+	}
+	return true;
+}
 
 TEST(Memory, BaseTypes)
 {

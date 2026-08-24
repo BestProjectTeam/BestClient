@@ -3,15 +3,9 @@
 data/
 !/data/
 
-# Doxygen output
-docs/warn.log
-docs/html
-
-
 bundle/
 !/other/bundle/
 
-# tidy-alphabetical-start
 .DS_Store
 .ninja_deps
 .ninja_log
@@ -45,7 +39,6 @@ pack_*/
 release
 rules.ninja
 testrunner\[1\]_include.cmake
-# tidy-alphabetical-end
 
 /SDL2.framework
 
@@ -95,9 +88,6 @@ target
 /integration_test/*
 /source_date_epoch
 
-# Cache folder for scripts/parse_crashlog_drmingw.py
-/scripts/drmingw_symbols_cache
-
 # IDE project files
 .cache
 .cproject
@@ -117,7 +107,6 @@ tags
 # don't ignore this, it's used for the vscode workspace that ddnet provides
 !ddnet-cmake-tools-kits.json
 
-# tidy-alphabetical-start
 *.a
 *.cmd
 *.csv
@@ -154,7 +143,6 @@ tags
 *.user
 *.vcxproj
 *.zip
-# tidy-alphabetical-end
+/build
 
 !steam_api.dll
-

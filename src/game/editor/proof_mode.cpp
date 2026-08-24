@@ -2,22 +2,20 @@
 
 #include "editor.h"
 
-#include <engine/graphics.h>
-
 #include <game/client/components/menu_background.h>
-
-void CProofMode::CState::Reset()
-{
-	m_ProofBorders = EProofBorder::OFF;
-	m_CurrentMenuProofIndex = 0;
-	m_vMenuBackgroundPositions.clear();
-	m_vvMenuBackgroundCollisions.clear();
-}
 
 void CProofMode::OnInit(CEditor *pEditor)
 {
 	CEditorComponent::OnInit(pEditor);
 	InitMenuBackgroundPositionNames();
+	OnReset();
+	OnMapLoad();
+}
+
+void CProofMode::OnReset()
+{
+	m_ProofBorders = EProofBorder::OFF;
+	m_CurrentMenuProofIndex = 0;
 }
 
 void CProofMode::OnMapLoad()
@@ -44,13 +42,13 @@ void CProofMode::InitMenuBackgroundPositionNames()
 	m_vpMenuBackgroundPositionNames[CMenuBackground::POS_SETTINGS_SOUND] = "settings(sound)";
 	m_vpMenuBackgroundPositionNames[CMenuBackground::POS_SETTINGS_DDNET] = "settings(ddnet)";
 	m_vpMenuBackgroundPositionNames[CMenuBackground::POS_SETTINGS_ASSETS] = "settings(assets)";
-	m_vpMenuBackgroundPositionNames[CMenuBackground::POS_SETTINGS_CREDITS] = "settings(credits)";
 	m_vpMenuBackgroundPositionNames[CMenuBackground::POS_BROWSER_CUSTOM0] = "custom(1)";
 	m_vpMenuBackgroundPositionNames[CMenuBackground::POS_BROWSER_CUSTOM1] = "custom(2)";
 	m_vpMenuBackgroundPositionNames[CMenuBackground::POS_BROWSER_CUSTOM2] = "custom(3)";
 	m_vpMenuBackgroundPositionNames[CMenuBackground::POS_BROWSER_CUSTOM3] = "custom(4)";
 	m_vpMenuBackgroundPositionNames[CMenuBackground::POS_BROWSER_CUSTOM4] = "custom(5)";
 	m_vpMenuBackgroundPositionNames[CMenuBackground::POS_SETTINGS_RESERVED0] = "reserved settings(1)";
+	m_vpMenuBackgroundPositionNames[CMenuBackground::POS_SETTINGS_RESERVED1] = "reserved settings(2)";
 	m_vpMenuBackgroundPositionNames[CMenuBackground::POS_RESERVED0] = "reserved(1)";
 	m_vpMenuBackgroundPositionNames[CMenuBackground::POS_RESERVED1] = "reserved(2)";
 	m_vpMenuBackgroundPositionNames[CMenuBackground::POS_RESERVED2] = "reserved(3)";
@@ -58,9 +56,8 @@ void CProofMode::InitMenuBackgroundPositionNames()
 
 void CProofMode::InitMenuBackgroundPositions()
 {
-	CState &State = Map()->m_ProofModeState;
 	std::array<vec2, CMenuBackground::NUM_POS> aBackgroundPositions = GenerateMenuBackgroundPositions();
-	State.m_vMenuBackgroundPositions.assign(aBackgroundPositions.begin(), aBackgroundPositions.end());
+	m_vMenuBackgroundPositions.assign(aBackgroundPositions.begin(), aBackgroundPositions.end());
 
 	if(Map()->m_pGameLayer)
 	{
@@ -72,7 +69,7 @@ void CProofMode::InitMenuBackgroundPositions()
 				if(Tile.m_Index >= TILE_TIME_CHECKPOINT_FIRST && Tile.m_Index <= TILE_TIME_CHECKPOINT_LAST)
 				{
 					int ArrayIndex = std::clamp<int>((Tile.m_Index - TILE_TIME_CHECKPOINT_FIRST), 0, CMenuBackground::NUM_POS);
-					State.m_vMenuBackgroundPositions[ArrayIndex] = vec2(x * 32.0f + 16.0f, y * 32.0f + 16.0f);
+					m_vMenuBackgroundPositions[ArrayIndex] = vec2(x * 32.0f + 16.0f, y * 32.0f + 16.0f);
 				}
 
 				x += Tile.m_Skip;
@@ -80,14 +77,14 @@ void CProofMode::InitMenuBackgroundPositions()
 		}
 	}
 
-	State.m_vvMenuBackgroundCollisions.clear();
-	State.m_vvMenuBackgroundCollisions.resize(State.m_vMenuBackgroundPositions.size());
-	for(size_t i = 0; i < State.m_vMenuBackgroundPositions.size(); i++)
+	m_vvMenuBackgroundCollisions.clear();
+	m_vvMenuBackgroundCollisions.resize(m_vMenuBackgroundPositions.size());
+	for(size_t i = 0; i < m_vMenuBackgroundPositions.size(); i++)
 	{
-		for(size_t j = i + 1; j < State.m_vMenuBackgroundPositions.size(); j++)
+		for(size_t j = i + 1; j < m_vMenuBackgroundPositions.size(); j++)
 		{
-			if(i != j && distance(State.m_vMenuBackgroundPositions[i], State.m_vMenuBackgroundPositions[j]) < 0.001f)
-				State.m_vvMenuBackgroundCollisions.at(i).push_back(j);
+			if(i != j && distance(m_vMenuBackgroundPositions[i], m_vMenuBackgroundPositions[j]) < 0.001f)
+				m_vvMenuBackgroundCollisions.at(i).push_back(j);
 		}
 	}
 }
@@ -106,46 +103,47 @@ void CProofMode::RenderScreenSizes()
 		Graphics()->LinesBegin();
 
 		// possible screen sizes (white border)
-		CScreenRect LastRect(0, 0, 0, 0);
+		float aLastPoints[4];
 		float Start = 1.0f; // 9.0f/16.0f;
 		float End = 16.0f / 9.0f;
 		const int NumSteps = 20;
 		for(int i = 0; i <= NumSteps; i++)
 		{
+			float aPoints[4];
 			float Aspect = Start + (End - Start) * (i / (float)NumSteps);
 
 			float Zoom = IsModeMenu() ? 0.7f : 1.0f;
-			CScreenRect ScreenRect = Graphics()->MapScreenToWorld(
+			Graphics()->MapScreenToWorld(
 				WorldOffset.x, WorldOffset.y,
-				100.0f, 100.0f, 100.0f, 0.0f, 0.0f, Aspect, Zoom);
+				100.0f, 100.0f, 100.0f, 0.0f, 0.0f, Aspect, Zoom, aPoints);
 
 			if(i == 0)
 			{
 				IGraphics::CLineItem aArray[] = {
-					IGraphics::CLineItem(ScreenRect.m_TopLeft.x, ScreenRect.m_TopLeft.y, ScreenRect.m_BottomRight.x, ScreenRect.m_TopLeft.y),
-					IGraphics::CLineItem(ScreenRect.m_TopLeft.x, ScreenRect.m_BottomRight.y, ScreenRect.m_BottomRight.x, ScreenRect.m_BottomRight.y)};
+					IGraphics::CLineItem(aPoints[0], aPoints[1], aPoints[2], aPoints[1]),
+					IGraphics::CLineItem(aPoints[0], aPoints[3], aPoints[2], aPoints[3])};
 				Graphics()->LinesDraw(aArray, std::size(aArray));
 			}
 
 			if(i != 0)
 			{
 				IGraphics::CLineItem aArray[] = {
-					IGraphics::CLineItem(ScreenRect.m_TopLeft.x, ScreenRect.m_TopLeft.y, LastRect.m_TopLeft.x, LastRect.m_TopLeft.y),
-					IGraphics::CLineItem(ScreenRect.m_BottomRight.x, ScreenRect.m_TopLeft.y, LastRect.m_BottomRight.x, LastRect.m_TopLeft.y),
-					IGraphics::CLineItem(ScreenRect.m_TopLeft.x, ScreenRect.m_BottomRight.y, LastRect.m_TopLeft.x, LastRect.m_BottomRight.y),
-					IGraphics::CLineItem(ScreenRect.m_BottomRight.x, ScreenRect.m_BottomRight.y, LastRect.m_BottomRight.x, LastRect.m_BottomRight.y)};
+					IGraphics::CLineItem(aPoints[0], aPoints[1], aLastPoints[0], aLastPoints[1]),
+					IGraphics::CLineItem(aPoints[2], aPoints[1], aLastPoints[2], aLastPoints[1]),
+					IGraphics::CLineItem(aPoints[0], aPoints[3], aLastPoints[0], aLastPoints[3]),
+					IGraphics::CLineItem(aPoints[2], aPoints[3], aLastPoints[2], aLastPoints[3])};
 				Graphics()->LinesDraw(aArray, std::size(aArray));
 			}
 
 			if(i == NumSteps)
 			{
 				IGraphics::CLineItem aArray[] = {
-					IGraphics::CLineItem(ScreenRect.m_TopLeft.x, ScreenRect.m_TopLeft.y, ScreenRect.m_TopLeft.x, ScreenRect.m_BottomRight.y),
-					IGraphics::CLineItem(ScreenRect.m_BottomRight.x, ScreenRect.m_TopLeft.y, ScreenRect.m_BottomRight.x, ScreenRect.m_BottomRight.y)};
+					IGraphics::CLineItem(aPoints[0], aPoints[1], aPoints[0], aPoints[3]),
+					IGraphics::CLineItem(aPoints[2], aPoints[1], aPoints[2], aPoints[3])};
 				Graphics()->LinesDraw(aArray, std::size(aArray));
 			}
 
-			LastRect = ScreenRect;
+			mem_copy(aLastPoints, aPoints, sizeof(aPoints));
 		}
 		Graphics()->LinesEnd();
 
@@ -154,18 +152,19 @@ void CProofMode::RenderScreenSizes()
 			Graphics()->SetColor(1, 0, 0, 1);
 			for(int Pass = 0; Pass < 2; Pass++)
 			{
+				float aPoints[4];
 				const float aAspects[] = {4.0f / 3.0f, 16.0f / 10.0f, 5.0f / 4.0f, 16.0f / 9.0f};
 				const ColorRGBA aColors[] = {ColorRGBA(1.0f, 0.0f, 0.0f, 1.0f), ColorRGBA(0.0f, 1.0f, 0.0f, 1.0f)};
 				float Zoom = IsModeMenu() ? 0.7f : 1.0f;
-				CScreenRect ScreenRect = Graphics()->MapScreenToWorld(
+				Graphics()->MapScreenToWorld(
 					WorldOffset.x, WorldOffset.y,
-					100.0f, 100.0f, 100.0f, 0.0f, 0.0f, aAspects[Pass], Zoom);
+					100.0f, 100.0f, 100.0f, 0.0f, 0.0f, aAspects[Pass], Zoom, aPoints);
 
 				CUIRect Rect;
-				Rect.x = ScreenRect.m_TopLeft.x;
-				Rect.y = ScreenRect.m_TopLeft.y;
-				Rect.w = ScreenRect.Width();
-				Rect.h = ScreenRect.Height();
+				Rect.x = aPoints[0];
+				Rect.y = aPoints[1];
+				Rect.w = aPoints[2] - aPoints[0];
+				Rect.h = aPoints[3] - aPoints[1];
 				Rect.DrawOutline(aColors[Pass]);
 			}
 		}
@@ -210,52 +209,52 @@ void CProofMode::RenderScreenSizes()
 
 bool CProofMode::IsEnabled() const
 {
-	return Map()->m_ProofModeState.m_ProofBorders != EProofBorder::OFF;
+	return m_ProofBorders != EProofBorder::OFF;
 }
 
 bool CProofMode::IsModeMenu() const
 {
-	return Map()->m_ProofModeState.m_ProofBorders == EProofBorder::MENU;
+	return m_ProofBorders == EProofBorder::MENU;
 }
 
 bool CProofMode::IsModeIngame() const
 {
-	return Map()->m_ProofModeState.m_ProofBorders == EProofBorder::INGAME;
+	return m_ProofBorders == EProofBorder::INGAME;
 }
 
 void CProofMode::Toggle()
 {
-	Map()->m_ProofModeState.m_ProofBorders = Map()->m_ProofModeState.m_ProofBorders == EProofBorder::OFF ? EProofBorder::INGAME : EProofBorder::OFF;
+	m_ProofBorders = m_ProofBorders == EProofBorder::OFF ? EProofBorder::INGAME : EProofBorder::OFF;
 }
 
 void CProofMode::SetModeIngame()
 {
-	Map()->m_ProofModeState.m_ProofBorders = EProofBorder::INGAME;
+	m_ProofBorders = EProofBorder::INGAME;
 }
 
 void CProofMode::SetModeMenu()
 {
-	Map()->m_ProofModeState.m_ProofBorders = EProofBorder::MENU;
+	m_ProofBorders = EProofBorder::MENU;
 }
 
 int CProofMode::CurrentMenuProofIndex() const
 {
-	return Map()->m_ProofModeState.m_CurrentMenuProofIndex;
+	return m_CurrentMenuProofIndex;
 }
 
 void CProofMode::SetCurrentMenuProofIndex(int MenuProofIndex)
 {
-	Map()->m_ProofModeState.m_CurrentMenuProofIndex = MenuProofIndex;
+	m_CurrentMenuProofIndex = MenuProofIndex;
 }
 
 const std::vector<vec2> &CProofMode::MenuBackgroundPositions() const
 {
-	return Map()->m_ProofModeState.m_vMenuBackgroundPositions;
+	return m_vMenuBackgroundPositions;
 }
 
 vec2 CProofMode::CurrentMenuBackgroundPosition() const
 {
-	return Map()->m_ProofModeState.m_vMenuBackgroundPositions[CurrentMenuProofIndex()];
+	return m_vMenuBackgroundPositions[CurrentMenuProofIndex()];
 }
 
 const char *CProofMode::MenuBackgroundPositionName(int MenuProofIndex) const
@@ -265,5 +264,5 @@ const char *CProofMode::MenuBackgroundPositionName(int MenuProofIndex) const
 
 const std::vector<int> &CProofMode::MenuBackgroundCollisions(int MenuProofIndex) const
 {
-	return Map()->m_ProofModeState.m_vvMenuBackgroundCollisions[MenuProofIndex];
+	return m_vvMenuBackgroundCollisions[MenuProofIndex];
 }

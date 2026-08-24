@@ -2,12 +2,9 @@
 
 #include <gtest/gtest.h>
 
-static bool IsLetter(char c)
-{
-	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
-}
+bool is_letter(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
 
-static bool IsValidEditorTooltip(const char *pTooltip, char *pErrorMsg, int ErrorMsgSize)
+bool IsValidEditorTooltip(const char *pTooltip, char *pErrorMsg, int ErrorMsgSize)
 {
 	pErrorMsg[0] = '\0';
 	char aHotkey[512];
@@ -31,7 +28,7 @@ static bool IsValidEditorTooltip(const char *pTooltip, char *pErrorMsg, int Erro
 			{
 				ExpectLowerCase = false;
 			}
-			else if(!IsLetter(aHotkey[i - 1]))
+			else if(!is_letter(aHotkey[i - 1]))
 			{
 				// the first character of a word should be uppercase
 				ExpectLowerCase = false;
@@ -78,7 +75,7 @@ static bool IsValidEditorTooltip(const char *pTooltip, char *pErrorMsg, int Erro
 	return true;
 }
 
-static void AssertTooltip(const char *pTooltip)
+void AssertTooltip(const char *pTooltip)
 {
 	char aError[512];
 	EXPECT_TRUE(IsValidEditorTooltip(pTooltip, aError, sizeof(aError))) << "Invalid tooltip: " << pTooltip << "\nError: " << aError;

@@ -12,7 +12,6 @@
 class CQuad;
 class CMapItemGroup;
 class CMapItemLayerQuads;
-class CCharacter;
 
 enum class EMovingTileRenderType
 {
@@ -72,7 +71,6 @@ public:
 	void OnStateChange(int NewState, int OldState) override;
 	void OnMapLoad() override;
 	void OnRender() override;
-	void ApplyEgoTilesAntiLag(CCharacter *pCharacter) const;
 
 	int Sizeof() const override { return sizeof(*this); }
 };

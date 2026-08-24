@@ -28,7 +28,6 @@ public:
 		USE_ACTION,
 		JOYSTICK_ACTION,
 		JOYSTICK_AIM,
-		JOYSTICK_AIM_RELATIVE,
 		JOYSTICK_FIRE,
 		JOYSTICK_HOOK,
 		NUM_PREDEFINEDTYPES
@@ -183,7 +182,7 @@ public:
 		std::function<std::unique_ptr<CTouchControls::CPredefinedTouchButtonBehavior>()> m_Factory;
 	};
 
-	static const CBehaviorFactoryEditor BEHAVIOR_FACTORIES_EDITOR[11];
+	static const CBehaviorFactoryEditor BEHAVIOR_FACTORIES_EDITOR[10];
 };
 
 #endif

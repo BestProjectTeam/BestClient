@@ -42,12 +42,9 @@ void CPrompt::SetInactive()
 {
 	m_ResetFilterResults = true;
 	m_PromptInput.Clear();
-
 	if(Editor()->m_Dialog == DIALOG_QUICK_PROMPT)
 	{
 		Editor()->OnDialogClose();
-		m_PromptInput.Deactivate();
-		Ui()->SetActiveItem(nullptr);
 	}
 }
 
@@ -69,7 +66,7 @@ void CPrompt::OnInit(CEditor *pEditor)
 #undef REGISTER_QUICK_ACTION
 }
 
-void CPrompt::Render()
+void CPrompt::OnRender(CUIRect _)
 {
 	if(!IsActive())
 		return;
@@ -154,7 +151,11 @@ void CPrompt::Render()
 		TextRender()->TextColor(TextRender()->DefaultTextColor());
 	}
 
-	m_PromptSelectedIndex = s_ListBox.DoEnd();
+	const int NewSelected = s_ListBox.DoEnd();
+	if(m_PromptSelectedIndex != NewSelected)
+	{
+		m_PromptSelectedIndex = NewSelected;
+	}
 
 	if(s_ListBox.WasItemActivated())
 	{

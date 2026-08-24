@@ -1,13 +1,14 @@
 #include "connection.h"
 
 #include <base/dbg.h>
-#include <base/log.h>
+#include <base/math.h>
 #include <base/mem.h>
 #include <base/str.h>
 
+#include <engine/console.h>
+
 #include <sqlite3.h>
 
-#include <algorithm>
 #include <atomic>
 
 class CSqliteConnection : public IDbConnection
@@ -15,7 +16,7 @@ class CSqliteConnection : public IDbConnection
 public:
 	CSqliteConnection(const char *pFilename, bool Setup);
 	~CSqliteConnection() override;
-	void Print(const char *pMode) override;
+	void Print(IConsole *pConsole, const char *pMode) override;
 
 	const char *BinaryCollate() const override { return "BINARY"; }
 	void ToUnixTimestamp(const char *pTimestamp, char *aBuf, unsigned int BufferSize) override;
@@ -23,6 +24,7 @@ public:
 	const char *CollateNocase() const override { return "? COLLATE NOCASE"; }
 	const char *InsertIgnore() const override { return "INSERT OR IGNORE"; }
 	const char *Random() const override { return "RANDOM()"; }
+	const char *MedianMapTime(char *pBuffer, int BufferSize) const override;
 	// Since SQLite 3.23.0 true/false literals are recognized, but still cleaner to use 1/0, because:
 	// > For compatibility, if there exist columns named "true" or "false", then
 	// > the identifiers refer to the columns rather than Boolean constants.
@@ -97,11 +99,13 @@ CSqliteConnection::~CSqliteConnection()
 	m_pDb = nullptr;
 }
 
-void CSqliteConnection::Print(const char *pMode)
+void CSqliteConnection::Print(IConsole *pConsole, const char *pMode)
 {
-	log_info("server",
+	char aBuf[512];
+	str_format(aBuf, sizeof(aBuf),
 		"SQLite-%s: DB: '%s'",
 		pMode, m_aFilename);
+	pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
 }
 
 void CSqliteConnection::ToUnixTimestamp(const char *pTimestamp, char *aBuf, unsigned int BufferSize)
@@ -338,9 +342,26 @@ void CSqliteConnection::GetString(int Col, char *pBuffer, int BufferSize)
 int CSqliteConnection::GetBlob(int Col, unsigned char *pBuffer, int BufferSize)
 {
 	int Size = sqlite3_column_bytes(m_pStmt, Col - 1);
-	Size = std::min(Size, BufferSize);
+	Size = minimum(Size, BufferSize);
 	mem_copy(pBuffer, sqlite3_column_blob(m_pStmt, Col - 1), Size);
 	return Size;
+}
+
+const char *CSqliteConnection::MedianMapTime(char *pBuffer, int BufferSize) const
+{
+	str_format(pBuffer, BufferSize,
+		"SELECT AVG("
+		"  CASE counter %% 2 "
+		"    WHEN 0 THEN CASE WHEN rn IN (counter / 2, counter / 2 + 1) THEN Time END "
+		"    WHEN 1 THEN CASE WHEN rn = counter / 2 + 1 THEN Time END END) "
+		"  OVER (PARTITION BY Map) AS Median "
+		"FROM ("
+		"  SELECT *, ROW_NUMBER() "
+		"  OVER (PARTITION BY Map ORDER BY Time) rn, COUNT(*) "
+		"  OVER (PARTITION BY Map) counter "
+		"  FROM %s_race where Map = l.Map) as r",
+		GetPrefix());
+	return pBuffer;
 }
 
 bool CSqliteConnection::Execute(const char *pQuery, char *pError, int ErrorSize)

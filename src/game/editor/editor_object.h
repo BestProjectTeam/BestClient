@@ -12,6 +12,7 @@ class ISound;
 class ITextRender;
 class IStorage;
 class CUi;
+class CRenderTools;
 class CRenderMap;
 
 class CEditorObject

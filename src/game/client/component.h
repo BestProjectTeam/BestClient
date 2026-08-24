@@ -300,14 +300,6 @@ public:
 	{
 		return false;
 	}
-
-	/**
-	 * Called when the current focus of the window changes, for example when the user alt-tabs out of the game.
-	 * @param Focused `true` if the window is now focused, `false` if it lost focus.
-	 */
-	virtual void OnFocusChange(bool Focused)
-	{
-	}
 };
 
 #endif

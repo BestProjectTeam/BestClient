@@ -124,11 +124,7 @@ void CChatBubbles::AddBubble(int ClientId, int Team, const char *pText)
 	CTextCursor Cursor;
 
 	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
-	const CScreenRect ScreenRect = Graphics()->GetScreen();
-	ScreenX0 = ScreenRect.m_TopLeft.x;
-	ScreenY0 = ScreenRect.m_TopLeft.y;
-	ScreenX1 = ScreenRect.m_BottomRight.x;
-	ScreenY1 = ScreenRect.m_BottomRight.y;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
 	Graphics()->MapScreenToInterface(GameClient()->m_Camera.m_Center.x, GameClient()->m_Camera.m_Center.y);
 
 	Cursor.SetPosition(vec2(0, 0));
@@ -149,7 +145,7 @@ void CChatBubbles::AddBubble(int ClientId, int Team, const char *pText)
 		ClientId = GameClient()->m_Snap.m_LocalClientId;
 		if(ClientId < 0 || ClientId >= MAX_CLIENTS)
 		{
-			Graphics()->MapScreen(CScreenRect(vec2(ScreenX0, ScreenY0), vec2(ScreenX1, ScreenY1)));
+			Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
 			return;
 		}
 	}
@@ -161,7 +157,7 @@ void CChatBubbles::AddBubble(int ClientId, int Team, const char *pText)
 
 	m_aChatBubbles[ClientId].insert(m_aChatBubbles[ClientId].begin(), Bubble);
 	UpdateBubbleOffsets(ClientId);
-	Graphics()->MapScreen(CScreenRect(vec2(ScreenX0, ScreenY0), vec2(ScreenX1, ScreenY1)));
+	Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
 }
 
 void CChatBubbles::RenderCurInput(float Y)
@@ -186,11 +182,7 @@ void CChatBubbles::RenderCurInput(float Y)
 	STextContainerIndex TextContainerIndex;
 
 	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
-	const CScreenRect ScreenRect = Graphics()->GetScreen();
-	ScreenX0 = ScreenRect.m_TopLeft.x;
-	ScreenY0 = ScreenRect.m_TopLeft.y;
-	ScreenX1 = ScreenRect.m_BottomRight.x;
-	ScreenY1 = ScreenRect.m_BottomRight.y;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
 	Graphics()->MapScreenToInterface(GameClient()->m_Camera.m_Center.x, GameClient()->m_Camera.m_Center.y);
 
 	Cursor.SetPosition(vec2(0, 0));
@@ -198,7 +190,7 @@ void CChatBubbles::RenderCurInput(float Y)
 	Cursor.m_Flags = TEXTFLAG_RENDER;
 	Cursor.m_LineWidth = 500.0f - FontSize * 2.0f;
 	TextRender()->CreateOrAppendTextContainer(TextContainerIndex, &Cursor, pText);
-	Graphics()->MapScreen(CScreenRect(vec2(ScreenX0, ScreenY0), vec2(ScreenX1, ScreenY1)));
+	Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
 
 	if(TextContainerIndex.Valid())
 	{
@@ -355,17 +347,14 @@ void CChatBubbles::OnRender()
 		return;
 
 	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
-	const CScreenRect ScreenRect = Graphics()->GetScreen();
-	ScreenX0 = ScreenRect.m_TopLeft.x;
-	ScreenY0 = ScreenRect.m_TopLeft.y;
-	ScreenX1 = ScreenRect.m_BottomRight.x;
-	ScreenY1 = ScreenRect.m_BottomRight.y;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
 
-	CScreenRect WorldScreen = Graphics()->MapScreenToWorld(
+	float aPoints[4];
+	Graphics()->MapScreenToWorld(
 		GameClient()->m_Camera.m_Center.x, GameClient()->m_Camera.m_Center.y,
 		100.0f, 100.0f, 100.0f, 0, 0,
-		Graphics()->ScreenAspect(), GameClient()->m_Camera.m_Zoom);
-	Graphics()->MapScreen(WorldScreen);
+		Graphics()->ScreenAspect(), GameClient()->m_Camera.m_Zoom, aPoints);
+	Graphics()->MapScreen(aPoints[0], aPoints[1], aPoints[2], aPoints[3]);
 
 	for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
 	{
@@ -377,7 +366,7 @@ void CChatBubbles::OnRender()
 		RenderChatBubbles(ClientId);
 	}
 
-	Graphics()->MapScreen(CScreenRect(vec2(ScreenX0, ScreenY0), vec2(ScreenX1, ScreenY1)));
+	Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
 }
 
 void CChatBubbles::Reset()

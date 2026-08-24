@@ -6,7 +6,8 @@
 
 static int str_utf8_skeleton(int ch, const int **skeleton, int *skeleton_len)
 {
-	for(size_t i = 0; i < NUM_DECOMPS; i++)
+	int i;
+	for(i = 0; i < NUM_DECOMPS; i++)
 	{
 		if(ch == decomp_chars[i])
 		{
@@ -99,3 +100,7 @@ int str_utf8_comp_confusable(const char *str1, const char *str2)
 			return 1;
 	}
 }
+
+#define CONFUSABLES_DATA
+#include "confusables_data.h"
+#undef CONFUSABLES_DATA

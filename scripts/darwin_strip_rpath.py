@@ -1,8 +1,6 @@
-#!/usr/bin/env python3
-
 import argparse
-import re
 import subprocess
+import re
 
 
 def split_cmds(lines):

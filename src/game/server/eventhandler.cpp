@@ -5,6 +5,7 @@
 #include "entity.h"
 #include "gamecontext.h"
 
+#include <base/system.h>
 #include <base/vmath.h>
 
 //////////////////////////////////////////////////
@@ -59,27 +60,9 @@ void CEventHandler::Snap(int SnappingClient)
 				if(GameServer()->Server()->IsSixup(SnappingClient))
 					EventToSixup(&Type, &Size, &pData);
 
-				const auto &&SnapEvent = [&]() {
-					GameServer()->Server()->SnapNewItem(Type, i, pData, Size);
-				};
-				const auto &&SnapTranslateEvent = [&](int *pClientId) {
-					int ClientId = *pClientId; // Save real Id
-					if(GameServer()->Server()->Translate(*pClientId, SnappingClient))
-					{
-						SnapEvent();
-						*pClientId = ClientId; // Reset Id for others
-					}
-				};
-
-				if(Type == NETEVENTTYPE_DEATH)
-				{
-					CNetEvent_Death *pDeath = (CNetEvent_Death *)pData;
-					SnapTranslateEvent(&pDeath->m_ClientId);
-				}
-				else
-				{
-					SnapEvent();
-				}
+				void *pItem = GameServer()->Server()->SnapNewItem(Type, i, Size);
+				if(pItem)
+					mem_copy(pItem, pData, Size);
 			}
 		}
 	}
@@ -98,7 +81,6 @@ void CEventHandler::EventToSixup(int *pType, int *pSize, const char **ppData)
 		pEvent7->m_X = pEvent->m_X;
 		pEvent7->m_Y = pEvent->m_Y;
 
-		// If ClientId is used in the future, translate it like death
 		pEvent7->m_ClientId = 0;
 		pEvent7->m_Angle = 0;
 

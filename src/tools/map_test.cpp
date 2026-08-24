@@ -1,40 +1,39 @@
 #include <base/hash.h>
 #include <base/logger.h>
 #include <base/os.h>
-#include <base/str.h>
+#include <base/system.h>
 
-#include <engine/map.h>
-#include <engine/shared/uuid_manager.h>
+#include <engine/shared/datafile.h>
 #include <engine/storage.h>
 
 static const char *TOOL_NAME = "map_test";
 
-static int TestMap(const char *pMapPath, bool CalcHashes, IStorage *pStorage)
+static int TestMap(const char *pMap, bool CalcHashes, IStorage *pStorage)
 {
-	log_info(TOOL_NAME, "Testing map '%s'...", pMapPath);
+	log_info(TOOL_NAME, "Testing map '%s'...", pMap);
 
-	std::unique_ptr<IMap> pMap = CreateMap();
-	if(!pMap->Load(pStorage, pMapPath, IStorage::TYPE_ABSOLUTE))
+	CDataFileReader Reader;
+	if(!Reader.Open(pStorage, pMap, IStorage::TYPE_ABSOLUTE))
 	{
-		log_error(TOOL_NAME, "Failed to open map '%s' for reading", pMapPath);
+		log_error(TOOL_NAME, "Failed to open map '%s' for reading", pMap);
 		return -1;
 	}
 
 	char aSha256Str[SHA256_MAXSTRSIZE];
-	sha256_str(pMap->Sha256(), aSha256Str, sizeof(aSha256Str));
-	log_info(TOOL_NAME, "File size: %d", pMap->Size());
+	sha256_str(Reader.Sha256(), aSha256Str, sizeof(aSha256Str));
+	log_info(TOOL_NAME, "File size: %d", Reader.Size());
 	log_info(TOOL_NAME, "File SHA256: %s", aSha256Str);
-	log_info(TOOL_NAME, "File CRC32: %08x", pMap->Crc());
-	log_info(TOOL_NAME, "Num items: %d", pMap->NumItems());
-	log_info(TOOL_NAME, "Num data: %d", pMap->NumData());
+	log_info(TOOL_NAME, "File CRC32: %08x", Reader.Crc());
+	log_info(TOOL_NAME, "Num items: %d", Reader.NumItems());
+	log_info(TOOL_NAME, "Num data: %d", Reader.NumData());
 
-	for(int Index = 0; Index < pMap->NumItems(); Index++)
+	for(int Index = 0; Index < Reader.NumItems(); Index++)
 	{
 		log_info(TOOL_NAME, "Item %d:", Index);
 
 		int Type, Id;
 		CUuid Uuid;
-		const void *pItem = pMap->GetItem(Index, &Type, &Id, &Uuid);
+		const void *pItem = Reader.GetItem(Index, &Type, &Id, &Uuid);
 
 		log_info(TOOL_NAME, "  Type: %d", Type);
 		log_info(TOOL_NAME, "  ID: %d", Id);
@@ -42,7 +41,7 @@ static int TestMap(const char *pMapPath, bool CalcHashes, IStorage *pStorage)
 		FormatUuid(Uuid, aUuidStr, sizeof(aUuidStr));
 		log_info(TOOL_NAME, "  UUID: %s", aUuidStr);
 
-		const int Size = pMap->GetItemSize(Index);
+		const int Size = Reader.GetItemSize(Index);
 		log_info(TOOL_NAME, "  Size: %d bytes", Size);
 
 		if(CalcHashes)
@@ -53,14 +52,14 @@ static int TestMap(const char *pMapPath, bool CalcHashes, IStorage *pStorage)
 		}
 	}
 
-	for(int Index = 0; Index < pMap->NumData(); Index++)
+	for(int Index = 0; Index < Reader.NumData(); Index++)
 	{
 		log_info(TOOL_NAME, "Data %d:", Index);
 
-		const int Size = pMap->GetDataSize(Index);
+		const int Size = Reader.GetDataSize(Index);
 		log_info(TOOL_NAME, "  Size: %d bytes", Size);
 
-		const void *pData = pMap->GetData(Index);
+		const void *pData = Reader.GetData(Index);
 		if(pData == nullptr)
 		{
 			log_info(TOOL_NAME, "  Data erroneous");
@@ -72,11 +71,11 @@ static int TestMap(const char *pMapPath, bool CalcHashes, IStorage *pStorage)
 			log_info(TOOL_NAME, "  Data (SHA256): %s", aSha256Str);
 		}
 
-		pMap->UnloadData(Index);
+		Reader.UnloadData(Index);
 	}
 
-	pMap->Unload();
-	log_info(TOOL_NAME, "Tested map '%s' successfully", pMapPath);
+	Reader.Close();
+	log_info(TOOL_NAME, "Tested map '%s' successfully", pMap);
 	return 0;
 }
 
@@ -85,16 +84,16 @@ int main(int argc, const char **argv)
 	const CCmdlineFix CmdlineFix(&argc, &argv);
 	log_set_global_logger_default();
 
-	const char *pMapPath;
+	const char *pMap;
 	bool CalcHashes;
 	if(argc == 2)
 	{
-		pMapPath = argv[1];
+		pMap = argv[1];
 		CalcHashes = false;
 	}
 	else if(argc == 3 && str_comp(argv[1], "--calc-hashes") == 0)
 	{
-		pMapPath = argv[2];
+		pMap = argv[2];
 		CalcHashes = true;
 	}
 	else
@@ -110,5 +109,5 @@ int main(int argc, const char **argv)
 		return -1;
 	}
 
-	return TestMap(pMapPath, CalcHashes, pStorage.get());
+	return TestMap(pMap, CalcHashes, pStorage.get());
 }

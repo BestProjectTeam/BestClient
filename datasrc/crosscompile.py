@@ -1,5 +1,4 @@
 import sys
-
 import network
 import seven.network
 

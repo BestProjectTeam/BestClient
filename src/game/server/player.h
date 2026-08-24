@@ -33,9 +33,7 @@ public:
 	void Reset();
 
 	void TryRespawn();
-
-	// mark respawning, with weak hook if WeakHook is true and strong otherwise
-	void Respawn(bool WeakHook = false);
+	void Respawn(bool WeakHook = false); // with WeakHook == true the character will be spawned after all calls of Tick from other Players
 	CCharacter *ForceSpawn(vec2 Pos); // required for loading savegames
 	void SetTeam(int Team, bool DoChatMsg = true);
 	int GetTeam() const { return m_Team; }
@@ -51,9 +49,6 @@ public:
 	void PostPostTick();
 	void Snap(int SnappingClient);
 	void FakeSnap();
-	void SendConnect(int FakeId, int ClientId);
-	void SendDisconnect(int FakeId);
-	int m_aStrongWeakId[LEGACY_MAX_CLIENTS];
 
 	void OnDirectInput(const CNetObj_PlayerInput *pNewInput);
 	void OnPredictedInput(const CNetObj_PlayerInput *pNewInput);
@@ -183,7 +178,7 @@ public:
 
 	bool IsPlaying() const;
 	int64_t m_LastKickVote;
-	std::optional<int64_t> m_LastDDRaceTeamChange;
+	int64_t m_LastDDRaceTeamChange;
 	int m_ShowOthers;
 	bool m_ShowAll;
 	bool m_EnableSpectatorCount;
@@ -205,10 +200,6 @@ public:
 		void Write(const CNetMsg_Cl_CameraInfo *pMsg);
 		void Reset();
 	} m_CameraInfo;
-
-	// effective radius for network clipping, updated every tick since it depends on the dynamic camera offset
-	vec2 m_NetworkClipRadius;
-	void UpdateNetworkClipRadius();
 
 	int m_ChatScore;
 

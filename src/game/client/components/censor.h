@@ -1,9 +1,11 @@
 #ifndef GAME_CLIENT_COMPONENTS_CENSOR_H
 #define GAME_CLIENT_COMPONENTS_CENSOR_H
+/*
 #include <base/lock.h>
 
 #include <engine/console.h>
 #include <engine/shared/config.h>
+#include <engine/shared/http.h>
 #include <engine/shared/jobs.h>
 
 #include <game/client/component.h>
@@ -12,11 +14,6 @@
 #include <optional>
 #include <string>
 #include <vector>
-
-void CensorReplaceWords(char *pBuffer, const std::vector<std::string> &vWords, char Replacement);
-
-/*
-class IHttpRequest;
 
 class CCensor : public CComponent
 {
@@ -40,7 +37,7 @@ private:
 		char m_aUrl[IO_MAX_PATH_LENGTH];
 		char m_aSaveFilePath[IO_MAX_PATH_LENGTH];
 		CLock m_Lock;
-		std::shared_ptr<IHttpRequest> m_pGetRequest;
+		std::shared_ptr<CHttpRequest> m_pGetRequest;
 	};
 
 	std::shared_ptr<CCensorListDownloadJob> m_pCensorListDownloadJob = nullptr;
@@ -62,6 +59,8 @@ public:
 	void CensorMessage(char *pMessage) const;
 };
 */
+
+#include <game/client/component.h>
 
 class CCensor : public CComponent
 {

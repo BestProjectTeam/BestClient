@@ -1,5 +1,7 @@
 #include "test.h"
 
+#include <base/system.h>
+
 #include <engine/shared/network.h>
 
 #include <gtest/gtest.h>

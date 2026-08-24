@@ -5,6 +5,8 @@
 #include <base/net.h>
 #include <base/time.h>
 
+#include <engine/shared/config.h>
+
 static NETADDR KeyAddress(NETADDR Addr)
 {
 	if(Addr.type == NETTYPE_WEBSOCKET_IPV4)
@@ -110,7 +112,7 @@ std::optional<CMute> CMutes::IsMuted(const NETADDR *pAddr, bool RespectInitialDe
 	{
 		return std::nullopt;
 	}
-	if(!RespectInitialDelay && It->second.m_InitialDelay)
+	if(!RespectInitialDelay && !It->second.m_InitialDelay)
 	{
 		return std::nullopt;
 	}

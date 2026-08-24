@@ -2,8 +2,7 @@
 
 #include "gameclient.h"
 
-#include <base/dbg.h>
-#include <base/time.h>
+#include <base/system.h>
 
 void CComponentInterfaces::OnInterfacesInit(CGameClient *pClient)
 {
@@ -116,23 +115,19 @@ class IUpdater *CComponentInterfaces::Updater() const
 int64_t CComponentInterfaces::time() const
 {
 #if defined(CONF_VIDEORECORDER)
-	if(IVideo::Current())
-	{
-		return IVideo::Current()->Time();
-	}
-#endif
+	return IVideo::Current() ? IVideo::Time() : time_get();
+#else
 	return time_get();
+#endif
 }
 
 float CComponentInterfaces::LocalTime() const
 {
 #if defined(CONF_VIDEORECORDER)
-	if(IVideo::Current())
-	{
-		return IVideo::Current()->LocalTime();
-	}
-#endif
+	return IVideo::Current() ? IVideo::LocalTime() : Client()->LocalTime();
+#else
 	return Client()->LocalTime();
+#endif
 }
 
 class IClient *CComponentInterfaces::Client() const

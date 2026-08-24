@@ -1259,7 +1259,7 @@ Browser Utils
 Auto server list refresh
 == 
 
-Short EGO/KoG server name
+Use short KoG server name
 == 
 
 Chat Media

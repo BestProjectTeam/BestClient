@@ -12,7 +12,7 @@
 #include <unordered_map>
 #include <vector>
 
-class IHttpRequest;
+class CHttpRequest;
 class CUi;
 class IHttp;
 class ITextRender;
@@ -64,7 +64,6 @@ private:
 	static constexpr int FALLBACK_NOT_FOUND = -20;
 	static constexpr int FALLBACK_TITLE = -19;
 	static constexpr int64_t NOT_FOUND_HOLD_MS = 5000;
-	static constexpr int64_t OFFLINE_HOLD_MS = 5000;
 
 	struct SCacheEntry
 	{
@@ -104,11 +103,10 @@ private:
 	std::string m_TrackTitle;
 	EDisplayState m_DisplayState = EDisplayState::Idle;
 	std::vector<SLine> m_vLines;
-	std::shared_ptr<IHttpRequest> m_pRequest;
+	std::shared_ptr<CHttpRequest> m_pRequest;
 	std::unordered_map<std::string, SCacheEntry> m_Cache;
 	int64_t m_OfflineRetryAt = 0;
 	float m_NotFoundDisplayMs = 0.0f;
-	float m_OfflineDisplayMs = 0.0f;
 	float m_TitleMarqueeOffset = 0.0f;
 
 	// Independent monotonic playback clock (media snapshots can jump backward).

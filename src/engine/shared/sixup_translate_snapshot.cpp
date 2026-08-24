@@ -1,7 +1,6 @@
 #include "snapshot.h"
 
-#include <base/dbg.h>
-#include <base/mem.h>
+#include <base/system.h>
 
 void CSnapshotBuilder::Init7(const CSnapshot *pSnapshot)
 {
@@ -10,7 +9,6 @@ void CSnapshotBuilder::Init7(const CSnapshot *pSnapshot)
 	// the method is called Init7 because it is only used for 0.7 support
 	// but the snap we are building is a 0.6 snap
 	m_Building = true;
-	m_HasDroppedItem = false;
 	m_Sixup = false;
 
 	m_DataSize = pSnapshot->m_DataSize;

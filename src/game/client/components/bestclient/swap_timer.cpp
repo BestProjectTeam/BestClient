@@ -734,11 +734,51 @@ void CSwapTimer::RenderHotkeyLayout(const SHotkeyLayout &Hotkeys, float X, float
 	RenderKey(FontIcon::EYE, s_PeekColor, Hotkeys.m_aPeekKey, 1.0f);
 }
 
+void CSwapTimer::FormatPlaceholders(const char *pFormat, int Seconds, const char *pSelf, const char *pOther, char *pBuf, int BufSize)
+{
+	char aNumber[16];
+	str_format(aNumber, sizeof(aNumber), "%d", Seconds);
+
+	int Out = 0;
+	bool Replaced = false;
+	for(const char *pCur = pFormat; *pCur && Out < BufSize - 1; pCur++)
+	{
+		const char *pValue = nullptr;
+		if(pCur[0] == '%')
+		{
+			if(!Replaced && pCur[1] == 'd')
+				pValue = aNumber;
+			else if(pCur[1] == 'y')
+				pValue = pSelf;
+			else if(pCur[1] == 'n')
+				pValue = pOther;
+		}
+
+		if(!pValue)
+		{
+			pBuf[Out++] = *pCur;
+			continue;
+		}
+
+		for(; *pValue && Out < BufSize - 1; pValue++)
+			pBuf[Out++] = *pValue;
+		Replaced |= pCur[1] == 'd';
+		pCur++;
+	}
+	pBuf[Out] = '\0';
+
+	if(!Replaced)
+		str_format(pBuf, BufSize, DEFAULT_MINIMAL_TEXT, Seconds);
+}
+
 void CSwapTimer::FormatMinimalText(const SSwapEntry &Entry, float Now, char *pBuf, int BufSize) const
 {
 	const bool OnCooldown = Now < Entry.m_CooldownEnd;
 	const float Target = OnCooldown ? Entry.m_CooldownEnd : Entry.m_ExpireTime;
-	str_format(pBuf, BufSize, DEFAULT_MINIMAL_TEXT, maximum(0, round_to_int(Target - Now)));
+	const char *pConfigured = OnCooldown ? g_Config.m_BcSwapTimerWaitText : g_Config.m_BcSwapTimerLeftText;
+
+	FormatPlaceholders(pConfigured[0] ? pConfigured : DEFAULT_MINIMAL_TEXT, maximum(0, round_to_int(Target - Now)),
+		Localize("You"), DisplayName(Entry), pBuf, BufSize);
 }
 
 void CSwapTimer::FormatStatusText(const SSwapEntry &Entry, float Now, char *pBuf, int BufSize) const
@@ -996,19 +1036,16 @@ void CSwapTimer::RenderNameplateMode()
 	const float Now = Client()->LocalTime();
 
 	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
-	const CScreenRect ScreenRect = Graphics()->GetScreen();
-	ScreenX0 = ScreenRect.m_TopLeft.x;
-	ScreenY0 = ScreenRect.m_TopLeft.y;
-	ScreenX1 = ScreenRect.m_BottomRight.x;
-	ScreenY1 = ScreenRect.m_BottomRight.y;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
 
-	CScreenRect WorldScreen = Graphics()->MapScreenToWorld(
+	float aPoints[4];
+	Graphics()->MapScreenToWorld(
 		GameClient()->m_Camera.m_Center.x, GameClient()->m_Camera.m_Center.y,
 		100.0f, 100.0f, 100.0f, 0, 0,
-		Graphics()->ScreenAspect(), GameClient()->m_Camera.m_Zoom);
-	Graphics()->MapScreen(WorldScreen);
+		Graphics()->ScreenAspect(), GameClient()->m_Camera.m_Zoom, aPoints);
+	Graphics()->MapScreen(aPoints[0], aPoints[1], aPoints[2], aPoints[3]);
 
 	RenderNameplateCard(m_aEntries[Conn], ClientId, Now);
 
-	Graphics()->MapScreen(CScreenRect(vec2(ScreenX0, ScreenY0), vec2(ScreenX1, ScreenY1)));
+	Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
 }

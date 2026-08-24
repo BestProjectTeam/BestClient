@@ -14,7 +14,7 @@ void CLayerSelector::OnInit(CEditor *pEditor)
 bool CLayerSelector::SelectByTile()
 {
 	// ctrl+right click a map index to select the layer that has a tile there
-	if(Ui()->HotItem() != Editor()->MapView())
+	if(Ui()->HotItem() != &Editor()->m_MapEditorId)
 		return false;
 	if(!Input()->ModifierIsPressed() || !Ui()->MouseButtonClicked(1))
 		return false;
@@ -25,7 +25,7 @@ bool CLayerSelector::SelectByTile()
 	int MatchedLayer = -1;
 	int Matches = 0;
 	bool IsFound = false;
-	for(const auto &HoverTile : m_vHoverTiles)
+	for(const auto &HoverTile : Editor()->HoverTiles())
 	{
 		if(!Map()->m_vpGroups[HoverTile.m_Group]->m_Visible ||
 			!Map()->m_vpGroups[HoverTile.m_Group]->m_vpLayers[HoverTile.m_Layer]->m_Visible)
@@ -53,51 +53,4 @@ bool CLayerSelector::SelectByTile()
 		return true;
 	}
 	return false;
-}
-
-void CLayerSelector::UpdateHoveredTiles()
-{
-	const vec2 UpdatedMousePos = Ui()->UpdatedMousePos();
-
-	m_vHoverTiles.clear();
-	for(size_t g = 0; g < Map()->m_vpGroups.size(); g++)
-	{
-		const std::shared_ptr<CLayerGroup> pGroup = Map()->m_vpGroups[g];
-		for(size_t l = 0; l < pGroup->m_vpLayers.size(); l++)
-		{
-			const std::shared_ptr<CLayer> pLayer = pGroup->m_vpLayers[l];
-			int LayerType = pLayer->m_Type;
-			if(LayerType != LAYERTYPE_TILES &&
-				LayerType != LAYERTYPE_FRONT &&
-				LayerType != LAYERTYPE_TELE &&
-				LayerType != LAYERTYPE_SPEEDUP &&
-				LayerType != LAYERTYPE_SWITCH &&
-				LayerType != LAYERTYPE_TUNE)
-				continue;
-
-			std::shared_ptr<CLayerTiles> pTiles = std::static_pointer_cast<CLayerTiles>(pLayer);
-			pGroup->MapScreen();
-			CScreenRect GroupRect = pGroup->Mapping();
-
-			CUIRect Rect;
-			Rect.x = GroupRect.m_TopLeft.x + GroupRect.Width() * (UpdatedMousePos.x / Graphics()->WindowWidth());
-			Rect.y = GroupRect.m_TopLeft.y + GroupRect.Height() * (UpdatedMousePos.y / Graphics()->WindowHeight());
-			Rect.w = 0;
-			Rect.h = 0;
-			CIntRect r;
-			pTiles->Convert(Rect, &r);
-			pTiles->Clamp(&r);
-			int x = r.x;
-			int y = r.y;
-
-			if(x < 0 || x >= pTiles->m_Width)
-				continue;
-			if(y < 0 || y >= pTiles->m_Height)
-				continue;
-
-			if(pTiles->GetTile(x, y).m_Index > 0)
-				m_vHoverTiles.emplace_back(g, l);
-		}
-	}
-	Ui()->MapScreen();
 }

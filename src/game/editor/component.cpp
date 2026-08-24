@@ -32,6 +32,10 @@ void CEditorComponent::OnUpdate()
 {
 }
 
+void CEditorComponent::OnRender(CUIRect View)
+{
+}
+
 void CEditorComponent::InitSubComponents()
 {
 	for(CEditorComponent &Component : m_vSubComponents)

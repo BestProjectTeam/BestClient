@@ -558,11 +558,12 @@ void CSelfTimeCp::OnRender()
 	if(!Enabled() || m_vCheckpoints.empty() || Client()->State() != IClient::STATE_ONLINE)
 		return;
 
-	CScreenRect WorldScreen = Graphics()->MapScreenToWorld(
+	float aPoints[4];
+	Graphics()->MapScreenToWorld(
 		GameClient()->m_Camera.m_Center.x, GameClient()->m_Camera.m_Center.y,
 		100.0f, 100.0f, 100.0f, 0, 0,
-		Graphics()->ScreenAspect(), GameClient()->m_Camera.m_Zoom);
-	Graphics()->MapScreen(WorldScreen);
+		Graphics()->ScreenAspect(), GameClient()->m_Camera.m_Zoom, aPoints);
+	Graphics()->MapScreen(aPoints[0], aPoints[1], aPoints[2], aPoints[3]);
 
 	ColorRGBA Color = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_BcSelfTimeCpColor, true));
 	Color.a = std::min(Color.a, 0.45f);

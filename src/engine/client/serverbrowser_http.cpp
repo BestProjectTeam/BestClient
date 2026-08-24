@@ -1,7 +1,6 @@
 #include "serverbrowser_http.h"
 
 #include <base/dbg.h>
-#include <base/hash.h>
 #include <base/io.h>
 #include <base/lock.h>
 #include <base/log.h>
@@ -13,9 +12,9 @@
 #include <engine/console.h>
 #include <engine/engine.h>
 #include <engine/external/json-parser/json.h>
-#include <engine/http.h>
 #include <engine/serverbrowser.h>
 #include <engine/shared/config.h>
+#include <engine/shared/http.h>
 #include <engine/shared/jobs.h>
 #include <engine/shared/linereader.h>
 #include <engine/shared/serverinfo.h>
@@ -23,7 +22,6 @@
 
 #include <chrono>
 #include <memory>
-#include <optional>
 #include <vector>
 
 using namespace std::chrono_literals;
@@ -86,8 +84,8 @@ private:
 		CChooseMaster *m_pParent;
 		CLock m_Lock;
 		std::shared_ptr<CData> m_pData;
-		std::shared_ptr<IHttpRequest> m_pHead;
-		std::shared_ptr<IHttpRequest> m_pGet;
+		std::shared_ptr<CHttpRequest> m_pHead;
+		std::shared_ptr<CHttpRequest> m_pGet;
 		void Run() override REQUIRES(!m_Lock);
 
 	public:
@@ -222,7 +220,7 @@ void CChooseMaster::CJob::Run()
 		aTimeMs[i] = -1;
 		aAgeS[i] = SanitizeAge({});
 		const char *pUrl = m_pData->m_aaUrls[aRandomized[i]];
-		std::shared_ptr<IHttpRequest> pHead = HttpHead(pUrl);
+		std::shared_ptr<CHttpRequest> pHead = HttpHead(pUrl);
 		pHead->Timeout(Timeout);
 		pHead->LogProgress(HTTPLOG::FAILURE);
 		{
@@ -243,7 +241,7 @@ void CChooseMaster::CJob::Run()
 		}
 
 		auto StartTime = time_get_nanoseconds();
-		std::shared_ptr<IHttpRequest> pGet = HttpGet(pUrl);
+		std::shared_ptr<CHttpRequest> pGet = HttpGet(pUrl);
 		pGet->Timeout(Timeout);
 		pGet->LogProgress(HTTPLOG::FAILURE);
 		{
@@ -329,10 +327,6 @@ public:
 	{
 		return m_vServers[Index];
 	}
-	bool ServersDataChanged() const override
-	{
-		return m_ServersDataChanged;
-	}
 
 private:
 	enum
@@ -351,13 +345,11 @@ private:
 	IStorage *m_pStorage;
 
 	int m_State = STATE_WANTREFRESH;
-	std::shared_ptr<IHttpRequest> m_pGetServers;
+	std::shared_ptr<CHttpRequest> m_pGetServers;
 	std::unique_ptr<CChooseMaster> m_pChooseMaster;
 	bool m_UseBestClientMaster = false;
 
 	std::vector<CServerInfo> m_vServers;
-	std::optional<SHA256_DIGEST> m_ServersSha256;
-	bool m_ServersDataChanged = false;
 
 	void ResetMasterChooser(const char *pPreviousBestUrl);
 };
@@ -415,47 +407,30 @@ void CServerBrowserHttp::Update()
 			return;
 		}
 		m_State = STATE_DONE;
-		std::shared_ptr<IHttpRequest> pGetServers = nullptr;
+		std::shared_ptr<CHttpRequest> pGetServers = nullptr;
 		std::swap(m_pGetServers, pGetServers);
 
-		m_ServersDataChanged = false;
-		if(pGetServers->State() != EHttpState::DONE)
-		{
-			log_error("serverbrowser_http", "failed getting serverlist, trying to find best URL");
-			m_pChooseMaster->Reset();
-			m_pChooseMaster->Refresh();
-			return;
-		}
-
-		const SHA256_DIGEST &ServersSha256 = pGetServers->ResultSha256();
-		if(m_ServersSha256 && *m_ServersSha256 == ServersSha256)
-		{
-			// Identical payload: keep the previously parsed list and skip the
-			// expensive JSON parse + browser rebuild on auto-refresh.
-			return;
-		}
-
-		json_value *pJson = pGetServers->ResultJson();
-		const bool Success = pJson && !Parse(pJson, &m_vServers);
+		bool Success = true;
+		json_value *pJson = pGetServers->State() == EHttpState::DONE ? pGetServers->ResultJson() : nullptr;
+		Success = Success && pJson;
+		Success = Success && !Parse(pJson, &m_vServers);
 		json_value_free(pJson);
 		if(!Success)
 		{
 			log_error("serverbrowser_http", "failed getting serverlist, trying to find best URL");
 			m_pChooseMaster->Reset();
 			m_pChooseMaster->Refresh();
-			return;
 		}
-
-		m_ServersSha256 = ServersSha256;
-		m_ServersDataChanged = true;
-
-		// Try to find new master if the current one returns
-		// results that are 5 minutes old.
-		int Age = SanitizeAge(pGetServers->ResultAgeSeconds());
-		if(Age > 300)
+		else
 		{
-			log_info("serverbrowser_http", "got stale serverlist, age=%ds, trying to find best URL", Age);
-			m_pChooseMaster->Refresh();
+			// Try to find new master if the current one returns
+			// results that are 5 minutes old.
+			int Age = SanitizeAge(pGetServers->ResultAgeSeconds());
+			if(Age > 300)
+			{
+				log_info("serverbrowser_http", "got stale serverlist, age=%ds, trying to find best URL", Age);
+				m_pChooseMaster->Refresh();
+			}
 		}
 	}
 }

@@ -21,7 +21,7 @@ class CPrompt : public CEditorComponent
 public:
 	void OnInit(CEditor *pEditor) override;
 	bool OnInput(const IInput::CEvent &Event) override;
-	void Render();
+	void OnRender(CUIRect _) override;
 	bool IsActive();
 	void SetActive();
 	void SetInactive();

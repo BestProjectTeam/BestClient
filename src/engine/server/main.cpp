@@ -9,7 +9,6 @@
 
 #include <engine/console.h>
 #include <engine/engine.h>
-#include <engine/http.h>
 #include <engine/map.h>
 #include <engine/server.h>
 #include <engine/server/antibot.h>
@@ -129,22 +128,13 @@ int main(int argc, const char **argv)
 	pFutureAssertionLogger->Set(CreateAssertionLogger(pStorage, GAME_NAME));
 
 	{
-		char aTimestamp[20];
-		str_timestamp(aTimestamp, sizeof(aTimestamp));
-
+		char aBuf[IO_MAX_PATH_LENGTH];
 		char aBufName[IO_MAX_PATH_LENGTH];
-		str_format(aBufName, sizeof(aBufName), "dumps/%s-Server_%s_%s_%s_crash_log_%s_%d_%s.RTP",
-			GAME_NAME,
-			GAME_RELEASE_VERSION,
-			CONF_PLATFORM_STRING,
-			CONF_ARCH_STRING,
-			aTimestamp,
-			process_id(),
-			GIT_SHORTREV_HASH != nullptr ? GIT_SHORTREV_HASH : "");
-
-		char aBufPath[IO_MAX_PATH_LENGTH];
-		pStorage->GetCompletePath(IStorage::TYPE_SAVE, aBufName, aBufPath, sizeof(aBufPath));
-		crashdump_init_if_available(aBufPath);
+		char aDate[64];
+		str_timestamp(aDate, sizeof(aDate));
+		str_format(aBufName, sizeof(aBufName), "dumps/" GAME_NAME "-Server_%s_crash_log_%s_%d_%s.RTP", CONF_PLATFORM_STRING, aDate, process_id(), GIT_SHORTREV_HASH != nullptr ? GIT_SHORTREV_HASH : "");
+		pStorage->GetCompletePath(IStorage::TYPE_SAVE, aBufName, aBuf, sizeof(aBuf));
+		crashdump_init_if_available(aBuf);
 	}
 
 	IConsole *pConsole = CreateConsole(CFGFLAG_SERVER | CFGFLAG_ECON).release();
@@ -152,10 +142,6 @@ int main(int argc, const char **argv)
 
 	IConfigManager *pConfigManager = CreateConfigManager();
 	pKernel->RegisterInterface(pConfigManager);
-
-	IEngineHttp *pEngineHttp = CreateEngineHttp();
-	pKernel->RegisterInterface(pEngineHttp); // IEngineHttp
-	pKernel->RegisterInterface(static_cast<IHttp *>(pEngineHttp), false);
 
 	IEngineAntibot *pEngineAntibot = CreateEngineAntibot();
 	pKernel->RegisterInterface(pEngineAntibot); // IEngineAntibot
@@ -198,9 +184,7 @@ int main(int argc, const char **argv)
 		IOHANDLE Logfile = pStorage->OpenFile(g_Config.m_Logfile, Mode, IStorage::TYPE_SAVE_OR_ABSOLUTE);
 		if(Logfile)
 		{
-			auto pFileLogger = log_logger_file(Logfile);
-			pFileLogger->SetFilter(CLogFilter{IConsole::ToLogLevelFilter(g_Config.m_Loglevel)});
-			pFutureFileLogger->Set(std::move(pFileLogger));
+			pFutureFileLogger->Set(log_logger_file(Logfile));
 		}
 		else
 		{

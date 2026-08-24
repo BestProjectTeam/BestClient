@@ -2,26 +2,12 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include "network.h"
 
-#include <base/mem.h>
-#include <base/net.h>
-#include <base/str.h>
-
-void CConsoleNetConnection::SetPeerAddr(const NETADDR *pAddr)
-{
-	m_PeerAddr = *pAddr;
-	net_addr_str(pAddr, m_aPeerAddrStr.data(), m_aPeerAddrStr.size(), true);
-}
-
-void CConsoleNetConnection::ClearPeerAddr()
-{
-	mem_zero(&m_PeerAddr, sizeof(m_PeerAddr));
-	m_aPeerAddrStr[0] = '\0';
-}
+#include <base/system.h>
 
 void CConsoleNetConnection::Reset()
 {
 	m_State = EState::OFFLINE;
-	ClearPeerAddr();
+	mem_zero(&m_PeerAddr, sizeof(m_PeerAddr));
 	m_aErrorString[0] = 0;
 
 	m_Socket = nullptr;
@@ -50,7 +36,7 @@ int CConsoleNetConnection::Init(NETSOCKET Socket, const NETADDR *pAddr)
 	}
 
 	m_Socket = Socket;
-	SetPeerAddr(pAddr);
+	m_PeerAddr = *pAddr;
 	m_State = EState::ONLINE;
 	return 0;
 }

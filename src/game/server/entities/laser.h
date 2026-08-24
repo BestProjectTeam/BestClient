@@ -4,7 +4,6 @@
 #define GAME_SERVER_ENTITIES_LASER_H
 
 #include <game/server/entity.h>
-#include <game/server/interactions.h>
 
 class CLaser : public CEntity
 {
@@ -32,23 +31,17 @@ private:
 	int m_Bounces;
 	int m_EvalTick;
 	int m_Owner;
+	CClientMask m_TeamMask;
 	bool m_ZeroEnergyBounceInLastTick;
-	CInteractions m_InteractState;
 
 	// DDRace
 
 	vec2 m_PrevPos;
 	int m_Type;
 	int m_TuneZone;
-	float m_ShotgunStrength;
-	float m_BounceNum;
-	float m_BounceCost;
-	float m_BounceDelay;
-
 	bool m_TeleportCancelled;
 	bool m_IsBlueTeleport;
 	bool m_BelongsToPracticeTeam;
-	void SyncInteractState();
 };
 
 #endif

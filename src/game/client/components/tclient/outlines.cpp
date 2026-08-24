@@ -146,11 +146,7 @@ void COutlines::OnRender()
 	const float Scale = 32.0f;
 
 	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
-	const CScreenRect ScreenRect = Graphics()->GetScreen();
-	ScreenX0 = ScreenRect.m_TopLeft.x;
-	ScreenY0 = ScreenRect.m_TopLeft.y;
-	ScreenX1 = ScreenRect.m_BottomRight.x;
-	ScreenY1 = ScreenRect.m_BottomRight.y;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
 
 	// Cull tile outlines outside optimizer FPS fog (same area as other non-map draws)
 	if(GameClient()->OptimizerFpsFogEnabled())

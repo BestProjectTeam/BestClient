@@ -24,11 +24,14 @@ public:
 	virtual void OnMapLoad();
 
 	/**
-	 * Should return `true` if the event was consumed.
+	 * Gets called before @link OnRender @endlink. Should return `true`
+	 * if the event was consumed.
 	 */
 	virtual bool OnInput(const IInput::CEvent &Event);
 
 	virtual void OnUpdate();
+
+	virtual void OnRender(CUIRect View);
 
 	/**
 	 * Initialize all registered subcomponents.

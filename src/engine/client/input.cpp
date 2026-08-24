@@ -4,10 +4,7 @@
 
 #include "keynames.h"
 
-#include <base/dbg.h>
-#include <base/log.h>
-#include <base/str.h>
-#include <base/time.h>
+#include <base/system.h>
 #include <base/windows.h>
 
 #include <engine/console.h>
@@ -116,13 +113,13 @@ void CInput::InitJoysticks()
 	{
 		if(SDL_InitSubSystem(SDL_INIT_JOYSTICK) < 0)
 		{
-			log_error("joystick", "Unable to init SDL joystick system: %s", SDL_GetError());
+			dbg_msg("joystick", "Unable to init SDL joystick system: %s", SDL_GetError());
 			return;
 		}
 	}
 
 	const int NumJoysticks = SDL_NumJoysticks();
-	log_info("joystick", "%d joystick(s) found", NumJoysticks);
+	dbg_msg("joystick", "%d joystick(s) found", NumJoysticks);
 	for(int i = 0; i < NumJoysticks; i++)
 		OpenJoystick(i);
 	UpdateActiveJoystick();
@@ -135,7 +132,7 @@ bool CInput::OpenJoystick(int JoystickIndex)
 	SDL_Joystick *pJoystick = SDL_JoystickOpen(JoystickIndex);
 	if(!pJoystick)
 	{
-		log_error("joystick", "Could not open joystick %d: '%s'", JoystickIndex, SDL_GetError());
+		dbg_msg("joystick", "Could not open joystick %d: '%s'", JoystickIndex, SDL_GetError());
 		return false;
 	}
 	if(std::find_if(m_vJoysticks.begin(), m_vJoysticks.end(), [pJoystick](const CJoystick &Joystick) -> bool { return Joystick.m_pDelegate == pJoystick; }) != m_vJoysticks.end())
@@ -145,7 +142,7 @@ bool CInput::OpenJoystick(int JoystickIndex)
 	}
 	m_vJoysticks.emplace_back(this, m_vJoysticks.size(), pJoystick);
 	const CJoystick &Joystick = m_vJoysticks[m_vJoysticks.size() - 1];
-	log_info("joystick", "Opened joystick %d '%s' (%d axes, %d buttons, %d balls, %d hats)", JoystickIndex, Joystick.GetName(),
+	dbg_msg("joystick", "Opened joystick %d '%s' (%d axes, %d buttons, %d balls, %d hats)", JoystickIndex, Joystick.GetName(),
 		Joystick.GetNumAxes(), Joystick.GetNumButtons(), Joystick.GetNumBalls(), Joystick.GetNumHats());
 	return true;
 }
@@ -179,7 +176,7 @@ void CInput::ConchainJoystickGuidChanged(IConsole::IResult *pResult, void *pUser
 
 float CInput::GetJoystickDeadzone()
 {
-	return std::min(g_Config.m_InpControllerTolerance / 50.0f, 0.995f);
+	return minimum(g_Config.m_InpControllerTolerance / 50.0f, 0.995f);
 }
 
 CInput::CJoystick::CJoystick(CInput *pInput, int Index, SDL_Joystick *pDelegate)
@@ -248,7 +245,7 @@ bool CInput::CJoystick::Relative(float *pX, float *pY)
 	const float DeadZone = Input()->GetJoystickDeadzone();
 	if(Len > DeadZone)
 	{
-		const float Factor = 2500.0f * Input()->GetUpdateTime() * std::max((Len - DeadZone) / (1.0f - DeadZone), 0.001f) / Len;
+		const float Factor = 2500.0f * Input()->GetUpdateTime() * maximum((Len - DeadZone) / (1.0f - DeadZone), 0.001f) / Len;
 		*pX = RawJoystickPos.x * Factor;
 		*pY = RawJoystickPos.y * Factor;
 		return true;
@@ -541,7 +538,7 @@ void CInput::HandleJoystickRemovedEvent(const SDL_JoyDeviceEvent &Event)
 	auto RemovedJoystick = std::find_if(m_vJoysticks.begin(), m_vJoysticks.end(), [Event](const CJoystick &Joystick) -> bool { return Joystick.GetInstanceId() == Event.which; });
 	if(RemovedJoystick != m_vJoysticks.end())
 	{
-		log_info("joystick", "Closed joystick %d '%s'", (*RemovedJoystick).GetIndex(), (*RemovedJoystick).GetName());
+		dbg_msg("joystick", "Closed joystick %d '%s'", (*RemovedJoystick).GetIndex(), (*RemovedJoystick).GetName());
 		auto NextJoystick = m_vJoysticks.erase(RemovedJoystick);
 		// Adjust indices of following joysticks
 		while(NextJoystick != m_vJoysticks.end())

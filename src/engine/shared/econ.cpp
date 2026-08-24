@@ -3,10 +3,8 @@
 #include "netban.h"
 
 #include <base/dbg.h>
-#include <base/log.h>
 #include <base/net.h>
 #include <base/str.h>
-#include <base/time.h>
 
 #include <engine/console.h>
 #include <engine/shared/config.h>
@@ -20,7 +18,11 @@ int CEcon::NewClientCallback(int ClientId, void *pUser)
 {
 	CEcon *pThis = (CEcon *)pUser;
 
-	log_info("econ", "Client accepted. client_id=%d addr=<{%s}>", ClientId, pThis->m_NetConsole.ClientAddrString(ClientId).data());
+	char aAddrStr[NETADDR_MAXSTRSIZE];
+	net_addr_str(pThis->m_NetConsole.ClientAddr(ClientId), aAddrStr, sizeof(aAddrStr), true);
+	char aBuf[128];
+	str_format(aBuf, sizeof(aBuf), "client accepted. cid=%d addr=%s'", ClientId, aAddrStr);
+	pThis->Console()->Print(IConsole::OUTPUT_LEVEL_ADDINFO, "econ", aBuf);
 
 	pThis->m_aClients[ClientId].m_State = CClient::STATE_CONNECTED;
 	pThis->m_aClients[ClientId].m_TimeConnected = time_get();
@@ -34,7 +36,11 @@ int CEcon::DelClientCallback(int ClientId, const char *pReason, void *pUser)
 {
 	CEcon *pThis = (CEcon *)pUser;
 
-	log_info("econ", "Client dropped. client_id=%d addr=<{%s}> reason='%s'", ClientId, pThis->m_NetConsole.ClientAddrString(ClientId).data(), pReason);
+	char aAddrStr[NETADDR_MAXSTRSIZE];
+	net_addr_str(pThis->m_NetConsole.ClientAddr(ClientId), aAddrStr, sizeof(aAddrStr), true);
+	char aBuf[256];
+	str_format(aBuf, sizeof(aBuf), "client dropped. cid=%d addr=%s reason='%s'", ClientId, aAddrStr, pReason);
+	pThis->Console()->Print(IConsole::OUTPUT_LEVEL_ADDINFO, "econ", aBuf);
 
 	pThis->m_aClients[ClientId].m_State = CClient::STATE_EMPTY;
 	return 0;
@@ -64,7 +70,7 @@ void CEcon::Init(CConfig *pConfig, IConsole *pConsole, CNetBan *pNetBan)
 
 	if(g_Config.m_EcPassword[0] == 0)
 	{
-		log_error("econ", "Setting ec_password is required for econ to be enabled.");
+		Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "econ", "ec_password is required to be set for econ to be enabled.");
 		return;
 	}
 
@@ -76,7 +82,9 @@ void CEcon::Init(CConfig *pConfig, IConsole *pConsole, CNetBan *pNetBan)
 	}
 	else
 	{
-		log_error("econ", "The configured bindaddr '%s' cannot be resolved.", g_Config.m_EcBindaddr);
+		char aBuf[256];
+		str_format(aBuf, sizeof(aBuf), "The configured bindaddr '%s' cannot be resolved.", g_Config.m_EcBindaddr);
+		Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "econ", aBuf);
 		return;
 	}
 
@@ -84,13 +92,13 @@ void CEcon::Init(CConfig *pConfig, IConsole *pConsole, CNetBan *pNetBan)
 	{
 		m_NetConsole.SetCallbacks(NewClientCallback, DelClientCallback, this);
 		m_Ready = true;
-		log_info("econ", "Bound to %s:%d", g_Config.m_EcBindaddr, g_Config.m_EcPort);
+		char aBuf[128];
+		str_format(aBuf, sizeof(aBuf), "bound to %s:%d", g_Config.m_EcBindaddr, g_Config.m_EcPort);
+		Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "econ", aBuf);
 		Console()->Register("logout", "", CFGFLAG_ECON, ConLogout, this, "Logout of econ");
 	}
 	else
-	{
-		log_error("econ", "Couldn't open socket. Port %d might already be in use.", g_Config.m_EcPort);
-	}
+		Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "econ", "couldn't open socket. port might already be in use");
 }
 
 void CEcon::Update()
@@ -112,12 +120,14 @@ void CEcon::Update()
 			{
 				m_aClients[ClientId].m_State = CClient::STATE_AUTHED;
 				m_NetConsole.Send(ClientId, "Authentication successful. External console access granted.");
-				log_info("econ", "Client authed. client_id=%d addr=<{%s}>", ClientId, m_NetConsole.ClientAddrString(ClientId).data());
+
+				str_format(aBuf, sizeof(aBuf), "cid=%d authed", ClientId);
+				Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "econ", aBuf);
 			}
 			else
 			{
 				m_aClients[ClientId].m_AuthTries++;
-				char aMsg[64];
+				char aMsg[128];
 				str_format(aMsg, sizeof(aMsg), "Wrong password %d/%d.", m_aClients[ClientId].m_AuthTries, MAX_AUTH_TRIES);
 				m_NetConsole.Send(ClientId, aMsg);
 				if(m_aClients[ClientId].m_AuthTries >= MAX_AUTH_TRIES)
@@ -131,7 +141,9 @@ void CEcon::Update()
 		}
 		else if(m_aClients[ClientId].m_State == CClient::STATE_AUTHED)
 		{
-			log_info("econ", "client_id=%d addr=<{%s}> command='%s'", ClientId, m_NetConsole.ClientAddrString(ClientId).data(), aBuf);
+			char aFormatted[256];
+			str_format(aFormatted, sizeof(aFormatted), "cid=%d cmd='%s'", ClientId, aBuf);
+			Console()->Print(IConsole::OUTPUT_LEVEL_ADDINFO, "server", aFormatted);
 			m_UserClientId = ClientId;
 			Console()->ExecuteLine(aBuf, IConsole::CLIENT_ID_UNSPECIFIED);
 			m_UserClientId = -1;
@@ -142,9 +154,7 @@ void CEcon::Update()
 	{
 		if(m_aClients[i].m_State == CClient::STATE_CONNECTED &&
 			time_get() > m_aClients[i].m_TimeConnected + g_Config.m_EcAuthTimeout * time_freq())
-		{
-			m_NetConsole.Drop(i, "Authentication timeout");
-		}
+			m_NetConsole.Drop(i, "authentication timeout");
 	}
 }
 
@@ -162,9 +172,7 @@ void CEcon::Send(int ClientId, const char *pLine)
 		}
 	}
 	else if(ClientId >= 0 && ClientId < NET_MAX_CONSOLE_CLIENTS && m_aClients[ClientId].m_State == CClient::STATE_AUTHED)
-	{
 		m_NetConsole.Send(ClientId, pLine);
-	}
 }
 
 void CEcon::Shutdown()

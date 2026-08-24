@@ -12,15 +12,12 @@
 
 #include <cstddef>
 
-// NOLINTBEGIN(readability-identifier-naming)
 void websocket_init();
-void websocket_reload_certs();
 int websocket_create(const NETADDR *bindaddr);
 void websocket_destroy(int socket);
 int websocket_recv(int socket, unsigned char *data, size_t maxsize, NETADDR *addr);
 int websocket_send(int socket, const unsigned char *data, size_t size, const NETADDR *addr);
 int websocket_fd_set(int socket, fd_set *set);
 int websocket_fd_get(int socket, fd_set *set);
-// NOLINTEND(readability-identifier-naming)
 
 #endif // ENGINE_SHARED_WEBSOCKETS_H

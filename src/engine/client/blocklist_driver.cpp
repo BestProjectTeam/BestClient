@@ -1,7 +1,6 @@
 #include "blocklist_driver.h"
 
-#include <base/detect.h>
-#include <base/str.h>
+#include <base/system.h>
 
 #include <cstddef>
 

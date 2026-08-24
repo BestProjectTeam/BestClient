@@ -1,9 +1,8 @@
 #include "fifo.h"
 
 #include <base/log.h>
-#include <base/str.h>
+#include <base/system.h>
 #if defined(CONF_FAMILY_UNIX)
-#include <base/fs.h>
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -86,7 +85,7 @@ void CFifo::Shutdown()
 		return;
 
 	close(m_File);
-	(void)fs_remove(m_aFilename);
+	fs_remove(m_aFilename);
 }
 
 void CFifo::Update()

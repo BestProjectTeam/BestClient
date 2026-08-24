@@ -3,14 +3,11 @@
 
 #include "console.h"
 
-#include <base/dbg.h>
-#include <base/io.h>
 #include <base/lock.h>
 #include <base/logger.h>
 #include <base/math.h>
-#include <base/mem.h>
 #include <base/str.h>
-#include <base/time.h>
+#include <base/system.h>
 
 #include <engine/console.h>
 #include <engine/engine.h>
@@ -102,9 +99,6 @@ static const CArgumentCompletionEntry gs_aArgumentCompletionEntries[] = {
 	{EArgumentCompletionType::TUNE, "tune_reset", 0},
 	{EArgumentCompletionType::TUNE, "toggle_tune", 0},
 	{EArgumentCompletionType::TUNE, "tune_zone", 1},
-	{EArgumentCompletionType::TUNE, "tune_lock", 1},
-	{EArgumentCompletionType::TUNE, "tune_lock_pl", 1},
-	{EArgumentCompletionType::TUNE, "tune_lock_pl_reset", 1},
 	{EArgumentCompletionType::SETTING, "reset", 0},
 	{EArgumentCompletionType::SETTING, "toggle", 0},
 	{EArgumentCompletionType::SETTING, "access_level", 0},
@@ -131,7 +125,7 @@ static std::pair<EArgumentCompletionType, int> ArgumentCompletion(const char *pS
 
 	for(const auto &Entry : gs_aArgumentCompletionEntries)
 	{
-		int Length = std::max(str_length(Entry.m_pCommandName), CommandLength);
+		int Length = maximum(str_length(Entry.m_pCommandName), CommandLength);
 		if(str_comp_nocase_num(Entry.m_pCommandName, pCommandStart, Length) == 0)
 		{
 			int CurrentArg = 0;
@@ -175,11 +169,6 @@ static int PossibleKeys(const char *pStr, IInput *pInput, IConsole::FPossibleCal
 	int Index = 0;
 	for(int Key = KEY_A; Key < KEY_JOY_AXIS_11_RIGHT; Key++)
 	{
-		if(Key == KEY_ESCAPE)
-		{
-			// Binding to Escape key is not supported
-			continue;
-		}
 		// Ignore unnamed keys starting with '&'
 		const char *pKeyName = pInput->KeyName(Key);
 		if(pKeyName[0] != '&' && str_find_nocase(pKeyName, pStr))
@@ -358,12 +347,12 @@ void CGameConsole::CInstance::UpdateCompletionSuggestions()
 	char aOldCommand[IConsole::CMDLINE_LENGTH];
 	aOldCommand[0] = '\0';
 	if(m_CompletionChosen != -1 && (size_t)m_CompletionChosen < m_vpCommandSuggestions.size())
-		str_copy(aOldCommand, m_vpCommandSuggestions[m_CompletionChosen]);
+		str_copy(aOldCommand, m_vpCommandSuggestions[m_CompletionChosen], sizeof(aOldCommand));
 
 	char aOldArgument[IConsole::CMDLINE_LENGTH];
 	aOldArgument[0] = '\0';
 	if(m_CompletionChosenArgument != -1 && (size_t)m_CompletionChosenArgument < m_vpArgumentSuggestions.size())
-		str_copy(aOldArgument, m_vpArgumentSuggestions[m_CompletionChosenArgument]);
+		str_copy(aOldArgument, m_vpArgumentSuggestions[m_CompletionChosenArgument], sizeof(aOldArgument));
 
 	m_vpCommandSuggestions.clear();
 	m_vpArgumentSuggestions.clear();
@@ -465,6 +454,20 @@ void CGameConsole::CInstance::ExecuteLine(const char *pLine)
 	}
 }
 
+void CGameConsole::CInstance::PossibleCommandsCompleteCallback(int Index, const char *pStr, void *pUser)
+{
+	CGameConsole::CInstance *pInstance = (CGameConsole::CInstance *)pUser;
+	if(pInstance->m_CompletionChosen == Index)
+	{
+		char aBefore[IConsole::CMDLINE_LENGTH];
+		str_truncate(aBefore, sizeof(aBefore), pInstance->m_aCompletionBuffer, pInstance->m_CompletionCommandStart);
+		char aBuf[IConsole::CMDLINE_LENGTH];
+		str_format(aBuf, sizeof(aBuf), "%s%s%s", aBefore, pStr, pInstance->m_aCompletionBuffer + pInstance->m_CompletionCommandEnd);
+		pInstance->m_Input.Set(aBuf);
+		pInstance->m_Input.SetCursorOffset(str_length(pStr) + pInstance->m_CompletionCommandStart);
+	}
+}
+
 void CGameConsole::CInstance::GetCommand(const char *pInput, char (&aCmd)[IConsole::CMDLINE_LENGTH])
 {
 	char aInput[IConsole::CMDLINE_LENGTH];
@@ -483,13 +486,29 @@ void CGameConsole::CInstance::GetCommand(const char *pInput, char (&aCmd)[IConso
 	}
 	m_CompletionCommandStart = str_skip_whitespaces_const(aInput + m_CompletionCommandStart) - aInput;
 
-	str_copy(aCmd, aInput + m_CompletionCommandStart);
+	str_copy(aCmd, aInput + m_CompletionCommandStart, sizeof(aCmd));
 }
 
 static void StrCopyUntilSpace(char *pDest, size_t DestSize, const char *pSrc)
 {
 	const char *pSpace = str_find(pSrc, " ");
-	str_copy(pDest, pSrc, std::min(pSpace ? (size_t)(pSpace - pSrc + 1) : 1, DestSize));
+	str_copy(pDest, pSrc, minimum<size_t>(pSpace ? pSpace - pSrc + 1 : 1, DestSize));
+}
+
+void CGameConsole::CInstance::PossibleArgumentsCompleteCallback(int Index, const char *pStr, void *pUser)
+{
+	CGameConsole::CInstance *pInstance = (CGameConsole::CInstance *)pUser;
+	if(pInstance->m_CompletionChosenArgument == Index)
+	{
+		// get command
+		char aBuf[IConsole::CMDLINE_LENGTH];
+		str_copy(aBuf, pInstance->GetString(), pInstance->m_CompletionArgumentPosition);
+		str_append(aBuf, " ");
+
+		// append argument
+		str_append(aBuf, pStr);
+		pInstance->m_Input.Set(aBuf);
+	}
 }
 
 bool CGameConsole::CInstance::OnInput(const IInput::CEvent &Event)
@@ -551,9 +570,7 @@ bool CGameConsole::CInstance::OnInput(const IInput::CEvent &Event)
 						m_pHistoryEntry = pTest;
 				}
 				else
-				{
 					m_pHistoryEntry = m_History.Last();
-				}
 
 				if(m_pHistoryEntry)
 					m_Input.Set(m_pHistoryEntry);
@@ -598,12 +615,7 @@ bool CGameConsole::CInstance::OnInput(const IInput::CEvent &Event)
 						m_CompletionChosen = (m_CompletionChosen + Direction + CompletionEnumerationCount) % CompletionEnumerationCount;
 						m_CompletionArgumentPosition = 0;
 
-						char aBefore[IConsole::CMDLINE_LENGTH];
-						str_truncate(aBefore, sizeof(aBefore), m_aCompletionBuffer, m_CompletionCommandStart);
-						char aBuf[IConsole::CMDLINE_LENGTH];
-						str_format(aBuf, sizeof(aBuf), "%s%s%s", aBefore, m_vpCommandSuggestions[m_CompletionChosen], m_aCompletionBuffer + m_CompletionCommandEnd);
-						m_Input.Set(aBuf);
-						m_Input.SetCursorOffset(str_length(m_vpCommandSuggestions[m_CompletionChosen]) + m_CompletionCommandStart);
+						PossibleCommandsCompleteCallback(m_CompletionChosen, m_vpCommandSuggestions[m_CompletionChosen], this);
 					}
 					else if(m_CompletionChosen != -1)
 					{
@@ -622,14 +634,7 @@ bool CGameConsole::CInstance::OnInput(const IInput::CEvent &Event)
 					m_CompletionChosenArgument = (m_CompletionChosenArgument + Direction + CompletionEnumerationCountArgs) % CompletionEnumerationCountArgs;
 					m_CompletionArgumentPosition = CompletionPos;
 
-					// get command
-					char aBuf[IConsole::CMDLINE_LENGTH];
-					str_copy(aBuf, GetString(), m_CompletionArgumentPosition);
-					str_append(aBuf, " ");
-
-					// append argument
-					str_append(aBuf, m_vpArgumentSuggestions[m_CompletionChosenArgument]);
-					m_Input.Set(aBuf);
+					PossibleArgumentsCompleteCallback(m_CompletionChosenArgument, m_vpArgumentSuggestions[m_CompletionChosenArgument], this);
 				}
 				else if(m_CompletionChosenArgument != -1)
 				{
@@ -754,9 +759,7 @@ bool CGameConsole::CInstance::OnInput(const IInput::CEvent &Event)
 				m_pCommandParams = pCommand->Params();
 			}
 			else
-			{
 				m_IsCommand = false;
-			}
 		}
 	}
 
@@ -789,7 +792,7 @@ int CGameConsole::CInstance::GetLinesToScroll(int Direction, int LinesToScroll)
 		pEntry = m_Backlog.Prev(pEntry);
 	}
 
-	int Amount = std::max(0, Line - LinesToSkip);
+	int Amount = maximum(0, Line - LinesToSkip);
 	while(pEntry && (LinesToScroll > 0 ? Amount < LinesToScroll : true))
 	{
 		if(pEntry->m_LineCount == -1)
@@ -798,7 +801,7 @@ int CGameConsole::CInstance::GetLinesToScroll(int Direction, int LinesToScroll)
 		pEntry = Direction == -1 ? m_Backlog.Prev(pEntry) : m_Backlog.Next(pEntry);
 	}
 
-	return LinesToScroll > 0 ? std::min(Amount, LinesToScroll) : Amount;
+	return LinesToScroll > 0 ? minimum(Amount, LinesToScroll) : Amount;
 }
 
 void CGameConsole::CInstance::ScrollToCenter(int StartLine, int EndLine)
@@ -806,7 +809,7 @@ void CGameConsole::CInstance::ScrollToCenter(int StartLine, int EndLine)
 	// This method is used to scroll lines from `StartLine` to `EndLine` to the center of the screen, if possible.
 
 	// Find target line
-	int Target = std::max(0, (int)std::ceil(StartLine - std::min(StartLine - EndLine, m_LinesRendered) / 2) - m_LinesRendered / 2);
+	int Target = maximum(0, (int)ceil(StartLine - minimum(StartLine - EndLine, m_LinesRendered) / 2) - m_LinesRendered / 2);
 	if(m_BacklogCurLine == Target)
 		return;
 
@@ -1152,9 +1155,7 @@ void CGameConsole::Prompt(char (&aPrompt)[32])
 				str_format(aPrompt, sizeof(aPrompt), "%s> ", Localize("Enter Password"));
 		}
 		else
-		{
 			str_format(aPrompt, sizeof(aPrompt), "%s> ", Localize("NOT CONNECTED"));
-		}
 	}
 	else
 	{
@@ -1280,8 +1281,6 @@ void CGameConsole::OnRender()
 		if(pConsole->m_MouseIsPress && !m_TouchState.m_PrimaryPressed && !Input()->NativeMousePressed(1))
 		{
 			pConsole->m_MouseIsPress = false;
-			if(m_ConsoleState == CONSOLE_OPEN && pConsole->m_MousePress.y > ConsoleHeight + 1.0f && pConsole->m_MouseRelease.y > ConsoleHeight + 1.0f) // for border
-				Toggle(m_ConsoleType);
 		}
 		if(pConsole->m_MouseIsPress)
 		{
@@ -1591,7 +1590,7 @@ void CGameConsole::OnRender()
 			if(Outside && !CanRenderOneLine)
 				break;
 
-			const int LinesNotRendered = pEntry->m_LineCount - std::min((int)std::floor((y - LocalOffsetY) / RowHeight), pEntry->m_LineCount);
+			const int LinesNotRendered = pEntry->m_LineCount - minimum((int)std::floor((y - LocalOffsetY) / RowHeight), pEntry->m_LineCount);
 			pConsole->m_LinesRendered -= LinesNotRendered;
 
 			CTextCursor EntryCursor;
@@ -1644,8 +1643,8 @@ void CGameConsole::OnRender()
 
 			if(EntryCursor.m_CalculateSelectionMode == TEXT_CURSOR_SELECTION_MODE_CALCULATE)
 			{
-				pConsole->m_CurSelStart = std::min(EntryCursor.m_SelectionStart, EntryCursor.m_SelectionEnd);
-				pConsole->m_CurSelEnd = std::max(EntryCursor.m_SelectionStart, EntryCursor.m_SelectionEnd);
+				pConsole->m_CurSelStart = minimum(EntryCursor.m_SelectionStart, EntryCursor.m_SelectionEnd);
+				pConsole->m_CurSelEnd = maximum(EntryCursor.m_SelectionStart, EntryCursor.m_SelectionEnd);
 			}
 			pConsole->m_LinesRendered += First ? pEntry->m_LineCount - (pConsole->m_BacklogLastActiveLine - SkippedLines) : pEntry->m_LineCount;
 
@@ -1753,9 +1752,7 @@ bool CGameConsole::OnInput(const IInput::CEvent &Event)
 #endif
 
 	if(Event.m_Key == KEY_ESCAPE && (Event.m_Flags & IInput::FLAG_PRESS) && !CurrentConsole()->m_Searching)
-	{
 		Toggle(m_ConsoleType);
-	}
 	else if(!CurrentConsole()->OnInput(Event))
 	{
 		if(GameClient()->Input()->ModifierIsPressed() && Event.m_Flags & IInput::FLAG_PRESS && Event.m_Key == KEY_C)

@@ -41,13 +41,13 @@ public:
 class CVideo : public IVideo
 {
 public:
-	CVideo(IGraphics *pGraphics, ISound *pSound, IStorage *pStorage, int Width, int Height, int64_t LocalStartTime, const char *pName);
+	CVideo(IGraphics *pGraphics, ISound *pSound, IStorage *pStorage, int Width, int Height, const char *pName);
 	~CVideo() override;
 
 	bool Start() override REQUIRES(!m_WriteLock);
 	void Stop() override;
 	void Pause(bool Pause) override;
-	bool IsRecording() const override { return m_Recording; }
+	bool IsRecording() override { return m_Recording; }
 
 	void NextVideoFrame() override;
 	void NextVideoFrameThread() override;
@@ -55,9 +55,7 @@ public:
 	void NextAudioFrame(ISoundMixFunc Mix) override;
 	void NextAudioFrameTimeline(ISoundMixFunc Mix) override;
 
-	int64_t Time() const override { return m_Time; }
-	float LocalTime() const override { return m_LocalTime; }
-	void SetLocalStartTime(int64_t LocalStartTime) override { m_LocalStartTime = LocalStartTime; }
+	static IVideo *Current() { return IVideo::ms_pCurrentVideo; }
 
 	static void Init();
 
@@ -91,10 +89,6 @@ private:
 	uint64_t m_AudioFrameIndex = 0;
 
 	int m_FPS;
-	int64_t m_TickTime;
-	int64_t m_LocalStartTime;
-	float m_LocalTime;
-	int64_t m_Time;
 
 	bool m_Started;
 	bool m_Stopped;

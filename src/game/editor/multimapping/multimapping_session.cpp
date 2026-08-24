@@ -210,8 +210,7 @@ void CMultiMappingSession::OnUpdate()
 	// cursor disappears when we open a dialog / picker / extra editor.
 	if(m_State == STATE_LIVE && m_LastLocalActivity == ACTIVITY_MAPPING && Now - m_LastCursorSendTime > Freq / 30)
 	{
-		const vec2 MouseWorld = Editor()->MapView()->MouseWorldNoParaPos();
-		SendCursor(MouseWorld.x, MouseWorld.y);
+		SendCursor(Editor()->m_MouseWorldNoParaPos.x, Editor()->m_MouseWorldNoParaPos.y);
 		m_LastCursorSendTime = Now;
 	}
 
@@ -241,13 +240,22 @@ void CMultiMappingSession::OnRender(CUIRect View)
 	if(m_State != STATE_LIVE)
 		return;
 
-	std::shared_ptr<CLayerGroup> pGameGroup = Editor()->Map()->m_pGameGroup;
+	std::shared_ptr<CLayerGroup> pGameGroup;
+	for(const auto &pGroup : Editor()->Map()->m_vpGroups)
+	{
+		if(pGroup->m_GameGroup)
+		{
+			pGameGroup = pGroup;
+			break;
+		}
+	}
 	if(!pGameGroup)
 		return;
 
-	CScreenRect GroupRect = pGameGroup->Mapping();
-	float WorldWidth = GroupRect.Width();
-	float WorldHeight = GroupRect.Height();
+	float aPoints[4];
+	pGameGroup->Mapping(aPoints);
+	float WorldWidth = aPoints[2] - aPoints[0];
+	float WorldHeight = aPoints[3] - aPoints[1];
 	if(WorldWidth <= 0.0f || WorldHeight <= 0.0f)
 		return;
 
@@ -261,8 +269,8 @@ void CMultiMappingSession::OnRender(CUIRect View)
 		if(!Peer.m_Connected || !Peer.m_HasCursor)
 			continue;
 
-		float ScreenX = (Peer.m_CursorX - GroupRect.m_TopLeft.x) / WorldWidth * pScreen->w;
-		float ScreenY = (Peer.m_CursorY - GroupRect.m_TopLeft.y) / WorldHeight * pScreen->h;
+		float ScreenX = (Peer.m_CursorX - aPoints[0]) / WorldWidth * pScreen->w;
+		float ScreenY = (Peer.m_CursorY - aPoints[1]) / WorldHeight * pScreen->h;
 
 		if(ScreenX < View.x || ScreenX > View.x + View.w || ScreenY < View.y || ScreenY > View.y + View.h)
 			continue;
@@ -608,6 +616,7 @@ void CMultiMappingSession::FlushTileEdits()
 {
 	if(m_Socket == nullptr || m_vPendingTileEdits.empty())
 		return;
+	m_LastTileEditSentTime = time_get();
 	for(const auto &Edit : m_vPendingTileEdits)
 	{
 		if(Edit.m_ExtraType == 0)
@@ -982,7 +991,7 @@ void CMultiMappingSession::HandleMessage(const uint8_t *pData, int Size)
 						Tile.m_Index = TileIndex;
 						Tile.m_Flags = TileFlags & 0x0F;
 						Tile.m_Skip = 0;
-						Tile.m_MustBe0 = 0;
+						Tile.m_Reserved = 0;
 						m_ApplyingRemote = true;
 						if(ExtraType == 1) // tele
 						{
@@ -1046,6 +1055,13 @@ void CMultiMappingSession::HandleMessage(const uint8_t *pData, int Size)
 							pTiles->SetTileIgnoreHistory(TileX, TileY, Tile);
 						}
 						m_ApplyingRemote = false;
+						// measure e2e tile latency
+						if(m_LastTileEditSentTime != 0)
+						{
+							int64_t Elapsed = time_get() - m_LastTileEditSentTime;
+							int Ms = (int)(Elapsed * 1000 / time_freq());
+							m_TileRelayLatencyMs = Ms;
+						}
 					}
 				}
 			}
@@ -1477,10 +1493,10 @@ void CMultiMappingSession::HandleMessage(const uint8_t *pData, int Size)
 		else if(Prop == ETilesProp::AUTOMAPPER)
 		{
 			if(pTiles->m_Image >= 0 && (int)Editor()->Map()->m_vpImages.size() > pTiles->m_Image &&
-				Editor()->Map()->m_vpImages[pTiles->m_Image]->m_Automapper.ConfigNamesNum() > 0 && Value >= 0)
-				pTiles->m_AutomapperConfig = Value % Editor()->Map()->m_vpImages[pTiles->m_Image]->m_Automapper.ConfigNamesNum();
+				Editor()->Map()->m_vpImages[pTiles->m_Image]->m_AutoMapper.ConfigNamesNum() > 0 && Value >= 0)
+				pTiles->m_AutoMapperConfig = Value % Editor()->Map()->m_vpImages[pTiles->m_Image]->m_AutoMapper.ConfigNamesNum();
 			else
-				pTiles->m_AutomapperConfig = -1;
+				pTiles->m_AutoMapperConfig = -1;
 		}
 		else if(Prop == ETilesProp::SEED)
 			pTiles->m_Seed = Value;
@@ -1542,7 +1558,7 @@ void CMultiMappingSession::HandleMessage(const uint8_t *pData, int Size)
 					TexFlag = 0;
 				pImg->m_Texture = Editor()->Graphics()->LoadTextureRaw(*pImg, TexFlag, aBuf);
 			}
-			pImg->m_Automapper.Load(pImg->m_aName);
+			pImg->m_AutoMapper.Load(pImg->m_aName);
 			m_ApplyingRemote = true;
 			Editor()->Map()->m_vpImages.push_back(pImg);
 			Editor()->Map()->SortImages();
@@ -1569,7 +1585,7 @@ void CMultiMappingSession::HandleMessage(const uint8_t *pData, int Size)
 				if(pImg->m_Width % 16 != 0 || pImg->m_Height % 16 != 0)
 					TexFlag = 0;
 				pImg->m_Texture = Editor()->Graphics()->LoadTextureRaw(*pImg, TexFlag, aName);
-				pImg->m_Automapper.Load(pImg->m_aName);
+				pImg->m_AutoMapper.Load(pImg->m_aName);
 				m_ApplyingRemote = true;
 				Editor()->Map()->m_vpImages.push_back(pImg);
 				Editor()->Map()->SortImages();
@@ -2455,7 +2471,7 @@ void CMultiMappingSession::SyncLayerContents(int GroupIdx, int LayerIdx)
 		SendStructLayerProp(GroupIdx, LayerIdx, (int)ETilesProp::LIVE_GAMETILES, pTiles->m_LiveGameTiles ? 1 : 0);
 		if(pTiles->m_Image >= 0)
 			SendStructSetImage(GroupIdx, LayerIdx, pTiles->m_Image);
-		SendStructLayerProp(GroupIdx, LayerIdx, (int)ETilesProp::AUTOMAPPER, pTiles->m_AutomapperConfig);
+		SendStructLayerProp(GroupIdx, LayerIdx, (int)ETilesProp::AUTOMAPPER, pTiles->m_AutoMapperConfig);
 		// tile contents will be synced by NotifyFullSync CRC check
 		SendSyncCheck(GroupIdx, LayerIdx);
 	}

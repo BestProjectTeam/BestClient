@@ -232,10 +232,7 @@ void fs_listdir_fileinfo(const char *dir, FS_LISTDIR_CALLBACK_FILEINFO cb, int t
 		}
 		str_copy(buffer + length, entry->d_name, sizeof(buffer) - length);
 		time_t created = -1, modified = -1;
-		if(fs_file_time(buffer, &created, &modified) != 0)
-		{
-			log_warn("filesystem", "Failed to determine file time of '%s'", buffer);
-		}
+		fs_file_time(buffer, &created, &modified);
 
 		CFsFileInfo info;
 		info.m_pName = entry->d_name;
@@ -595,20 +592,7 @@ int fs_rename(const char *oldname, const char *newname)
 	{
 		return 0;
 	}
-
-	// Can't rename on Windows when target file has open handles, delete target
-	// file and retry. We can't retry it before renaming because for a rename of
-	// foo to FOO the source file would be deleted.
-	DWORD error = GetLastError();
-	if(error == ERROR_ACCESS_DENIED)
-	{
-		(void)fs_remove(newname);
-		if(MoveFileExW(wide_oldname.c_str(), wide_newname.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITE_THROUGH) != 0)
-		{
-			return 0;
-		}
-		error = GetLastError();
-	}
+	const DWORD error = GetLastError();
 	log_error("filesystem", "Failed to rename file '%s' to '%s' (%ld '%s')", oldname, newname, error, windows_format_system_message(error).c_str());
 	return 1;
 #else

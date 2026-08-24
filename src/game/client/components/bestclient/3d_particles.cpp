@@ -265,11 +265,7 @@ void C3DParticles::OnRender()
 	const float BaseAlpha = std::clamp(g_Config.m_Bc3dParticlesAlpha / 100.0f, 0.0f, 1.0f);
 
 	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
-	const CScreenRect ScreenRect = Graphics()->GetScreen();
-	ScreenX0 = ScreenRect.m_TopLeft.x;
-	ScreenY0 = ScreenRect.m_TopLeft.y;
-	ScreenX1 = ScreenRect.m_BottomRight.x;
-	ScreenY1 = ScreenRect.m_BottomRight.y;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
 	const float ScreenMinX = std::min(ScreenX0, ScreenX1);
 	const float ScreenMaxX = std::max(ScreenX0, ScreenX1);
 	const float ScreenMinY = std::min(ScreenY0, ScreenY1);

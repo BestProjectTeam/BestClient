@@ -4,12 +4,10 @@
 
 #include <base/log.h>
 #include <base/math.h>
-#include <base/mem.h>
 #include <base/process.h>
 #include <base/time.h>
 
 #include <engine/ghost.h>
-#include <engine/graphics.h>
 #include <engine/shared/config.h>
 #include <engine/storage.h>
 
@@ -390,11 +388,6 @@ void CGhost::OnRender()
 
 	int PlaybackTick = Client()->PredGameTick(g_Config.m_ClDummy) - m_StartRenderTick;
 
-	CScreenRect ScreenRect = Graphics()->GetScreen();
-
-	// 200x200 box around the player
-	ScreenRect.Expand(100.0f);
-
 	for(auto &Ghost : m_aActiveGhosts)
 	{
 		if(Ghost.Empty())
@@ -413,7 +406,7 @@ void CGhost::OnRender()
 			continue;
 
 		int CurPos = Ghost.m_PlaybackPos;
-		int PrevPos = std::max(0, CurPos - 1);
+		int PrevPos = maximum(0, CurPos - 1);
 		if(Ghost.m_Path.Get(PrevPos)->m_Tick > GhostTick)
 			continue;
 
@@ -444,8 +437,8 @@ void CGhost::OnRender()
 			pRenderInfo = &GhostNinjaRenderInfo;
 		}
 
-		GameClient()->m_Players.RenderHook(ScreenRect, &Prev, &Player, pRenderInfo, -2, IntraTick);
-		GameClient()->m_Players.RenderPlayer(ScreenRect, &Prev, &Player, pRenderInfo, -2, IntraTick);
+		GameClient()->m_Players.RenderHook(&Prev, &Player, pRenderInfo, -2, IntraTick);
+		GameClient()->m_Players.RenderPlayer(&Prev, &Player, pRenderInfo, -2, IntraTick);
 	}
 }
 
@@ -553,88 +546,52 @@ int CGhost::Load(const char *pFilename)
 
 	int Index = 0;
 	bool FoundSkin = false;
-	bool FoundCharacterNoTick = false;
-	bool FoundCharacterTick = false;
+	bool NoTick = false;
 	bool Error = false;
 
 	int Type;
-	while(GhostLoader()->ReadNextType(&Type))
+	while(!Error && GhostLoader()->ReadNextType(&Type))
 	{
 		if(Index == pInfo->m_NumTicks && (Type == GHOSTDATA_TYPE_CHARACTER || Type == GHOSTDATA_TYPE_CHARACTER_NO_TICK))
 		{
-			log_error_color(LOG_COLOR_GHOST, "ghost", "Failed to read ghost data: too many ghost characters");
 			Error = true;
 			break;
 		}
 
 		if(Type == GHOSTDATA_TYPE_SKIN && !FoundSkin)
 		{
-			if(!GhostLoader()->ReadData(Type, &pGhost->m_Skin, sizeof(CGhostSkin)))
-			{
-				log_error_color(LOG_COLOR_GHOST, "ghost", "Failed to read ghost data: failed to read skin");
-				Error = true;
-				break;
-			}
 			FoundSkin = true;
+			if(!GhostLoader()->ReadData(Type, &pGhost->m_Skin, sizeof(CGhostSkin)))
+				Error = true;
 		}
 		else if(Type == GHOSTDATA_TYPE_CHARACTER_NO_TICK)
 		{
-			if(FoundCharacterTick)
-			{
-				log_error_color(LOG_COLOR_GHOST, "ghost", "Failed to read ghost data: ghost character with and without tick cannot be mixed");
+			NoTick = true;
+			if(!GhostLoader()->ReadData(Type, pGhost->m_Path.Get(Index++), sizeof(CGhostCharacter_NoTick)))
 				Error = true;
-				break;
-			}
-			else if(!GhostLoader()->ReadData(Type, pGhost->m_Path.Get(Index++), sizeof(CGhostCharacter_NoTick)))
-			{
-				log_error_color(LOG_COLOR_GHOST, "ghost", "Failed to read ghost data: failed to read ghost character (without tick)");
-				Error = true;
-				break;
-			}
-			FoundCharacterNoTick = true;
 		}
 		else if(Type == GHOSTDATA_TYPE_CHARACTER)
 		{
-			if(FoundCharacterNoTick)
-			{
-				log_error_color(LOG_COLOR_GHOST, "ghost", "Failed to read ghost data: ghost character with and without tick cannot be mixed");
+			if(!GhostLoader()->ReadData(Type, pGhost->m_Path.Get(Index++), sizeof(CGhostCharacter)))
 				Error = true;
-				break;
-			}
-			else if(!GhostLoader()->ReadData(Type, pGhost->m_Path.Get(Index++), sizeof(CGhostCharacter)))
-			{
-				log_error_color(LOG_COLOR_GHOST, "ghost", "Failed to read ghost data: failed to read ghost character (with tick)");
-				Error = true;
-				break;
-			}
-			FoundCharacterTick = true;
 		}
 		else if(Type == GHOSTDATA_TYPE_START_TICK)
 		{
 			if(!GhostLoader()->ReadData(Type, &pGhost->m_StartTick, sizeof(int)))
-			{
-				log_error_color(LOG_COLOR_GHOST, "ghost", "Failed to read ghost data: failed to read start tick");
 				Error = true;
-				break;
-			}
 		}
 	}
 
 	GhostLoader()->Close();
 
-	if(!Error && Index != pInfo->m_NumTicks)
+	if(Error || Index != pInfo->m_NumTicks)
 	{
-		log_error_color(LOG_COLOR_GHOST, "ghost", "Failed to read all ghost data (got '%d' ticks, wanted '%d' ticks)", Index, pInfo->m_NumTicks);
-		Error = true;
-	}
-
-	if(Error)
-	{
+		log_error_color(LOG_COLOR_GHOST, "ghost", "Failed to read all ghost data (error='%d', got '%d' ticks, wanted '%d' ticks)", Error, Index, pInfo->m_NumTicks);
 		pGhost->Reset();
 		return -1;
 	}
 
-	if(FoundCharacterNoTick)
+	if(NoTick)
 	{
 		int StartTick = 0;
 		for(int i = 1; i < pInfo->m_NumTicks; i++) // estimate start tick

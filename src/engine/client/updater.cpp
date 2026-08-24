@@ -3,15 +3,13 @@
 
 #include <base/math.h>
 #include <base/process.h>
-#include <base/str.h>
-#include <base/time.h>
-#include <base/types.h>
+#include <base/system.h>
 
 #include <engine/client.h>
 #include <engine/config.h>
 #include <engine/external/json-parser/json.h>
-#include <engine/http.h>
 #include <engine/shared/config.h>
+#include <engine/shared/http.h>
 #include <engine/shared/json.h>
 #include <engine/storage.h>
 
@@ -311,11 +309,11 @@ CUpdater::CUpdater()
 	str_copy(m_aArchivePath, UPDATE_ARCHIVE_PATH, sizeof(m_aArchivePath));
 }
 
-void CUpdater::Init()
+void CUpdater::Init(CHttp *pHttp)
 {
 	m_pClient = Kernel()->RequestInterface<IClient>();
 	m_pStorage = Kernel()->RequestInterface<IStorage>();
-	m_pHttp = Kernel()->RequestInterface<IHttp>();
+	m_pHttp = pHttp;
 
 #if !defined(CONF_HEADLESS_CLIENT) && (defined(CONF_FAMILY_WINDOWS) || defined(CONF_PLATFORM_LINUX) || defined(CONF_PLATFORM_ANDROID))
 	m_bAutoCheckPending = true;

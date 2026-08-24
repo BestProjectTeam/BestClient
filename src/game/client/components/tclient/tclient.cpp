@@ -144,17 +144,6 @@ void CTClient::OnMessage(int MsgType, void *pRawMsg)
 	if(Client()->State() == IClient::STATE_DEMOPLAYBACK)
 		return;
 
-	if(MsgType == NETMSGTYPE_SV_RACEFINISH)
-	{
-		const CNetMsg_Sv_RaceFinish *pMsg = static_cast<const CNetMsg_Sv_RaceFinish *>(pRawMsg);
-		if(in_range(pMsg->m_ClientId, 0, MAX_CLIENTS - 1))
-		{
-			m_aFinishFlagShown[pMsg->m_ClientId] = true;
-			m_aFinishFlagCharacterWasInactive[pMsg->m_ClientId] = false;
-		}
-		return;
-	}
-
 	if(MsgType == NETMSGTYPE_SV_CHAT)
 	{
 		CNetMsg_Sv_Chat *pMsg = (CNetMsg_Sv_Chat *)pRawMsg;
@@ -433,7 +422,7 @@ void CTClient::OnConsoleInit()
 	Console()->Register("emote_cycle", "", CFGFLAG_CLIENT, ConEmoteCycle, this, "Cycle through emotes");
 
 	Console()->Chain(
-		"tc_allow_any_res", [](IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData) {
+		"tc_allow_any_resolution", [](IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData) {
 			pfnCallback(pResult, pCallbackUserData);
 			((CTClient *)pUserData)->SetForcedAspect();
 		},
@@ -673,27 +662,11 @@ void CTClient::OnStateChange(int OldState, int NewState)
 	SetForcedAspect();
 	for(auto &AirRescuePositions : m_aAirRescuePositions)
 		AirRescuePositions = {};
-	mem_zero(m_aFinishFlagShown, sizeof(m_aFinishFlagShown));
-	mem_zero(m_aFinishFlagCharacterWasInactive, sizeof(m_aFinishFlagCharacterWasInactive));
 }
 
 void CTClient::OnNewSnapshot()
 {
 	SetForcedAspect();
-	for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
-	{
-		if(!m_aFinishFlagShown[ClientId])
-			continue;
-
-		if(!GameClient()->m_Snap.m_aCharacters[ClientId].m_Active)
-			m_aFinishFlagCharacterWasInactive[ClientId] = true;
-		else if(m_aFinishFlagCharacterWasInactive[ClientId])
-		{
-			m_aFinishFlagShown[ClientId] = false;
-			m_aFinishFlagCharacterWasInactive[ClientId] = false;
-		}
-	}
-
 	// Update volleyball
 	bool IsVolleyBall = false;
 	if(g_Config.m_TcVolleyBallBetterBall > 0 && g_Config.m_TcVolleyBallBetterBallSkin[0] != '\0')
@@ -851,11 +824,7 @@ void CTClient::RenderCenterLines()
 	Graphics()->TextureClear();
 
 	float X0, Y0, X1, Y1;
-	const CScreenRect ScreenRect = Graphics()->GetScreen();
-	X0 = ScreenRect.m_TopLeft.x;
-	Y0 = ScreenRect.m_TopLeft.y;
-	X1 = ScreenRect.m_BottomRight.x;
-	Y1 = ScreenRect.m_BottomRight.y;
+	Graphics()->GetScreen(&X0, &Y0, &X1, &Y1);
 	const float XMid = (X0 + X1) / 2.0f;
 	const float YMid = (Y0 + Y1) / 2.0f;
 

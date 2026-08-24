@@ -6,9 +6,6 @@
 
 #include <base/str.h>
 
-#include <game/client/lineinput.h>
-#include <game/client/ui_listbox.h>
-
 #include <map>
 #include <string>
 #include <vector>
@@ -238,8 +235,6 @@ public:
 		friend class CMapSettingsBackend;
 
 	public:
-		virtual ~CContext() = default;
-
 		bool CommandIsValid() const { return m_pCurrentSetting != nullptr; }
 		int CurrentArg() const { return m_CursorArgIndex; }
 		const char *CurrentArgName() const { return (!m_pCurrentSetting || m_CursorArgIndex < 0 || m_CursorArgIndex >= (int)m_pBackend->m_ParsedCommandArgs.at(m_pCurrentSetting).size()) ? nullptr : m_pBackend->m_ParsedCommandArgs.at(m_pCurrentSetting).at(m_CursorArgIndex).m_aName; }
@@ -253,6 +248,7 @@ public:
 		int ArgCount() const { return (int)m_vCurrentArgs.size(); }
 		const SCurrentSettingArg &Arg(int Index) const { return m_vCurrentArgs.at(Index); }
 		const std::shared_ptr<IMapSetting> &Setting() const { return m_pCurrentSetting; }
+		CLineInput *LineInput() const { return m_pLineInput; }
 		void SetFontSize(float FontSize) { m_FontSize = FontSize; }
 		int CommentOffset() const { return m_CommentOffset; }
 
@@ -263,7 +259,7 @@ public:
 		void Update();
 		void UpdateFromString(const char *pStr);
 		bool UpdateCursor(bool Force = false);
-		virtual void Reset();
+		void Reset();
 		void GetCommandHelpText(char *pStr, int Length) const;
 		bool Valid() const;
 		void ColorArguments(std::vector<STextColorSplit> &vColorSplits) const;
@@ -274,12 +270,10 @@ public:
 
 	private:
 		// Methods
-		CContext(CMapSettingsBackend *pBackend, CLineInput *pLineInput) :
-			m_DropdownContext(),
-			m_pBackend(pBackend)
+		CContext(CMapSettingsBackend *pMaster, CLineInput *pLineinput) :
+			m_DropdownContext(), m_pLineInput(pLineinput), m_pBackend(pMaster)
 		{
 			m_AllowUnknownCommands = false;
-			m_pLineInput = pLineInput;
 			Reset();
 		}
 
@@ -305,40 +299,13 @@ public:
 		int m_CommentOffset; // Position of the comment, if there is one
 
 		CMapSettingsBackend *m_pBackend;
+		std::string m_CompositionStringBuffer;
 		float m_FontSize;
 	};
 
-	class CContextWithInput : public CContext
+	CContext NewContext(CLineInput *pLineInput)
 	{
-	public:
-		CContextWithInput(CMapSettingsBackend *pBackend) :
-			CContext(pBackend, &m_CommandInput)
-		{
-		}
-
-		void Reset() override;
-
-		int m_CommandSelectedIndex;
-		CLineInputBuffered<256> m_CommandInput;
-		CListBox m_ListBox;
-	};
-	class CHeadlessContext : public CContext
-	{
-	public:
-		CHeadlessContext(CMapSettingsBackend *pBackend) :
-			CContext(pBackend, nullptr)
-		{
-		}
-	};
-
-	CContextWithInput NewContextWithInput()
-	{
-		return CContextWithInput(this);
-	}
-
-	CHeadlessContext NewHeadlessContext()
-	{
-		return CHeadlessContext(this);
+		return CContext(this, pLineInput);
 	}
 
 private:

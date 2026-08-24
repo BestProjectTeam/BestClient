@@ -1,7 +1,7 @@
 def only(x):
 	if len(x) != 1:
 		raise ValueError
-	return next(iter(x))
+	return list(x)[0]
 
 
 GlobalIdCounter = 0
@@ -133,8 +133,10 @@ class Array(BaseType):
 		BaseType.EmitPreDefinition(self, target_name)
 
 		lines = []
-		for i, item in enumerate(self.items):
-			lines += item.EmitPreDefinition(f"{self.Identifier()}[{i}]")
+		i = 0
+		for item in self.items:
+			lines += item.EmitPreDefinition(f"{self.Identifier()}[{int(i)}]")
+			i += 1
 
 		if self.items:
 			lines += [f"static {self.TypeName()} {self.Identifier()}[] = {{"]
@@ -143,7 +145,7 @@ class Array(BaseType):
 				lines += ["\t" + " ".join(itemlines).replace("\t", " ") + ","]
 			lines += ["};"]
 		else:
-			lines += [f"static {self.TypeName()} *{self.Identifier()} = nullptr;"]
+			lines += [f"static {self.TypeName()} *{self.Identifier()} = 0;"]
 
 		return lines
 
@@ -531,11 +533,6 @@ class NetTick(NetIntAny):
 		return NetVariable(self.name).emit_dump(offset) + [f'dbg_msg("snapshot", "%s\\t{self.name}=%d (NetTick)", aRawData, pObj->{self.name});']
 
 
-class NetTickStrict(NetIntRange):
-	def __init__(self, name, *, default=None):
-		NetIntRange.__init__(self, name, "MIN_TICK", "MAX_TICK", default=default)
-
-
 class NetArray(NetVariable):
 	def __init__(self, var, size):
 		NetVariable.__init__(self, var.name, default=var.default)
@@ -608,34 +605,3 @@ class NetTwIntString(NetArray):
 			result += NetVariable(self.var).emit_dump(offset + i)
 			result += [f'dbg_msg("snapshot", "%s\\t{self.base_name}[{int(i)}]=%d\\tIntToStr: %s", aRawData, pObj->{self.base_name}[{int(i)}], aStr);']
 		return result
-
-
-class NetTuningParams(NetVariable):
-	def __init__(self, name, num_params):
-		super().__init__(name)
-		self.num_params = num_params
-
-	def emit_declaration(self):
-		return [
-			f"int {self.name}[{self.num_params}];",
-			f'static_assert(sizeof({self.name}) == sizeof(CTuningParams), "Tuning array size mismatch");',
-			f'static_assert(alignof(decltype({self.name})) == alignof(CTuningParams), "Tuning alignment mismatch");',
-			f"CTuningParams *{self.name}_AsTuning() {{ return reinterpret_cast<CTuningParams*>({self.name}); }}",
-			f"const CTuningParams *{self.name}_AsTuning() const {{ return reinterpret_cast<const CTuningParams*>({self.name}); }}",
-			f"void Set_{self.name}(const CTuningParams &Tuning) {{ mem_copy({self.name}, Tuning.NetworkArray(), sizeof({self.name})); }}",
-		]
-
-	def emit_uncompressed_unpack_obj(self):
-		return [f"for(int &Value : pData->{self.name})", "\tValue = pUnpacker->GetUncompressedInt();"]
-
-	def emit_unpack_msg(self):
-		return [f"for(int &Value : pData->{self.name})", "\tValue = pUnpacker->GetInt();"]
-
-	def emit_pack(self):
-		return [f"for(int Value : pData->{self.name})", "\tpPacker->AddInt(Value);"]
-
-	def num_emit_dump_offsets(self):
-		return self.num_params
-
-	def emit_dump(self, offset):
-		return [f'for(int i = 0; i < {self.num_params}; i++) dbg_msg("snapshot", "%s\\t{self.name}[%d]=%d", aRawData, i, pObj->{self.name}[i]);']

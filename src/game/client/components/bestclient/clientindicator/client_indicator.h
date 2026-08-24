@@ -11,7 +11,7 @@
 
 #include <game/client/component.h>
 
-#include <engine/http.h>
+#include <engine/shared/http.h>
 #include <engine/shared/uuid_manager.h>
 
 #include <memory>
@@ -68,8 +68,8 @@ private:
 	std::unordered_map<int, std::string> m_ClientVersions;
 	CPresenceCache m_PresenceCache;
 
-	std::shared_ptr<IHttpRequest> m_pBrowserTask = nullptr;
-	std::shared_ptr<IHttpRequest> m_pTokenTask = nullptr;
+	std::shared_ptr<CHttpRequest> m_pBrowserTask = nullptr;
+	std::shared_ptr<CHttpRequest> m_pTokenTask = nullptr;
 	CBrowserCache m_BrowserCache;
 	char m_aWebSharedToken[256] = "";
 	std::string m_LastPresenceBlockReason;

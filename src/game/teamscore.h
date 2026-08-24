@@ -7,9 +7,8 @@
 enum
 {
 	TEAM_FLOCK = 0,
-	TEAM_SUPER = MAX_CLIENTS,
+	TEAM_SUPER = 64,
 	NUM_DDRACE_TEAMS = TEAM_SUPER + 1,
-	LEGACY_TEAM_SUPER = LEGACY_MAX_CLIENTS,
 	VANILLA_TEAM_SUPER = VANILLA_MAX_CLIENTS
 };
 
@@ -29,11 +28,8 @@ class CTeamsCore
 
 public:
 	bool m_IsDDRace16;
-	bool m_IsDDRace64;
 
 	CTeamsCore();
-
-	int TeamSuper() const { return m_IsDDRace16 ? VANILLA_TEAM_SUPER : (m_IsDDRace64 ? LEGACY_TEAM_SUPER : TEAM_SUPER); }
 
 	bool SameTeam(int ClientId1, int ClientId2) const;
 

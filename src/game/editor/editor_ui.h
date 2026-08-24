@@ -15,24 +15,15 @@ struct SEditBoxDropdownContext
 	int m_Width = 0;
 };
 
-class CEditorUiElements
-{
-public:
-	CScrollRegion m_LayersScrollRegion;
-	CScrollRegion m_ImagesScrollRegion;
-	CScrollRegion m_SoundsScrollRegion;
-};
-
 // TODO: add and use constants for other special Checked-values in CEditor::GetButtonColor
 namespace EditorButtonChecked
 {
-	inline constexpr int DANGEROUS_ACTION = 9;
-	inline constexpr int POSITIVE_ACTION = 10;
+	[[maybe_unused]] static constexpr int DANGEROUS_ACTION = 9;
 }
 
 namespace EditorFontSizes
 {
-	static constexpr float MENU = 10.0f;
+	[[maybe_unused]] static constexpr float MENU = 10.0f;
 }
 
 #endif

@@ -1,8 +1,6 @@
 #ifndef GAME_CLIENT_COMPONENTS_TOOLTIPS_H
 #define GAME_CLIENT_COMPONENTS_TOOLTIPS_H
 
-#include <base/color.h>
-
 #include <game/client/component.h>
 #include <game/client/ui_rect.h>
 
@@ -19,7 +17,6 @@ struct CTooltip
 	float m_WidthHint;
 	bool m_OnScreen; // used to know if the tooltip should be rendered.
 	float m_FadeTime = 0.75f;
-	ColorRGBA m_TextColor = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
 };
 
 /**
@@ -55,9 +52,8 @@ public:
 	 * @param pNearRect Place the tooltip near this rect.
 	 * @param pText The text to display in the tooltip.
 	 * @param WidthHint The maximum width of the tooltip, or -1.0f for unlimited.
-	 * @param TextColor Text color for the tooltip (defaults to white).
 	 */
-	void DoToolTip(const void *pId, const CUIRect *pNearRect, const char *pText, float WidthHint = -1.0f, ColorRGBA TextColor = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));
+	void DoToolTip(const void *pId, const CUIRect *pNearRect, const char *pText, float WidthHint = -1.0f);
 
 	void OnReset() override;
 	void OnRender() override;

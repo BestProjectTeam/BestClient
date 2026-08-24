@@ -1,7 +1,6 @@
 #include "prng.h"
 
-#include <base/dbg.h>
-#include <base/str.h>
+#include <base/system.h>
 
 // From https://en.wikipedia.org/w/index.php?title=Permuted_congruential_generator&oldid=901497400#Example_code.
 //

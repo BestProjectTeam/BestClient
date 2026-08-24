@@ -4,7 +4,7 @@
 
 #include <base/detect.h>
 #include <base/lock.h>
-#include <base/types.h>
+#include <base/system.h>
 
 #include <engine/updater.h>
 
@@ -39,7 +39,7 @@
 #define PLAT_CLIENT_EXEC CLIENT_EXEC PLAT_EXT
 #define PLAT_SERVER_EXEC SERVER_EXEC PLAT_EXT
 
-class IHttpRequest;
+class CHttpRequest;
 
 class CUpdater : public IUpdater
 {
@@ -52,7 +52,7 @@ class CUpdater : public IUpdater
 
 	class IClient *m_pClient;
 	class IStorage *m_pStorage;
-	class IHttp *m_pHttp;
+	class CHttp *m_pHttp;
 
 	CLock m_Lock;
 
@@ -60,7 +60,7 @@ class CUpdater : public IUpdater
 	char m_aStatus[256] GUARDED_BY(m_Lock);
 	int m_Percent GUARDED_BY(m_Lock);
 
-	std::shared_ptr<IHttpRequest> m_pCurrentTask;
+	std::shared_ptr<CHttpRequest> m_pCurrentTask;
 	ETaskKind m_TaskKind = ETaskKind::NONE;
 	bool m_bAutoCheckPending = false;
 
@@ -90,7 +90,7 @@ public:
 	void InitiateUpdate() REQUIRES(!m_Lock) override;
 	void ApplyUpdateAndRestart() REQUIRES(!m_Lock) override;
 	const char *GetLatestVersionString() override REQUIRES(!m_Lock);
-	void Init();
+	void Init(CHttp *pHttp);
 	void Update() REQUIRES(!m_Lock) override;
 };
 

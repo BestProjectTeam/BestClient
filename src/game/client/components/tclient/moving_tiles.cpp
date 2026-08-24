@@ -12,7 +12,6 @@
 
 #include <game/client/components/envelope_state.h>
 #include <game/client/gameclient.h>
-#include <game/client/prediction/entities/character.h>
 #include <game/map/render_map.h>
 #include <game/mapitems.h>
 
@@ -25,51 +24,6 @@ inline static void RotatePoint(const vec2 &Center, vec2 &Point, float Rotation)
 	const vec2 RelativePos = Point - Center;
 	Point.x = RelativePos.x * std::cos(Rotation) - RelativePos.y * std::sin(Rotation) + Center.x;
 	Point.y = RelativePos.x * std::sin(Rotation) + RelativePos.y * std::cos(Rotation) + Center.y;
-}
-
-inline static float Cross(const vec2 &A, const vec2 &B, const vec2 &C)
-{
-	const vec2 AB = B - A;
-	const vec2 AC = C - A;
-	return AB.x * AC.y - AB.y * AC.x;
-}
-
-inline static bool PointInTriangle(const vec2 &Point, const vec2 &A, const vec2 &B, const vec2 &C)
-{
-	const float CrossAB = Cross(A, B, Point);
-	const float CrossBC = Cross(B, C, Point);
-	const float CrossCA = Cross(C, A, Point);
-	const bool HasNegative = CrossAB < 0.0f || CrossBC < 0.0f || CrossCA < 0.0f;
-	const bool HasPositive = CrossAB > 0.0f || CrossBC > 0.0f || CrossCA > 0.0f;
-	return !HasNegative || !HasPositive;
-}
-
-inline static bool PointOnSegment(const vec2 &Point, const vec2 &A, const vec2 &B)
-{
-	constexpr float Epsilon = 0.001f;
-	return absolute(Cross(A, B, Point)) <= Epsilon &&
-		Point.x >= minimum(A.x, B.x) - Epsilon && Point.x <= maximum(A.x, B.x) + Epsilon &&
-		Point.y >= minimum(A.y, B.y) - Epsilon && Point.y <= maximum(A.y, B.y) + Epsilon;
-}
-
-inline static bool SegmentsIntersect(const vec2 &A, const vec2 &B, const vec2 &C, const vec2 &D)
-{
-	const float CrossABC = Cross(A, B, C);
-	const float CrossABD = Cross(A, B, D);
-	const float CrossCDA = Cross(C, D, A);
-	const float CrossCDB = Cross(C, D, B);
-
-	if(((CrossABC < 0.0f && CrossABD > 0.0f) || (CrossABC > 0.0f && CrossABD < 0.0f)) &&
-		((CrossCDA < 0.0f && CrossCDB > 0.0f) || (CrossCDA > 0.0f && CrossCDB < 0.0f)))
-		return true;
-
-	return PointOnSegment(C, A, B) || PointOnSegment(D, A, B) || PointOnSegment(A, C, D) || PointOnSegment(B, C, D);
-}
-
-inline static bool SegmentIntersectsTriangle(const vec2 &From, const vec2 &To, const vec2 &A, const vec2 &B, const vec2 &C)
-{
-	return PointInTriangle(From, A, B, C) || PointInTriangle(To, A, B, C) ||
-		SegmentsIntersect(From, To, A, B) || SegmentsIntersect(From, To, B, C) || SegmentsIntersect(From, To, C, A);
 }
 
 inline static bool QuadName(const int *pInts, size_t NumInts, char *pStr, size_t StrSize)
@@ -171,63 +125,6 @@ void CMovingTiles::OnMapLoad()
 	m_EnvEvaluator.OnInterfacesInit(GameClient());
 }
 
-void CMovingTiles::ApplyEgoTilesAntiLag(CCharacter *pCharacter) const
-{
-	if(!g_Config.m_TcEgoTilesAntiLag || !pCharacter || m_RenderAbove || m_vQuads.empty())
-		return;
-	if(pCharacter->m_FreezeTime > 0 || pCharacter->Core()->m_Super || pCharacter->Core()->m_Invincible || pCharacter->Core()->m_DeepFrozen)
-		return;
-
-	const vec2 From = pCharacter->Core()->m_Pos;
-	const vec2 To = From + pCharacter->Core()->m_Vel;
-	for(const CQuadData &QuadData : m_vQuads)
-	{
-		if(QuadData.m_Type != EQType::FREEZE || !QuadData.m_pQuad)
-			continue;
-
-		ColorRGBA Position(0.0f, 0.0f, 0.0f, 0.0f);
-		m_EnvEvaluator.EnvelopeEval(QuadData.m_pQuad->m_PosEnvOffset, QuadData.m_pQuad->m_PosEnv, Position, 3);
-		const vec2 Offset(Position.r, Position.g);
-		const float Rotation = Position.b / 180.0f * pi + QuadData.m_Angle;
-
-		vec2 aPoints[4] = {
-			QuadData.m_Pos[0],
-			QuadData.m_Pos[1],
-			QuadData.m_Pos[2],
-			QuadData.m_Pos[3],
-		};
-		if(Rotation != 0.0f)
-		{
-			for(vec2 &Point : aPoints)
-				RotatePoint(QuadData.m_Pos[4], Point, Rotation);
-		}
-		for(vec2 &Point : aPoints)
-			Point += Offset;
-
-		float MinX = aPoints[0].x;
-		float MaxX = aPoints[0].x;
-		float MinY = aPoints[0].y;
-		float MaxY = aPoints[0].y;
-		for(size_t i = 1; i < std::size(aPoints); i++)
-		{
-			MinX = minimum(MinX, aPoints[i].x);
-			MaxX = maximum(MaxX, aPoints[i].x);
-			MinY = minimum(MinY, aPoints[i].y);
-			MaxY = maximum(MaxY, aPoints[i].y);
-		}
-		if(maximum(From.x, To.x) < MinX || minimum(From.x, To.x) > MaxX ||
-			maximum(From.y, To.y) < MinY || minimum(From.y, To.y) > MaxY)
-			continue;
-
-		if(SegmentIntersectsTriangle(From, To, aPoints[0], aPoints[1], aPoints[2]) ||
-			SegmentIntersectsTriangle(From, To, aPoints[1], aPoints[3], aPoints[2]))
-		{
-			pCharacter->Freeze();
-			return;
-		}
-	}
-}
-
 void CMovingTiles::OnRender()
 {
 	if(g_Config.m_ClOverlayEntities != 100)
@@ -251,11 +148,7 @@ void CMovingTiles::OnRender()
 			Graphics()->MapScreenToInterface(Center.x, Center.y, Zoom);
 
 			float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
-			const CScreenRect ScreenRect = Graphics()->GetScreen();
-			ScreenX0 = ScreenRect.m_TopLeft.x;
-			ScreenY0 = ScreenRect.m_TopLeft.y;
-			ScreenX1 = ScreenRect.m_BottomRight.x;
-			ScreenY1 = ScreenRect.m_BottomRight.y;
+			Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
 
 			const float ScreenWidth = ScreenX1 - ScreenX0;
 			const float ScreenHeight = ScreenY1 - ScreenY0;
@@ -278,12 +171,13 @@ void CMovingTiles::OnRender()
 		}
 
 		const int ParallaxZoom = std::clamp(maximum(pGroup->m_ParallaxX, pGroup->m_ParallaxY), 0, 100);
-		CScreenRect ScreenRect = Graphics()->MapScreenToWorld(
+		float aPoints[4];
+		Graphics()->MapScreenToWorld(
 			Center.x, Center.y,
 			pGroup->m_ParallaxX, pGroup->m_ParallaxY, (float)ParallaxZoom,
 			pGroup->m_OffsetX, pGroup->m_OffsetY,
-			Graphics()->ScreenAspect(), Zoom);
-		Graphics()->MapScreen(ScreenRect);
+			Graphics()->ScreenAspect(), Zoom, aPoints);
+		Graphics()->MapScreen(aPoints[0], aPoints[1], aPoints[2], aPoints[3]);
 
 		return true;
 	};

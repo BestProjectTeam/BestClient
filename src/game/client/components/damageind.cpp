@@ -37,7 +37,23 @@ void CDamageInd::OnRender()
 		return;
 
 	static float s_LastLocalTime = LocalTime();
-	const float LifeAdjustment = (LocalTime() - s_LastLocalTime) * GameClient()->GetAnimationPlaybackSpeed();
+	float LifeAdjustment;
+	if(Client()->State() == IClient::STATE_DEMOPLAYBACK)
+	{
+		const IDemoPlayer::CInfo *pInfo = DemoPlayer()->BaseInfo();
+		if(pInfo->m_Paused)
+			LifeAdjustment = 0.0f;
+		else
+			LifeAdjustment = (LocalTime() - s_LastLocalTime) * pInfo->m_Speed;
+	}
+	else
+	{
+		const auto &pGameInfoObj = GameClient()->m_Snap.m_pGameInfoObj;
+		if(pGameInfoObj && pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_PAUSED)
+			LifeAdjustment = 0.0f;
+		else
+			LifeAdjustment = LocalTime() - s_LastLocalTime;
+	}
 	s_LastLocalTime = LocalTime();
 
 	Graphics()->TextureSet(GameClient()->m_GameSkin.m_aSpriteStars[0]);

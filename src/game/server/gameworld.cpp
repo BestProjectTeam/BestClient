@@ -12,6 +12,9 @@
 
 #include <game/collision.h>
 
+#include <algorithm>
+#include <utility>
+
 //////////////////////////////////////////////////
 // game world
 //////////////////////////////////////////////////
@@ -46,15 +49,6 @@ void CGameWorld::Init(CCollision *pCollision, CTuningParams *pTuningList)
 {
 	m_Core.InitSwitchers(pCollision->m_HighestSwitchNumber);
 	m_pTuningList = pTuningList;
-}
-
-CTuningParams *CGameWorld::TuningFromChrOrZone(int ClientId, int Zone)
-{
-	if(GameServer()->GetPlayerChar(ClientId))
-		return GameServer()->GetPlayerChar(ClientId)->GetTuning();
-	if(Zone > 0)
-		return GetTuning(Zone);
-	return GlobalTuning();
 }
 
 CEntity *CGameWorld::FindFirst(int Type)

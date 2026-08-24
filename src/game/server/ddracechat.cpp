@@ -17,6 +17,36 @@
 #include <game/teamscore.h>
 #include <game/version.h>
 
+void CGameContext::ConCredits(IConsole::IResult *pResult, void *pUserData)
+{
+	static constexpr const char *CREDITS[] = {
+		"DDNet is run by the DDNet staff (DDNet.org/staff)",
+		"Great maps and many ideas from the great community",
+		"Help and code by eeeee, HMH, east, CookieMichal, Learath2,",
+		"Savander, laxa, Tobii, BeaR, Wohoo, nuborn, timakro, Shiki,",
+		"trml, Soreu, hi_leute_gll, Lady Saavik, Chairn, heinrich5991,",
+		"swick, oy, necropotame, Ryozuki, Redix, d3fault, marcelherd,",
+		"BannZay, ACTom, SiuFuWong, PathosEthosLogos, TsFreddie,",
+		"Jupeyy, noby, ChillerDragon, ZombieToad, weez15, z6zzz,",
+		"Piepow, QingGo, RafaelFF, sctt, jao, daverck, fokkonaut,",
+		"Bojidar, FallenKN, ardadem, archimede67, sirius1242, Aerll,",
+		"trafilaw, Zwelf, Patiga, Konsti, ElXreno, MikiGamer,",
+		"Fireball, Banana090, axblk, yangfl, Kaffeine, Zodiac,",
+		"c0d3d3v, GiuCcc, Ravie, Robyt3, simpygirl, Tater, Cellegen,",
+		"srdante, Nouaa, Voxel, luk51, Vy0x2, Avolicious, louis,",
+		"Marmare314, hus3h, ArijanJ, tarunsamanta2k20, Possseidon,",
+		"+KZ, Teero, furo, dobrykafe, Moiman, JSaurusRex,",
+		"Steinchen, ewancg, gerdoe-jr, melon, KebsCS, bencie,",
+		"DynamoFox, MilkeeyCat, iMilchshake, SchrodingerZhu,",
+		"catseyenebulous, Rei-Tw, Matodor, Emilcha, art0007i, SollyBunny,",
+		"0xfaulty & others",
+		"Based on DDRace by the DDRace developers,",
+		"which is a mod of Teeworlds by the Teeworlds developers.",
+	};
+	for(const char *pLine : CREDITS)
+		log_info("chatresp", "%s", pLine);
+}
+
 void CGameContext::ConInfo(IConsole::IResult *pResult, void *pUserData)
 {
 	log_info("chatresp", "DDraceNetwork Mod. Version: " GAME_VERSION);
@@ -541,24 +571,31 @@ void CGameContext::ConTimeout(IConsole::IResult *pResult, void *pUserData)
 
 	const char *pTimeout = pResult->NumArguments() > 0 ? pResult->GetString(0) : pPlayer->m_aTimeoutCode;
 
-	for(int i = 0; i < pSelf->Server()->MaxClients(); i++)
+	if(!pSelf->Server()->IsSixup(pResult->m_ClientId))
 	{
-		if(i == pResult->m_ClientId)
-			continue;
-		if(!pSelf->m_apPlayers[i])
-			continue;
-		if(str_comp(pSelf->m_apPlayers[i]->m_aTimeoutCode, pTimeout))
-			continue;
-		if(pSelf->Server()->SetTimedOut(i, pResult->m_ClientId))
+		for(int i = 0; i < pSelf->Server()->MaxClients(); i++)
 		{
-			if(pSelf->m_apPlayers[i]->GetCharacter())
-				pSelf->SendTuningParams(i, pSelf->m_apPlayers[i]->GetCharacter()->m_TuneZone);
-			return;
+			if(i == pResult->m_ClientId)
+				continue;
+			if(!pSelf->m_apPlayers[i])
+				continue;
+			if(str_comp(pSelf->m_apPlayers[i]->m_aTimeoutCode, pTimeout))
+				continue;
+			if(pSelf->Server()->SetTimedOut(i, pResult->m_ClientId))
+			{
+				if(pSelf->m_apPlayers[i]->GetCharacter())
+					pSelf->SendTuningParams(i, pSelf->m_apPlayers[i]->GetCharacter()->m_TuneZone);
+				return;
+			}
 		}
+	}
+	else
+	{
+		log_info("chatresp", "Your timeout code has been set. 0.7 clients can not reclaim their tees on timeout; however, a 0.6 client can claim your tee ");
 	}
 
 	pSelf->Server()->SetTimeoutProtected(pResult->m_ClientId);
-	str_copy(pPlayer->m_aTimeoutCode, pResult->GetString(0));
+	str_copy(pPlayer->m_aTimeoutCode, pResult->GetString(0), sizeof(pPlayer->m_aTimeoutCode));
 }
 
 void CGameContext::ConPractice(IConsole::IResult *pResult, void *pUserData)
@@ -678,7 +715,7 @@ void CGameContext::ConUnPractice(IConsole::IResult *pResult, void *pUserData)
 		return;
 	}
 
-	if(Teams.TeamSize(Team) > g_Config.m_SvMaxTeamSize && pSelf->m_pController->Teams().TeamLocked(Team))
+	if(Teams.Count(Team) > g_Config.m_SvMaxTeamSize && pSelf->m_pController->Teams().TeamLocked(Team))
 	{
 		log_info("chatresp", "Can't disable practice. This team exceeds the maximum allowed size of %d players for regular team", g_Config.m_SvMaxTeamSize);
 		return;
@@ -707,7 +744,6 @@ void CGameContext::ConUnPractice(IConsole::IResult *pResult, void *pUserData)
 
 	Teams.KillCharacterOrTeam(pResult->m_ClientId, Team);
 	Teams.SetPractice(Team, false);
-	pPlayer->Respawn(); // set spawn as strong hook
 }
 
 void CGameContext::ConPracticeCmdList(IConsole::IResult *pResult, void *pUserData)
@@ -760,18 +796,23 @@ void CGameContext::ConSwap(IConsole::IResult *pResult, void *pUserData)
 
 	int Team = Teams.m_Core.Team(pResult->m_ClientId);
 
-	if(Team == TEAM_SUPER)
+	if(!Teams.IsValidTeamNumber(Team))
 	{
-		log_info(
-			"chatresp",
-			"Turn off super to use swap feature, which means you can swap positions with each other.");
+		log_info("chatresp", "You aren't in a valid team.");
 		return;
 	}
 
 	int TargetClientId = -1;
 	if(pResult->NumArguments() == 1)
 	{
-		TargetClientId = pSelf->FindClientIdByName(pName).value_or(-1);
+		for(int i = 0; i < MAX_CLIENTS; i++)
+		{
+			if(pSelf->m_apPlayers[i] && !str_comp(pName, pSelf->Server()->ClientName(i)))
+			{
+				TargetClientId = i;
+				break;
+			}
+		}
 	}
 	else
 	{
@@ -868,6 +909,12 @@ void CGameContext::ConCancelSwap(IConsole::IResult *pResult, void *pUserData)
 	CGameTeams &Teams = pSelf->m_pController->Teams();
 
 	int Team = Teams.m_Core.Team(pResult->m_ClientId);
+
+	if(!pSelf->m_pController->Teams().IsValidTeamNumber(Team))
+	{
+		log_info("chatresp", "You aren't in a valid team.");
+		return;
+	}
 
 	bool SwapPending = pPlayer->m_SwapTargetsClientId != -1 && !pSelf->Server()->ClientSlotEmpty(pPlayer->m_SwapTargetsClientId);
 
@@ -1064,7 +1111,7 @@ void CGameContext::AttemptJoinTeam(int ClientId, int Team)
 	}
 
 	char aError[512];
-	if(pPlayer->m_LastDDRaceTeamChange.has_value() && pPlayer->m_LastDDRaceTeamChange.value() + (int64_t)Server()->TickSpeed() * g_Config.m_SvTeamChangeDelay > Server()->Tick())
+	if(pPlayer->m_LastDDRaceTeamChange + (int64_t)Server()->TickSpeed() * g_Config.m_SvTeamChangeDelay > Server()->Tick())
 	{
 		log_info("chatresp", "You can't change teams that fast!");
 	}
@@ -1074,7 +1121,7 @@ void CGameContext::AttemptJoinTeam(int ClientId, int Team)
 					     "This team is locked using /lock. Only members of the team can unlock it using /lock." :
 					     "This team is locked using /lock. Only members of the team can invite you or unlock it using /lock.");
 	}
-	else if(Team != TEAM_FLOCK && m_pController->Teams().TeamSize(Team) >= g_Config.m_SvMaxTeamSize && !m_pController->Teams().TeamFlock(Team) && !m_pController->Teams().IsPractice(Team))
+	else if(Team != TEAM_FLOCK && m_pController->Teams().Count(Team) >= g_Config.m_SvMaxTeamSize && !m_pController->Teams().TeamFlock(Team) && !m_pController->Teams().IsPractice(Team))
 	{
 		char aBuf[512];
 		str_format(aBuf, sizeof(aBuf), "This team already has the maximum allowed size of %d players", g_Config.m_SvMaxTeamSize);
@@ -1089,7 +1136,7 @@ void CGameContext::AttemptJoinTeam(int ClientId, int Team)
 		if(PracticeByDefault())
 		{
 			// joined an empty team
-			if(m_pController->Teams().TeamSize(Team) == 1)
+			if(m_pController->Teams().Count(Team) == 1)
 				m_pController->Teams().SetPractice(Team, true);
 		}
 
@@ -1129,8 +1176,17 @@ void CGameContext::ConInvite(IConsole::IResult *pResult, void *pUserData)
 	int Team = pController->Teams().m_Core.Team(pResult->m_ClientId);
 	if(Team != TEAM_FLOCK && pController->Teams().IsValidTeamNumber(Team))
 	{
-		int Target = pSelf->FindClientIdByName(pName).value_or(-1);
-		if(Target == -1)
+		int Target = -1;
+		for(int i = 0; i < MAX_CLIENTS; i++)
+		{
+			if(!str_comp(pName, pSelf->Server()->ClientName(i)))
+			{
+				Target = i;
+				break;
+			}
+		}
+
+		if(Target < 0)
 		{
 			log_info("chatresp", "Player not found");
 			return;
@@ -1206,7 +1262,7 @@ void CGameContext::ConTeam0Mode(IConsole::IResult *pResult, void *pUserData)
 	char aBuf[512];
 	if(Mode)
 	{
-		if(pController->Teams().TeamSize(Team) > g_Config.m_SvMaxTeamSize)
+		if(pController->Teams().Count(Team) > g_Config.m_SvMaxTeamSize)
 		{
 			str_format(aBuf, sizeof(aBuf), "Can't disable team 0 mode. This team exceeds the maximum allowed size of %d players for regular team", g_Config.m_SvMaxTeamSize);
 			pSelf->SendChatTarget(pResult->m_ClientId, aBuf);
@@ -1284,8 +1340,17 @@ void CGameContext::ConJoin(IConsole::IResult *pResult, void *pUserData)
 	if(!CheckClientId(pResult->m_ClientId))
 		return;
 
+	int Target = -1;
 	const char *pName = pResult->GetString(0);
-	int Target = pSelf->FindClientIdByName(pName).value_or(-1);
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(!str_comp(pName, pSelf->Server()->ClientName(i)))
+		{
+			Target = i;
+			break;
+		}
+	}
+
 	if(Target == -1)
 	{
 		log_info("chatresp", "Player not found");
@@ -1482,15 +1547,18 @@ void CGameContext::ConSayTime(IConsole::IResult *pResult, void *pUserData)
 
 	if(pResult->NumArguments() > 0)
 	{
-		ClientId = pSelf->FindClientIdByName(pResult->GetString(0)).value_or(-1);
-		if(ClientId == -1)
+		for(ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
+			if(str_comp(pResult->GetString(0), pSelf->Server()->ClientName(ClientId)) == 0)
+				break;
+
+		if(ClientId == MAX_CLIENTS)
 			return;
 
 		str_format(aBufName, sizeof(aBufName), "%s's", pSelf->Server()->ClientName(ClientId));
 	}
 	else
 	{
-		str_copy(aBufName, "Your");
+		str_copy(aBufName, "Your", sizeof(aBufName));
 		ClientId = pResult->m_ClientId;
 	}
 
@@ -1640,8 +1708,8 @@ void CGameContext::ConRescue(IConsole::IResult *pResult, void *pUserData)
 
 	if(GoRescue)
 	{
-		if(pChr->Rescue())
-			pChr->Unfreeze();
+		pChr->Rescue();
+		pChr->Unfreeze();
 	}
 }
 
@@ -1714,8 +1782,8 @@ void CGameContext::ConBack(IConsole::IResult *pResult, void *pUserData)
 			return;
 		}
 		pChr->GetLastRescueTeeRef(pPlayer->m_RescueMode) = pPlayer->m_LastDeath.value();
-		if(pChr->Rescue())
-			pChr->Unfreeze();
+		pChr->Rescue();
+		pChr->Unfreeze();
 	}
 }
 
@@ -1748,13 +1816,23 @@ void CGameContext::ConTeleTo(IConsole::IResult *pResult, void *pUserData)
 	}
 	else
 	{
-		const CPlayer *pDestPlayer = pSelf->FindPlayerByName(pResult->GetString(0));
-		if(!pDestPlayer)
+		// Search for player with this name
+		int ClientId;
+		for(ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
+		{
+			if(str_comp(pResult->GetString(0), pSelf->Server()->ClientName(ClientId)) == 0)
+				break;
+		}
+		if(ClientId == MAX_CLIENTS)
 		{
 			pSelf->SendChatTarget(pCallingPlayer->GetCid(), "No player with this name found.");
 			return;
 		}
-		const CCharacter *pDestCharacter = pDestPlayer->GetCharacter();
+
+		CPlayer *pDestPlayer = pSelf->m_apPlayers[ClientId];
+		if(!pDestPlayer)
+			return;
+		CCharacter *pDestCharacter = pDestPlayer->GetCharacter();
 		if(!pDestCharacter)
 			return;
 
@@ -1877,13 +1955,21 @@ void CGameContext::ConTeleCursor(IConsole::IResult *pResult, void *pUserData)
 	}
 	else if(pResult->NumArguments() > 0)
 	{
-		const CPlayer *pPlayerTo = pSelf->FindPlayerByName(pResult->GetString(0));
-		if(!pPlayerTo)
+		int ClientId;
+		for(ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
+		{
+			if(str_comp(pResult->GetString(0), pSelf->Server()->ClientName(ClientId)) == 0)
+				break;
+		}
+		if(ClientId == MAX_CLIENTS)
 		{
 			pSelf->SendChatTarget(pPlayer->GetCid(), "No player with this name found.");
 			return;
 		}
-		const CCharacter *pChrTo = pPlayerTo->GetCharacter();
+		CPlayer *pPlayerTo = pSelf->m_apPlayers[ClientId];
+		if(!pPlayerTo)
+			return;
+		CCharacter *pChrTo = pPlayerTo->GetCharacter();
 		if(!pChrTo)
 			return;
 		Pos = pChrTo->m_Pos;

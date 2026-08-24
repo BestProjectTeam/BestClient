@@ -1,10 +1,6 @@
-#include <base/dbg.h>
-#include <base/log.h>
-#include <base/mem.h>
+#include <base/system.h>
 
 #include <engine/image.h>
-
-#include <cstdlib>
 
 CImageInfo::CImageInfo(CImageInfo &&Other)
 {
@@ -17,50 +13,20 @@ CImageInfo &CImageInfo::operator=(CImageInfo &&Other)
 	m_Height = Other.m_Height;
 	m_Format = Other.m_Format;
 	m_pData = Other.m_pData;
-	m_IsAllocated = Other.m_IsAllocated;
 	Other.m_Width = 0;
 	Other.m_Height = 0;
 	Other.m_Format = FORMAT_UNDEFINED;
 	Other.m_pData = nullptr;
-	Other.m_IsAllocated = false;
 	return *this;
-}
-
-CImageInfo::~CImageInfo()
-{
-	if(m_IsAllocated)
-		Free();
-}
-
-void CImageInfo::Allocate()
-{
-	dbg_assert(m_pData == nullptr && !m_IsAllocated, "Image data already allocated");
-	// format is asserted in pixel size
-	m_pData = static_cast<uint8_t *>(malloc(DataSize()));
-	m_IsAllocated = true;
-}
-
-void CImageInfo::AllocateFillZero()
-{
-	dbg_assert(m_pData == nullptr && !m_IsAllocated, "Image data already allocated");
-	// format is asserted in pixel size
-	m_pData = static_cast<uint8_t *>(calloc(DataSize(), sizeof(uint8_t)));
-	m_IsAllocated = true;
 }
 
 void CImageInfo::Free()
 {
-	if(m_pData != nullptr)
-	{
-		if(!m_IsAllocated)
-			log_warn("graphics", "Image free without calling 'Allocate'");
-		free(m_pData);
-		m_pData = nullptr;
-	}
-	m_IsAllocated = false;
 	m_Width = 0;
 	m_Height = 0;
 	m_Format = FORMAT_UNDEFINED;
+	free(m_pData);
+	m_pData = nullptr;
 }
 
 size_t CImageInfo::PixelSize(EImageFormat Format)
@@ -72,7 +38,7 @@ size_t CImageInfo::PixelSize(EImageFormat Format)
 
 const char *CImageInfo::FormatName(EImageFormat Format)
 {
-	static const char *s_apNames[] = {"UNDEFINED", "RGB", "RGBA", "R", "RA"};
+	static const char *s_apNames[] = {"UNDEFINED", "RGBA", "RGB", "R", "RA"};
 	return s_apNames[(int)Format + 1];
 }
 
@@ -179,7 +145,7 @@ CImageInfo CImageInfo::DeepCopy() const
 	Copy.m_Width = m_Width;
 	Copy.m_Height = m_Height;
 	Copy.m_Format = m_Format;
-	Copy.Allocate();
+	Copy.m_pData = static_cast<uint8_t *>(malloc(Size));
 	mem_copy(Copy.m_pData, m_pData, Size);
 	return Copy;
 }

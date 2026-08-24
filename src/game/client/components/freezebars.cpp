@@ -16,8 +16,8 @@ void CFreezeBars::RenderFreezeBar(const int ClientId)
 		return;
 	}
 
-	const int64_t Max = (int64_t)pCharacter->m_FreezeEnd - pCharacter->m_FreezeStart;
-	float FreezeProgress = std::clamp<int64_t>(Max - ((int64_t)Client()->GameTick(g_Config.m_ClDummy) - pCharacter->m_FreezeStart), 0, Max) / (float)Max;
+	const int Max = pCharacter->m_FreezeEnd - pCharacter->m_FreezeStart;
+	float FreezeProgress = std::clamp(Max - (Client()->GameTick(g_Config.m_ClDummy) - pCharacter->m_FreezeStart), 0, Max) / (float)Max;
 	if(FreezeProgress <= 0.0f)
 	{
 		return;
@@ -207,13 +207,17 @@ void CFreezeBars::OnRender()
 		return;
 	}
 	// get screen edges to avoid rendering offscreen
-	CScreenRect ScreenRect = Graphics()->GetScreen();
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
 	// expand the edges to prevent popping in/out onscreen
 	//
 	// it is assumed that the tee with the freeze bar fit into a 240x240 box centered on the tee
 	// this may need to be changed or calculated differently in the future
-	constexpr float BorderBuffer = 120.0f;
-	ScreenRect.Expand(BorderBuffer);
+	float BorderBuffer = 120;
+	ScreenX0 -= BorderBuffer;
+	ScreenX1 += BorderBuffer;
+	ScreenY0 -= BorderBuffer;
+	ScreenY1 += BorderBuffer;
 
 	int LocalClientId = GameClient()->m_Snap.m_LocalClientId;
 
@@ -226,7 +230,8 @@ void CFreezeBars::OnRender()
 		}
 
 		//don't render if the tee is offscreen
-		if(!ScreenRect.Inside(GameClient()->m_aClients[ClientId].m_RenderPos))
+		vec2 *pRenderPos = &GameClient()->m_aClients[ClientId].m_RenderPos;
+		if(pRenderPos->x < ScreenX0 || pRenderPos->x > ScreenX1 || pRenderPos->y < ScreenY0 || pRenderPos->y > ScreenY1)
 		{
 			continue;
 		}

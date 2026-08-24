@@ -3,11 +3,10 @@
 #include <engine/server/databases/connection_pool.h>
 
 #if defined(CONF_MYSQL)
-#include <base/dbg.h>
-#include <base/log.h>
-#include <base/mem.h>
 #include <base/sphore.h>
-#include <base/str.h>
+#include <base/system.h>
+
+#include <engine/console.h>
 
 #include <mysql.h>
 
@@ -27,8 +26,8 @@ enum
 	MYSQLSTATE_SHUTTINGDOWN,
 };
 
-static std::atomic_int g_MysqlState = {MYSQLSTATE_UNINITIALIZED};
-static std::atomic_int g_MysqlNumConnections;
+std::atomic_int g_MysqlState = {MYSQLSTATE_UNINITIALIZED};
+std::atomic_int g_MysqlNumConnections;
 
 bool MysqlAvailable()
 {
@@ -68,9 +67,9 @@ void MysqlUninit()
 class CMysqlConnection : public IDbConnection
 {
 public:
-	explicit CMysqlConnection(CMysqlConfig Config);
-	~CMysqlConnection() override;
-	void Print(const char *pMode) override;
+	explicit CMysqlConnection(CMysqlConfig m_Config);
+	~CMysqlConnection();
+	void Print(IConsole *pConsole, const char *pMode) override;
 
 	const char *BinaryCollate() const override { return "utf8mb4_bin"; }
 	void ToUnixTimestamp(const char *pTimestamp, char *aBuf, unsigned int BufferSize) override;
@@ -78,6 +77,7 @@ public:
 	const char *CollateNocase() const override { return "CONVERT(? USING utf8mb4) COLLATE utf8mb4_general_ci"; }
 	const char *InsertIgnore() const override { return "INSERT IGNORE"; }
 	const char *Random() const override { return "RAND()"; }
+	const char *MedianMapTime(char *pBuffer, int BufferSize) const override;
 	const char *False() const override { return "FALSE"; }
 	const char *True() const override { return "TRUE"; }
 
@@ -121,10 +121,10 @@ private:
 
 	union UParameterExtra
 	{
-		int m_Int;
-		int64_t m_Int64;
-		unsigned long m_UnsignedLong;
-		float m_Float;
+		int i;
+		int64_t i64;
+		unsigned long ul;
+		float f;
 	};
 
 	bool m_NewQuery = false;
@@ -189,11 +189,13 @@ bool CMysqlConnection::PrepareAndExecuteStatement(const char *pStmt)
 	return true;
 }
 
-void CMysqlConnection::Print(const char *pMode)
+void CMysqlConnection::Print(IConsole *pConsole, const char *pMode)
 {
-	log_info("server",
+	char aBuf[512];
+	str_format(aBuf, sizeof(aBuf),
 		"MySQL-%s: DB: '%s' Prefix: '%s' User: '%s' IP: <{'%s'}> Port: %d",
 		pMode, m_Config.m_aDatabase, GetPrefix(), m_Config.m_aUser, m_Config.m_aIp, m_Config.m_Port);
+	pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
 }
 
 void CMysqlConnection::ToUnixTimestamp(const char *pTimestamp, char *aBuf, unsigned int BufferSize)
@@ -219,7 +221,7 @@ bool CMysqlConnection::ConnectImpl()
 {
 	if(m_HaveConnection)
 	{
-		if(m_pStmt && mysql_stmt_field_count(m_pStmt.get()) > 0 && mysql_stmt_free_result(m_pStmt.get()))
+		if(m_pStmt && mysql_stmt_free_result(m_pStmt.get()))
 		{
 			StoreErrorStmt("free_result");
 			dbg_msg("mysql", "can't free last result %s", m_aErrorDetail);
@@ -251,56 +253,11 @@ bool CMysqlConnection::ConnectImpl()
 		mysql_options(&m_Mysql, MYSQL_OPT_BIND, m_Config.m_aBindaddr);
 	}
 
-	// SSL support
-	int ClientFlags = CLIENT_IGNORE_SIGPIPE;
-	if(m_Config.m_UseSsl)
-	{
-		// Enable SSL, e.g. required by servers with require_secure_transport enabled.
-		// If no CA file is given, the server certificate is not verified.
-		if(m_Config.m_aSslKey[0])
-		{
-			mysql_options(&m_Mysql, MYSQL_OPT_SSL_KEY, m_Config.m_aSslKey);
-		}
-		if(m_Config.m_aSslCert[0])
-		{
-			mysql_options(&m_Mysql, MYSQL_OPT_SSL_CERT, m_Config.m_aSslCert);
-		}
-		if(m_Config.m_aSslCa[0])
-		{
-			mysql_options(&m_Mysql, MYSQL_OPT_SSL_CA, m_Config.m_aSslCa);
-#if defined(MARIADB_VERSION_ID)
-			my_bool OptVerifyServerCert = 1;
-			mysql_options(&m_Mysql, MYSQL_OPT_SSL_VERIFY_SERVER_CERT, &OptVerifyServerCert);
-#else
-			// MYSQL_OPT_SSL_VERIFY_SERVER_CERT is deprecated/removed in MySQL 8.0, use MYSQL_OPT_SSL_MODE instead
-			unsigned int OptSslMode = SSL_MODE_VERIFY_IDENTITY;
-			mysql_options(&m_Mysql, MYSQL_OPT_SSL_MODE, &OptSslMode);
-#endif
-		}
-		ClientFlags |= CLIENT_SSL;
-	}
-
-	if(!mysql_real_connect(&m_Mysql, m_Config.m_aIp, m_Config.m_aUser, m_Config.m_aPass, nullptr, m_Config.m_Port, nullptr, ClientFlags))
+	if(!mysql_real_connect(&m_Mysql, m_Config.m_aIp, m_Config.m_aUser, m_Config.m_aPass, nullptr, m_Config.m_Port, nullptr, CLIENT_IGNORE_SIGPIPE))
 	{
 		StoreErrorMysql("real_connect");
 		return false;
 	}
-
-	// Check SSL status
-	if(m_Config.m_UseSsl)
-	{
-		const char *pSslCipher = mysql_get_ssl_cipher(&m_Mysql);
-		if(!pSslCipher)
-		{
-			str_copy(m_aErrorDetail, "(ssl_cipher): connection not encrypted despite m_UseSsl (server ssl disabled?)", sizeof(m_aErrorDetail));
-			mysql_close(&m_Mysql);
-			mem_zero(&m_Mysql, sizeof(m_Mysql));
-			mysql_init(&m_Mysql);
-			return false;
-		}
-		dbg_msg("mysql", "using ssl cipher: %s", pSslCipher);
-	}
-
 	m_HaveConnection = true;
 
 	m_pStmt = std::unique_ptr<MYSQL_STMT, CStmtDeleter>(mysql_stmt_init(&m_Mysql));
@@ -388,12 +345,12 @@ void CMysqlConnection::BindString(int Idx, const char *pString)
 	dbg_assert(0 <= Idx && Idx < (int)m_vStmtParameters.size(), "Error in BindString: index out of bounds: %d", Idx);
 
 	int Length = str_length(pString);
-	m_vStmtParameterExtras[Idx].m_UnsignedLong = Length;
+	m_vStmtParameterExtras[Idx].ul = Length;
 	MYSQL_BIND *pParam = &m_vStmtParameters[Idx];
 	pParam->buffer_type = MYSQL_TYPE_STRING;
 	pParam->buffer = (void *)pString;
 	pParam->buffer_length = Length + 1;
-	pParam->length = &m_vStmtParameterExtras[Idx].m_UnsignedLong;
+	pParam->length = &m_vStmtParameterExtras[Idx].ul;
 	pParam->is_null = nullptr;
 	pParam->is_unsigned = false;
 	pParam->error = nullptr;
@@ -405,12 +362,12 @@ void CMysqlConnection::BindBlob(int Idx, unsigned char *pBlob, int Size)
 	Idx -= 1;
 	dbg_assert(0 <= Idx && Idx < (int)m_vStmtParameters.size(), "Error in BindBlob: index out of bounds: %d", Idx);
 
-	m_vStmtParameterExtras[Idx].m_UnsignedLong = Size;
+	m_vStmtParameterExtras[Idx].ul = Size;
 	MYSQL_BIND *pParam = &m_vStmtParameters[Idx];
 	pParam->buffer_type = MYSQL_TYPE_BLOB;
 	pParam->buffer = pBlob;
 	pParam->buffer_length = Size;
-	pParam->length = &m_vStmtParameterExtras[Idx].m_UnsignedLong;
+	pParam->length = &m_vStmtParameterExtras[Idx].ul;
 	pParam->is_null = nullptr;
 	pParam->is_unsigned = false;
 	pParam->error = nullptr;
@@ -422,11 +379,11 @@ void CMysqlConnection::BindInt(int Idx, int Value)
 	Idx -= 1;
 	dbg_assert(0 <= Idx && Idx < (int)m_vStmtParameters.size(), "Error in BindInt: index out of bounds: %d", Idx);
 
-	m_vStmtParameterExtras[Idx].m_Int = Value;
+	m_vStmtParameterExtras[Idx].i = Value;
 	MYSQL_BIND *pParam = &m_vStmtParameters[Idx];
 	pParam->buffer_type = MYSQL_TYPE_LONG;
-	pParam->buffer = &m_vStmtParameterExtras[Idx].m_Int;
-	pParam->buffer_length = sizeof(m_vStmtParameterExtras[Idx].m_Int);
+	pParam->buffer = &m_vStmtParameterExtras[Idx].i;
+	pParam->buffer_length = sizeof(m_vStmtParameterExtras[Idx].i);
 	pParam->length = nullptr;
 	pParam->is_null = nullptr;
 	pParam->is_unsigned = false;
@@ -439,11 +396,11 @@ void CMysqlConnection::BindInt64(int Idx, int64_t Value)
 	Idx -= 1;
 	dbg_assert(0 <= Idx && Idx < (int)m_vStmtParameters.size(), "Error in BindInt64: index out of bounds: %d", Idx);
 
-	m_vStmtParameterExtras[Idx].m_Int64 = Value;
+	m_vStmtParameterExtras[Idx].i64 = Value;
 	MYSQL_BIND *pParam = &m_vStmtParameters[Idx];
 	pParam->buffer_type = MYSQL_TYPE_LONGLONG;
-	pParam->buffer = &m_vStmtParameterExtras[Idx].m_Int64;
-	pParam->buffer_length = sizeof(m_vStmtParameterExtras[Idx].m_Int64);
+	pParam->buffer = &m_vStmtParameterExtras[Idx].i64;
+	pParam->buffer_length = sizeof(m_vStmtParameterExtras[Idx].i64);
 	pParam->length = nullptr;
 	pParam->is_null = nullptr;
 	pParam->is_unsigned = false;
@@ -456,11 +413,11 @@ void CMysqlConnection::BindFloat(int Idx, float Value)
 	Idx -= 1;
 	dbg_assert(0 <= Idx && Idx < (int)m_vStmtParameters.size(), "Error in BindFloat: index out of bounds: %d", Idx);
 
-	m_vStmtParameterExtras[Idx].m_Float = Value;
+	m_vStmtParameterExtras[Idx].f = Value;
 	MYSQL_BIND *pParam = &m_vStmtParameters[Idx];
 	pParam->buffer_type = MYSQL_TYPE_FLOAT;
-	pParam->buffer = &m_vStmtParameterExtras[Idx].m_Float;
-	pParam->buffer_length = sizeof(m_vStmtParameterExtras[Idx].m_Float);
+	pParam->buffer = &m_vStmtParameterExtras[Idx].f;
+	pParam->buffer_length = sizeof(m_vStmtParameterExtras[Idx].i);
 	pParam->length = nullptr;
 	pParam->is_null = nullptr;
 	pParam->is_unsigned = false;
@@ -687,6 +644,18 @@ int CMysqlConnection::GetBlob(int Col, unsigned char *pBuffer, int BufferSize)
 	dbg_assert(!IsNull, "Error in GetBlob(%d): NULL", Col + 1);
 	dbg_assert(!Error, "Error in GetBlob(%d): truncation occurred", Col + 1);
 	return Length;
+}
+
+const char *CMysqlConnection::MedianMapTime(char *pBuffer, int BufferSize) const
+{
+	str_format(pBuffer, BufferSize,
+		"SELECT MEDIAN(Time) "
+		"OVER (PARTITION BY Map) "
+		"FROM %s_race "
+		"WHERE Map = l.Map "
+		"LIMIT 1",
+		GetPrefix());
+	return pBuffer;
 }
 
 bool CMysqlConnection::AddPoints(const char *pPlayer, int Points, char *pError, int ErrorSize)

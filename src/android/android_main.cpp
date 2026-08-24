@@ -1,17 +1,14 @@
 #include "android_main.h"
 
-#include <base/fs.h>
 #include <base/hash.h>
-#include <base/io.h>
 #include <base/log.h>
-#include <base/str.h>
+#include <base/system.h>
 
 #include <engine/shared/linereader.h>
 
 #include <SDL.h>
 #include <jni.h>
 
-#include <algorithm>
 #include <string>
 #include <vector>
 

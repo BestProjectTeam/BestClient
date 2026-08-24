@@ -17,10 +17,6 @@
 #include <engine/shared/websockets.h>
 #endif
 
-#if defined(CONF_PLATFORM_EMSCRIPTEN)
-#include <emscripten.h>
-#endif
-
 #if defined(CONF_FAMILY_UNIX)
 #include <sys/time.h> // timeval
 #include <unistd.h> // close
@@ -48,11 +44,8 @@
 
 static NETSTATS network_stats = {0};
 
-#ifdef CONF_PLATFORM_LINUX
-static constexpr size_t VLEN = 128;
-#endif
-static constexpr size_t PACKETSIZE = 1400;
-
+#define VLEN 128
+#define PACKETSIZE 1400
 typedef struct
 {
 #ifdef CONF_PLATFORM_LINUX
@@ -67,7 +60,7 @@ typedef struct
 #endif
 } NETSOCKET_BUFFER;
 
-static void net_buffer_init(NETSOCKET_BUFFER *buffer)
+void net_buffer_init(NETSOCKET_BUFFER *buffer)
 {
 #if defined(CONF_PLATFORM_LINUX)
 	buffer->pos = 0;
@@ -75,7 +68,7 @@ static void net_buffer_init(NETSOCKET_BUFFER *buffer)
 	mem_zero(buffer->msgs, sizeof(buffer->msgs));
 	mem_zero(buffer->iovecs, sizeof(buffer->iovecs));
 	mem_zero(buffer->sockaddrs, sizeof(buffer->sockaddrs));
-	for(size_t i = 0; i < VLEN; ++i)
+	for(int i = 0; i < VLEN; ++i)
 	{
 		buffer->iovecs[i].iov_base = buffer->bufs[i];
 		buffer->iovecs[i].iov_len = PACKETSIZE;
@@ -87,18 +80,17 @@ static void net_buffer_init(NETSOCKET_BUFFER *buffer)
 #endif
 }
 
-#if defined(CONF_PLATFORM_LINUX)
-static void net_buffer_reinit(NETSOCKET_BUFFER *buffer)
+void net_buffer_reinit(NETSOCKET_BUFFER *buffer)
 {
-	for(size_t i = 0; i < VLEN; i++)
+#if defined(CONF_PLATFORM_LINUX)
+	for(int i = 0; i < VLEN; i++)
 	{
 		buffer->msgs[i].msg_hdr.msg_namelen = sizeof(buffer->sockaddrs[i]);
 	}
-}
 #endif
+}
 
-#if defined(CONF_WEBSOCKETS)
-static void net_buffer_simple(NETSOCKET_BUFFER *buffer, char **buf, int *size)
+void net_buffer_simple(NETSOCKET_BUFFER *buffer, char **buf, int *size)
 {
 #if defined(CONF_PLATFORM_LINUX)
 	*buf = buffer->bufs[0];
@@ -108,7 +100,6 @@ static void net_buffer_simple(NETSOCKET_BUFFER *buffer, char **buf, int *size)
 	*size = sizeof(buffer->buf);
 #endif
 }
-#endif
 
 struct NETSOCKET_INTERNAL
 {
@@ -215,7 +206,7 @@ int net_addr_comp_noport(const NETADDR *a, const NETADDR *b)
 	return mem_comp(a->ip, b->ip, sizeof(a->ip));
 }
 
-static void net_addr_str_v6(const unsigned short ip[8], int port, char *buffer, int buffer_size)
+void net_addr_str_v6(const unsigned short ip[8], int port, char *buffer, int buffer_size)
 {
 	int longest_seq_len = 0;
 	int longest_seq_start = -1;
@@ -366,52 +357,15 @@ static int parse_uint16(unsigned short *out, const char **str)
 	return 0;
 }
 
-// Applies the network types of a URL scheme to an address. The websocket types are
-// narrowed down to the address family of the address, unless it is not known yet.
-static void net_addr_apply_url_types(NETADDR *addr, int url_types)
-{
-	if(url_types & (NETTYPE_WEBSOCKET_IPV4 | NETTYPE_WEBSOCKET_IPV6))
-	{
-		if(addr->type & NETTYPE_IPV4)
-		{
-			addr->type = (addr->type & ~NETTYPE_IPV4) | NETTYPE_WEBSOCKET_IPV4;
-		}
-		else if(addr->type & NETTYPE_IPV6)
-		{
-			addr->type = (addr->type & ~NETTYPE_IPV6) | NETTYPE_WEBSOCKET_IPV6;
-		}
-		else
-		{
-			addr->type |= NETTYPE_WEBSOCKET_IPV4 | NETTYPE_WEBSOCKET_IPV6;
-		}
-	}
-	addr->type |= url_types & (NETTYPE_TW7 | NETTYPE_WEBSOCKET_TLS);
-}
-
 int net_addr_from_url(NETADDR *addr, const char *string, char *host_buf, size_t host_buf_size)
 {
-	static const struct
-	{
-		const char *scheme;
-		int types;
-	} SCHEMES[] = {
-		{"tw-0.6+udp://", 0},
-		{"tw-0.7+udp://", NETTYPE_TW7},
-		{"ddnet-20+ws://", NETTYPE_WEBSOCKET_IPV4 | NETTYPE_WEBSOCKET_IPV6},
-		{"ddnet-20+wss://", NETTYPE_WEBSOCKET_IPV4 | NETTYPE_WEBSOCKET_IPV6 | NETTYPE_WEBSOCKET_TLS},
-	};
-
+	bool sixup = false;
 	mem_zero(addr, sizeof(*addr));
-	const char *str = nullptr;
-	int url_types = 0;
-	for(const auto &scheme : SCHEMES)
+	const char *str = str_startswith(string, "tw-0.6+udp://");
+	if(!str && (str = str_startswith(string, "tw-0.7+udp://")))
 	{
-		str = str_startswith(string, scheme.scheme);
-		if(str)
-		{
-			url_types = scheme.types;
-			break;
-		}
+		addr->type |= NETTYPE_TW7;
+		sixup = true;
 	}
 	if(!str)
 		return 1;
@@ -442,58 +396,14 @@ int net_addr_from_url(NETADDR *addr, const char *string, char *host_buf, size_t 
 	if(host_buf)
 		str_copy(host_buf, host, host_buf_size);
 
-	const int failure = net_addr_from_str(addr, host);
-	// The types of the scheme are also reported when the host is not an IP address,
-	// so that they can be applied to the address after resolving the hostname.
-	net_addr_apply_url_types(addr, url_types);
+	int failure = net_addr_from_str(addr, host);
+	if(failure)
+		return failure;
+
+	if(sixup)
+		addr->type |= NETTYPE_TW7;
 
 	return failure;
-}
-
-int net_addr_from_url_lookup(NETADDR *addr, const char *string, int types)
-{
-	char host[128];
-	const int url_failure = net_addr_from_url(addr, string, host, sizeof(host));
-	if(url_failure == 0)
-		return 0;
-
-	int url_types = 0;
-	if(url_failure > 0)
-	{
-		// Not a URL, so the entire string is the host.
-		str_copy(host, string);
-	}
-	else
-	{
-		url_types = addr->type;
-	}
-
-	if(net_host_lookup(host, addr, types) != 0)
-		return -1;
-
-	net_addr_apply_url_types(addr, url_types);
-	return 0;
-}
-
-void net_addr_url_str(const NETADDR *addr, char *string, int max_length, bool add_port)
-{
-	const char *scheme = "";
-	if(addr->type & NETTYPE_TW7)
-	{
-		scheme = "tw-0.7+udp://";
-	}
-	else if(addr->type & NETTYPE_WEBSOCKET_TLS)
-	{
-		scheme = "ddnet-20+wss://";
-	}
-	else if(addr->type & (NETTYPE_WEBSOCKET_IPV4 | NETTYPE_WEBSOCKET_IPV6))
-	{
-		scheme = "ddnet-20+ws://";
-	}
-
-	char addr_str[NETADDR_MAXSTRSIZE];
-	net_addr_str(addr, addr_str, sizeof(addr_str), add_port);
-	str_format(string, max_length, "%s%s", scheme, addr_str);
 }
 
 bool net_addr_is_local(const NETADDR *addr)
@@ -654,10 +564,8 @@ static int net_host_lookup_fallback(const char *hostname, NETADDR *addr, int typ
 	return -1;
 }
 
-int net_host_lookup(const char *hostname, NETADDR *addr, int types)
+static int net_host_lookup_impl(const char *hostname, NETADDR *addr, int types)
 {
-	types &= ~(NETTYPE_WEBSOCKET_IPV4 | NETTYPE_WEBSOCKET_IPV6);
-
 	char host[256];
 	int port = 0;
 	if(priv_net_extract(hostname, host, sizeof(host), &port))
@@ -694,34 +602,34 @@ int net_host_lookup(const char *hostname, NETADDR *addr, int types)
 	return 0;
 }
 
-#if defined(CONF_PLATFORM_EMSCRIPTEN)
-static bool websocket_secure_default = false;
-
-void net_websocket_set_secure(bool secure)
+int net_host_lookup(const char *hostname, NETADDR *addr, int types)
 {
-	MAIN_THREAD_EM_ASM({
-		var url = $0 ? "wss://" : "ws://";
-		(Module["websocket"] = Module["websocket"] || {})["url"] = url;
-		if(typeof SOCKFS != "undefined" && SOCKFS.websocketArgs)
+	const char *ws_hostname = str_startswith(hostname, "ws://");
+	if(ws_hostname)
+	{
+		if((types & (NETTYPE_WEBSOCKET_IPV4 | NETTYPE_WEBSOCKET_IPV6)) == 0)
 		{
-			SOCKFS.websocketArgs["url"] = url;
-		} }, secure);
+			return -1;
+		}
+		int result = net_host_lookup_impl(ws_hostname, addr, types & ~(NETTYPE_WEBSOCKET_IPV4 | NETTYPE_WEBSOCKET_IPV6));
+		if(result == 0)
+		{
+			if(addr->type == NETTYPE_IPV4)
+			{
+				addr->type = NETTYPE_WEBSOCKET_IPV4;
+			}
+			else if(addr->type == NETTYPE_IPV6)
+			{
+				addr->type = NETTYPE_WEBSOCKET_IPV6;
+			}
+		}
+		return result;
+	}
+	return net_host_lookup_impl(hostname, addr, types & ~(NETTYPE_WEBSOCKET_IPV4 | NETTYPE_WEBSOCKET_IPV6));
 }
-
-void net_websocket_reset_secure()
-{
-	net_websocket_set_secure(websocket_secure_default);
-}
-#endif
 
 void net_init()
 {
-#if defined(CONF_PLATFORM_EMSCRIPTEN)
-	websocket_secure_default = MAIN_THREAD_EM_ASM_INT({
-		var url = (Module["websocket"] && Module["websocket"]["url"]) || "";
-		return url.startsWith("wss") ? 1 : 0;
-	}) != 0;
-#endif
 #if defined(CONF_FAMILY_WINDOWS)
 	WSADATA wsa_data;
 	dbg_assert(WSAStartup(MAKEWORD(1, 1), &wsa_data) == 0, "WSAStartup failure");
@@ -773,12 +681,12 @@ static int net_set_blocking_impl(NETSOCKET sock, bool blocking)
 		if(sockets[i] >= 0)
 		{
 #if defined(CONF_FAMILY_WINDOWS)
-			if(ioctlsocket(sockets[i], FIONBIO, &mode) != NO_ERROR)
+			if(ioctlsocket(sockets[i], FIONBIO, (unsigned long *)&mode) != NO_ERROR)
 			{
 				log_error("net", "Setting %s mode for %s socket failed (%s)", socket_str[i], mode_str, net_error_message().c_str());
 			}
 #else
-			if(ioctl(sockets[i], FIONBIO, &mode) == -1)
+			if(ioctl(sockets[i], FIONBIO, (unsigned long *)&mode) == -1)
 			{
 				log_error("net", "Setting %s mode for %s socket failed (%s)", socket_str[i], mode_str, net_error_message().c_str());
 			}
@@ -1212,7 +1120,7 @@ int net_udp_recv(NETSOCKET sock, NETADDR *addr, unsigned char **data)
 		if(sock->buffer.pos >= sock->buffer.size)
 		{
 			net_buffer_reinit(&sock->buffer);
-			sock->buffer.size = recvmmsg(sock->ipv4sock, sock->buffer.msgs, VLEN, 0, nullptr);
+			sock->buffer.size = recvmmsg(sock->ipv4sock, sock->buffer.msgs, VLEN, 0, NULL);
 			sock->buffer.pos = 0;
 		}
 	}
@@ -1222,57 +1130,47 @@ int net_udp_recv(NETSOCKET sock, NETADDR *addr, unsigned char **data)
 		if(sock->buffer.pos >= sock->buffer.size)
 		{
 			net_buffer_reinit(&sock->buffer);
-			sock->buffer.size = recvmmsg(sock->ipv6sock, sock->buffer.msgs, VLEN, 0, nullptr);
+			sock->buffer.size = recvmmsg(sock->ipv6sock, sock->buffer.msgs, VLEN, 0, NULL);
 			sock->buffer.pos = 0;
 		}
 	}
 
-	while(sock->buffer.pos < sock->buffer.size)
+	if(sock->buffer.pos < sock->buffer.size)
 	{
 		sockaddr_to_netaddr((sockaddr *)&(sock->buffer.sockaddrs[sock->buffer.pos]), sizeof(sock->buffer.sockaddrs[sock->buffer.pos]), addr);
 		bytes = sock->buffer.msgs[sock->buffer.pos].msg_len;
 		*data = (unsigned char *)sock->buffer.bufs[sock->buffer.pos];
 		sock->buffer.pos++;
-		if(bytes == 0)
-		{
-			continue;
-		}
 		update_stats(bytes);
 		return bytes;
 	}
 #else
 	if(sock->ipv4sock >= 0)
 	{
-		do
+		sockaddr_storage recv_addr;
+		socklen_t fromlen = sizeof(recv_addr);
+		bytes = recvfrom(sock->ipv4sock, sock->buffer.buf, sizeof(sock->buffer.buf), 0, (sockaddr *)&recv_addr, &fromlen);
+		*data = (unsigned char *)sock->buffer.buf;
+		if(bytes > 0)
 		{
-			sockaddr_storage recv_addr;
-			socklen_t fromlen = sizeof(recv_addr);
-			bytes = recvfrom(sock->ipv4sock, sock->buffer.buf, sizeof(sock->buffer.buf), 0, (sockaddr *)&recv_addr, &fromlen);
-			*data = (unsigned char *)sock->buffer.buf;
-			if(bytes > 0)
-			{
-				sockaddr_to_netaddr((sockaddr *)&recv_addr, fromlen, addr);
-				update_stats(bytes);
-				return bytes;
-			}
-		} while(bytes == 0);
+			sockaddr_to_netaddr((sockaddr *)&recv_addr, fromlen, addr);
+			update_stats(bytes);
+			return bytes;
+		}
 	}
 
 	if(sock->ipv6sock >= 0)
 	{
-		do
+		sockaddr_storage recv_addr;
+		socklen_t fromlen = sizeof(recv_addr);
+		bytes = recvfrom(sock->ipv6sock, sock->buffer.buf, sizeof(sock->buffer.buf), 0, (sockaddr *)&recv_addr, &fromlen);
+		*data = (unsigned char *)sock->buffer.buf;
+		if(bytes > 0)
 		{
-			sockaddr_storage recv_addr;
-			socklen_t fromlen = sizeof(recv_addr);
-			bytes = recvfrom(sock->ipv6sock, sock->buffer.buf, sizeof(sock->buffer.buf), 0, (sockaddr *)&recv_addr, &fromlen);
-			*data = (unsigned char *)sock->buffer.buf;
-			if(bytes > 0)
-			{
-				sockaddr_to_netaddr((sockaddr *)&recv_addr, fromlen, addr);
-				update_stats(bytes);
-				return bytes;
-			}
-		} while(bytes == 0);
+			sockaddr_to_netaddr((sockaddr *)&recv_addr, fromlen, addr);
+			update_stats(bytes);
+			return bytes;
+		}
 	}
 #endif
 

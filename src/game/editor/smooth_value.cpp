@@ -19,8 +19,9 @@ void CSmoothValue::SetValue(float Target)
 	float Derivative = 0.0f;
 	if(m_Smoothing)
 	{
-		Current = m_ValueSmoothing.Evaluate(Progress(Now));
-		Derivative = m_ValueSmoothing.Derivative(Progress(Now));
+		const float Progress = ZoomProgress(Now);
+		Current = m_ValueSmoothing.Evaluate(Progress);
+		Derivative = m_ValueSmoothing.Derivative(Progress);
 	}
 
 	m_ValueSmoothingTarget = Target;
@@ -31,10 +32,10 @@ void CSmoothValue::SetValue(float Target)
 	m_Smoothing = true;
 }
 
-void CSmoothValue::ScaleValue(float Factor)
+void CSmoothValue::ChangeValue(float Amount)
 {
 	const float CurrentTarget = m_Smoothing ? m_ValueSmoothingTarget : m_Value;
-	SetValue(CurrentTarget * Factor);
+	SetValue(CurrentTarget + Amount);
 }
 
 bool CSmoothValue::UpdateValue()
@@ -50,7 +51,7 @@ bool CSmoothValue::UpdateValue()
 		}
 		else
 		{
-			m_Value = m_ValueSmoothing.Evaluate(Progress(Time));
+			m_Value = m_ValueSmoothing.Evaluate(ZoomProgress(Time));
 			if((OldLevel < m_ValueSmoothingTarget && m_Value > m_ValueSmoothingTarget) || (OldLevel > m_ValueSmoothingTarget && m_Value < m_ValueSmoothingTarget))
 			{
 				m_Value = m_ValueSmoothingTarget;
@@ -65,7 +66,7 @@ bool CSmoothValue::UpdateValue()
 	return false;
 }
 
-float CSmoothValue::Progress(float CurrentTime) const
+float CSmoothValue::ZoomProgress(float CurrentTime) const
 {
 	return (CurrentTime - m_ValueSmoothingStart) / (m_ValueSmoothingEnd - m_ValueSmoothingStart);
 }

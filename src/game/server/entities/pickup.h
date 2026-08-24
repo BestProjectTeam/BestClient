@@ -18,6 +18,7 @@ public:
 	void Snap(int SnappingClient) override;
 
 	int Type() const { return m_Type; }
+	int Subtype() const { return m_Subtype; }
 
 private:
 	int m_Type;

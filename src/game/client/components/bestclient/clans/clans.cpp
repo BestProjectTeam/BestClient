@@ -250,7 +250,7 @@ void CClans::SetStatus(const char *pMsg)
 	str_copy(m_aStatus, pMsg ? pMsg : "", sizeof(m_aStatus));
 }
 
-void CClans::AuthHeader(IHttpRequest *pReq) const
+void CClans::AuthHeader(CHttpRequest *pReq) const
 {
 	if(m_aAccessToken[0])
 	{
@@ -260,7 +260,7 @@ void CClans::AuthHeader(IHttpRequest *pReq) const
 	}
 }
 
-void CClans::BeginRequest(std::shared_ptr<IHttpRequest> pReq, int Kind)
+void CClans::BeginRequest(std::shared_ptr<CHttpRequest> pReq, int Kind)
 {
 	if(m_pPending)
 	{
@@ -274,7 +274,7 @@ void CClans::BeginRequest(std::shared_ptr<IHttpRequest> pReq, int Kind)
 	Http()->Run(m_pPending);
 }
 
-void CClans::BeginBackground(std::shared_ptr<IHttpRequest> pReq, int Kind)
+void CClans::BeginBackground(std::shared_ptr<CHttpRequest> pReq, int Kind)
 {
 	if(m_pBgPending && !m_pBgPending->Done())
 	{
@@ -1130,7 +1130,7 @@ void CClans::MaybePushPresence(bool UiOpen)
 		"{\"online\":true,\"in_game\":%s,\"server\":\"%s\",\"map\":\"%s\",\"players\":%d,\"max_players\":%d,\"skin\":%s}",
 		InGame ? "true" : "false", aEscServer, aEscMap, Players, MaxPlayers, aSkin);
 
-	auto pReq = CreateHttpRequest(aUrl);
+	auto pReq = std::make_shared<CHttpRequest>(aUrl);
 	pReq->PostJson(aJson);
 	AuthHeader(pReq.get());
 	pReq->FailOnErrorStatus(false);

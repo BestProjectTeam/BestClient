@@ -31,13 +31,14 @@ void CEditor::AddQuadOrSound()
 
 	std::shared_ptr<CLayerGroup> pGroup = Map()->SelectedGroup();
 
-	CScreenRect GroupRect = pGroup->Mapping();
-	int x = GroupRect.m_TopLeft.x + GroupRect.Width() / 2;
-	int y = GroupRect.m_TopLeft.y + GroupRect.Height() / 2;
+	float aMapping[4];
+	pGroup->Mapping(aMapping);
+	int x = aMapping[0] + (aMapping[2] - aMapping[0]) / 2;
+	int y = aMapping[1] + (aMapping[3] - aMapping[1]) / 2;
 	if(m_Dialog == DIALOG_NONE && CLineInput::GetActiveInput() == nullptr && Input()->KeyPress(KEY_Q) && Input()->ModifierIsPressed())
 	{
-		x += MapView()->MouseWorldPos().x - (MapView()->GetWorldOffset().x * pGroup->m_ParallaxX / 100) - pGroup->m_OffsetX;
-		y += MapView()->MouseWorldPos().y - (MapView()->GetWorldOffset().y * pGroup->m_ParallaxY / 100) - pGroup->m_OffsetY;
+		x += Ui()->MouseWorldX() - (MapView()->GetWorldOffset().x * pGroup->m_ParallaxX / 100) - pGroup->m_OffsetX;
+		y += Ui()->MouseWorldY() - (MapView()->GetWorldOffset().y * pGroup->m_ParallaxY / 100) - pGroup->m_OffsetY;
 	}
 
 	if(pLayer->m_Type == LAYERTYPE_QUADS)
@@ -195,13 +196,6 @@ void CEditor::MapDetails()
 		PopupHeight,
 		this,
 		PopupMapInfo);
-	Ui()->SetActiveItem(nullptr);
-}
-
-void CEditor::GotoPosition()
-{
-	static SPopupMenuId s_PopupGotoId;
-	Ui()->DoPopupMenu(&s_PopupGotoId, Ui()->MouseX(), Ui()->MouseY(), 120.0f, 52.0f, this, PopupGoto);
 	Ui()->SetActiveItem(nullptr);
 }
 

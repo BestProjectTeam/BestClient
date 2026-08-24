@@ -1,6 +1,6 @@
 #include "test.h"
 
-#include <base/secure.h>
+#include <base/system.h>
 
 #include <gtest/gtest.h>
 

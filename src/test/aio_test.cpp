@@ -10,26 +10,26 @@
 
 static const int BUF_SIZE = 64 * 1024;
 
-class Async : public ::testing::Test // NOLINT(readability-identifier-naming)
+class Async : public ::testing::Test
 {
 protected:
 	ASYNCIO *m_pAio;
 	CTestInfo m_Info;
-	bool m_Delete;
+	bool Delete;
 
 	void SetUp() override
 	{
 		IOHANDLE File = io_open(m_Info.m_aFilename, IOFLAG_WRITE);
 		ASSERT_TRUE(File);
 		m_pAio = aio_new(File);
-		m_Delete = false;
+		Delete = false;
 	}
 
-	void TearDown() override
+	~Async()
 	{
-		if(m_Delete)
+		if(Delete)
 		{
-			EXPECT_FALSE(fs_remove(m_Info.m_aFilename));
+			fs_remove(m_Info.m_aFilename);
 		}
 	}
 
@@ -52,7 +52,7 @@ protected:
 
 		ASSERT_EQ(str_length(pOutput), Read);
 		ASSERT_TRUE(mem_comp(aBuf, pOutput, Read) == 0);
-		m_Delete = true;
+		Delete = true;
 	}
 };
 

@@ -76,7 +76,7 @@ enum
 	NET_MAX_CHUNKHEADERSIZE = 3,
 	NET_PACKETHEADERSIZE = 3,
 	NET_CONNLESS_EXTRA_SIZE = 4,
-	NET_MAX_CLIENTS = 128,
+	NET_MAX_CLIENTS = 64,
 	NET_MAX_CONSOLE_CLIENTS = 4,
 	NET_MAX_SEQUENCE = 1 << 10,
 	NET_MAX_PACKET_CHUNKS = 0xFF,
@@ -278,7 +278,6 @@ private:
 	bool IsSixup() const { return m_Sixup; }
 
 	//
-	bool IsPeerAddress(const NETADDR &Addr) const;
 	void SetPeerAddr(const NETADDR *pAddr);
 	void ClearPeerAddr();
 	void ResetStats();
@@ -361,7 +360,6 @@ private:
 	EState m_State;
 
 	NETADDR m_PeerAddr;
-	std::array<char, NETADDR_MAXSTRSIZE> m_aPeerAddrStr;
 	NETSOCKET m_Socket;
 
 	char m_aBuffer[NET_MAX_PACKETSIZE];
@@ -372,16 +370,12 @@ private:
 	bool m_LineEndingDetected;
 	char m_aLineEnding[3];
 
-	void SetPeerAddr(const NETADDR *pAddr);
-	void ClearPeerAddr();
-
 public:
 	int Init(NETSOCKET Socket, const NETADDR *pAddr);
 	void Disconnect(const char *pReason);
 
 	EState State() const { return m_State; }
 	const NETADDR *PeerAddress() const { return &m_PeerAddr; }
-	const std::array<char, NETADDR_MAXSTRSIZE> &PeerAddressString() const { return m_aPeerAddrStr; }
 	const char *ErrorString() const { return m_aErrorString; }
 
 	void Reset();
@@ -434,9 +428,6 @@ class CNetServer
 	int m_MaxClients = NET_MAX_CLIENTS;
 	int m_MaxClientsPerIp;
 
-	bool m_FlushBatch = false;
-	bool m_aFlushPending[NET_MAX_CLIENTS] = {};
-
 	NETFUNC_NEWCLIENT m_pfnNewClient;
 	NETFUNC_NEWCLIENT_NOAUTH m_pfnNewClientNoAuth;
 	NETFUNC_DELCLIENT m_pfnDelClient;
@@ -479,13 +470,6 @@ public:
 	int Recv(CNetChunk *pChunk, SECURITY_TOKEN *pResponseToken);
 	int Send(CNetChunk *pChunk);
 	void Update();
-
-	// While a flush batch is open, sends requesting MSGFLAG_FLUSH only queue
-	// their chunk and mark the connection; EndFlushBatch() then flushes each
-	// marked connection once. Used to coalesce the flushes triggered while
-	// draining a burst of incoming packets into one packet per recipient.
-	void BeginFlushBatch() { m_FlushBatch = true; }
-	void EndFlushBatch();
 
 	//
 	void Drop(int ClientId, const char *pReason);
@@ -550,7 +534,6 @@ public:
 
 	// status requests
 	const NETADDR *ClientAddr(int ClientId) const { return m_aSlots[ClientId].m_Connection.PeerAddress(); }
-	const std::array<char, NETADDR_MAXSTRSIZE> &ClientAddrString(int ClientId) const { return m_aSlots[ClientId].m_Connection.PeerAddressString(); }
 	CNetBan *NetBan() const { return m_pNetBan; }
 };
 

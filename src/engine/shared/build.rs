@@ -14,10 +14,5 @@ fn main() {
     if !rustc_output.status.success() {
         panic!("rustc --version: exit status {}", rustc_output.status);
     }
-    let rustc_version = rustc_output
-        .stdout
-        .strip_suffix(b"\n")
-        .expect("rustc version output ends with newline");
-    assert!(!rustc_version.contains(&b'\n'));
-    fs::write(&out, rustc_version).expect("file write");
+    fs::write(&out, rustc_output.stdout).expect("file write");
 }

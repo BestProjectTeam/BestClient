@@ -4,9 +4,7 @@
 #include <engine/client/enums.h>
 #include <engine/external/regex.h>
 #include <engine/shared/console.h>
-#include <engine/http.h>
-
-#include <generated/protocol.h>
+#include <engine/shared/http.h>
 
 #include <game/client/component.h>
 
@@ -40,8 +38,6 @@ class CTClient : public CComponent
 
 	float m_FinishTextTimeout = 0.0f;
 	void DoFinishCheck();
-	bool m_aFinishFlagShown[MAX_CLIENTS] = {};
-	bool m_aFinishFlagCharacterWasInactive[MAX_CLIENTS] = {};
 
 	bool ServerCommandExists(const char *pCommand);
 
@@ -57,7 +53,7 @@ public:
 	void OnNewSnapshot() override;
 	void SetForcedAspect();
 
-	std::shared_ptr<IHttpRequest> m_pTClientInfoTask = nullptr;
+	std::shared_ptr<CHttpRequest> m_pTClientInfoTask = nullptr;
 	void FetchTClientInfo();
 	void FinishTClientInfo();
 	void ResetTClientInfoTask();
@@ -66,7 +62,6 @@ public:
 	void RenderMiniVoteHud();
 	void RenderCenterLines();
 	void RenderCtfFlag(vec2 Pos, float Alpha);
-	bool HasFinishFlag(int ClientId) const { return m_aFinishFlagShown[ClientId]; }
 
 	bool ChatDoSpecId(const char *pInput);
 	bool InfoTaskDone() { return m_pTClientInfoTask && m_pTClientInfoTask->State() == EHttpState::DONE; }

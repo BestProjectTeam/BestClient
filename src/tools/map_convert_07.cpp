@@ -1,12 +1,9 @@
 /* (c) DDNet developers. See licence.txt in the root of the distribution for more information. */
 /* If you are missing that file, acquire a complete release at teeworlds.com.  */
 
-#include <base/dbg.h>
-#include <base/fs.h>
-#include <base/io.h>
 #include <base/logger.h>
 #include <base/os.h>
-#include <base/str.h>
+#include <base/system.h>
 
 #include <engine/gfx/image_loader.h>
 #include <engine/shared/datafile.h>
@@ -130,12 +127,12 @@ int main(int argc, const char **argv)
 
 	if(argc == 3)
 	{
-		str_copy(aDestFilename, argv[2]);
+		str_copy(aDestFilename, argv[2], sizeof(aDestFilename));
 	}
 	else
 	{
 		char aBuf[IO_MAX_PATH_LENGTH];
-		fs_split_file_extension(fs_filename(pSourceFilename), aBuf, sizeof(aBuf));
+		IStorage::StripPathAndExtension(pSourceFilename, aBuf, sizeof(aBuf));
 		str_format(aDestFilename, sizeof(aDestFilename), "data/maps7/%s.map", aBuf);
 		if(fs_makedir("data") != 0)
 		{

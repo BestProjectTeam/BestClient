@@ -1,7 +1,4 @@
-#include <base/dbg.h>
-#include <base/fs.h>
-#include <base/io.h>
-#include <base/str.h>
+#include <base/system.h>
 
 #include <engine/shared/datafile.h>
 #include <engine/storage.h>
@@ -58,7 +55,7 @@ static void Process(IStorage *pStorage, const char *pMapName, const char *pConfi
 	Reader.Close();
 	if(!ConfigFound)
 	{
-		(void)fs_remove(pConfigName);
+		fs_remove(pConfigName);
 	}
 }
 #include "config_common.h"

@@ -1,7 +1,7 @@
 #include "teeinfo.h"
 
 #include <base/color.h>
-#include <base/str.h>
+#include <base/system.h>
 
 class CStandardSkin
 {

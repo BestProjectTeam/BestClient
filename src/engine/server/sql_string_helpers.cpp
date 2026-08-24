@@ -1,6 +1,6 @@
 #include "sql_string_helpers.h"
 
-#include <base/str.h>
+#include <base/system.h>
 
 #include <cmath>
 

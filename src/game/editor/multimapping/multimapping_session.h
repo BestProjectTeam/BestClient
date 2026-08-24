@@ -18,7 +18,7 @@ public:
 	void OnInit(CEditor *pEditor) override;
 	void OnReset() override;
 	void OnUpdate() override;
-	void OnRender(CUIRect View);
+	void OnRender(CUIRect View) override;
 
 	void NotifyTileEdit(int GroupIdx, int LayerIdx, int TileX, int TileY, uint8_t Index, uint8_t Flags);
 	// Tele layer
@@ -166,7 +166,11 @@ public:
 	int m_DbgQuadSent = 0;
 	int m_DbgQuadRecv = 0;
 
-	// ping/pong RTT measurement — sent every ~2s while STATE_LIVE
+	// e2e tile latency: time from FlushTileEdits to receiving TILE_RELAY, in ms
+	int64_t m_LastTileEditSentTime = 0;   // time_get() when last batch was flushed
+	int m_TileRelayLatencyMs = -1;        // -1 = no measurement yet
+
+	// ping/pong RTT measurement вЂ” sent every ~2s while STATE_LIVE
 	int64_t m_LastPingSentTime = 0;
 	int64_t m_LastPingTime = 0;
 	int m_PingMs = -1;                    // -1 = no measurement yet

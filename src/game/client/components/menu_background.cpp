@@ -1,9 +1,6 @@
 #include "menu_background.h"
 
-#include <base/dbg.h>
-#include <base/log.h>
-#include <base/str.h>
-#include <base/time.h>
+#include <base/system.h>
 
 #include <engine/graphics.h>
 #include <engine/map.h>
@@ -42,7 +39,6 @@ std::array<vec2, CMenuBackground::NUM_POS> GenerateMenuBackgroundPositions()
 	Positions[CMenuBackground::POS_SETTINGS_SOUND] = vec2(1000.0f, 1000.0f);
 	Positions[CMenuBackground::POS_SETTINGS_DDNET] = vec2(1200.0f, 200.0f);
 	Positions[CMenuBackground::POS_SETTINGS_ASSETS] = vec2(500.0f, 500.0f);
-	Positions[CMenuBackground::POS_SETTINGS_CREDITS] = vec2(1100.0f, 1000.0f);
 	for(int i = 0; i < CMenuBackground::POS_BROWSER_CUSTOM_NUM; ++i)
 		Positions[CMenuBackground::POS_BROWSER_CUSTOM0 + i] = vec2(500.0f + (75.0f * (float)i), 650.0f - (75.0f * (float)i));
 	for(int i = 0; i < CMenuBackground::POS_SETTINGS_RESERVED_NUM; ++i)
@@ -102,14 +98,13 @@ void CMenuBackground::LoadThemeIcon(CTheme &Theme)
 	char aIconPath[IO_MAX_PATH_LENGTH];
 	str_format(aIconPath, sizeof(aIconPath), "themes/%s.png", Theme.m_Name.empty() ? "none" : Theme.m_Name.c_str());
 	Theme.m_IconTexture = Graphics()->LoadTexture(aIconPath, IStorage::TYPE_ALL);
+
+	char aBuf[32 + IO_MAX_PATH_LENGTH];
 	if(Theme.m_IconTexture.IsNullTexture())
-	{
-		log_error("menuthemes", "failed to load theme icon '%s'", aIconPath);
-	}
+		str_format(aBuf, sizeof(aBuf), "failed to load theme icon '%s'", aIconPath);
 	else
-	{
-		log_trace("menuthemes", "loaded theme icon '%s'", aIconPath);
-	}
+		str_format(aBuf, sizeof(aBuf), "loaded theme icon '%s'", aIconPath);
+	Console()->Print(IConsole::OUTPUT_LEVEL_ADDINFO, "menuthemes", aBuf);
 }
 
 int CMenuBackground::ThemeScan(const char *pName, int IsDir, int DirType, void *pUser)
@@ -154,7 +149,9 @@ int CMenuBackground::ThemeScan(const char *pName, int IsDir, int DirType, void *
 	}
 
 	// make new theme
-	log_trace("menuthemes", "added theme '%s' from 'themes/%s'", aThemeName, pName);
+	char aBuf[512];
+	str_format(aBuf, sizeof(aBuf), "added theme '%s' from 'themes/%s'", aThemeName, pName);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_ADDINFO, "menuthemes", aBuf);
 	pSelf->m_vThemes.emplace_back(aThemeName, IsDay, IsNight);
 	pSelf->LoadThemeIcon(pSelf->m_vThemes.back());
 
@@ -260,7 +257,7 @@ void CMenuBackground::LoadMenuBackground(bool HasDayHint, bool HasNightHint)
 
 		if(m_Loaded)
 		{
-			m_pLayers->Init(m_pMap, true, true);
+			m_pLayers->Init(m_pMap, true);
 
 			m_pImages->LoadBackground(m_pLayers, m_pMap);
 			CMapLayers::OnMapLoad();

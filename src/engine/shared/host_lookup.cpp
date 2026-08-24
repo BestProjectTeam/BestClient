@@ -6,6 +6,8 @@
 #include <base/net.h>
 #include <base/str.h>
 
+CHostLookup::CHostLookup() = default;
+
 CHostLookup::CHostLookup(const char *pHostname, int Nettype)
 {
 	str_copy(m_aHostname, pHostname);

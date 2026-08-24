@@ -3,26 +3,21 @@
 
 #include "skins.h"
 
-#include <base/dbg.h>
 #include <base/log.h>
 #include <base/math.h>
-#include <base/str.h>
-#include <base/time.h>
+#include <base/system.h>
 
 #include <engine/engine.h>
 #include <engine/gfx/image_manipulation.h>
 #include <engine/graphics.h>
-#include <engine/http.h>
 #include <engine/shared/config.h>
+#include <engine/shared/http.h>
 #include <engine/storage.h>
 
 #include <generated/client_data.h>
 
 #include <game/client/gameclient.h>
 #include <game/localization.h>
-
-#include <optional>
-#include <vector>
 
 using namespace std::chrono_literals;
 
@@ -73,8 +68,6 @@ static constexpr std::chrono::nanoseconds MIN_REQUESTED_TIME_FOR_PENDING = 250ms
 static constexpr std::chrono::nanoseconds MAX_REQUESTED_TIME_FOR_PENDING = 500ms;
 static constexpr std::chrono::nanoseconds MIN_UNLOAD_TIME_PENDING = 1s;
 static constexpr std::chrono::nanoseconds MIN_UNLOAD_TIME_LOADED = 2s;
-static constexpr std::chrono::nanoseconds MIN_UNLOAD_TIME_LOADED_OVERBUDGET = 250ms;
-static constexpr size_t MAX_CONCURRENT_SKIN_LOADS = 4;
 static_assert(MIN_REQUESTED_TIME_FOR_PENDING < MAX_REQUESTED_TIME_FOR_PENDING);
 static_assert(MIN_REQUESTED_TIME_FOR_PENDING < MIN_UNLOAD_TIME_PENDING, "Unloading pending skins must take longer than adding more pending skins");
 
@@ -294,9 +287,7 @@ static void CheckMetrics(CSkin::CSkinMetricVariable &Metrics, const uint8_t *pIm
 
 bool CSkins::LoadSkinData(const char *pName, CSkinLoadData &Data) const
 {
-	const int DivX = g_pData->m_aSprites[SPRITE_TEE_BODY].m_pSet->m_Gridx;
-	const int DivY = g_pData->m_aSprites[SPRITE_TEE_BODY].m_pSet->m_Gridy;
-	if(!Graphics()->CheckImageDivisibility(pName, Data.m_Info, DivX, DivY, true))
+	if(!Graphics()->CheckImageDivisibility(pName, Data.m_Info, g_pData->m_aSprites[SPRITE_TEE_BODY].m_pSet->m_Gridx, g_pData->m_aSprites[SPRITE_TEE_BODY].m_pSet->m_Gridy, true))
 	{
 		log_error("skins", "Skin failed image divisibility: %s", pName);
 		Data.m_Info.Free();
@@ -308,26 +299,8 @@ bool CSkins::LoadSkinData(const char *pName, CSkinLoadData &Data) const
 		Data.m_Info.Free();
 		return false;
 	}
-
-	// Downscale oversized skins before uploading dozens of sprite textures to GPU.
-	// Vanilla skins are 256x128; 4K sheets otherwise exhaust VRAM in the tee skin list.
-	const size_t MaxWidth = (size_t)g_Config.m_ClSkinMaxWidth;
-	if(Data.m_Info.m_Width > MaxWidth && DivX > 0 && DivY > 0)
-	{
-		size_t NewWidth = (MaxWidth / (size_t)DivX) * (size_t)DivX;
-		size_t NewHeight = (NewWidth * Data.m_Info.m_Height) / Data.m_Info.m_Width;
-		NewHeight = (NewHeight / (size_t)DivY) * (size_t)DivY;
-		if(NewWidth >= (size_t)DivX && NewHeight >= (size_t)DivY &&
-			(NewWidth < Data.m_Info.m_Width || NewHeight < Data.m_Info.m_Height))
-		{
-			log_info("skins", "Downscaling skin '%s' from %" PRIzu "x%" PRIzu " to %" PRIzu "x%" PRIzu " (cl_skin_max_width %" PRIzu ")",
-				pName, Data.m_Info.m_Width, Data.m_Info.m_Height, NewWidth, NewHeight, MaxWidth);
-			ResizeImage(Data.m_Info, NewWidth, NewHeight);
-		}
-	}
-
-	const size_t BodyWidth = g_pData->m_aSprites[SPRITE_TEE_BODY].m_W * (Data.m_Info.m_Width / (size_t)DivX);
-	const size_t BodyHeight = g_pData->m_aSprites[SPRITE_TEE_BODY].m_H * (Data.m_Info.m_Height / (size_t)DivY);
+	const size_t BodyWidth = g_pData->m_aSprites[SPRITE_TEE_BODY].m_W * (Data.m_Info.m_Width / g_pData->m_aSprites[SPRITE_TEE_BODY].m_pSet->m_Gridx);
+	const size_t BodyHeight = g_pData->m_aSprites[SPRITE_TEE_BODY].m_H * (Data.m_Info.m_Height / g_pData->m_aSprites[SPRITE_TEE_BODY].m_pSet->m_Gridy);
 	if(BodyWidth > Data.m_Info.m_Width || BodyHeight > Data.m_Info.m_Height)
 	{
 		log_error("skins", "Skin size unsupported (w=%" PRIzu ", h=%" PRIzu "): %s", Data.m_Info.m_Width, Data.m_Info.m_Height, pName);
@@ -441,27 +414,26 @@ void CSkins::LoadSkinFinish(CSkinContainer *pSkinContainer, const CSkinLoadData 
 {
 	CSkin Skin{pSkinContainer->Name()};
 
-	// people load the jankiest skins, so we ignore empty sprites
-	Skin.m_OriginalSkin.m_Body = Graphics()->LoadSpriteTexture(Data.m_Info, std::nullopt, &g_pData->m_aSprites[SPRITE_TEE_BODY]);
-	Skin.m_OriginalSkin.m_BodyOutline = Graphics()->LoadSpriteTexture(Data.m_Info, std::nullopt, &g_pData->m_aSprites[SPRITE_TEE_BODY_OUTLINE]);
-	Skin.m_OriginalSkin.m_Feet = Graphics()->LoadSpriteTexture(Data.m_Info, std::nullopt, &g_pData->m_aSprites[SPRITE_TEE_FOOT]);
-	Skin.m_OriginalSkin.m_FeetOutline = Graphics()->LoadSpriteTexture(Data.m_Info, std::nullopt, &g_pData->m_aSprites[SPRITE_TEE_FOOT_OUTLINE]);
-	Skin.m_OriginalSkin.m_Hands = Graphics()->LoadSpriteTexture(Data.m_Info, std::nullopt, &g_pData->m_aSprites[SPRITE_TEE_HAND]);
-	Skin.m_OriginalSkin.m_HandsOutline = Graphics()->LoadSpriteTexture(Data.m_Info, std::nullopt, &g_pData->m_aSprites[SPRITE_TEE_HAND_OUTLINE]);
+	Skin.m_OriginalSkin.m_Body = Graphics()->LoadSpriteTexture(Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_BODY]);
+	Skin.m_OriginalSkin.m_BodyOutline = Graphics()->LoadSpriteTexture(Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_BODY_OUTLINE]);
+	Skin.m_OriginalSkin.m_Feet = Graphics()->LoadSpriteTexture(Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_FOOT]);
+	Skin.m_OriginalSkin.m_FeetOutline = Graphics()->LoadSpriteTexture(Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_FOOT_OUTLINE]);
+	Skin.m_OriginalSkin.m_Hands = Graphics()->LoadSpriteTexture(Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_HAND]);
+	Skin.m_OriginalSkin.m_HandsOutline = Graphics()->LoadSpriteTexture(Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_HAND_OUTLINE]);
 	for(size_t i = 0; i < std::size(Skin.m_OriginalSkin.m_aEyes); ++i)
 	{
-		Skin.m_OriginalSkin.m_aEyes[i] = Graphics()->LoadSpriteTexture(Data.m_Info, std::nullopt, &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + i]);
+		Skin.m_OriginalSkin.m_aEyes[i] = Graphics()->LoadSpriteTexture(Data.m_Info, &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + i]);
 	}
 
-	Skin.m_ColorableSkin.m_Body = Graphics()->LoadSpriteTexture(Data.m_InfoGrayscale, std::nullopt, &g_pData->m_aSprites[SPRITE_TEE_BODY]);
-	Skin.m_ColorableSkin.m_BodyOutline = Graphics()->LoadSpriteTexture(Data.m_InfoGrayscale, std::nullopt, &g_pData->m_aSprites[SPRITE_TEE_BODY_OUTLINE]);
-	Skin.m_ColorableSkin.m_Feet = Graphics()->LoadSpriteTexture(Data.m_InfoGrayscale, std::nullopt, &g_pData->m_aSprites[SPRITE_TEE_FOOT]);
-	Skin.m_ColorableSkin.m_FeetOutline = Graphics()->LoadSpriteTexture(Data.m_InfoGrayscale, std::nullopt, &g_pData->m_aSprites[SPRITE_TEE_FOOT_OUTLINE]);
-	Skin.m_ColorableSkin.m_Hands = Graphics()->LoadSpriteTexture(Data.m_InfoGrayscale, std::nullopt, &g_pData->m_aSprites[SPRITE_TEE_HAND]);
-	Skin.m_ColorableSkin.m_HandsOutline = Graphics()->LoadSpriteTexture(Data.m_InfoGrayscale, std::nullopt, &g_pData->m_aSprites[SPRITE_TEE_HAND_OUTLINE]);
+	Skin.m_ColorableSkin.m_Body = Graphics()->LoadSpriteTexture(Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_BODY]);
+	Skin.m_ColorableSkin.m_BodyOutline = Graphics()->LoadSpriteTexture(Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_BODY_OUTLINE]);
+	Skin.m_ColorableSkin.m_Feet = Graphics()->LoadSpriteTexture(Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_FOOT]);
+	Skin.m_ColorableSkin.m_FeetOutline = Graphics()->LoadSpriteTexture(Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_FOOT_OUTLINE]);
+	Skin.m_ColorableSkin.m_Hands = Graphics()->LoadSpriteTexture(Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_HAND]);
+	Skin.m_ColorableSkin.m_HandsOutline = Graphics()->LoadSpriteTexture(Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_HAND_OUTLINE]);
 	for(size_t i = 0; i < std::size(Skin.m_ColorableSkin.m_aEyes); ++i)
 	{
-		Skin.m_ColorableSkin.m_aEyes[i] = Graphics()->LoadSpriteTexture(Data.m_InfoGrayscale, std::nullopt, &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + i]);
+		Skin.m_ColorableSkin.m_aEyes[i] = Graphics()->LoadSpriteTexture(Data.m_InfoGrayscale, &g_pData->m_aSprites[SPRITE_TEE_EYE_NORMAL + i]);
 	}
 
 	Skin.m_Metrics = Data.m_Metrics;
@@ -570,16 +542,13 @@ void CSkins::OnUpdate()
 
 void CSkins::UpdateUnloadSkins(CSkinLoadingStats &Stats)
 {
-	const size_t LoadedBudget = (size_t)g_Config.m_ClSkinsLoadedMax;
-	if(Stats.m_NumPending + Stats.m_NumLoaded + Stats.m_NumLoading <= LoadedBudget)
+	if(Stats.m_NumPending + Stats.m_NumLoaded + Stats.m_NumLoading <= (size_t)g_Config.m_ClSkinsLoadedMax)
 	{
 		return;
 	}
 
 	const std::chrono::nanoseconds UnloadStart = time_get_nanoseconds();
-	const size_t OverBudget = Stats.m_NumPending + Stats.m_NumLoaded + Stats.m_NumLoading - LoadedBudget;
-	const bool SeverelyOverBudget = OverBudget > LoadedBudget / 4;
-	size_t NumToUnload = std::min(OverBudget, SeverelyOverBudget ? (size_t)64 : (size_t)16);
+	size_t NumToUnload = std::min<size_t>(Stats.m_NumPending + Stats.m_NumLoaded + Stats.m_NumLoading - (size_t)g_Config.m_ClSkinsLoadedMax, 16);
 	const size_t MaxSkipped = m_SkinsUsageList.size() / 8;
 	size_t NumSkipped = 0;
 	for(auto It = m_SkinsUsageList.rbegin(); It != m_SkinsUsageList.rend() && NumToUnload != 0 && NumSkipped < MaxSkipped; ++It)
@@ -595,11 +564,8 @@ void CSkins::UpdateUnloadSkins(CSkinLoadingStats &Stats)
 			NumSkipped++;
 			continue;
 		}
-		const std::chrono::nanoseconds MinUnused = pSkinContainer->m_State == CSkinContainer::EState::LOADED ?
-			(SeverelyOverBudget ? MIN_UNLOAD_TIME_LOADED_OVERBUDGET : MIN_UNLOAD_TIME_LOADED) :
-			MIN_UNLOAD_TIME_PENDING;
 		const std::chrono::nanoseconds TimeUnused = UnloadStart - pSkinContainer->m_LastLoadRequest.value();
-		if(TimeUnused < MinUnused)
+		if(TimeUnused < (pSkinContainer->m_State == CSkinContainer::EState::LOADED ? MIN_UNLOAD_TIME_LOADED : MIN_UNLOAD_TIME_PENDING))
 		{
 			NumSkipped++;
 			continue;
@@ -623,57 +589,16 @@ void CSkins::UpdateUnloadSkins(CSkinLoadingStats &Stats)
 
 void CSkins::UpdateStartLoading(CSkinLoadingStats &Stats)
 {
-	// Prefer recently requested skins (front of usage list) so the tee list
-	// loads visible previews first. Always-loaded vanilla skins are not on the
-	// usage list, so they are started afterwards.
-	// Collect first: SetState(LOADING) removes the skin from the usage list.
-	std::vector<CSkinContainer *> vpToLoad;
-	vpToLoad.reserve(MAX_CONCURRENT_SKIN_LOADS);
-
-	const auto &&TryQueue = [&](CSkinContainer *pSkinContainer) {
-		if(Stats.m_NumPending == 0 ||
-			Stats.m_NumLoading + Stats.m_NumLoaded + vpToLoad.size() >= (size_t)g_Config.m_ClSkinsLoadedMax ||
-			Stats.m_NumLoading + vpToLoad.size() >= MAX_CONCURRENT_SKIN_LOADS)
-		{
-			return false;
-		}
-		if(pSkinContainer->m_State != CSkinContainer::EState::PENDING)
-		{
-			return true;
-		}
-		vpToLoad.push_back(pSkinContainer);
-		return true;
-	};
-
-	for(const std::string_view &SkinName : m_SkinsUsageList)
+	for(auto &[_, pSkinContainer] : m_Skins)
 	{
-		auto SkinIt = m_Skins.find(SkinName);
-		dbg_assert(SkinIt != m_Skins.end(), "m_SkinsUsageList contains skin not in m_Skins");
-		if(!TryQueue(SkinIt->second.get()))
+		if(Stats.m_NumPending == 0 || Stats.m_NumLoading + Stats.m_NumLoaded >= (size_t)g_Config.m_ClSkinsLoadedMax)
 		{
 			break;
 		}
-	}
-
-	if(Stats.m_NumPending > 0 &&
-		Stats.m_NumLoading + vpToLoad.size() < MAX_CONCURRENT_SKIN_LOADS &&
-		Stats.m_NumLoading + Stats.m_NumLoaded + vpToLoad.size() < (size_t)g_Config.m_ClSkinsLoadedMax)
-	{
-		for(auto &[_, pSkinContainer] : m_Skins)
+		if(pSkinContainer->m_State != CSkinContainer::EState::PENDING)
 		{
-			if(!pSkinContainer->IsAlwaysLoaded())
-			{
-				continue;
-			}
-			if(!TryQueue(pSkinContainer.get()))
-			{
-				break;
-			}
+			continue;
 		}
-	}
-
-	for(CSkinContainer *pSkinContainer : vpToLoad)
-	{
 		switch(pSkinContainer->Type())
 		{
 		case CSkinContainer::EType::LOCAL:
@@ -1079,7 +1004,7 @@ void CSkins::CSkinDownloadJob::Run()
 	const CTimeout Timeout{10000, 0, 8192, 10};
 	const size_t MaxResponseSize = 10 * 1024 * 1024; // 10 MiB
 
-	std::shared_ptr<IHttpRequest> pGet = HttpGetBoth(aUrl, m_pSkins->Storage(), aPathReal, IStorage::TYPE_SAVE);
+	std::shared_ptr<CHttpRequest> pGet = HttpGetBoth(aUrl, m_pSkins->Storage(), aPathReal, IStorage::TYPE_SAVE);
 	pGet->Timeout(Timeout);
 	pGet->MaxResponseSize(MaxResponseSize);
 	pGet->ValidateBeforeOverwrite(true);

@@ -2,11 +2,9 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 
 #include "chat.h"
-#include <base/color.h>
 
 #include <base/io.h>
 #include <base/log.h>
-#include <base/log_color.h>
 #include <base/time.h>
 
 #include <engine/editor.h>
@@ -16,7 +14,7 @@
 #include <engine/keys.h>
 #include <engine/shared/config.h>
 #include <engine/shared/csv.h>
-#include <engine/http.h>
+#include <engine/shared/http.h>
 #include <engine/textrender.h>
 
 #include <generated/protocol.h>
@@ -486,7 +484,7 @@ CChat::CChat()
 				str_startswith(pStr, "/load ")))
 		{
 			bool Censor = false;
-			const size_t NumLetters = std::min(NumChars, sizeof(ms_aDisplayText) - 1);
+			const size_t NumLetters = minimum(NumChars, sizeof(ms_aDisplayText) - 1);
 			for(size_t i = 0; i < NumLetters; ++i)
 			{
 				if(Censor)
@@ -834,7 +832,7 @@ void CChat::ConChat(IConsole::IResult *pResult, void *pUserData)
 	else if(str_comp(pMode, "team") == 0)
 		((CChat *)pUserData)->EnableMode(1);
 	else
-		log_error("chat", "expected all or team as mode");
+		((CChat *)pUserData)->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "console", "expected all or team as mode");
 
 	CChat *pChat = (CChat *)pUserData;
 	if(pResult->GetString(1)[0])
@@ -896,30 +894,6 @@ void CChat::ConchainChatWidth(IConsole::IResult *pResult, void *pUserData, ICons
 void CChat::Echo(const char *pString)
 {
 	AddLine(CLIENT_MSG, 0, pString);
-}
-
-void CChat::AddColoredLine(const char *pLine, ColorRGBA Color)
-{
-	if(!pLine || pLine[0] == '\0')
-		return;
-
-	const int PrevShowChatClient = g_Config.m_TcShowChatClient;
-	g_Config.m_TcShowChatClient = 1;
-	AddLine(CLIENT_MSG, 0, pLine);
-	g_Config.m_TcShowChatClient = PrevShowChatClient;
-
-	CLine &Line = m_aLines[m_CurrentLine];
-	if(!Line.m_Initialized || Line.m_ClientId != CLIENT_MSG)
-		return;
-
-	Line.m_CustomColor = Color;
-	Line.m_aName[0] = '\0';
-	TextRender()->DeleteTextContainer(Line.m_TextContainerIndex);
-	Graphics()->DeleteQuadContainer(Line.m_QuadContainerIndex);
-	Line.m_TextContainerIndex.Reset();
-	Line.m_QuadContainerIndex = -1;
-	Line.m_aYOffset[0] = -1.0f;
-	Line.m_aYOffset[1] = -1.0f;
 }
 
 void CChat::OnConsoleInit()
@@ -1400,9 +1374,7 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 				m_pHistoryEntry = pTest;
 		}
 		else
-		{
 			m_pHistoryEntry = m_History.Last();
-		}
 
 		if(m_pHistoryEntry)
 			m_Input.Set(m_pHistoryEntry->m_aText);
@@ -1439,6 +1411,7 @@ void CChat::EnableMode(int Team)
 		else
 			m_Mode = MODE_ALL;
 
+		Input()->Clear();
 		m_CompletionChosen = -1;
 		m_CompletionUsed = false;
 		m_ChatOpenAnimationStart = time_get();
@@ -1683,7 +1656,7 @@ void CChat::OpenTranslateSettingsPopup(const CUIRect &ButtonRect)
 	// Use UI-space coordinates so the popup is positioned correctly by CMenus
 	const float PopupW = 300.0f;
 	const float PopupX = m_TranslateButtonUiRect.x + m_TranslateButtonUiRect.w / 2.0f - PopupW / 2.0f;
-	Ui()->DoPopupMenu(&m_TranslateSettingsPopupId, PopupX, m_TranslateButtonUiRect.y, PopupW, 190.0f, this, PopupTranslateSettings);
+	Ui()->DoPopupMenu(&m_TranslateSettingsPopupId, PopupX, m_TranslateButtonUiRect.y, PopupW, 156.0f, this, PopupTranslateSettings);
 	(void)ButtonRect;
 }
 
@@ -1777,27 +1750,19 @@ CUi::EPopupMenuFunctionResult CChat::PopupTranslateSettings(void *pContext, CUIR
 		if(NewDstIdx != DstIdx)
 			ApplyTranslateLanguage(g_Config.m_BcTranslateOutgoingTarget, sizeof(g_Config.m_BcTranslateOutgoingTarget), NewDstIdx, gs_aTranslateTargetOptions);
 	}
+	View.HSplitTop(SmallGap, nullptr, &View);
+	{
+		CUIRect Row;
+		View.HSplitTop(18.0f, &Row, &View);
+		if(pChat->GameClient()->m_Menus.DoButton_CheckBox(&pChat->m_TranslateSettingsStripPunctuationButton, "No commas or periods", g_Config.m_BcTranslateOutgoingStripPunctuation, &Row))
+			g_Config.m_BcTranslateOutgoingStripPunctuation ^= 1;
+	}
 
 	RenderSep();
 
-	{
-		CUIRect Row, Label, Field;
-		View.HSplitTop(RowH, &Row, &View);
-		Row.VSplitLeft(Row.w * 0.42f, &Label, &Field);
-		pChat->Ui()->DoLabel(&Label, Localize("Skip languages"), FontSize, TEXTALIGN_ML);
-		static CLineInput s_IgnoreLanguagesInput;
-		s_IgnoreLanguagesInput.SetBuffer(g_Config.m_BcTranslateIncomingIgnoreLanguages, sizeof(g_Config.m_BcTranslateIncomingIgnoreLanguages));
-		s_IgnoreLanguagesInput.SetEmptyText("ru/en/zh");
-		pChat->Ui()->DoEditBox(&s_IgnoreLanguagesInput, &Field, FontSize);
-	}
-	View.HSplitTop(SmallGap, nullptr, &View);
-
-	static CButtonContainer s_TranslateOthersKeyReader;
-	static CButtonContainer s_TranslateOthersKeyClear;
-	static CButtonContainer s_TranslateYoursKeyReader;
-	static CButtonContainer s_TranslateYoursKeyClear;
-	pChat->GameClient()->m_Menus.DoLine_KeyReader(View, s_TranslateOthersKeyReader, s_TranslateOthersKeyClear, Localize("Others"), "toggle_translate");
-	pChat->GameClient()->m_Menus.DoLine_KeyReader(View, s_TranslateYoursKeyReader, s_TranslateYoursKeyClear, Localize("Yours"), "toggle_translate_yours");
+	static CButtonContainer s_TranslateKeyReader;
+	static CButtonContainer s_TranslateKeyClear;
+	pChat->GameClient()->m_Menus.DoLine_KeyReader(View, s_TranslateKeyReader, s_TranslateKeyClear, Localize("Toggle translate"), "toggle_translate");
 
 	return CUi::POPUP_KEEP_OPEN;
 }
@@ -3148,7 +3113,7 @@ void CChat::StartMediaDownload(CLine &Line)
 		}
 	}
 
-	std::shared_ptr<IHttpRequest> pGet = HttpGet(Line.m_aMediaUrl);
+	std::shared_ptr<CHttpRequest> pGet = HttpGet(Line.m_aMediaUrl);
 	pGet->Timeout(CTimeout{8000, 0, 4096, 8});
 	pGet->MaxResponseSize(CHAT_MEDIA_MAX_RESPONSE_SIZE);
 	pGet->FailOnErrorStatus(false);
@@ -3898,9 +3863,7 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 			pEnd = nullptr;
 		}
 		else if(pEnd == nullptr)
-		{
 			pEnd = pStrOld;
-		}
 
 		if(++Length >= MAX_LINE_LENGTH)
 		{
@@ -3916,7 +3879,10 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 
 	bool Highlighted = false;
 
-	auto &&FChatMsgCheckAndPrint = [](const CLine &Line) {
+	auto &&FChatMsgCheckAndPrint = [this](const CLine &Line) {
+		char aBuf[1024];
+		str_format(aBuf, sizeof(aBuf), "%s%s%s", Line.m_aName, Line.m_ClientId >= 0 ? ": " : "", Line.m_aText);
+
 		ColorRGBA ChatLogColor = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
 		if(Line.m_Highlighted)
 		{
@@ -3948,33 +3914,13 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 		else
 			pFrom = "chat/all";
 
-		log_info_color(color_cast<LOG_COLOR>(ChatLogColor), pFrom, "%s%s%s", Line.m_aName, Line.m_ClientId >= 0 ? ": " : "", Line.m_aText);
+		Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, pFrom, aBuf, ChatLogColor);
 	};
 
 	// Custom color for new line
 	std::optional<ColorRGBA> CustomColor = std::nullopt;
 	if(ClientId == CLIENT_MSG)
 		CustomColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClMessageClientColor));
-
-	// Check for highlighted name before deciding whether to keep this message.
-	if(Client()->State() != IClient::STATE_DEMOPLAYBACK)
-	{
-		if(ClientId >= 0 && ClientId != GameClient()->m_aLocalIds[0] && ClientId != GameClient()->m_aLocalIds[1])
-		{
-			for(int LocalId : GameClient()->m_aLocalIds)
-			{
-				Highlighted |= LocalId >= 0 && LineShouldHighlight(pLine, GameClient()->m_aClients[LocalId].m_aName);
-			}
-		}
-	}
-	else
-	{
-		// On demo playback use local id from snap directly, since m_aLocalIds isn't valid there.
-		Highlighted |= GameClient()->m_Snap.m_LocalClientId >= 0 && LineShouldHighlight(pLine, GameClient()->m_aClients[GameClient()->m_Snap.m_LocalClientId].m_aName);
-	}
-
-	if(g_Config.m_BcChatOnlyTagsAndWhispers && !Highlighted && Team < 2)
-		return;
 
 	CLine &PreviousLine = m_aLines[m_CurrentLine];
 
@@ -4016,6 +3962,23 @@ void CChat::AddLine(int ClientId, int Team, const char *pLine)
 	CurrentLine.m_NameColor = -2;
 	CurrentLine.m_CustomColor = CustomColor;
 
+	// check for highlighted name
+	if(Client()->State() != IClient::STATE_DEMOPLAYBACK)
+	{
+		if(ClientId >= 0 && ClientId != GameClient()->m_aLocalIds[0] && ClientId != GameClient()->m_aLocalIds[1])
+		{
+			for(int LocalId : GameClient()->m_aLocalIds)
+			{
+				Highlighted |= LocalId >= 0 && LineShouldHighlight(pLine, GameClient()->m_aClients[LocalId].m_aName);
+			}
+		}
+	}
+	else
+	{
+		// on demo playback use local id from snap directly,
+		// since m_aLocalIds isn't valid there
+		Highlighted |= GameClient()->m_Snap.m_LocalClientId >= 0 && LineShouldHighlight(pLine, GameClient()->m_aClients[GameClient()->m_Snap.m_LocalClientId].m_aName);
+	}
 	CurrentLine.m_Highlighted = Highlighted;
 
 	str_copy(CurrentLine.m_aText, pLine);
@@ -4641,7 +4604,7 @@ void CChat::OnPrepareLines(float x, float y, int StartLine, int HoveredTranslate
 			}
 			else
 			{
-				FullWidth += std::max(LineCursor.m_LongestLineWidth, AppendCursor.m_LongestLineWidth);
+				FullWidth += maximum(LineCursor.m_LongestLineWidth, AppendCursor.m_LongestLineWidth);
 			}
 			if(Line.m_aMediaPreviewWidth[OffsetType] > 0.0f)
 			{
@@ -4723,7 +4686,7 @@ void CChat::OnRender()
 
 	const float Height = 300.0f;
 	const float Width = Height * Graphics()->ScreenAspect();
-	Graphics()->MapScreenToSize(Width, Height);
+	Graphics()->MapScreen(0.0f, 0.0f, Width, Height);
 
 	// Determine which translated line the cursor hovers over (using last frame's screen-space rects)
 	int HoveredTranslateLineIndex = -1;
@@ -4760,6 +4723,7 @@ void CChat::OnRender()
 
 	// TClient
 	float y = ChatLayout.m_Y;
+	// float y = 300.0f - 20.0f * FontSize() / 6.0f;
 
 	float ScaledFontSize = FontSize() * (8.0f / 6.0f);
 	const bool BcChatMessageAnimEnabled = BCUiAnimations::Enabled() && g_Config.m_BcChatAnimation != 0;
@@ -4966,11 +4930,7 @@ void CChat::OnRender()
 			if(CaretVisible)
 			{
 				float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
-				const CScreenRect ScreenRect = Graphics()->GetScreen();
-				ScreenX0 = ScreenRect.m_TopLeft.x;
-				ScreenY0 = ScreenRect.m_TopLeft.y;
-				ScreenX1 = ScreenRect.m_BottomRight.x;
-				ScreenY1 = ScreenRect.m_BottomRight.y;
+				Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
 				const float CursorInnerWidth = ((ScreenX1 - ScreenX0) / Graphics()->ScreenWidth()) * 2.0f;
 				const float CursorOuterWidth = CursorInnerWidth * 2.0f;
 				const float CursorOuterInnerDiff = (CursorOuterWidth - CursorInnerWidth) / 2.0f;
@@ -5041,7 +5001,7 @@ void CChat::OnRender()
 			m_TranslateButtonRectValid = true;
 			Ui()->MapScreen();
 			RenderTranslateSettingsButton(m_TranslateButtonUiRect);
-			Graphics()->MapScreenToSize(Width, Height);
+			Graphics()->MapScreen(0.0f, 0.0f, Width, Height);
 			if(Ui()->HotItem() == &m_TranslateSettingsButton || m_TranslateButtonPressed)
 			{
 				m_MouseIsPress = false;
@@ -5444,7 +5404,7 @@ void CChat::OnRender()
 		Ui()->MapScreen();
 		Ui()->Update(vec2(0.0f, 0.0f));
 		Ui()->RenderPopupMenus();
-		Graphics()->MapScreenToSize(Width, Height);
+		Graphics()->MapScreen(0.0f, 0.0f, Width, Height);
 	}
 
 	RenderFullscreenMedia(Width, Height);

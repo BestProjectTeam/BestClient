@@ -44,6 +44,12 @@ int64_t time_get()
 	return last;
 }
 
+int64_t time_freq()
+{
+	using namespace std::chrono_literals;
+	return std::chrono::nanoseconds(1s).count();
+}
+
 int64_t time_timestamp()
 {
 	return time(nullptr);
@@ -57,7 +63,7 @@ static tm time_localtime_threadlocal(time_t *time_data)
 	tm *time = localtime(time_data);
 #else
 	// Thread-local buffer for the result of localtime_r
-	thread_local tm time_info_buf; // NOLINT(misc-use-internal-linkage) // TODO: remove NOLINT when updating clang-tidy version
+	thread_local tm time_info_buf;
 	tm *time = localtime_r(time_data, &time_info_buf);
 #endif
 	dbg_assert(time != nullptr, "Failed to get local time for time data %" PRId64, (int64_t)time_data);
@@ -174,7 +180,6 @@ void str_timestamp_ex(time_t time_data, char *buffer, int buffer_size, const cha
 bool timestamp_from_str(const char *string, const char *format, time_t *timestamp)
 {
 	std::tm tm{};
-	tm.tm_isdst = -1; // determine DST from parsed date
 	std::istringstream ss(string);
 	ss >> std::get_time(&tm, format);
 	if(ss.fail() || !ss.eof())
@@ -190,11 +195,6 @@ bool timestamp_from_str(const char *string, const char *format, time_t *timestam
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif
-
-int64_t time_milliseconds_from_seconds(float seconds)
-{
-	return static_cast<int64_t>(std::round(static_cast<double>(seconds) * 1000.0));
-}
 
 int str_time(int64_t centisecs, ETimeFormat format, char *buffer, int buffer_size)
 {
@@ -242,6 +242,5 @@ int str_time(int64_t centisecs, ETimeFormat format, char *buffer, int buffer_siz
 
 int str_time_float(float secs, ETimeFormat format, char *buffer, int buffer_size)
 {
-	int64_t millis = time_milliseconds_from_seconds(secs);
-	return str_time(millis / 10, format, buffer, buffer_size);
+	return str_time(static_cast<int64_t>(std::roundf(secs * 1000) / 10), format, buffer, buffer_size);
 }

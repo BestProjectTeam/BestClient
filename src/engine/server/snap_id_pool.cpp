@@ -3,8 +3,7 @@
 
 #include "snap_id_pool.h"
 
-#include <base/dbg.h>
-#include <base/time.h>
+#include <base/system.h>
 
 CSnapIdPool::CSnapIdPool()
 {
@@ -44,7 +43,7 @@ void CSnapIdPool::RemoveFirstTimeout()
 	m_Usage--;
 }
 
-std::optional<int> CSnapIdPool::NewId()
+int CSnapIdPool::NewId()
 {
 	int64_t Now = time_get();
 
@@ -56,7 +55,7 @@ std::optional<int> CSnapIdPool::NewId()
 	if(Id == -1)
 	{
 		dbg_msg("server", "invalid id");
-		return std::nullopt;
+		return Id;
 	}
 	m_FirstFree = m_aIds[m_FirstFree].m_Next;
 	m_aIds[Id].m_State = ID_ALLOCATED;

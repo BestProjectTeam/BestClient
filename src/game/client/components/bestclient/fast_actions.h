@@ -43,6 +43,11 @@ public:
 	public:
 		char m_aName[FAST_ACTIONS_MAX_NAME] = "";
 		char m_aCommand[FAST_ACTIONS_MAX_CMD] = "";
+
+		bool operator==(const CBind &Other) const
+		{
+			return str_comp(m_aName, Other.m_aName) == 0 && str_comp(m_aCommand, Other.m_aCommand) == 0;
+		}
 	};
 
 	std::vector<CBind> m_vBinds;

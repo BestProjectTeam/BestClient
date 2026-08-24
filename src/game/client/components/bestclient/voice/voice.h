@@ -28,7 +28,7 @@
 
 struct OpusEncoder;
 struct OpusDecoder;
-class IHttpRequest;
+class CHttpRequest;
 
 class CVoiceChat : public CComponent
 {
@@ -264,7 +264,7 @@ private:
 	int m_LastOutputDevice = -2;
 	std::vector<CVoiceServerEntry> m_vServerEntries;
 	std::vector<CButtonContainer> m_ServerRowButtons;
-	std::shared_ptr<IHttpRequest> m_pServerListTask = nullptr;
+	std::shared_ptr<CHttpRequest> m_pServerListTask = nullptr;
 	std::string m_AdvertisedRoomKey;
 	std::string m_AdvertisedPlayerName;
 	int m_AdvertisedGameClientId = BestClientVoice::INVALID_GAME_CLIENT_ID - 1;

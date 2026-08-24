@@ -3,12 +3,10 @@
 #include "editor.h"
 #include "editor_actions.h"
 
-#include <base/fs.h>
-#include <base/str.h>
-
 #include <game/editor/mapitems/image.h>
 
 #include <algorithm>
+#include <array>
 #include <vector>
 
 CQuadArt::CQuadArt(CQuadArtParameters Parameters, CImageInfo &&Img) :
@@ -44,6 +42,35 @@ ivec2 CQuadArt::GetOptimizedQuadSize(const ColorRGBA &Pixel, const ivec2 &Pos)
 	MarkPixelAsVisited(Pos, OptimizedSize);
 	Size = OptimizedSize / ImgPixelSize;
 	return Size;
+}
+
+size_t CQuadArt::FindSuperPixelSize(const ColorRGBA &Pixel, const ivec2 &Pos, const size_t CurrentSize)
+{
+	ivec2 Size(CurrentSize, CurrentSize);
+	if(Pos.x + CurrentSize >= m_Img.m_Width || Pos.y + CurrentSize >= m_Img.m_Height)
+	{
+		MarkPixelAsVisited(Pos, Size);
+		return CurrentSize;
+	}
+
+	for(int i = 0; i < 2; i++)
+	{
+		for(size_t j = 0; j < CurrentSize + 1; j++)
+		{
+			ivec2 CurrentPos = Pos;
+			CurrentPos.x += i == 0 ? j : CurrentSize;
+			CurrentPos.y += i == 0 ? CurrentSize : j;
+
+			ColorRGBA CheckPixel = GetPixelClamped(CurrentPos);
+			if(CurrentPos.x >= (int)m_Img.m_Width || CurrentPos.y >= (int)m_Img.m_Height || Pixel != CheckPixel)
+			{
+				MarkPixelAsVisited(Pos, Size);
+				return CurrentSize;
+			}
+		}
+	}
+
+	return FindSuperPixelSize(Pixel, Pos, CurrentSize + 1);
 }
 
 ColorRGBA CQuadArt::GetPixelClamped(const ivec2 &Pos) const
@@ -141,31 +168,32 @@ bool CQuadArt::Create(std::shared_ptr<CLayerQuads> &pQuadLayer)
 	return true;
 }
 
-void CEditorMap::AddQuadArt(CImageInfo &&Image, const CQuadArtParameters &Parameters, bool IgnoreHistory)
+void CEditor::AddQuadArt(bool IgnoreHistory)
 {
 	char aQuadArtName[IO_MAX_PATH_LENGTH];
-	fs_split_file_extension(fs_filename(Parameters.m_aFilename), aQuadArtName, sizeof(aQuadArtName));
+	IStorage::StripPathAndExtension(m_QuadArtParameters.m_aFilename, aQuadArtName, sizeof(aQuadArtName));
 
-	std::shared_ptr<CLayerGroup> pGroup = NewGroup();
+	std::shared_ptr<CLayerGroup> pGroup = Map()->NewGroup();
 	str_copy(pGroup->m_aName, aQuadArtName);
 	pGroup->m_UseClipping = true;
 	pGroup->m_ClipX = -1;
 	pGroup->m_ClipY = -1;
-	pGroup->m_ClipH = std::ceil(Image.m_Height * 1.f * Parameters.m_QuadPixelSize / Parameters.m_ImagePixelSize) + 2;
-	pGroup->m_ClipW = std::ceil(Image.m_Width * 1.f * Parameters.m_QuadPixelSize / Parameters.m_ImagePixelSize) + 2;
+	pGroup->m_ClipH = std::ceil(m_QuadArtImageInfo.m_Height * 1.f * m_QuadArtParameters.m_QuadPixelSize / m_QuadArtParameters.m_ImagePixelSize) + 2;
+	pGroup->m_ClipW = std::ceil(m_QuadArtImageInfo.m_Width * 1.f * m_QuadArtParameters.m_QuadPixelSize / m_QuadArtParameters.m_ImagePixelSize) + 2;
 
-	std::shared_ptr<CLayerQuads> pLayer = std::make_shared<CLayerQuads>(this);
+	std::shared_ptr<CLayerQuads> pLayer = std::make_shared<CLayerQuads>(Map());
 	str_copy(pLayer->m_aName, aQuadArtName);
 	pGroup->AddLayer(pLayer);
 	pLayer->m_Flags |= LAYERFLAG_DETAIL;
 
-	CQuadArt QuadArt(Parameters, std::move(Image));
+	CQuadArt QuadArt(m_QuadArtParameters, std::move(m_QuadArtImageInfo));
 	QuadArt.Create(pLayer);
 
 	if(!IgnoreHistory)
-		m_EditorHistory.RecordAction(std::make_shared<CEditorActionQuadArt>(this, pGroup));
+		Map()->m_EditorHistory.RecordAction(std::make_shared<CEditorActionQuadArt>(Map(), m_QuadArtParameters));
 
-	OnModify();
+	Map()->OnModify();
+	OnDialogClose();
 }
 
 bool CEditor::CallbackAddQuadArt(const char *pFilepath, int StorageType, void *pUser)
@@ -192,89 +220,4 @@ bool CEditor::CallbackAddQuadArt(const char *pFilepath, int StorageType, void *p
 	constexpr float PopupHeight = 120.0f;
 	pEditor->Ui()->DoPopupMenu(&s_PopupQuadArtId, View.w / 2.0f - PopupWidth / 2.0f, View.h / 2.0f - PopupHeight / 2.0f, PopupWidth, PopupHeight, pEditor, PopupQuadArt);
 	return false;
-}
-
-CUi::EPopupMenuFunctionResult CEditor::PopupQuadArt(void *pContext, CUIRect View, bool Active)
-{
-	CEditor *pEditor = static_cast<CEditor *>(pContext);
-
-	enum
-	{
-		PROP_IMAGE_PIXELSIZE = 0,
-		PROP_QUAD_PIXELSIZE,
-		PROP_OPTIMIZE,
-		PROP_CENTRALIZE,
-		NUM_PROPS,
-	};
-
-	CProperty aProps[] = {
-		{"Image pixelsize", pEditor->m_QuadArtParameters.m_ImagePixelSize, PROPTYPE_INT, 1, 1024},
-		{"Quad pixelsize", pEditor->m_QuadArtParameters.m_QuadPixelSize, PROPTYPE_INT, 1, 1024},
-		{"Optimize", pEditor->m_QuadArtParameters.m_Optimize, PROPTYPE_BOOL, false, true},
-		{"Centralize", pEditor->m_QuadArtParameters.m_Centralize, PROPTYPE_BOOL, false, true},
-		{nullptr},
-	};
-
-	static int s_aIds[NUM_PROPS] = {0};
-	int NewVal = 0;
-
-	// Title
-	CUIRect Label;
-	View.HSplitTop(20.0f, &Label, &View);
-	pEditor->Ui()->DoLabel(&Label, "Configure quad art", 20.0f, TEXTALIGN_MC);
-	View.HSplitTop(10.0f, nullptr, &View);
-
-	// Properties
-	int Prop = pEditor->DoProperties(&View, aProps, s_aIds, &NewVal);
-
-	if(Prop == PROP_IMAGE_PIXELSIZE)
-	{
-		pEditor->m_QuadArtParameters.m_ImagePixelSize = NewVal;
-	}
-	else if(Prop == PROP_QUAD_PIXELSIZE)
-	{
-		pEditor->m_QuadArtParameters.m_QuadPixelSize = NewVal;
-	}
-	else if(Prop == PROP_OPTIMIZE)
-	{
-		pEditor->m_QuadArtParameters.m_Optimize = (bool)NewVal;
-	}
-	else if(Prop == PROP_CENTRALIZE)
-	{
-		pEditor->m_QuadArtParameters.m_Centralize = (bool)NewVal;
-	}
-
-	// Buttons
-	CUIRect BottomBar, Left, Right;
-	View.HSplitBottom(20.f, &View, &BottomBar);
-	BottomBar.VSplitLeft(110.f, &Left, &BottomBar);
-
-	static int s_Cancel;
-	if(pEditor->DoButton_Editor(&s_Cancel, "Cancel", 0, &Left, BUTTONFLAG_LEFT, nullptr))
-	{
-		pEditor->m_QuadArtImageInfo.Free();
-		return CUi::POPUP_CLOSE_CURRENT;
-	}
-
-	BottomBar.VSplitRight(110.f, &BottomBar, &Right);
-	static int s_Confirm;
-	constexpr int MaximumQuadThreshold = 100'000;
-	if(pEditor->DoButton_Editor(&s_Confirm, "Confirm", 0, &Right, BUTTONFLAG_LEFT, nullptr))
-	{
-		size_t MaximumQuadNumber = (pEditor->m_QuadArtImageInfo.m_Width / pEditor->m_QuadArtParameters.m_ImagePixelSize) *
-					   (pEditor->m_QuadArtImageInfo.m_Height / pEditor->m_QuadArtParameters.m_ImagePixelSize);
-		if(MaximumQuadNumber > MaximumQuadThreshold)
-		{
-			pEditor->m_PopupEventType = CEditor::POPEVENT_QUAD_ART_BIG_IMAGE;
-			pEditor->m_PopupEventActivated = true;
-		}
-		else
-		{
-			pEditor->Map()->AddQuadArt(std::move(pEditor->m_QuadArtImageInfo), pEditor->m_QuadArtParameters, false);
-			pEditor->OnDialogClose();
-		}
-		return CUi::POPUP_CLOSE_CURRENT;
-	}
-
-	return CUi::POPUP_KEEP_OPEN;
 }

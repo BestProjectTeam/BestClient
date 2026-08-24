@@ -280,7 +280,7 @@ Show always
 Auto server list refresh
 == 自动刷新服务器列表
 
-Short EGO/KoG server name
+Use short KoG server name
 == 使用简短的KoG服务器名称
 
 Voice

@@ -24,6 +24,7 @@ struct CParticle
 		m_Rotspeed = 0;
 		m_Gravity = 0;
 		m_Friction = 0;
+		m_FlowAffected = 1.0f;
 		m_Color = ColorRGBA(1, 1, 1, 1);
 		m_Collides = true;
 	}
@@ -32,6 +33,8 @@ struct CParticle
 	vec2 m_Vel;
 
 	int m_Spr;
+
+	float m_FlowAffected;
 
 	float m_LifeSpan;
 
@@ -118,6 +121,6 @@ private:
 	CRenderGroup<GROUP_EXTRA> m_RenderExtra;
 	CRenderGroup<GROUP_GENERAL> m_RenderGeneral;
 
-	bool ParticleIsVisibleOnScreen(const vec2 &CurPos, float CurSize) const;
+	bool ParticleIsVisibleOnScreen(const vec2 &CurPos, float CurSize);
 };
 #endif

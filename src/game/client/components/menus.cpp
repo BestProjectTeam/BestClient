@@ -350,6 +350,66 @@ int CMenus::DoButton_CheckBox_Common(const void *pId, const char *pText, const c
 	return Ui()->DoButtonLogic(pId, 0, pRect, Flags);
 }
 
+void CMenus::DoLaserPreview(const CUIRect *pRect, const ColorHSLA LaserOutlineColor, const ColorHSLA LaserInnerColor, const int LaserType)
+{
+	CUIRect Section = *pRect;
+	vec2 From = vec2(Section.x + 30.0f, Section.y + Section.h / 2.0f);
+	vec2 Pos = vec2(Section.x + Section.w - 20.0f, Section.y + Section.h / 2.0f);
+
+	const ColorRGBA OuterColor = color_cast<ColorRGBA>(ColorHSLA(LaserOutlineColor));
+	const ColorRGBA InnerColor = color_cast<ColorRGBA>(ColorHSLA(LaserInnerColor));
+	const float TicksHead = Client()->GlobalTime() * Client()->GameTickSpeed();
+
+	// TicksBody = 4.0 for less laser width for weapon alignment
+	GameClient()->m_Items.RenderLaser(From, Pos, OuterColor, InnerColor, 4.0f, TicksHead, LaserType);
+
+	switch(LaserType)
+	{
+	case LASERTYPE_RIFLE:
+		Graphics()->TextureSet(GameClient()->m_GameSkin.m_SpriteWeaponLaser);
+		Graphics()->SelectSprite(SPRITE_WEAPON_LASER_BODY);
+		Graphics()->QuadsBegin();
+		Graphics()->QuadsSetSubset(0, 0, 1, 1);
+		Graphics()->DrawSprite(Section.x + 30.0f, Section.y + Section.h / 2.0f, 60.0f);
+		Graphics()->QuadsEnd();
+		break;
+	case LASERTYPE_SHOTGUN:
+		Graphics()->TextureSet(GameClient()->m_GameSkin.m_SpriteWeaponShotgun);
+		Graphics()->SelectSprite(SPRITE_WEAPON_SHOTGUN_BODY);
+		Graphics()->QuadsBegin();
+		Graphics()->QuadsSetSubset(0, 0, 1, 1);
+		Graphics()->DrawSprite(Section.x + 30.0f, Section.y + Section.h / 2.0f, 60.0f);
+		Graphics()->QuadsEnd();
+		break;
+	case LASERTYPE_DRAGGER:
+	{
+		CTeeRenderInfo TeeRenderInfo;
+		TeeRenderInfo.Apply(GameClient()->m_Skins.Find(g_Config.m_ClPlayerSkin));
+		TeeRenderInfo.ApplyColors(g_Config.m_ClPlayerUseCustomColor, g_Config.m_ClPlayerColorBody, g_Config.m_ClPlayerColorFeet);
+		TeeRenderInfo.m_Size = 64.0f;
+		RenderTools()->RenderTee(CAnimState::GetIdle(), &TeeRenderInfo, EMOTE_NORMAL, vec2(-1, 0), Pos);
+		break;
+	}
+	case LASERTYPE_FREEZE:
+	{
+		CTeeRenderInfo TeeRenderInfo;
+		if(g_Config.m_ClShowNinja)
+			TeeRenderInfo.Apply(GameClient()->m_Skins.Find("x_ninja"));
+		else
+			TeeRenderInfo.Apply(GameClient()->m_Skins.Find(g_Config.m_ClPlayerSkin));
+		TeeRenderInfo.m_TeeRenderFlags = TEE_EFFECT_FROZEN;
+		TeeRenderInfo.m_Size = 64.0f;
+		TeeRenderInfo.m_ColorBody = ColorRGBA(1, 1, 1);
+		TeeRenderInfo.m_ColorFeet = ColorRGBA(1, 1, 1);
+		RenderTools()->RenderTee(CAnimState::GetIdle(), &TeeRenderInfo, EMOTE_PAIN, vec2(1, 0), From);
+		GameClient()->m_Effects.FreezingFlakes(From, vec2(32, 32), 1.0f);
+		break;
+	}
+	default:
+		GameClient()->m_Items.RenderLaser(From, From, OuterColor, InnerColor, 4.0f, TicksHead, LaserType);
+	}
+}
+
 bool CMenus::DoLine_RadioMenu(CUIRect &View, const char *pLabel, std::vector<CButtonContainer> &vButtonContainers, const std::vector<const char *> &vLabels, const std::vector<int> &vValues, int &Value)
 {
 	dbg_assert(vButtonContainers.size() == vValues.size(), "vButtonContainers and vValues must have the same size");
@@ -511,10 +571,14 @@ void CMenus::RenderMenubar(CUIRect Box, IClient::EClientState ClientState)
 	ColorRGBA QuitColor(1, 0, 0, 0.5f);
 	if(DoButton_MenuTab(&s_QuitButton, FontIcon::POWER_OFF, 0, &Button, IGraphics::CORNER_T, &m_aAnimatorsSmallPage[SMALL_TAB_QUIT], nullptr, nullptr, &QuitColor, 10.0f))
 	{
-		if(g_Config.m_BcConfirmQuit || GameClient()->Editor()->HasUnsavedData() || (GameClient()->CurrentRaceTime() / 60 >= g_Config.m_ClConfirmQuitTime && g_Config.m_ClConfirmQuitTime >= 0) || m_MenusIngameTouchControls.UnsavedChanges() || GameClient()->m_TouchControls.HasEditingChanges())
+		if(GameClient()->Editor()->HasUnsavedData() || (GameClient()->CurrentRaceTime() / 60 >= g_Config.m_ClConfirmQuitTime && g_Config.m_ClConfirmQuitTime >= 0) || m_MenusIngameTouchControls.UnsavedChanges() || GameClient()->m_TouchControls.HasEditingChanges())
+		{
 			m_Popup = POPUP_QUIT;
+		}
 		else
+		{
 			Client()->Quit();
+		}
 	}
 	GameClient()->m_Tooltips.DoToolTip(&s_QuitButton, &Button, Localize("Quit"));
 
@@ -1163,8 +1227,7 @@ void CMenus::Render()
 	// tab is open. Uses the plain (non-forced) refresh path so it only re-polls the
 	// current list instead of re-requesting DDNet info and force-rebuilding the
 	// community cache every tick, which caused noticeable stutter with a short
-	// refresh interval. Unchanged master payloads are skipped entirely by the
-	// serverbrowser HTTP layer; changed payloads are applied incrementally.
+	// refresh interval.
 	const bool BrowserPageActive = m_MenuPage >= PAGE_INTERNET && m_MenuPage <= PAGE_FAVORITE_COMMUNITY_5;
 	if(BrowserPageActive && g_Config.m_BcAutoServerListRefresh)
 	{
@@ -1178,6 +1241,7 @@ void CMenus::Render()
 			else if(RefreshInterval > 0 && Now - m_LastServerBrowserRefreshTick >= RefreshInterval)
 			{
 				ServerBrowser()->Refresh(ServerBrowser()->GetCurrentType());
+				UpdateCommunityCache(false);
 				m_LastServerBrowserRefreshTick = Now;
 			}
 		}
@@ -2507,20 +2571,84 @@ void CMenus::PopupConfirmDemoReplaceVideo()
 }
 #endif
 
+void CMenus::RenderThemeSelection(CUIRect MainView)
+{
+	const std::vector<CTheme> &vThemes = GameClient()->m_MenuBackground.GetThemes();
+
+	int SelectedTheme = -1;
+	for(int i = 0; i < (int)vThemes.size(); i++)
+	{
+		if(str_comp(vThemes[i].m_Name.c_str(), g_Config.m_ClMenuMap) == 0)
+		{
+			SelectedTheme = i;
+			break;
+		}
+	}
+	const int OldSelected = SelectedTheme;
+
+	static CListBox s_ListBox;
+	s_ListBox.DoHeader(&MainView, Localize("Theme"), 20.0f);
+	s_ListBox.DoStart(20.0f, vThemes.size(), 1, 3, SelectedTheme);
+
+	for(int i = 0; i < (int)vThemes.size(); i++)
+	{
+		const CTheme &Theme = vThemes[i];
+		const CListboxItem Item = s_ListBox.DoNextItem(&Theme.m_Name, i == SelectedTheme);
+
+		if(!Item.m_Visible)
+			continue;
+
+		CUIRect Icon, Label;
+		Item.m_Rect.VSplitLeft(Item.m_Rect.h * 2.0f, &Icon, &Label);
+
+		// draw icon if it exists
+		if(Theme.m_IconTexture.IsValid())
+		{
+			Icon.VMargin(6.0f, &Icon);
+			Icon.HMargin(3.0f, &Icon);
+			Graphics()->TextureSet(Theme.m_IconTexture);
+			Graphics()->QuadsBegin();
+			Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
+			IGraphics::CQuadItem QuadItem(Icon.x, Icon.y, Icon.w, Icon.h);
+			Graphics()->QuadsDrawTL(&QuadItem, 1);
+			Graphics()->QuadsEnd();
+		}
+
+		char aName[128];
+		if(Theme.m_Name.empty())
+			str_copy(aName, "(none)");
+		else if(str_comp(Theme.m_Name.c_str(), "auto") == 0)
+			str_copy(aName, "(seasons)");
+		else if(str_comp(Theme.m_Name.c_str(), "rand") == 0)
+			str_copy(aName, "(random)");
+		else if(Theme.m_HasDay && Theme.m_HasNight)
+			str_copy(aName, Theme.m_Name.c_str());
+		else if(Theme.m_HasDay && !Theme.m_HasNight)
+			str_format(aName, sizeof(aName), "%s (day)", Theme.m_Name.c_str());
+		else if(!Theme.m_HasDay && Theme.m_HasNight)
+			str_format(aName, sizeof(aName), "%s (night)", Theme.m_Name.c_str());
+		else // generic
+			str_copy(aName, Theme.m_Name.c_str());
+
+		Ui()->DoLabel(&Label, aName, 16.0f * CUi::ms_FontmodHeight, TEXTALIGN_ML);
+	}
+
+	SelectedTheme = s_ListBox.DoEnd();
+
+	if(OldSelected != SelectedTheme)
+	{
+		const CTheme &Theme = vThemes[SelectedTheme];
+		str_copy(g_Config.m_ClMenuMap, Theme.m_Name.c_str());
+		GameClient()->m_MenuBackground.LoadMenuBackground(Theme.m_HasDay, Theme.m_HasNight);
+	}
+}
+
 void CMenus::SetActive(bool Active)
 {
 	if(Active != m_MenuActive)
 	{
 		Ui()->SetHotItem(nullptr);
 		Ui()->SetActiveItem(nullptr);
-		if(!Active)
-		{
-			// Popups and active line inputs block demo hotkeys via IsPopupOpen() /
-			// text composition. Clear them when hiding the navbar with Escape.
-			Ui()->ClosePopupMenus();
-			if(CLineInput *pActiveInput = CLineInput::GetActiveInput())
-				pActiveInput->Deactivate();
-		}
 	}
 	m_MenuActive = Active;
 	if(!m_MenuActive)
@@ -2537,7 +2665,7 @@ void CMenus::SetActive(bool Active)
 			m_NeedSendDummyinfo = false;
 		}
 
-		if(Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK)
+		if(Client()->State() == IClient::STATE_ONLINE)
 		{
 			GameClient()->OnRelease();
 		}
@@ -2573,17 +2701,8 @@ bool CMenus::OnCursorMove(float x, float y, IInput::ECursorType CursorType)
 
 bool CMenus::OnInput(const IInput::CEvent &Event)
 {
-	// Escape is always handled to activate/deactivate the menu.
-	// While a demo is playing with the navbar hidden, consume keyboard input so
-	// binds cannot steal demo hotkeys (pause/seek/speed) from RenderDemoPlayer.
-	// Leave mouse wheel alone when inactive so zoom binds still work.
-	const bool IsMouseWheel = Event.m_Key == KEY_MOUSE_WHEEL_UP || Event.m_Key == KEY_MOUSE_WHEEL_DOWN ||
-				  Event.m_Key == KEY_MOUSE_WHEEL_LEFT || Event.m_Key == KEY_MOUSE_WHEEL_RIGHT;
-	const bool DemoHotkeys = Client()->State() == IClient::STATE_DEMOPLAYBACK &&
-				 g_Config.m_ClDemoKeyboardShortcuts &&
-				 m_DemoPlayerState == DEMOPLAYER_NONE &&
-				 !IsMouseWheel;
-	if((Event.m_Flags & IInput::FLAG_PRESS && Event.m_Key == KEY_ESCAPE) || IsActive() || s_AspectConfirmWantsInput || DemoHotkeys)
+	// Escape key is always handled to activate/deactivate menu
+	if((Event.m_Flags & IInput::FLAG_PRESS && Event.m_Key == KEY_ESCAPE) || IsActive() || s_AspectConfirmWantsInput)
 	{
 		Ui()->OnInput(Event);
 		return true;
@@ -2782,9 +2901,7 @@ void CMenus::OnRender()
 		Ui()->SetActiveItem(nullptr);
 
 	if(IsActive())
-		Ui()->DoBackButton();
-
-	Render();
+		Render();
 
 	// After Render: discard buttons that became active, and suppress hot item next frame
 	if(ShowAspectConfirmOverlay && IsActive())
@@ -2875,7 +2992,6 @@ void CMenus::OnRender()
 			const vec2 RawMouse = Ui()->UpdatedMousePos();
 			CursorPos = vec2(RawMouse.x * pScreen->w / (float)Graphics()->ScreenWidth(), RawMouse.y * pScreen->h / (float)Graphics()->ScreenHeight());
 		}
-		Ui()->RenderBackButton();
 		RenderTools()->RenderCursor(CursorPos, 24.0f);
 	}
 
@@ -2916,7 +3032,7 @@ void CMenus::RenderBackground()
 
 	const float ScreenHeight = 300.0f;
 	const float ScreenWidth = ScreenHeight * Graphics()->ScreenAspect();
-	Graphics()->MapScreen(CScreenRect(vec2(0.0f, 0.0f), vec2(ScreenWidth, ScreenHeight)));
+	Graphics()->MapScreen(0.0f, 0.0f, ScreenWidth, ScreenHeight);
 
 	// render background color
 	Graphics()->TextureClear();

@@ -7,10 +7,6 @@ on:
   pull_request:
   merge_group:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/master' && !startsWith(github.ref, 'refs/tags/') }}
-
 jobs:
   build-cmake:
     runs-on: ${{ matrix.os }}
@@ -65,33 +61,7 @@ jobs:
         sudo apt-get update -y
         # mount: /var/lib/grub/esp: special device /dev/disk/by-id/scsi-... does not exist.
         # sudo apt-get upgrade -y
-        packages=(
-          # tidy-alphabetical-start
-          gcovr
-          libavcodec-dev
-          libavformat-dev
-          libavutil-dev
-          libcurl4-openssl-dev
-          libdbus-1-dev
-          libfreetype6-dev
-          libglew-dev
-          libnotify-dev
-          libogg-dev
-          libopus-dev
-          libopusfile-dev
-          libpng-dev
-          libsdl2-dev
-          libsqlite3-dev
-          libswresample-dev
-          libswscale-dev
-          libvulkan-dev
-          libx264-dev
-          ninja-build
-          pkg-config
-          valgrind
-          # tidy-alphabetical-end
-        )
-        sudo apt-get install -y "${packages[@]}"
+        sudo apt-get install pkg-config ninja-build libcurl4-openssl-dev libfreetype6-dev libnotify-dev libogg-dev libopus-dev libopusfile-dev libsdl2-dev libsqlite3-dev libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev libx264-dev libpng-dev libvulkan-dev valgrind gcovr libglew-dev -y
 
     - name: Prepare Linux (non-fancy)
       if: contains(matrix.os, 'ubuntu') && !contains(matrix.name, 'fancy')
@@ -99,7 +69,7 @@ jobs:
         curl -LO https://github.com/Kitware/CMake/releases/download/v3.13.4/cmake-3.13.4-Linux-x86_64.tar.gz
         sudo tar --strip-components 1 -C /usr -xf cmake-3.13.4-Linux-x86_64.tar.gz
         # Our minimum supported Rust version (MSRV)
-        rustup default 1.85.0
+        rustup default 1.63.0
         sudo rm -rf /var/lib/mysql/ /var/run/mysqld
         sudo mkdir /var/lib/mysql/ /var/run/mysqld/
         sudo chown mysql:mysql /var/lib/mysql/ /var/run/mysqld/
@@ -135,7 +105,7 @@ jobs:
         brew update
         brew install ffmpeg molten-vk ninja pkg-config
         brew upgrade freetype
-        pip3 install --break-system-packages dmgbuild pyobjc-framework-Quartz
+        pip3 install --break-system-packages dmgbuild
         echo /Library/Frameworks/Python.framework/Versions/3.12/bin >> $GITHUB_PATH
         sudo rm -rf /Library/Developer/CommandLineTools
 
@@ -167,7 +137,6 @@ jobs:
     - name: Cache Rust dependencies
       uses: Swatinem/rust-cache@v2
       with:
-          cache-bin: false # WORKAROUND(https://github.com/Swatinem/rust-cache/issues/341)
           workspaces: |
               src/mastersrv
               src/masterping
@@ -236,7 +205,7 @@ jobs:
       run: |
         mkdir headless
         cd headless
-        ${{ matrix.cmake-path }}cmake -E env CXXFLAGS="--coverage -Werror" ${{ matrix.cmake-path }}cmake -E env LDFLAGS="--coverage -Werror" ${{ matrix.cmake-path }}cmake ${{ matrix.cmake-args }} -DHEADLESS_CLIENT=ON -DWEBSOCKETS=ON -DCMAKE_BUILD_TYPE=Debug -Werror=dev -DDOWNLOAD_GTEST=ON -DDEV=ON -DCMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG=. ..
+        ${{ matrix.cmake-path }}cmake -E env CXXFLAGS="--coverage -Werror" ${{ matrix.cmake-path }}cmake -E env LDFLAGS="--coverage -Werror" ${{ matrix.cmake-path }}cmake ${{ matrix.cmake-args }} -DHEADLESS_CLIENT=ON -DCMAKE_BUILD_TYPE=Debug -Werror=dev -DDOWNLOAD_GTEST=ON -DDEV=ON -DCMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG=. ..
         ${{ matrix.workaround-issue10203-run-after-configure }}
         ${{ matrix.cmake-path }}cmake -E env RUSTFLAGS="-Clink-arg=--coverage" ${{ matrix.cmake-path }}cmake --build . --config Debug
 
@@ -300,7 +269,7 @@ jobs:
         # Remove old coverage data:
         find headless -name '*.gcno' -o -name '*.gcda' -delete
         cp src/mastersrv/target/debug/mastersrv${{ matrix.executable-suffix }} headless
-        python scripts/integration_test.py --show-full-output --test-mastersrv --test-websockets --valgrind-memcheck headless
+        python scripts/integration_test.py --show-full-output --test-mastersrv --valgrind-memcheck headless
 
     - name: Upload integration test results
       id: integration_test_artifact_upload
@@ -389,7 +358,6 @@ jobs:
     - name: Cache Rust dependencies
       uses: Swatinem/rust-cache@v2
       with:
-          cache-bin: false # WORKAROUND(https://github.com/Swatinem/rust-cache/issues/341)
           workspaces: |
               src/mastersrv
               src/masterping
@@ -461,7 +429,6 @@ jobs:
     - name: Cache Rust dependencies
       uses: Swatinem/rust-cache@v2
       with:
-          cache-bin: false # WORKAROUND(https://github.com/Swatinem/rust-cache/issues/341)
           workspaces: |
               src/mastersrv
               src/masterping
@@ -476,16 +443,9 @@ jobs:
 
     - name: Test headless Emscripten client
       run: |
+        export MOZ_HEADLESS=1
         source emsdk/emsdk_env.sh
-        emrun \
-          --browser firefox \
-          --browser-args=-headless \
-          --port 8000 \
-          --silence_timeout=120 \
-          --timeout=300 \
-          --kill_start \
-          --kill_exit \
-          build-emscripten-headless/index.html -- "quit" "#__emrun_autostart__"
+        emrun --browser firefox build-emscripten-headless/DDNet.html -- "quit"
 
     - name: Build Emscripten client in release mode
       run: |

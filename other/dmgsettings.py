@@ -19,13 +19,11 @@ def read_plist(path):
 #   dmgbuild -s settings.py -D app=/path/to/My.app "My Application" MyApp.dmg
 
 # .. Useful stuff ..............................................................
-server_enabled = 'server' in defines
 
 application_client = defines.get('client', 'DDNet.app')
+application_server = defines.get('server', 'DDNet-Server.app')
 appname_client = os.path.basename(application_client)
-if server_enabled:
-	application_server = defines.get('server', 'DDNet-Server.app')
-	appname_server = os.path.basename(application_server)
+appname_server = os.path.basename(application_server)
 
 def icon_from_app(app_path):
 	plist_path = os.path.join(app_path, 'Contents', 'Info.plist')
@@ -40,7 +38,7 @@ def icon_from_app(app_path):
 # .. Basics ....................................................................
 
 # Uncomment to override the output filename
-# filename = 'DDNet.dmg'
+# filename = 'DDNet.dmg''
 
 # Uncomment to override the output volume name
 # volume_name = 'DDNet'
@@ -55,9 +53,7 @@ compression_level = 9
 size = defines.get('size', None)
 
 # Files to include
-files = [ application_client ]
-if server_enabled:
-	files.append(application_server)
+files = [ application_client, application_server ]
 
 # Symlinks to create
 symlinks = { 'Applications': '/Applications' }
@@ -66,9 +62,7 @@ symlinks = { 'Applications': '/Applications' }
 # hide = [ 'Secret.data' ]
 
 # Files to hide the extension of
-hide_extension = [ appname_client ]
-if server_enabled:
-	hide_extension.append(appname_server)
+hide_extension = [ appname_client, appname_server ]
 
 # Volume icon
 #
@@ -78,19 +72,14 @@ if server_enabled:
 # pyobjc-framework-Quartz.
 #
 #icon = '/path/to/icon.icns'
-badge_icon = icon_from_app(application_client)
+badge_icon_client = icon_from_app(application_client)
+badge_icon_server = icon_from_app(application_server)
 
 # Where to put the icons
-if server_enabled:
-	icon_locations = {
-		appname_client: (128, 288),
-		appname_server: (272, 288),
-		'Applications': (512, 288)
-	}
-else:
-	icon_locations = {
-		appname_client: (200, 288),
-		'Applications': (440, 288)
+icon_locations = {
+	appname_client: (128, 288),
+	appname_server: (272, 288),
+	'Applications': (512, 288)
 	}
 
 # .. Window configuration ......................................................

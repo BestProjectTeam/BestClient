@@ -75,11 +75,7 @@ int64_t time_get();
  *
  * @return The frequency of the high resolution timer.
  */
-constexpr int64_t time_freq()
-{
-	using namespace std::chrono_literals;
-	return std::chrono::nanoseconds(1s).count();
-}
+int64_t time_freq();
 
 /**
  * Retrieves the current time as a UNIX timestamp.
@@ -212,20 +208,6 @@ enum class ETimeFormat
 	MINS_CENTISECS,
 	SECS_CENTISECS,
 };
-
-/**
- * Returns the number of milliseconds from a time float.
- *
- * Takes care to not introduce more rounding issues, which is what a naive
- * `std::roundf(seconds * 1000.0)` would do.
- *
- * @ingroup Timestamp
- *
- * @param seconds Time in seconds.
- *
- * @return Number of milliseconds.
- */
-int64_t time_milliseconds_from_seconds(float seconds);
 
 /**
  * Formats a time string.

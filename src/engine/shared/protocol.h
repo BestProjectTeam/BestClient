@@ -88,21 +88,11 @@ enum
 	SERVERINFO_MAX_CLIENTS = 128,
 	MAX_CLIENTS = 128,
 	VANILLA_MAX_CLIENTS = 16,
-	SERVER_MAX_CLIENTS = 128,
-	LEGACY_MAX_CLIENTS = 64,
+	SERVER_MAX_CLIENTS = 64,
 	MAX_CHECKPOINTS = 25,
 	MIN_TICK = 0,
 	MAX_TICK = 0x6FFFFFFF,
 
-	/**
-	 * The minimum size of inputs (in `int32_t`s) accepted by the server.
-	 *
-	 * Currently `10` because this has always been the minimum size of CNetObj_PlayerInput in all supported protocols.
-	 */
-	MIN_INPUT_SIZE = 10,
-	/**
-	 * The maximum size of inputs (in `int32_t`s) accepted by the server.
-	 */
 	MAX_INPUT_SIZE = 128,
 	MAX_SNAPSHOT_PACKSIZE = 900,
 
@@ -131,11 +121,6 @@ enum
 	 * Don't send the message to client/server. Useful combined with @link MSGFLAG_RECORD @endlink to record a message without sending it.
 	 */
 	MSGFLAG_NOSEND = 1 << 4,
-
-	/**
-	 * for 0.7 player mapping fake disconnect/connects
-	 */
-	MSGFLAG_NOTRANSLATE = 1 << 5,
 };
 
 enum
@@ -163,19 +148,6 @@ enum
 	VERSION_DDNET_SAVE_CODE = 19060,
 	VERSION_DDNET_IMPORTANT_ALERT = 19060,
 	VERSION_DDNET_MAP_BESTTIME = 19070,
-	VERSION_DDNET_128_TEAMS = 20000,
-	VERSION_DDNET_TUNELOCK = 20000,
-};
-
-/**
- * Country codes in ISO 3166-1 numeric.
- * MINIMUM is extended below -1 to allow BestClient custom flags (X-WHITE, etc.).
- */
-namespace CountryCode
-{
-	inline constexpr int DEFAULT = -1;
-	inline constexpr int MINIMUM = -999;
-	inline constexpr int MAXIMUM = 999;
 };
 
 namespace TuneZone

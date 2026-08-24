@@ -7,7 +7,6 @@
 #include <game/server/entity.h>
 #include <game/server/save.h>
 
-class CPlayer;
 class CGameTeams;
 class CGameWorld;
 class IAntibot;
@@ -34,7 +33,6 @@ class CCharacter : public CEntity
 
 public:
 	CCharacter(CGameWorld *pWorld, CNetObj_PlayerInput LastInput);
-	~CCharacter() override;
 
 	void Reset() override;
 	void Destroy() override;
@@ -83,8 +81,10 @@ public:
 	void CancelSwapRequests();
 
 	bool Spawn(class CPlayer *pPlayer, vec2 Pos);
+	bool Remove();
 
 	bool IncreaseHealth(int Amount);
+	bool IncreaseArmor(int Amount);
 
 	void GiveWeapon(int Weapon, bool Remove = false);
 	void GiveNinja();
@@ -94,13 +94,12 @@ public:
 	void SetEmote(int Emote, int Tick);
 	int DetermineEyeEmote();
 
-	bool Rescue();
+	void Rescue();
 
 	int NeededFaketuning() const { return m_NeededFaketuning; }
 	bool IsAlive() const { return m_Alive; }
 	bool IsPaused() const { return m_Paused; }
-	CPlayer *GetPlayer() { return m_pPlayer; }
-	const CPlayer *GetPlayer() const { return m_pPlayer; }
+	class CPlayer *GetPlayer() { return m_pPlayer; }
 	CClientMask TeamMask();
 
 	void SetPosition(const vec2 &Position);
@@ -132,6 +131,8 @@ private:
 	int m_AttackTick;
 
 	int m_MoveRestrictions;
+
+	int m_DamageTaken;
 
 	int m_EmoteType;
 	int m_EmoteStop;
@@ -167,8 +168,8 @@ private:
 
 	// DDRace
 
-	void SnapCharacter(int SnappingClient, int MapId);
-	static bool IsSwitchActiveCb(unsigned char Number, void *pUser);
+	void SnapCharacter(int SnappingClient, int Id);
+	static bool IsSwitchActiveCb(int Number, void *pUser);
 	void SetTimeCheckpoint(int TimeCheckpoint);
 	void HandleTiles(int Index);
 	float m_Time;
@@ -180,19 +181,11 @@ private:
 	void DDRacePostCoreTick();
 	void HandleBroadcast();
 	void HandleTuneLayer();
-	void SendTuneMsg(const char *pMessage);
+	void SendZoneMsgs();
 	IAntibot *Antibot();
 
 	bool m_SetSavePos[NUM_RESCUEMODES];
 	CSaveTee m_RescueTee[NUM_RESCUEMODES];
-
-	enum EUntranslatedMap
-	{
-		ID_HOOK,
-		ID_WEAPON,
-		NUM_IDS
-	};
-	std::optional<int> m_aUntranslatedId[EUntranslatedMap::NUM_IDS];
 
 public:
 	CGameTeams *Teams() { return m_pTeams; }
@@ -204,6 +197,7 @@ public:
 	bool Freeze(int Seconds);
 	bool Freeze();
 	bool Unfreeze();
+	void GiveAllWeapons();
 	void ResetPickups();
 	void ResetJumps();
 	ERaceState m_DDRaceState;
@@ -217,8 +211,6 @@ public:
 	bool m_FrozenLastTick;
 	int m_TuneZone;
 	int m_TuneZoneOld;
-	LOCKED_TUNES m_LockedTunings;
-	LOCKED_TUNES m_LastLockedTunings;
 	int m_PainSoundTimer;
 	int m_LastMove;
 	int m_StartTime;
@@ -266,7 +258,6 @@ public:
 	void SetNinjaCurrentMoveTime(int CurrentMoveTime) { m_Core.m_Ninja.m_CurrentMoveTime = CurrentMoveTime; }
 
 	int GetLastAction() const { return m_LastAction; }
-	bool IsIdle() const { return !m_SavedInput.m_Direction && !m_SavedInput.m_Hook && !m_SavedInput.m_Jump && !(m_SavedInput.m_Fire & 1); }
 
 	bool HasTelegunGun() const { return m_Core.m_HasTelegunGun; }
 	bool HasTelegunGrenade() const { return m_Core.m_HasTelegunGrenade; }
@@ -285,8 +276,7 @@ public:
 	bool IsSuper() const { return m_Core.m_Super; }
 
 	CSaveTee &GetLastRescueTeeRef(int Mode = RESCUEMODE_AUTO) { return m_RescueTee[Mode]; }
-	CTuningParams *GetTuning();
-	void ApplyLockedTunings(bool SendTuningParams = true);
+	CTuningParams *GetTuning(int Zone) { return &TuningList()[Zone]; }
 };
 
 #endif

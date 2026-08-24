@@ -1,17 +1,16 @@
+/*
 #include "censor.h"
 
 #include <base/log.h>
-#include <base/str.h>
 
 #include <engine/engine.h>
 #include <engine/external/json-parser/json.h>
-#include <engine/http.h>
 #include <engine/shared/config.h>
 
 #include <optional>
 #include <utility>
 
-void CensorReplaceWords(char *pBuffer, const std::vector<std::string> &vWords, char Replacement)
+static void ReplaceWords(char *pBuffer, const std::vector<std::string> &vWords, char Replacement)
 {
 	if(!pBuffer)
 		return;
@@ -39,7 +38,6 @@ void CensorReplaceWords(char *pBuffer, const std::vector<std::string> &vWords, c
 	}
 }
 
-/*
 void CCensor::ConchainRefreshCensorList(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData)
 {
 	pfnCallback(pResult, pCallbackUserData);
@@ -102,7 +100,7 @@ void CCensor::CensorMessage(char *pMessage) const
 
 	if(!*pMessage)
 		return;
-	CensorReplaceWords(pMessage, m_vCensoredWords, '*');
+	ReplaceWords(pMessage, m_vCensoredWords, '*');
 }
 
 std::optional<std::vector<std::string>> CCensor::LoadCensorListFromFile(const char *pFilePath) const
@@ -203,7 +201,7 @@ void CCensor::CCensorListDownloadJob::Run()
 	const CTimeout Timeout{10000, 0, 8192, 10};
 	const size_t MaxResponseSize = 50 * 1024 * 1024; // 50 MiB
 
-	std::shared_ptr<IHttpRequest> pGet = HttpGetBoth(m_aUrl, m_pCensor->Storage(), m_aSaveFilePath, IStorage::TYPE_SAVE);
+	std::shared_ptr<CHttpRequest> pGet = HttpGetBoth(m_aUrl, m_pCensor->Storage(), m_aSaveFilePath, IStorage::TYPE_SAVE);
 	pGet->Timeout(Timeout);
 	pGet->MaxResponseSize(MaxResponseSize);
 	pGet->SkipByFileTime(true);

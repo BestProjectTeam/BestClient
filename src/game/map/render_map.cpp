@@ -2,11 +2,14 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include "render_map.h"
 
+#include <base/math.h>
 #include <base/str.h>
 
 #include <engine/graphics.h>
 #include <engine/map.h>
 #include <engine/shared/config.h>
+#include <engine/shared/datafile.h>
+#include <engine/shared/map.h>
 #include <engine/textrender.h>
 
 #include <generated/client_data.h>
@@ -14,7 +17,6 @@
 #include <game/mapitems.h>
 #include <game/mapitems_ex.h>
 
-#include <algorithm>
 #include <chrono>
 #include <cmath>
 
@@ -106,12 +108,22 @@ CMapBasedEnvelopePointAccess::CMapBasedEnvelopePointAccess(IMap *pMap)
 void CMapBasedEnvelopePointAccess::SetPointsRange(int StartPoint, int NumPoints)
 {
 	m_StartPoint = std::clamp(StartPoint, 0, m_NumPointsMax);
-	m_NumPoints = std::clamp(NumPoints, 0, m_NumPointsMax - m_StartPoint);
+	m_NumPoints = std::clamp(NumPoints, 0, maximum(m_NumPointsMax - StartPoint, 0));
+}
+
+int CMapBasedEnvelopePointAccess::StartPoint() const
+{
+	return m_StartPoint;
 }
 
 int CMapBasedEnvelopePointAccess::NumPoints() const
 {
 	return m_NumPoints;
+}
+
+int CMapBasedEnvelopePointAccess::NumPointsMax() const
+{
+	return m_NumPointsMax;
 }
 
 const CEnvPoint *CMapBasedEnvelopePointAccess::GetPoint(int Index) const
@@ -356,7 +368,7 @@ static void Rotate(const CPoint *pCenter, CPoint *pPoint, float Rotation)
 	pPoint->y = (int)(x * std::sin(Rotation) + y * std::cos(Rotation) + pCenter->y);
 }
 
-void CRenderMap::ForceRenderQuads(CQuad *pQuads, int NumQuads, int RenderFlags, const IEnvelopeEval *pEnvEval, float Alpha)
+void CRenderMap::ForceRenderQuads(CQuad *pQuads, int NumQuads, int RenderFlags, IEnvelopeEval *pEnvEval, float Alpha)
 {
 	Graphics()->TrianglesBegin();
 	float Conv = 1 / 255.0f;
@@ -425,11 +437,12 @@ void CRenderMap::RenderTileRectangle(int RectX, int RectY, int RectW, int RectH,
 	unsigned char IndexIn, unsigned char IndexOut,
 	float Scale, ColorRGBA Color, int RenderFlags)
 {
-	CScreenRect ScreenRect = Graphics()->GetScreen();
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
 
 	// calculate the final pixelsize for the tiles
 	float TilePixelSize = 1024 / 32.0f;
-	float FinalTileSize = Scale / ScreenRect.Width() * Graphics()->ScreenWidth();
+	float FinalTileSize = Scale / (ScreenX1 - ScreenX0) * Graphics()->ScreenWidth();
 	float FinalTilesetScale = FinalTileSize / TilePixelSize;
 
 	if(Graphics()->HasTextureArraysSupport())
@@ -438,10 +451,10 @@ void CRenderMap::RenderTileRectangle(int RectX, int RectY, int RectW, int RectH,
 		Graphics()->QuadsBegin();
 	Graphics()->SetColor(Color);
 
-	int StartY = (int)(ScreenRect.m_TopLeft.y / Scale) - 1;
-	int StartX = (int)(ScreenRect.m_TopLeft.x / Scale) - 1;
-	int EndY = (int)(ScreenRect.m_BottomRight.y / Scale) + 1;
-	int EndX = (int)(ScreenRect.m_BottomRight.x / Scale) + 1;
+	int StartY = (int)(ScreenY0 / Scale) - 1;
+	int StartX = (int)(ScreenX0 / Scale) - 1;
+	int EndY = (int)(ScreenY1 / Scale) + 1;
+	int EndX = (int)(ScreenX1 / Scale) + 1;
 
 	// adjust the texture shift according to mipmap level
 	float TexSize = 1024.0f;
@@ -510,7 +523,7 @@ void CRenderMap::RenderTileRectangle(int RectX, int RectY, int RectW, int RectH,
 		Graphics()->QuadsTex3DEnd();
 	else
 		Graphics()->QuadsEnd();
-	Graphics()->MapScreen(ScreenRect);
+	Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
 }
 
 void CRenderMap::RenderTile(int x, int y, unsigned char Index, float Scale, ColorRGBA Color)
@@ -520,11 +533,12 @@ void CRenderMap::RenderTile(int x, int y, unsigned char Index, float Scale, Colo
 	else
 		Graphics()->QuadsBegin();
 
-	CScreenRect ScreenRect = Graphics()->GetScreen();
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
 
 	// calculate the final pixelsize for the tiles
 	float TilePixelSize = 1024 / Scale;
-	float FinalTileSize = Scale / ScreenRect.Width() * Graphics()->ScreenWidth();
+	float FinalTileSize = Scale / (ScreenX1 - ScreenX0) * Graphics()->ScreenWidth();
 	float FinalTilesetScale = FinalTileSize / TilePixelSize;
 
 	float TexSize = 1024.0f;
@@ -576,16 +590,17 @@ void CRenderMap::RenderTile(int x, int y, unsigned char Index, float Scale, Colo
 		Graphics()->QuadsTex3DEnd();
 	else
 		Graphics()->QuadsEnd();
-	Graphics()->MapScreen(ScreenRect);
+	Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
 }
 
 void CRenderMap::RenderTilemap(CTile *pTiles, int w, int h, float Scale, ColorRGBA Color, int RenderFlags)
 {
-	CScreenRect ScreenRect = Graphics()->GetScreen();
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
 
 	// calculate the final pixelsize for the tiles
 	float TilePixelSize = 1024 / 32.0f;
-	float FinalTileSize = Scale / ScreenRect.Width() * Graphics()->ScreenWidth();
+	float FinalTileSize = Scale / (ScreenX1 - ScreenX0) * Graphics()->ScreenWidth();
 	float FinalTilesetScale = FinalTileSize / TilePixelSize;
 
 	if(Graphics()->HasTextureArraysSupport())
@@ -595,19 +610,10 @@ void CRenderMap::RenderTilemap(CTile *pTiles, int w, int h, float Scale, ColorRG
 	Graphics()->SetColor(Color);
 	const bool ColorOpaque = Color.a > 254.0f / 255.0f;
 
-	const bool ExtendTiles = (RenderFlags & TILERENDERFLAG_EXTEND) != 0;
-
-	int StartY = (int)(ScreenRect.m_TopLeft.y / Scale) - 1;
-	int StartX = (int)(ScreenRect.m_TopLeft.x / Scale) - 1;
-	int EndY = (int)(ScreenRect.m_BottomRight.y / Scale) + 1;
-	int EndX = (int)(ScreenRect.m_BottomRight.x / Scale) + 1;
-	if(!ExtendTiles)
-	{
-		StartY = std::max(0, StartY);
-		StartX = std::max(0, StartX);
-		EndY = std::min(h, EndY);
-		EndX = std::min(w, EndX);
-	}
+	int StartY = (int)(ScreenY0 / Scale) - 1;
+	int StartX = (int)(ScreenX0 / Scale) - 1;
+	int EndY = (int)(ScreenY1 / Scale) + 1;
+	int EndX = (int)(ScreenX1 / Scale) + 1;
 
 	// adjust the texture shift according to mipmap level
 	float TexSize = 1024.0f;
@@ -621,7 +627,7 @@ void CRenderMap::RenderTilemap(CTile *pTiles, int w, int h, float Scale, ColorRG
 			int mx = x;
 			int my = y;
 
-			if(ExtendTiles)
+			if(RenderFlags & TILERENDERFLAG_EXTEND)
 			{
 				if(mx < 0)
 					mx = 0;
@@ -631,6 +637,17 @@ void CRenderMap::RenderTilemap(CTile *pTiles, int w, int h, float Scale, ColorRG
 					my = 0;
 				if(my >= h)
 					my = h - 1;
+			}
+			else
+			{
+				if(mx < 0)
+					continue; // mx = 0;
+				if(mx >= w)
+					continue; // mx = w-1;
+				if(my < 0)
+					continue; // my = 0;
+				if(my >= h)
+					continue; // my = h-1;
 			}
 
 			int c = mx + my * w;
@@ -734,7 +751,7 @@ void CRenderMap::RenderTilemap(CTile *pTiles, int w, int h, float Scale, ColorRG
 		Graphics()->QuadsTex3DEnd();
 	else
 		Graphics()->QuadsEnd();
-	Graphics()->MapScreen(ScreenRect);
+	Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
 }
 
 void CRenderMap::RenderTeleOverlay(CTeleTile *pTele, int w, int h, float Scale, int OverlayRenderFlag, float Alpha)
@@ -742,19 +759,16 @@ void CRenderMap::RenderTeleOverlay(CTeleTile *pTele, int w, int h, float Scale, 
 	if(!(OverlayRenderFlag & OVERLAYRENDERFLAG_TEXT))
 		return;
 
-	CScreenRect ScreenRect = Graphics()->GetScreen();
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
 
-	int StartY = (int)(ScreenRect.m_TopLeft.y / Scale) - 1;
-	int StartX = (int)(ScreenRect.m_TopLeft.x / Scale) - 1;
-	int EndY = (int)(ScreenRect.m_BottomRight.y / Scale) + 1;
-	int EndX = (int)(ScreenRect.m_BottomRight.x / Scale) + 1;
+	int StartY = (int)(ScreenY0 / Scale) - 1;
+	int StartX = (int)(ScreenX0 / Scale) - 1;
+	int EndY = (int)(ScreenY1 / Scale) + 1;
+	int EndX = (int)(ScreenX1 / Scale) + 1;
+
 	if(EndX - StartX > Graphics()->ScreenWidth() / g_Config.m_GfxTextOverlay || EndY - StartY > Graphics()->ScreenHeight() / g_Config.m_GfxTextOverlay)
 		return; // its useless to render text at this distance
-
-	StartY = std::max(0, StartY);
-	StartX = std::max(0, StartX);
-	EndY = std::min(h, EndY);
-	EndX = std::min(w, EndX);
 
 	float Size = g_Config.m_ClTextEntitiesSize / 100.f;
 	char aBuf[16];
@@ -764,7 +778,19 @@ void CRenderMap::RenderTeleOverlay(CTeleTile *pTele, int w, int h, float Scale, 
 	{
 		for(int x = StartX; x < EndX; x++)
 		{
-			int c = x + y * w;
+			int mx = x;
+			int my = y;
+
+			if(mx < 0)
+				continue; // mx = 0;
+			if(mx >= w)
+				continue; // mx = w-1;
+			if(my < 0)
+				continue; // my = 0;
+			if(my >= h)
+				continue; // my = h-1;
+
+			int c = mx + my * w;
 
 			unsigned char Index = pTele[c].m_Number;
 			if(Index && IsTeleTileNumberUsedAny(pTele[c].m_Type))
@@ -775,29 +801,26 @@ void CRenderMap::RenderTeleOverlay(CTeleTile *pTele, int w, int h, float Scale, 
 				float Factor = std::clamp(Scale / ScaledWidth, 0.0f, 1.0f);
 				float LocalSize = Size * Factor;
 				float ToCenterOffset = (1 - LocalSize) / 2.f;
-				TextRender()->Text((x + 0.5f) * Scale - (ScaledWidth * Factor) / 2.0f, (y + ToCenterOffset) * Scale, LocalSize * Scale, aBuf);
+				TextRender()->Text((mx + 0.5f) * Scale - (ScaledWidth * Factor) / 2.0f, (my + ToCenterOffset) * Scale, LocalSize * Scale, aBuf);
 			}
 		}
 	}
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
-	Graphics()->MapScreen(ScreenRect);
+	Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
 }
 
 void CRenderMap::RenderSpeedupOverlay(CSpeedupTile *pSpeedup, int w, int h, float Scale, int OverlayRenderFlag, float Alpha)
 {
-	CScreenRect ScreenRect = Graphics()->GetScreen();
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
 
-	int StartY = (int)(ScreenRect.m_TopLeft.y / Scale) - 1;
-	int StartX = (int)(ScreenRect.m_TopLeft.x / Scale) - 1;
-	int EndY = (int)(ScreenRect.m_BottomRight.y / Scale) + 1;
-	int EndX = (int)(ScreenRect.m_BottomRight.x / Scale) + 1;
+	int StartY = (int)(ScreenY0 / Scale) - 1;
+	int StartX = (int)(ScreenX0 / Scale) - 1;
+	int EndY = (int)(ScreenY1 / Scale) + 1;
+	int EndX = (int)(ScreenX1 / Scale) + 1;
+
 	if(EndX - StartX > Graphics()->ScreenWidth() / g_Config.m_GfxTextOverlay || EndY - StartY > Graphics()->ScreenHeight() / g_Config.m_GfxTextOverlay)
 		return; // its useless to render text at this distance
-
-	StartY = std::max(0, StartY);
-	StartX = std::max(0, StartX);
-	EndY = std::min(h, EndY);
-	EndX = std::min(w, EndX);
 
 	float Size = g_Config.m_ClTextEntitiesSize / 100.f;
 	float ToCenterOffset = (1 - Size) / 2.f;
@@ -808,7 +831,19 @@ void CRenderMap::RenderSpeedupOverlay(CSpeedupTile *pSpeedup, int w, int h, floa
 	{
 		for(int x = StartX; x < EndX; x++)
 		{
-			int c = x + y * w;
+			int mx = x;
+			int my = y;
+
+			if(mx < 0)
+				continue; // mx = 0;
+			if(mx >= w)
+				continue; // mx = w-1;
+			if(my < 0)
+				continue; // my = 0;
+			if(my >= h)
+				continue; // my = h-1;
+
+			int c = mx + my * w;
 
 			int Force = (int)pSpeedup[c].m_Force;
 			int MaxSpeed = (int)pSpeedup[c].m_MaxSpeed;
@@ -824,18 +859,18 @@ void CRenderMap::RenderSpeedupOverlay(CSpeedupTile *pSpeedup, int w, int h, floa
 					Graphics()->SetColor(1.0f, 1.0f, 1.0f, Alpha);
 					Graphics()->SelectSprite(SPRITE_SPEEDUP_ARROW);
 					Graphics()->QuadsSetRotation(pSpeedup[c].m_Angle * (pi / 180.0f));
-					Graphics()->DrawSprite(x * Scale + 16, y * Scale + 16, 35.0f);
+					Graphics()->DrawSprite(mx * Scale + 16, my * Scale + 16, 35.0f);
 					Graphics()->QuadsEnd();
 
 					// draw force and max speed
 					if(OverlayRenderFlag & OVERLAYRENDERFLAG_TEXT)
 					{
 						str_format(aBuf, sizeof(aBuf), "%d", Force);
-						TextRender()->Text(x * Scale, (y + 0.5f + ToCenterOffset / 2) * Scale, Size * Scale / 2.f, aBuf);
+						TextRender()->Text(mx * Scale, (my + 0.5f + ToCenterOffset / 2) * Scale, Size * Scale / 2.f, aBuf);
 						if(MaxSpeed)
 						{
 							str_format(aBuf, sizeof(aBuf), "%d", MaxSpeed);
-							TextRender()->Text(x * Scale, (y + ToCenterOffset / 2) * Scale, Size * Scale / 2.f, aBuf);
+							TextRender()->Text(mx * Scale, (my + ToCenterOffset / 2) * Scale, Size * Scale / 2.f, aBuf);
 						}
 					}
 				}
@@ -845,20 +880,20 @@ void CRenderMap::RenderSpeedupOverlay(CSpeedupTile *pSpeedup, int w, int h, floa
 					if(OverlayRenderFlag & OVERLAYRENDERFLAG_TEXT)
 					{
 						float LineSpacing = Size * Scale / 3.f;
-						float BaseY = (y + ToCenterOffset) * Scale;
+						float BaseY = (my + ToCenterOffset) * Scale;
 						str_format(aBuf, sizeof(aBuf), "%d", Force);
-						TextRender()->Text(x * Scale, BaseY, LineSpacing, aBuf);
+						TextRender()->Text(mx * Scale, BaseY, LineSpacing, aBuf);
 						str_format(aBuf, sizeof(aBuf), "%d", MaxSpeed);
-						TextRender()->Text(x * Scale, BaseY + LineSpacing, LineSpacing, aBuf);
+						TextRender()->Text(mx * Scale, BaseY + LineSpacing, LineSpacing, aBuf);
 						str_format(aBuf, sizeof(aBuf), "%d", Angle);
-						TextRender()->Text(x * Scale, BaseY + 2 * LineSpacing, LineSpacing, aBuf);
+						TextRender()->Text(mx * Scale, BaseY + 2 * LineSpacing, LineSpacing, aBuf);
 					}
 				}
 			}
 		}
 	}
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
-	Graphics()->MapScreen(ScreenRect);
+	Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
 }
 
 void CRenderMap::RenderSwitchOverlay(CSwitchTile *pSwitch, int w, int h, float Scale, int OverlayRenderFlag, float Alpha)
@@ -866,19 +901,16 @@ void CRenderMap::RenderSwitchOverlay(CSwitchTile *pSwitch, int w, int h, float S
 	if(!(OverlayRenderFlag & OVERLAYRENDERFLAG_TEXT))
 		return;
 
-	CScreenRect ScreenRect = Graphics()->GetScreen();
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
 
-	int StartY = (int)(ScreenRect.m_TopLeft.y / Scale) - 1;
-	int StartX = (int)(ScreenRect.m_TopLeft.x / Scale) - 1;
-	int EndY = (int)(ScreenRect.m_BottomRight.y / Scale) + 1;
-	int EndX = (int)(ScreenRect.m_BottomRight.x / Scale) + 1;
+	int StartY = (int)(ScreenY0 / Scale) - 1;
+	int StartX = (int)(ScreenX0 / Scale) - 1;
+	int EndY = (int)(ScreenY1 / Scale) + 1;
+	int EndX = (int)(ScreenX1 / Scale) + 1;
+
 	if(EndX - StartX > Graphics()->ScreenWidth() / g_Config.m_GfxTextOverlay || EndY - StartY > Graphics()->ScreenHeight() / g_Config.m_GfxTextOverlay)
 		return; // its useless to render text at this distance
-
-	StartY = std::max(0, StartY);
-	StartX = std::max(0, StartX);
-	EndY = std::min(h, EndY);
-	EndX = std::min(w, EndX);
 
 	float Size = g_Config.m_ClTextEntitiesSize / 100.f;
 	float ToCenterOffset = (1 - Size) / 2.f;
@@ -889,25 +921,37 @@ void CRenderMap::RenderSwitchOverlay(CSwitchTile *pSwitch, int w, int h, float S
 	{
 		for(int x = StartX; x < EndX; x++)
 		{
-			int c = x + y * w;
+			int mx = x;
+			int my = y;
+
+			if(mx < 0)
+				continue; // mx = 0;
+			if(mx >= w)
+				continue; // mx = w-1;
+			if(my < 0)
+				continue; // my = 0;
+			if(my >= h)
+				continue; // my = h-1;
+
+			int c = mx + my * w;
 
 			unsigned char Index = pSwitch[c].m_Number;
 			if(Index && IsSwitchTileNumberUsed(pSwitch[c].m_Type))
 			{
 				str_format(aBuf, sizeof(aBuf), "%d", Index);
-				TextRender()->Text(x * Scale, (y + ToCenterOffset / 2) * Scale, Size * Scale / 2.f, aBuf);
+				TextRender()->Text(mx * Scale, (my + ToCenterOffset / 2) * Scale, Size * Scale / 2.f, aBuf);
 			}
 
 			unsigned char Delay = pSwitch[c].m_Delay;
 			if(Delay && IsSwitchTileDelayUsed(pSwitch[c].m_Type))
 			{
 				str_format(aBuf, sizeof(aBuf), "%d", Delay);
-				TextRender()->Text(x * Scale, (y + 0.5f + ToCenterOffset / 2) * Scale, Size * Scale / 2.f, aBuf);
+				TextRender()->Text(mx * Scale, (my + 0.5f + ToCenterOffset / 2) * Scale, Size * Scale / 2.f, aBuf);
 			}
 		}
 	}
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
-	Graphics()->MapScreen(ScreenRect);
+	Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
 }
 
 void CRenderMap::RenderTuneOverlay(CTuneTile *pTune, int w, int h, float Scale, int OverlayRenderFlag, float Alpha)
@@ -915,19 +959,16 @@ void CRenderMap::RenderTuneOverlay(CTuneTile *pTune, int w, int h, float Scale, 
 	if(!(OverlayRenderFlag & OVERLAYRENDERFLAG_TEXT))
 		return;
 
-	CScreenRect ScreenRect = Graphics()->GetScreen();
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
 
-	int StartY = (int)(ScreenRect.m_TopLeft.y / Scale) - 1;
-	int StartX = (int)(ScreenRect.m_TopLeft.x / Scale) - 1;
-	int EndY = (int)(ScreenRect.m_BottomRight.y / Scale) + 1;
-	int EndX = (int)(ScreenRect.m_BottomRight.x / Scale) + 1;
+	int StartY = (int)(ScreenY0 / Scale) - 1;
+	int StartX = (int)(ScreenX0 / Scale) - 1;
+	int EndY = (int)(ScreenY1 / Scale) + 1;
+	int EndX = (int)(ScreenX1 / Scale) + 1;
+
 	if(EndX - StartX > Graphics()->ScreenWidth() / g_Config.m_GfxTextOverlay || EndY - StartY > Graphics()->ScreenHeight() / g_Config.m_GfxTextOverlay)
 		return; // its useless to render text at this distance
-
-	StartY = std::max(0, StartY);
-	StartX = std::max(0, StartX);
-	EndY = std::min(h, EndY);
-	EndX = std::min(w, EndX);
 
 	float Size = g_Config.m_ClTextEntitiesSize / 200.f;
 	char aBuf[16];
@@ -937,7 +978,19 @@ void CRenderMap::RenderTuneOverlay(CTuneTile *pTune, int w, int h, float Scale, 
 	{
 		for(int x = StartX; x < EndX; x++)
 		{
-			int c = x + y * w;
+			int mx = x;
+			int my = y;
+
+			if(mx < 0)
+				continue; // mx = 0;
+			if(mx >= w)
+				continue; // mx = w-1;
+			if(my < 0)
+				continue; // my = 0;
+			if(my >= h)
+				continue; // my = h-1;
+
+			int c = mx + my * w;
 
 			unsigned char Index = pTune[c].m_Number;
 			if(Index)
@@ -948,21 +1001,22 @@ void CRenderMap::RenderTuneOverlay(CTuneTile *pTune, int w, int h, float Scale, 
 				float Factor = std::clamp(Scale / ScaledWidth, 0.0f, 1.0f);
 				float LocalSize = Size * Factor;
 				float ToCenterOffset = (1 - LocalSize) / 2.f;
-				TextRender()->Text((x + 0.5f) * Scale - (ScaledWidth * Factor) / 2.0f, (y + ToCenterOffset) * Scale, LocalSize * Scale, aBuf);
+				TextRender()->Text((mx + 0.5f) * Scale - (ScaledWidth * Factor) / 2.0f, (my + ToCenterOffset) * Scale, LocalSize * Scale, aBuf);
 			}
 		}
 	}
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
-	Graphics()->MapScreen(ScreenRect);
+	Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
 }
 
 void CRenderMap::RenderTelemap(CTeleTile *pTele, int w, int h, float Scale, ColorRGBA Color, int RenderFlags)
 {
-	CScreenRect ScreenRect = Graphics()->GetScreen();
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
 
 	// calculate the final pixelsize for the tiles
 	float TilePixelSize = 1024 / 32.0f;
-	float FinalTileSize = Scale / ScreenRect.Width() * Graphics()->ScreenWidth();
+	float FinalTileSize = Scale / (ScreenX1 - ScreenX0) * Graphics()->ScreenWidth();
 	float FinalTilesetScale = FinalTileSize / TilePixelSize;
 
 	if(Graphics()->HasTextureArraysSupport())
@@ -971,19 +1025,10 @@ void CRenderMap::RenderTelemap(CTeleTile *pTele, int w, int h, float Scale, Colo
 		Graphics()->QuadsBegin();
 	Graphics()->SetColor(Color);
 
-	bool ExtendTiles = (RenderFlags & TILERENDERFLAG_EXTEND) != 0;
-
-	int StartY = (int)(ScreenRect.m_TopLeft.y / Scale) - 1;
-	int StartX = (int)(ScreenRect.m_TopLeft.x / Scale) - 1;
-	int EndY = (int)(ScreenRect.m_BottomRight.y / Scale) + 1;
-	int EndX = (int)(ScreenRect.m_BottomRight.x / Scale) + 1;
-	if(!ExtendTiles)
-	{
-		StartY = std::max(0, StartY);
-		StartX = std::max(0, StartX);
-		EndY = std::min(h, EndY);
-		EndX = std::min(w, EndX);
-	}
+	int StartY = (int)(ScreenY0 / Scale) - 1;
+	int StartX = (int)(ScreenX0 / Scale) - 1;
+	int EndY = (int)(ScreenY1 / Scale) + 1;
+	int EndX = (int)(ScreenX1 / Scale) + 1;
 
 	// adjust the texture shift according to mipmap level
 	float TexSize = 1024.0f;
@@ -996,7 +1041,7 @@ void CRenderMap::RenderTelemap(CTeleTile *pTele, int w, int h, float Scale, Colo
 			int mx = x;
 			int my = y;
 
-			if(ExtendTiles)
+			if(RenderFlags & TILERENDERFLAG_EXTEND)
 			{
 				if(mx < 0)
 					mx = 0;
@@ -1006,6 +1051,17 @@ void CRenderMap::RenderTelemap(CTeleTile *pTele, int w, int h, float Scale, Colo
 					my = 0;
 				if(my >= h)
 					my = h - 1;
+			}
+			else
+			{
+				if(mx < 0)
+					continue; // mx = 0;
+				if(mx >= w)
+					continue; // mx = w-1;
+				if(my < 0)
+					continue; // my = 0;
+				if(my >= h)
+					continue; // my = h-1;
 			}
 
 			int c = mx + my * w;
@@ -1067,16 +1123,17 @@ void CRenderMap::RenderTelemap(CTeleTile *pTele, int w, int h, float Scale, Colo
 		Graphics()->QuadsTex3DEnd();
 	else
 		Graphics()->QuadsEnd();
-	Graphics()->MapScreen(ScreenRect);
+	Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
 }
 
 void CRenderMap::RenderSwitchmap(CSwitchTile *pSwitchTile, int w, int h, float Scale, ColorRGBA Color, int RenderFlags)
 {
-	CScreenRect ScreenRect = Graphics()->GetScreen();
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
 
 	// calculate the final pixelsize for the tiles
 	float TilePixelSize = 1024 / 32.0f;
-	float FinalTileSize = Scale / ScreenRect.Width() * Graphics()->ScreenWidth();
+	float FinalTileSize = Scale / (ScreenX1 - ScreenX0) * Graphics()->ScreenWidth();
 	float FinalTilesetScale = FinalTileSize / TilePixelSize;
 
 	if(Graphics()->HasTextureArraysSupport())
@@ -1085,19 +1142,10 @@ void CRenderMap::RenderSwitchmap(CSwitchTile *pSwitchTile, int w, int h, float S
 		Graphics()->QuadsBegin();
 	Graphics()->SetColor(Color);
 
-	bool ExtendTiles = (RenderFlags & TILERENDERFLAG_EXTEND) != 0;
-
-	int StartY = (int)(ScreenRect.m_TopLeft.y / Scale) - 1;
-	int StartX = (int)(ScreenRect.m_TopLeft.x / Scale) - 1;
-	int EndY = (int)(ScreenRect.m_BottomRight.y / Scale) + 1;
-	int EndX = (int)(ScreenRect.m_BottomRight.x / Scale) + 1;
-	if(!ExtendTiles)
-	{
-		StartY = std::max(0, StartY);
-		StartX = std::max(0, StartX);
-		EndY = std::min(h, EndY);
-		EndX = std::min(w, EndX);
-	}
+	int StartY = (int)(ScreenY0 / Scale) - 1;
+	int StartX = (int)(ScreenX0 / Scale) - 1;
+	int EndY = (int)(ScreenY1 / Scale) + 1;
+	int EndX = (int)(ScreenX1 / Scale) + 1;
 
 	// adjust the texture shift according to mipmap level
 	float TexSize = 1024.0f;
@@ -1110,7 +1158,7 @@ void CRenderMap::RenderSwitchmap(CSwitchTile *pSwitchTile, int w, int h, float S
 			int mx = x;
 			int my = y;
 
-			if(ExtendTiles)
+			if(RenderFlags & TILERENDERFLAG_EXTEND)
 			{
 				if(mx < 0)
 					mx = 0;
@@ -1120,6 +1168,17 @@ void CRenderMap::RenderSwitchmap(CSwitchTile *pSwitchTile, int w, int h, float S
 					my = 0;
 				if(my >= h)
 					my = h - 1;
+			}
+			else
+			{
+				if(mx < 0)
+					continue; // mx = 0;
+				if(mx >= w)
+					continue; // mx = w-1;
+				if(my < 0)
+					continue; // my = 0;
+				if(my >= h)
+					continue; // my = h-1;
 			}
 
 			int c = mx + my * w;
@@ -1224,16 +1283,17 @@ void CRenderMap::RenderSwitchmap(CSwitchTile *pSwitchTile, int w, int h, float S
 		Graphics()->QuadsTex3DEnd();
 	else
 		Graphics()->QuadsEnd();
-	Graphics()->MapScreen(ScreenRect);
+	Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
 }
 
-void CRenderMap::RenderTunemap(CTuneTile *pTune, int w, int h, float Scale, ColorRGBA Color, int RenderFlags, CTuneColorMapper *pTuneColorMapper)
+void CRenderMap::RenderTunemap(CTuneTile *pTune, int w, int h, float Scale, ColorRGBA Color, int RenderFlags)
 {
-	CScreenRect ScreenRect = Graphics()->GetScreen();
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
 
 	// calculate the final pixelsize for the tiles
 	float TilePixelSize = 1024 / 32.0f;
-	float FinalTileSize = Scale / ScreenRect.Width() * Graphics()->ScreenWidth();
+	float FinalTileSize = Scale / (ScreenX1 - ScreenX0) * Graphics()->ScreenWidth();
 	float FinalTilesetScale = FinalTileSize / TilePixelSize;
 
 	if(Graphics()->HasTextureArraysSupport())
@@ -1242,19 +1302,10 @@ void CRenderMap::RenderTunemap(CTuneTile *pTune, int w, int h, float Scale, Colo
 		Graphics()->QuadsBegin();
 	Graphics()->SetColor(Color);
 
-	bool ExtendTiles = (RenderFlags & TILERENDERFLAG_EXTEND) != 0;
-
-	int StartY = (int)(ScreenRect.m_TopLeft.y / Scale) - 1;
-	int StartX = (int)(ScreenRect.m_TopLeft.x / Scale) - 1;
-	int EndY = (int)(ScreenRect.m_BottomRight.y / Scale) + 1;
-	int EndX = (int)(ScreenRect.m_BottomRight.x / Scale) + 1;
-	if(!ExtendTiles)
-	{
-		StartY = std::max(0, StartY);
-		StartX = std::max(0, StartX);
-		EndY = std::min(h, EndY);
-		EndX = std::min(w, EndX);
-	}
+	int StartY = (int)(ScreenY0 / Scale) - 1;
+	int StartX = (int)(ScreenX0 / Scale) - 1;
+	int EndY = (int)(ScreenY1 / Scale) + 1;
+	int EndX = (int)(ScreenX1 / Scale) + 1;
 
 	// adjust the texture shift according to mipmap level
 	float TexSize = 1024.0f;
@@ -1267,7 +1318,7 @@ void CRenderMap::RenderTunemap(CTuneTile *pTune, int w, int h, float Scale, Colo
 			int mx = x;
 			int my = y;
 
-			if(ExtendTiles)
+			if(RenderFlags & TILERENDERFLAG_EXTEND)
 			{
 				if(mx < 0)
 					mx = 0;
@@ -1278,11 +1329,21 @@ void CRenderMap::RenderTunemap(CTuneTile *pTune, int w, int h, float Scale, Colo
 				if(my >= h)
 					my = h - 1;
 			}
+			else
+			{
+				if(mx < 0)
+					continue; // mx = 0;
+				if(mx >= w)
+					continue; // mx = w-1;
+				if(my < 0)
+					continue; // my = 0;
+				if(my >= h)
+					continue; // my = h-1;
+			}
 
 			int c = mx + my * w;
 
-			const unsigned char Index = pTune[c].m_Type;
-
+			unsigned char Index = pTune[c].m_Type;
 			if(Index)
 			{
 				bool Render = false;
@@ -1291,16 +1352,6 @@ void CRenderMap::RenderTunemap(CTuneTile *pTune, int w, int h, float Scale, Colo
 
 				if(Render)
 				{
-					const unsigned char Number = pTune[c].m_Number;
-
-					if(Number == 0 || pTuneColorMapper == nullptr)
-						Graphics()->SetColor(Color);
-					else
-					{
-						uint8_t ColorIndex = pTuneColorMapper->TuneNumberToColorIndex(Number);
-						Graphics()->SetColor(pTuneColorMapper->TuneColorIndexToColor(ColorIndex).Multiply(Color));
-					}
-
 					int tx = Index % 16;
 					int ty = Index / 16;
 					int Px0 = tx * (1024 / 16);
@@ -1349,7 +1400,7 @@ void CRenderMap::RenderTunemap(CTuneTile *pTune, int w, int h, float Scale, Colo
 		Graphics()->QuadsTex3DEnd();
 	else
 		Graphics()->QuadsEnd();
-	Graphics()->MapScreen(ScreenRect);
+	Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
 }
 
 void CRenderMap::RenderDebugClip(float ClipX, float ClipY, float ClipW, float ClipH, ColorRGBA Color, float Zoom, const char *pLabel)
@@ -1371,38 +1422,4 @@ void CRenderMap::RenderDebugClip(float ClipX, float ClipY, float ClipW, float Cl
 	// clamp zoom and set line width, because otherwise the text can be partially clipped out
 	TextRender()->Text(ClipX, ClipY, std::min(12.0f * Zoom, 20.0f), pLabel, ClipW);
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
-}
-
-CTuneColorMapper::CTuneColorMapper()
-{
-	Reset();
-}
-
-uint8_t CTuneColorMapper::TuneNumberToColorIndex(uint8_t TuneNumber)
-{
-	if(TuneNumber == 0)
-		return 0;
-
-	uint8_t &TuneColorIndex = m_aTuneNumberToColorIndex[TuneNumber - 1];
-	if(TuneColorIndex == 0)
-	{
-		TuneColorIndex = m_NextTuneNumberIndex + 1;
-		++m_NextTuneNumberIndex;
-	}
-	return TuneColorIndex;
-}
-
-ColorRGBA CTuneColorMapper::TuneColorIndexToColor(uint8_t TuneColorIndex) const
-{
-	if(TuneColorIndex == 0)
-		return ColorRGBA(1.0f, 1.0f, 1.0f);
-
-	float Hue = std::fmod((TuneColorIndex - 1) * normalized_golden_angle, 1.0f);
-	return color_cast<ColorRGBA>(ColorHSLA(Hue, 0.75f, 0.5f, 1.0f));
-}
-
-void CTuneColorMapper::Reset()
-{
-	m_aTuneNumberToColorIndex.fill(0);
-	m_NextTuneNumberIndex = 0;
 }

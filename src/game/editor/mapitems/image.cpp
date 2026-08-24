@@ -4,7 +4,7 @@
 
 CEditorImage::CEditorImage(CEditorMap *pMap) :
 	CMapObject(pMap),
-	m_Automapper(pMap)
+	m_AutoMapper(pMap)
 {
 	m_Texture.Invalidate();
 }
@@ -12,12 +12,14 @@ CEditorImage::CEditorImage(CEditorMap *pMap) :
 CEditorImage::~CEditorImage()
 {
 	Graphics()->UnloadTexture(&m_Texture);
+	free(m_pData);
+	m_pData = nullptr;
 }
 
 void CEditorImage::OnAttach(CEditorMap *pMap)
 {
 	CMapObject::OnAttach(pMap);
-	m_Automapper.OnAttach(pMap);
+	m_AutoMapper.OnAttach(pMap);
 }
 
 void CEditorImage::AnalyseTileFlags()
@@ -53,13 +55,6 @@ void CEditorImage::AnalyseTileFlags()
 void CEditorImage::Free()
 {
 	Graphics()->UnloadTexture(&m_Texture);
-	m_Automapper.Unload();
+	m_AutoMapper.Unload();
 	CImageInfo::Free();
-}
-
-CEditorImage &CEditorImage::operator=(CImageInfo &&Other)
-{
-	CImageInfo *pThis = this;
-	*pThis = std::move(Other);
-	return *this;
 }

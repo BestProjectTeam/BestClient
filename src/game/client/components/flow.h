@@ -18,12 +18,14 @@ class CFlow : public CComponent
 	int m_Width;
 	int m_Spacing;
 
+	void DbgRender();
 	void Init();
 
 public:
 	CFlow();
 	int Sizeof() const override { return sizeof(*this); }
 
+	vec2 Get(vec2 Pos);
 	void Add(vec2 Pos, vec2 Vel, float Size);
 	void Update();
 };

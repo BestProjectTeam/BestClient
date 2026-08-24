@@ -16,13 +16,14 @@
 #include <engine/graphics.h>
 #include <engine/shared/bestclient_indicator_protocol.h>
 #include <engine/shared/config.h>
-#include <engine/http.h>
+#include <engine/shared/http.h>
 #include <engine/shared/json.h>
 #include <engine/storage.h>
 #include <engine/textrender.h>
 
 #include <game/client/animstate.h>
 #include <game/client/bc_ui_animations.h>
+#include <game/client/components/countryflags.h>
 #include <game/client/components/hud_layout.h>
 #include <game/client/gameclient.h>
 #include <game/client/ui_scrollregion.h>

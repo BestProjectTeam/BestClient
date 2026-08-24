@@ -7,11 +7,21 @@
 #include <game/client/component.h>
 #include <game/client/ui_rect.h>
 
+#include <cstdint>
 #include <memory>
 
 class CMusicPlayer : public CComponent
 {
 public:
+	struct SNowPlayingInfo
+	{
+		bool m_Valid = false;
+		bool m_Playing = false;
+		int64_t m_DurationMs = 0;
+		int64_t m_PositionMs = 0;
+		uint32_t m_Seed = 0;
+	};
+
 	struct SHudReservation
 	{
 		CUIRect m_Rect{};
@@ -33,6 +43,7 @@ public:
 
 	SHudReservation HudReservation() const;
 	vec2 GetHudPushOffsetForRect(const CUIRect &Rect, float CanvasWidth, float CanvasHeight, float Padding = 0.0f) const;
+	bool GetNowPlayingInfo(SNowPlayingInfo &Out) const;
 	bool GetHudThemeColor(ColorRGBA &Out, bool ForcePreview = false) const;
 	CUIRect GetHudEditorRect(bool ForcePreview = false) const;
 	void RenderHudEditor(bool ForcePreview);

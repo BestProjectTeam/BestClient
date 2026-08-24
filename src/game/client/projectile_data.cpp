@@ -3,9 +3,6 @@
 
 #include "projectile_data.h"
 
-#include <base/dbg.h>
-#include <base/log.h>
-
 #include <engine/shared/snapshot.h>
 
 #include <generated/protocol.h>
@@ -24,14 +21,14 @@ CProjectileData ExtractProjectileInfo(int NetObjType, const void *pData, CGameWo
 
 	if(NetObjType == NETOBJTYPE_DDNETPROJECTILE)
 	{
-		return ExtractProjectileInfoDDNet((CNetObj_DDNetProjectile *)pData, pGameWorld);
+		return ExtractProjectileInfoDDNet((CNetObj_DDNetProjectile *)pData);
 	}
 	else if(NetObjType == NETOBJTYPE_DDRACEPROJECTILE || (NetObjType == NETOBJTYPE_PROJECTILE && UseProjectileExtraInfo(pProj)))
 	{
 		return ExtractProjectileInfoDDRace((CNetObj_DDRaceProjectile *)pData, pGameWorld, pEntEx);
 	}
 
-	CProjectileData Result;
+	CProjectileData Result = {vec2(0, 0)};
 	Result.m_StartPos.x = pProj->m_X;
 	Result.m_StartPos.y = pProj->m_Y;
 	Result.m_StartVel.x = pProj->m_VelX / 100.0f;
@@ -42,13 +39,12 @@ CProjectileData ExtractProjectileInfo(int NetObjType, const void *pData, CGameWo
 	Result.m_Owner = -1;
 	Result.m_TuneZone = pGameWorld && pGameWorld->m_WorldConfig.m_UseTuneZones ? pGameWorld->Collision()->IsTune(pGameWorld->Collision()->GetMapIndex(Result.m_StartPos)) : 0;
 	Result.m_SwitchNumber = pEntEx ? pEntEx->m_SwitchNumber : 0;
-	GetProjectileTunings(&Result, pGameWorld);
 	return Result;
 }
 
 CProjectileData ExtractProjectileInfoDDRace(const CNetObj_DDRaceProjectile *pProj, CGameWorld *pGameWorld, const CNetObj_EntityEx *pEntEx)
 {
-	CProjectileData Result;
+	CProjectileData Result = {vec2(0, 0)};
 
 	Result.m_StartPos.x = pProj->m_X / 100.0f;
 	Result.m_StartPos.y = pProj->m_Y / 100.0f;
@@ -70,13 +66,12 @@ CProjectileData ExtractProjectileInfoDDRace(const CNetObj_DDRaceProjectile *pPro
 	Result.m_Freeze = pProj->m_Data & LEGACYPROJECTILEFLAG_FREEZE;
 	Result.m_TuneZone = pGameWorld && pGameWorld->m_WorldConfig.m_UseTuneZones ? pGameWorld->Collision()->IsTune(pGameWorld->Collision()->GetMapIndex(Result.m_StartPos)) : 0;
 	Result.m_SwitchNumber = pEntEx ? pEntEx->m_SwitchNumber : 0;
-	GetProjectileTunings(&Result, pGameWorld);
 	return Result;
 }
 
-CProjectileData ExtractProjectileInfoDDNet(const CNetObj_DDNetProjectile *pProj, CGameWorld *pGameWorld)
+CProjectileData ExtractProjectileInfoDDNet(const CNetObj_DDNetProjectile *pProj)
 {
-	CProjectileData Result;
+	CProjectileData Result = {vec2(0, 0)};
 
 	Result.m_StartPos = vec2(pProj->m_X / 100.0f, pProj->m_Y / 100.0f);
 	Result.m_StartVel = pProj->m_Owner < 0 ? vec2(pProj->m_VelX, pProj->m_VelY) / 1e6f : vec2(pProj->m_VelX, pProj->m_VelY);
@@ -107,16 +102,6 @@ CProjectileData ExtractProjectileInfoDDNet(const CNetObj_DDNetProjectile *pProj,
 	Result.m_Explosive = pProj->m_Flags & PROJECTILEFLAG_EXPLOSIVE;
 	Result.m_Freeze = pProj->m_Flags & PROJECTILEFLAG_FREEZE;
 
-	if(pProj->m_Flags & PROJECTILEFLAG_HAS_TUNEPARAMS)
-	{
-		Result.m_Curvature = pProj->m_Curvature / 100.f;
-		Result.m_Speed = pProj->m_Speed / 100.f;
-		Result.m_Lifetime = pProj->m_Lifetime / 100.f;
-	}
-	else
-	{
-		GetProjectileTunings(&Result, pGameWorld);
-	}
 	return Result;
 }
 
@@ -129,31 +114,5 @@ void DemoObjectRemoveExtraProjectileInfo(CNetObj_Projectile *pProj)
 		pProj->m_Y = Data.m_StartPos.y;
 		pProj->m_VelX = (int)(Data.m_StartVel.x * 100.0f);
 		pProj->m_VelY = (int)(Data.m_StartVel.y * 100.0f);
-	}
-}
-
-void GetProjectileTunings(CProjectileData *pData, class CGameWorld *pGameWorld)
-{
-	const CTuningParams *pTuning = pGameWorld ? pGameWorld->TuningFromChrOrZone(pData->m_Owner, pData->m_TuneZone) : &CTuningParams::DEFAULT;
-	pData->m_Curvature = 0.0f;
-	pData->m_Speed = 0.0f;
-	pData->m_Lifetime = 0.0f;
-	if(pData->m_Type == WEAPON_GRENADE)
-	{
-		pData->m_Curvature = pTuning->m_GrenadeCurvature;
-		pData->m_Speed = pTuning->m_GrenadeSpeed;
-		pData->m_Lifetime = pTuning->m_GrenadeLifetime;
-	}
-	else if(pData->m_Type == WEAPON_SHOTGUN)
-	{
-		pData->m_Curvature = pTuning->m_ShotgunCurvature;
-		pData->m_Speed = pTuning->m_ShotgunSpeed;
-		pData->m_Lifetime = pTuning->m_ShotgunLifetime;
-	}
-	else if(pData->m_Type == WEAPON_GUN)
-	{
-		pData->m_Curvature = pTuning->m_GunCurvature;
-		pData->m_Speed = pTuning->m_GunSpeed;
-		pData->m_Lifetime = pTuning->m_GunLifetime;
 	}
 }

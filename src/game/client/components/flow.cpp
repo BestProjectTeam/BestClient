@@ -2,6 +2,8 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include "flow.h"
 
+#include <engine/graphics.h>
+
 #include <game/layers.h>
 #include <game/mapitems.h>
 
@@ -11,6 +13,27 @@ CFlow::CFlow()
 	m_Height = 0;
 	m_Width = 0;
 	m_Spacing = 16;
+}
+
+void CFlow::DbgRender()
+{
+	if(!m_pCells)
+		return;
+
+	Graphics()->TextureClear();
+	IGraphics::CLineItemBatch LineItemBatch;
+	Graphics()->LinesBatchBegin(&LineItemBatch);
+	for(int y = 0; y < m_Height; y++)
+	{
+		for(int x = 0; x < m_Width; x++)
+		{
+			vec2 Pos(x * m_Spacing, y * m_Spacing);
+			vec2 Vel = m_pCells[y * m_Width + x].m_Vel * 0.01f;
+			const IGraphics::CLineItem Item = IGraphics::CLineItem(Pos.x, Pos.y, Pos.x + Vel.x, Pos.y + Vel.y);
+			Graphics()->LinesBatchDraw(&LineItemBatch, &Item, 1);
+		}
+	}
+	Graphics()->LinesBatchEnd(&LineItemBatch);
 }
 
 void CFlow::Init()
@@ -37,6 +60,19 @@ void CFlow::Update()
 	for(int y = 0; y < m_Height; y++)
 		for(int x = 0; x < m_Width; x++)
 			m_pCells[y * m_Width + x].m_Vel *= 0.85f;
+}
+
+vec2 CFlow::Get(vec2 Pos)
+{
+	if(!m_pCells)
+		return vec2(0, 0);
+
+	int x = (int)(Pos.x / m_Spacing);
+	int y = (int)(Pos.y / m_Spacing);
+	if(x < 0 || y < 0 || x >= m_Width || y >= m_Height)
+		return vec2(0, 0);
+
+	return m_pCells[y * m_Width + x].m_Vel;
 }
 
 void CFlow::Add(vec2 Pos, vec2 Vel, float Size)

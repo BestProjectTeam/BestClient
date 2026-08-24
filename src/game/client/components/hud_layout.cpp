@@ -49,7 +49,6 @@ namespace HudLayout
 			{84.5f, 152.0f, 100, 0, true, false, 0x66000000U}, // KEYSTROKES_MOUSE
 			{484.0f, 172.0f, 100, 0, true, true, 0x66000000U}, // DUMMY_ACTIONS
 			{250.0f, 258.0f, 100, 0, true, true, 0x66000000U}, // SWAP_TIMER
-			{200.0f, 168.0f, 100, 0, true, true, 0xE6000033U}, // EDGE_INFO
 		};
 
 		static const char *gs_apModuleNames[MODULE_COUNT] = {
@@ -76,7 +75,6 @@ namespace HudLayout
 			"Mouse",
 			"Dummy Actions",
 			"Swap timer",
-			"Edge Info",
 		};
 
 		static SModuleLayout gs_aRuntimeModuleLayouts[MODULE_COUNT];
@@ -114,8 +112,7 @@ namespace HudLayout
 			       Module == MODULE_VOICE_STATUS ||
 			       Module == MODULE_CHAT ||
 			       Module == MODULE_VOTES ||
-			       Module == MODULE_NOTIFY_LAST ||
-			       Module == MODULE_EDGE_INFO;
+			       Module == MODULE_NOTIFY_LAST;
 		}
 
 		bool HasLegacyConfigOverride(EModule Module)
@@ -145,9 +142,6 @@ namespace HudLayout
 			case MODULE_NOTIFY_LAST:
 				// Percentage + font-size settings are always the source of truth so the
 				// tclient scrollbars and the HUD editor stay in sync both ways.
-				return true;
-			case MODULE_EDGE_INFO:
-				// Keep the original RushieClient position configs compatible with the HUD editor.
 				return true;
 			default:
 				return false;
@@ -198,12 +192,6 @@ namespace HudLayout
 				gs_aRuntimeModuleLayouts[Module].m_X = Layout.m_X;
 				gs_aRuntimeModuleLayouts[Module].m_Y = Layout.m_Y;
 				break;
-			case MODULE_EDGE_INFO:
-				Layout.m_X = g_Config.m_RiEdgeInfoPosX * 4.0f;
-				Layout.m_Y = g_Config.m_RiEdgeInfoPosY * 3.0f;
-				gs_aRuntimeModuleLayouts[Module].m_X = Layout.m_X;
-				gs_aRuntimeModuleLayouts[Module].m_Y = Layout.m_Y;
-				break;
 			default:
 				break;
 			}
@@ -246,10 +234,6 @@ namespace HudLayout
 			case MODULE_NOTIFY_LAST:
 				g_Config.m_TcNotifyWhenLastX = std::clamp(round_to_int((Layout.m_X / CANVAS_WIDTH) * 100.0f), 0, 100);
 				g_Config.m_TcNotifyWhenLastY = std::clamp(round_to_int((Layout.m_Y / CANVAS_HEIGHT) * 100.0f), 0, 100);
-				break;
-			case MODULE_EDGE_INFO:
-				g_Config.m_RiEdgeInfoPosX = std::clamp(round_to_int(Layout.m_X / 4.0f), 0, 100);
-				g_Config.m_RiEdgeInfoPosY = std::clamp(round_to_int(Layout.m_Y / 3.0f), 0, 100);
 				break;
 			default:
 				break;
@@ -411,9 +395,6 @@ namespace HudLayout
 		{
 			(void)pUserData;
 			EnsureRuntimeLayouts();
-			// Edge Info keeps its original ri_* position configs for compatibility.
-			// Synchronize them even if the component was never rendered this session.
-			LegacyConfigLayout(MODULE_EDGE_INFO);
 
 			char aLine[256];
 			for(int Module = 0; Module < MODULE_COUNT; ++Module)

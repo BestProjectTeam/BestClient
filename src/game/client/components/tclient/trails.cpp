@@ -107,6 +107,10 @@ void CTrails::OnRender()
 			GameTick,
 		};
 
+		// // NOTE: this is kind of a hack to fix 25tps. This fixes flickering when using the speed mode
+		// m_History[ClientId][(GameTick + 1) % 200] = m_History[ClientId][GameTick % 200];
+		// m_History[ClientId][(GameTick + 2) % 200] = m_History[ClientId][GameTick % 200];
+
 		IGraphics::CLineItem LineItem;
 		bool LineMode = g_Config.m_TcTeeTrailWidth == 0;
 

@@ -2171,6 +2171,9 @@ Dragger Outline Color
 Dragger Inner Color
 == Dragger İç Rengi
 
+AntiPing: prediction margin
+== AntiPing: tahmin marjı
+
 [Spectating]
 Following %d: %s
 == İzleniyor %d: %s
@@ -2589,106 +2592,62 @@ The extra menu with the given number is activated.
 == Belirtilen sayıda ekstra menü aktif edildi.
 
 Joining Tutorial server
-== Öğretici sunucuya bağlanılıyor
+== 
 
 There are no Tutorial servers available
-== Erişilebilir Öğretici sunucu yok
+== 
 
 Retrying…
-== Tekrar deneniyor…
+== 
 
 Error joining Tutorial server
-== Öğretici sunucuya katılırken hata
+== 
 
 Could not find a Tutorial server. Check your internet connection.
-== Öğretici sunucu bulunamadı. İnternet bağlantınızı kontrol edin.
+== 
 
 You're playing on a local server because no online Tutorial server could be found.\n\nYour record will only be saved locally.
-== Çevrimiçi Öğretici sunucu bulunamadığı için yerel sunucuda oynuyorsunuz.\n\nRekorunuz sadece yerel olarak kaydedilecek.
+== 
 
 Could not find online Tutorial server.\nStarting and connecting to local server…
-== Çevrimiçi Öğretici sunucu bulunamadı.\nYerel sunucu başlatılıp bağlanılıyor…
+== 
 
 Waiting for local server to stop…
-== Yerel sunucunun kapanması bekleniyor…
+== 
 
 Waiting for local server to start…
-== Yerel sunucunun başlatılması bekleniyor…
+== 
 
 Error loading communities
-== Toplulukları yüklerken hata
+== 
 
 Click to remove this community from your favorites.
-== Bu topluluğu favorilerden çıkarmak için tıkla.
+== 
 
 Click to add this community to your favorites.
-== Bu topluluğu favorilere eklemek için tıkla.
+== 
 
 Update Rate
-== Yenileme Oranı
+== 
 
 Save power by lowering update rate (higher input latency)
-== Yenileme oranını düşürerek tasarruf et (daha fazla girdi gecikmesi)
+== 
 
 Colors of the hook collision line:
-== Kanca çizgisi renkleri:
+== 
 
 [Hook collision line color]
 When nothing is hookable
-== Hiçbir şey kancalanabilir olduğunda
+== 
 
 [Hook collision line color]
 When something is hookable
-== Kancalanabilir bir şey olduğunda
+== 
 
 [Hook collision line color]
 When a Tee is hookable
-== Bir Tee kancalanabilir olduğunda
+== 
 
 [Hook collision line color]
 Hook collision line tip
-== Kanca çizgisi ucu
-
-Refresh the demo list
-== Demo listesini yenile
-
-Open the selected folder
-== Seçili dosyayı aç
-
-Play the selected demo
-== Seçili demoyu oynat
-
-Prediction margin
-== Tahmin etme payı
-
-Predict events (experimental)
-== Olayları tahmin et (deneysel)
-
-[Direct touch input]
-Relative aim
-== 
-
-[Predefined touch button behaviors]
-Joystick Relative Aim
-== 
-
-Virtual joystick which only aims and moves the mouse pointer relatively.
-== 
-
-[AntiPing: predict other players]
-Off
-== 
-
-[AntiPing: predict other players]
-All
-== 
-
-[AntiPing: predict other players]
-Interact
-== 
-
-Always predict frozen players
-== 
-
-No country flags match your filter criteria
 == 

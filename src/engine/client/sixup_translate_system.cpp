@@ -1,5 +1,3 @@
-#include <base/dbg.h>
-
 #include <engine/client/client.h>
 
 int CClient::TranslateSysMsg(int *pMsgId, bool System, CUnpacker *pUnpacker, CPacker *pPacker, CNetChunk *pPacket, bool *pIsExMsg)

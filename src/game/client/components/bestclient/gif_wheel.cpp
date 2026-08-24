@@ -6,7 +6,7 @@
 
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
-#include <engine/http.h>
+#include <engine/shared/http.h>
 
 #include <generated/protocol.h>
 
@@ -247,7 +247,7 @@ void CGifWheel::EnsureThumbnail(CSlot &Slot)
 
 	Slot.m_ThumbnailRequested = true;
 
-	std::shared_ptr<IHttpRequest> pGet = HttpGet(Slot.m_aUrl);
+	std::shared_ptr<CHttpRequest> pGet = HttpGet(Slot.m_aUrl);
 	pGet->Timeout(CTimeout{8000, 0, 4096, 8});
 	pGet->MaxResponseSize(8 * 1024 * 1024);
 	pGet->FailOnErrorStatus(false);

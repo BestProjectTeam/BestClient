@@ -135,8 +135,8 @@ public:
 
 	void SetGamePaused(bool Paused);
 	bool IsGamePaused() const;
-	virtual void StartRound();
-	virtual void EndRound();
+	void StartRound();
+	void EndRound();
 	void ChangeMap(const char *pToMap);
 
 	/*
@@ -202,7 +202,7 @@ public:
 	// spawn
 	virtual bool CanSpawn(int Team, vec2 *pOutPos, int ClientId);
 
-	virtual void DoTeamChange(class CPlayer *pPlayer, int Team, bool DoChatMsg);
+	virtual void DoTeamChange(class CPlayer *pPlayer, int Team, bool DoChatMsg = true);
 
 	int TileFlagsToPickupFlags(int TileFlags) const;
 

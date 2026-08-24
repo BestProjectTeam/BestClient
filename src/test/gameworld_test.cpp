@@ -1,10 +1,10 @@
 #include "test.h"
 
 #include <base/logger.h>
+#include <base/system.h>
 #include <base/types.h>
 
 #include <engine/engine.h>
-#include <engine/http.h>
 #include <engine/kernel.h>
 #include <engine/server/databases/connection.h>
 #include <engine/server/databases/connection_pool.h>
@@ -33,14 +33,13 @@ bool IsInterrupted()
 	return false;
 }
 
-#if defined(CONF_PLATFORM_ANDROID)
+std::vector<std::string> FakeQueue;
 std::vector<std::string> FetchAndroidServerCommandQueue()
 {
-	return {};
+	return FakeQueue;
 }
-#endif
 
-class GameWorld : public ::testing::Test // NOLINT(readability-identifier-naming)
+class CTestGameWorld : public ::testing::Test
 {
 public:
 	IGameServer *m_pGameServer = nullptr;
@@ -49,12 +48,12 @@ public:
 	CTestInfo m_TestInfo;
 	std::unique_ptr<IStorage> m_pStorage;
 
-	CGameContext *GameServer() // NOLINT(readability-make-member-function-const)
+	CGameContext *GameServer()
 	{
 		return (CGameContext *)m_pGameServer;
 	}
 
-	GameWorld()
+	CTestGameWorld()
 	{
 		CServer *pServer = CreateServer();
 		m_pServer = pServer;
@@ -75,10 +74,6 @@ public:
 
 		IConfigManager *pConfigManager = CreateConfigManager();
 		m_pKernel->RegisterInterface(pConfigManager);
-
-		IEngineHttp *pEngineHttp = CreateEngineHttp();
-		m_pKernel->RegisterInterface(pEngineHttp); // IEngineHttp
-		m_pKernel->RegisterInterface(static_cast<IHttp *>(pEngineHttp), false);
 
 		IEngineAntibot *pEngineAntibot = CreateEngineAntibot();
 		m_pKernel->RegisterInterface(pEngineAntibot);
@@ -110,7 +105,10 @@ public:
 		m_pServer->m_pPersistentData = malloc(GameServer()->PersistentDataSize());
 		EXPECT_NE(m_pServer->LoadMap("coverage"), 0);
 
-		EXPECT_TRUE(pEngineHttp->Init(std::chrono::seconds{2})) << "Failed to initialize the HTTP client";
+		if(!pServer->m_Http.Init(std::chrono::seconds{2}))
+		{
+			log_error("server", "Failed to initialize the HTTP client.");
+		}
 
 		pServer->m_NetServer.SetCallbacks(
 			CServer::NewClientCallback,
@@ -127,7 +125,7 @@ public:
 		pServer->InitMaplist();
 	}
 
-	~GameWorld() override
+	~CTestGameWorld() override
 	{
 		m_pServer->m_Econ.Shutdown();
 		m_pServer->m_Fifo.Shutdown();
@@ -136,7 +134,7 @@ public:
 	}
 };
 
-TEST_F(GameWorld, ClosestCharacter)
+TEST_F(CTestGameWorld, ClosestCharacter)
 {
 	CNetObj_PlayerInput Input = {};
 	CCharacter *pChr1 = new(0) CCharacter(&GameServer()->m_World, Input);
@@ -151,7 +149,7 @@ TEST_F(GameWorld, ClosestCharacter)
 	EXPECT_EQ(pClosest, pChr1);
 }
 
-TEST_F(GameWorld, IntersectEntity)
+TEST_F(CTestGameWorld, IntersectEntity)
 {
 	CNetObj_PlayerInput Input = {};
 	CCharacter *pChrLeft = new(0) CCharacter(&GameServer()->m_World, Input);
@@ -252,7 +250,7 @@ TEST_F(GameWorld, IntersectEntity)
 	EXPECT_EQ(pIntersectedChar, pChrRight);
 }
 
-TEST_F(GameWorld, BasicTick)
+TEST_F(CTestGameWorld, BasicTick)
 {
 	int ClientId = 0;
 	bool Afk = true;
@@ -263,7 +261,7 @@ TEST_F(GameWorld, BasicTick)
 	GameServer()->OnTick();
 }
 
-TEST_F(GameWorld, CharacterEmote)
+TEST_F(CTestGameWorld, CharacterEmote)
 {
 	int ClientId = 0;
 	bool Afk = true;

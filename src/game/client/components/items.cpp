@@ -163,9 +163,29 @@ void RenderCrystalLaserHead(IGraphics *pGraphics, vec2 From, vec2 Pos, const Col
 
 } // namespace
 
-void CItems::RenderProjectile(const CProjectileData *pCurrent, int ItemId, const CScreenRect &ScreenRect)
+void CItems::RenderProjectile(const CProjectileData *pCurrent, int ItemId)
 {
 	int CurWeapon = std::clamp(pCurrent->m_Type, 0, NUM_WEAPONS - 1);
+
+	// get positions
+	float Curvature = 0;
+	float Speed = 0;
+	const CTuningParams *pTuning = GameClient()->GetTuning(pCurrent->m_TuneZone);
+	if(CurWeapon == WEAPON_GRENADE)
+	{
+		Curvature = pTuning->m_GrenadeCurvature;
+		Speed = pTuning->m_GrenadeSpeed;
+	}
+	else if(CurWeapon == WEAPON_SHOTGUN)
+	{
+		Curvature = pTuning->m_ShotgunCurvature;
+		Speed = pTuning->m_ShotgunSpeed;
+	}
+	else if(CurWeapon == WEAPON_GUN)
+	{
+		Curvature = pTuning->m_GunCurvature;
+		Speed = pTuning->m_GunSpeed;
+	}
 
 	bool LocalPlayerInGame = false;
 
@@ -173,7 +193,7 @@ void CItems::RenderProjectile(const CProjectileData *pCurrent, int ItemId, const
 		LocalPlayerInGame = GameClient()->m_aClients[GameClient()->m_Snap.m_pLocalInfo->m_ClientId].m_Team != TEAM_SPECTATORS;
 
 	static float s_LastGameTickTime = Client()->GameTickTime(g_Config.m_ClDummy);
-	if(!GameClient()->IsWorldPaused() && !GameClient()->IsDemoPlaybackPaused())
+	if(GameClient()->m_Snap.m_pGameInfoObj && !(GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_PAUSED))
 		s_LastGameTickTime = Client()->GameTickTime(g_Config.m_ClDummy);
 
 	bool IsOtherTeam = (pCurrent->m_ExtraInfo && pCurrent->m_Owner >= 0 && GameClient()->IsOtherTeam(pCurrent->m_Owner));
@@ -208,10 +228,10 @@ void CItems::RenderProjectile(const CProjectileData *pCurrent, int ItemId, const
 		}
 	}
 
-	vec2 Pos = CalcPos(pCurrent->m_StartPos, pCurrent->m_StartVel, pCurrent->m_Curvature, pCurrent->m_Speed, Ct);
-	if(!ScreenRect.Inside(Pos) || !GameClient()->OptimizerAllowRenderPos(Pos))
+	vec2 Pos = CalcPos(pCurrent->m_StartPos, pCurrent->m_StartVel, Curvature, Speed, Ct);
+	if(!GameClient()->OptimizerAllowRenderPos(Pos))
 		return;
-	vec2 PrevPos = CalcPos(pCurrent->m_StartPos, pCurrent->m_StartVel, pCurrent->m_Curvature, pCurrent->m_Speed, Ct - 0.001f);
+	vec2 PrevPos = CalcPos(pCurrent->m_StartPos, pCurrent->m_StartVel, Curvature, Speed, Ct - 0.001f);
 
 	float Alpha = 1.f;
 	if(IsOtherTeam)
@@ -229,7 +249,17 @@ void CItems::RenderProjectile(const CProjectileData *pCurrent, int ItemId, const
 		static float s_Time = 0.0f;
 		static float s_LastLocalTime = LocalTime();
 
-		s_Time += (LocalTime() - s_LastLocalTime) * GameClient()->GetAnimationPlaybackSpeed();
+		if(Client()->State() == IClient::STATE_DEMOPLAYBACK)
+		{
+			const IDemoPlayer::CInfo *pInfo = DemoPlayer()->BaseInfo();
+			if(!pInfo->m_Paused)
+				s_Time += (LocalTime() - s_LastLocalTime) * pInfo->m_Speed;
+		}
+		else
+		{
+			if(GameClient()->m_Snap.m_pGameInfoObj && !(GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_PAUSED))
+				s_Time += LocalTime() - s_LastLocalTime;
+		}
 
 		Graphics()->QuadsSetRotation(s_Time * pi * 2 * 2 + ItemId);
 		s_LastLocalTime = LocalTime();
@@ -327,7 +357,17 @@ void CItems::RenderPickup(const CNetObj_Pickup *pPrev, const CNetObj_Pickup *pCu
 	static float s_Time = 0.0f;
 	static float s_LastLocalTime = LocalTime();
 	float Offset = Pos.y / 32.0f + Pos.x / 32.0f;
-	s_Time += (LocalTime() - s_LastLocalTime) * GameClient()->GetAnimationPlaybackSpeed();
+	if(Client()->State() == IClient::STATE_DEMOPLAYBACK)
+	{
+		const IDemoPlayer::CInfo *pInfo = DemoPlayer()->BaseInfo();
+		if(!pInfo->m_Paused)
+			s_Time += (LocalTime() - s_LastLocalTime) * pInfo->m_Speed;
+	}
+	else
+	{
+		if(GameClient()->m_Snap.m_pGameInfoObj && !(GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_PAUSED))
+			s_Time += LocalTime() - s_LastLocalTime;
+	}
 	Pos += direction(s_Time * 2.0f + Offset) * 2.5f;
 	s_LastLocalTime = LocalTime();
 
@@ -608,28 +648,11 @@ void CItems::OnRender()
 	bool BlinkingProjEx = (Ticks % 6) < 2;
 	bool BlinkingLight = (Ticks % 6) < 2;
 	int SwitcherTeam = GameClient()->SwitchStateTeam();
-	int DraggerStartTick = std::max((Client()->GameTick(g_Config.m_ClDummy) / 7) * 7, Client()->GameTick(g_Config.m_ClDummy) - 4);
+	int DraggerStartTick = maximum((Client()->GameTick(g_Config.m_ClDummy) / 7) * 7, Client()->GameTick(g_Config.m_ClDummy) - 4);
 	int GunStartTick = (Client()->GameTick(g_Config.m_ClDummy) / 7) * 7;
 
 	bool UsePredicted = GameClient()->Predict() && GameClient()->AntiPingGunfire();
 	auto &aSwitchers = GameClient()->Switchers();
-
-	CScreenRect ScreenRectLaser = Graphics()->GetScreen();
-	CScreenRect ScreenRectProjectile = ScreenRectLaser;
-	CScreenRect ScreenRectPickup = ScreenRectLaser;
-
-	constexpr float TileSize = 64.0f;
-	ScreenRectProjectile.Expand(TileSize);
-	ScreenRectLaser.Expand(TileSize / 2.0f);
-	ScreenRectPickup.Expand(1.75f * TileSize, 0.75f * TileSize);
-
-	auto IsLaserInside = [&](const CLaserData &LaserData) -> bool {
-		const vec2 &From = LaserData.m_From;
-		const vec2 &To = LaserData.m_To;
-		return !((From.x < ScreenRectLaser.m_TopLeft.x && To.x < ScreenRectLaser.m_TopLeft.x) || (From.x > ScreenRectLaser.m_BottomRight.x && To.x > ScreenRectLaser.m_BottomRight.x) ||
-			 (From.y < ScreenRectLaser.m_TopLeft.y && To.y < ScreenRectLaser.m_TopLeft.y) || (From.y > ScreenRectLaser.m_BottomRight.y && To.y > ScreenRectLaser.m_BottomRight.y));
-	};
-
 	if(UsePredicted)
 	{
 		// BestClient: practice projectiles/lasers live in the copied practice world
@@ -640,7 +663,7 @@ void CItems::OnRender()
 				continue;
 
 			CProjectileData Data = pProj->GetData();
-			RenderProjectile(&Data, pProj->GetId(), ScreenRectProjectile);
+			RenderProjectile(&Data, pProj->GetId());
 		}
 		for(CEntity *pEnt = PrevWorld.FindFirst(CGameWorld::ENTTYPE_LASER); pEnt; pEnt = pEnt->NextEntity())
 		{
@@ -648,8 +671,6 @@ void CItems::OnRender()
 			if(!pLaser || pLaser->GetOwner() < 0 || !GameClient()->m_aClients[pLaser->GetOwner()].m_IsPredictedLocal)
 				continue;
 			CLaserData Data = pLaser->GetData();
-			if(!IsLaserInside(Data))
-				continue;
 			RenderLaser(&Data, true);
 		}
 		for(auto *pPickup = (CPickup *)PrevWorld.FindFirst(CGameWorld::ENTTYPE_PICKUP); pPickup; pPickup = (CPickup *)pPickup->NextEntity())
@@ -700,13 +721,11 @@ void CItems::OnRender()
 						continue;
 				}
 			}
-			RenderProjectile(&Data, Item.m_Id, ScreenRectProjectile);
+			RenderProjectile(&Data, Item.m_Id);
 		}
 		else if(Item.m_Type == NETOBJTYPE_PICKUP || Item.m_Type == NETOBJTYPE_DDNETPICKUP)
 		{
 			CPickupData Data = ExtractPickupInfo(Item.m_Type, pData, pEntEx);
-			if(!ScreenRectPickup.Inside(Data.m_Pos))
-				continue;
 			bool Inactive = !IsSuper && Data.m_SwitchNumber > 0 && Data.m_SwitchNumber < (int)aSwitchers.size() && !aSwitchers[Data.m_SwitchNumber].m_aStatus[SwitcherTeam];
 
 			if(Inactive && BlinkingPickup)
@@ -731,8 +750,6 @@ void CItems::OnRender()
 			}
 
 			CLaserData Data = ExtractLaserInfo(Item.m_Type, pData, &GameClient()->m_GameWorld, pEntEx);
-			if(!IsLaserInside(Data))
-				continue;
 			bool Inactive = !IsSuper && Data.m_SwitchNumber > 0 && Data.m_SwitchNumber < (int)aSwitchers.size() && !aSwitchers[Data.m_SwitchNumber].m_aStatus[SwitcherTeam];
 
 			bool IsEntBlink = false;
@@ -864,6 +881,27 @@ void CItems::ReconstructSmokeTrail(const CProjectileData *pCurrent, int DestroyT
 	if(PredictionTick == pCurrent->m_StartTick)
 		return;
 
+	// get positions
+	float Curvature = 0;
+	float Speed = 0;
+	const CTuningParams *pTuning = GameClient()->GetTuning(pCurrent->m_TuneZone);
+
+	if(pCurrent->m_Type == WEAPON_GRENADE)
+	{
+		Curvature = pTuning->m_GrenadeCurvature;
+		Speed = pTuning->m_GrenadeSpeed;
+	}
+	else if(pCurrent->m_Type == WEAPON_SHOTGUN)
+	{
+		Curvature = pTuning->m_ShotgunCurvature;
+		Speed = pTuning->m_ShotgunSpeed;
+	}
+	else if(pCurrent->m_Type == WEAPON_GUN)
+	{
+		Curvature = pTuning->m_GunCurvature;
+		Speed = pTuning->m_GunSpeed;
+	}
+
 	float Pt = ((float)(PredictionTick - pCurrent->m_StartTick) + Client()->PredIntraGameTick(g_Config.m_ClDummy)) / (float)Client()->GameTickSpeed();
 	if(Pt < 0)
 		return; // projectile haven't been shot yet
@@ -878,19 +916,19 @@ void CItems::ReconstructSmokeTrail(const CProjectileData *pCurrent, int DestroyT
 
 	float T = Pt;
 	if(DestroyTick >= 0)
-		T = std::min(Pt, ((float)(DestroyTick - 1 - pCurrent->m_StartTick) + Client()->PredIntraGameTick(g_Config.m_ClDummy)) / (float)Client()->GameTickSpeed());
+		T = minimum(Pt, ((float)(DestroyTick - 1 - pCurrent->m_StartTick) + Client()->PredIntraGameTick(g_Config.m_ClDummy)) / (float)Client()->GameTickSpeed());
 
 	float MinTrailSpan = 0.4f * ((pCurrent->m_Type == WEAPON_GRENADE) ? 0.5f : 0.25f);
-	float Step = std::max(Client()->FrameTimeAverage(), (pCurrent->m_Type == WEAPON_GRENADE) ? 0.02f : 0.01f);
+	float Step = maximum(Client()->FrameTimeAverage(), (pCurrent->m_Type == WEAPON_GRENADE) ? 0.02f : 0.01f);
 	for(int i = 1 + (int)(Gt / Step); i < (int)(T / Step); i++)
 	{
 		float t = Step * (float)i + 0.4f * Step * random_float(-0.5f, 0.5f);
-		vec2 Pos = CalcPos(pCurrent->m_StartPos, pCurrent->m_StartVel, pCurrent->m_Curvature, pCurrent->m_Speed, t);
-		vec2 PrevPos = CalcPos(pCurrent->m_StartPos, pCurrent->m_StartVel, pCurrent->m_Curvature, pCurrent->m_Speed, t - 0.001f);
+		vec2 Pos = CalcPos(pCurrent->m_StartPos, pCurrent->m_StartVel, Curvature, Speed, t);
+		vec2 PrevPos = CalcPos(pCurrent->m_StartPos, pCurrent->m_StartVel, Curvature, Speed, t - 0.001f);
 		vec2 Vel = Pos - PrevPos;
 		float TimePassed = Pt - t;
 		if(Pt - MinTrailSpan > 0.01f)
-			TimePassed = std::min(TimePassed, (TimePassed - MinTrailSpan) / (Pt - MinTrailSpan) * (MinTrailSpan * 0.5f) + MinTrailSpan);
+			TimePassed = minimum(TimePassed, (TimePassed - MinTrailSpan) / (Pt - MinTrailSpan) * (MinTrailSpan * 0.5f) + MinTrailSpan);
 		// add particle for this projectile
 		if(pCurrent->m_Type == WEAPON_GRENADE)
 			GameClient()->m_Effects.SmokeTrail(Pos, Vel * -1, Alpha, TimePassed);

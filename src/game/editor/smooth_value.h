@@ -1,17 +1,16 @@
 #ifndef GAME_EDITOR_SMOOTH_VALUE_H
 #define GAME_EDITOR_SMOOTH_VALUE_H
 
-#include "editor_object.h"
+#include "component.h"
 
 #include <base/bezier.h>
 
 /**
  * A value that is changed smoothly over time.
  */
-class CSmoothValue : public CEditorObject
+class CSmoothValue : public CEditorComponent
 {
 public:
-	CSmoothValue() = default;
 	CSmoothValue(float InitialValue, float MinValue, float MaxValue);
 
 	/**
@@ -20,9 +19,9 @@ public:
 	void SetValue(float Target);
 
 	/**
-	 * Scale the value by the given amount.
+	 * Change the value by the given amount.
 	 */
-	void ScaleValue(float Factor);
+	void ChangeValue(float Amount);
 
 	/**
 	 * Set the value to the target instantly. If the value was changing the
@@ -38,7 +37,7 @@ public:
 	float GetMaxValue() const;
 
 private:
-	float Progress(float CurrentTime) const;
+	float ZoomProgress(float CurrentTime) const;
 
 	bool m_Smoothing;
 	float m_Value;

@@ -1,6 +1,5 @@
 #include "custom_communities.h"
 
-#include <base/dbg.h>
 #include <base/log.h>
 
 #include <engine/client/serverbrowser.h>

@@ -6,7 +6,6 @@
 #include <base/io.h>
 #include <base/log.h>
 #include <base/str.h>
-#include <base/time.h>
 
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
@@ -91,7 +90,7 @@ void CVideo::Init()
 	av_log_set_callback(AvLogCallback);
 }
 
-CVideo::CVideo(IGraphics *pGraphics, ISound *pSound, IStorage *pStorage, int Width, int Height, int64_t LocalStartTime, const char *pName) :
+CVideo::CVideo(IGraphics *pGraphics, ISound *pSound, IStorage *pStorage, int Width, int Height, const char *pName) :
 	m_pGraphics(pGraphics),
 	m_pStorage(pStorage),
 	m_pSound(pSound)
@@ -108,8 +107,6 @@ CVideo::CVideo(IGraphics *pGraphics, ISound *pSound, IStorage *pStorage, int Wid
 	str_copy(m_aName, pName);
 
 	m_FPS = g_Config.m_ClVideoRecorderFPS;
-	m_TickTime = time_freq() / m_FPS;
-	m_LocalStartTime = LocalStartTime;
 
 	m_Recording = false;
 	m_Started = false;
@@ -120,6 +117,8 @@ CVideo::CVideo(IGraphics *pGraphics, ISound *pSound, IStorage *pStorage, int Wid
 	m_HasAudio = m_pSound->IsSoundEnabled() && g_Config.m_ClVideoSndEnable;
 
 	dbg_assert(ms_pCurrentVideo == nullptr, "ms_pCurrentVideo is NOT set to nullptr while creating a new Video.");
+
+	ms_TickTime = time_freq() / m_FPS;
 	ms_pCurrentVideo = this;
 }
 
@@ -288,8 +287,7 @@ bool CVideo::Start()
 	m_Recording = true;
 	m_Started = true;
 	m_Stopped = false;
-	m_Time = time_get();
-	m_LocalTime = (m_Time - m_LocalStartTime) / (float)time_freq();
+	ms_Time = time_get();
 	return true;
 }
 
@@ -418,8 +416,8 @@ void CVideo::NextVideoFrame()
 {
 	if(m_Recording)
 	{
-		m_Time += m_TickTime;
-		m_LocalTime = (m_Time - m_LocalStartTime) / (float)time_freq();
+		ms_Time += ms_TickTime;
+		ms_LocalTime = (ms_Time - ms_LocalStartTime) / (float)time_freq();
 	}
 }
 
@@ -560,12 +558,12 @@ void CVideo::FillAudioFrame(size_t ThreadIndex)
 		return;
 	}
 
-	const int MakeWritableResult = av_frame_make_writable(m_AudioStream.m_vpFrames[ThreadIndex]);
-	if(MakeWritableResult < 0)
+	const int MakeWriteableResult = av_frame_make_writable(m_AudioStream.m_vpFrames[ThreadIndex]);
+	if(MakeWriteableResult < 0)
 	{
 		char aError[AV_ERROR_MAX_STRING_SIZE];
-		av_strerror(MakeWritableResult, aError, sizeof(aError));
-		log_error("videorecorder", "Could not make audio frame writable: %s", aError);
+		av_strerror(MakeWriteableResult, aError, sizeof(aError));
+		log_error("videorecorder", "Could not make audio frame writeable: %s", aError);
 		return;
 	}
 
@@ -1048,9 +1046,7 @@ void CVideo::WriteFrame(COutputStream *pStream, size_t ThreadIndex)
 			}
 		}
 		else
-		{
 			break;
-		}
 	} while(true);
 
 	if(RecvResult && RecvResult != AVERROR(EAGAIN))
@@ -1098,9 +1094,7 @@ void CVideo::FinishFrames(COutputStream *pStream)
 			}
 		}
 		else
-		{
 			break;
-		}
 	} while(true);
 
 	if(RecvResult && RecvResult != AVERROR_EOF)

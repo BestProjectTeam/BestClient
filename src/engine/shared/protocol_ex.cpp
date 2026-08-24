@@ -3,8 +3,7 @@
 #include "config.h"
 #include "uuid_manager.h"
 
-#include <base/dbg.h>
-#include <base/mem.h>
+#include <base/system.h>
 
 #include <engine/message.h>
 

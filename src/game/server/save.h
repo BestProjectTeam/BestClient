@@ -43,8 +43,7 @@ public:
 	void Save(CCharacter *pChr, bool AddPenalty = true);
 	bool Load(CCharacter *pChr, std::optional<int> Team = std::nullopt);
 	char *GetString(const CSaveTeam *pTeam);
-	// returns false if the tee could not be parsed or contains invalid values
-	bool FromString(const char *pString, int MembersCount);
+	int FromString(const char *pString);
 	void LoadHookedPlayer(const CSaveTeam *pTeam);
 	bool IsHooking() const;
 	vec2 GetPos() const { return m_Pos; }

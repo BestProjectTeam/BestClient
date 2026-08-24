@@ -19,7 +19,6 @@ namespace FontIcon
 	inline const char *const BOMB = "\uF1E2";
 	inline const char *const BOOKMARK = "\uF02E";
 	inline const char *const BORDER_ALL = "\uF84C";
-	inline const char *const BRUSH = "\uF55D";
 	inline const char *const CAMERA = "\uF030";
 	inline const char *const CHECK = "\uF00C";
 	inline const char *const CHESS_BISHOP = "\uF43A";

@@ -2,21 +2,20 @@
 
 #include "editor.h"
 
-#include <engine/graphics.h>
 #include <engine/keys.h>
 
 static constexpr int MIN_GRID_FACTOR = 1;
 static constexpr int MAX_GRID_FACTOR = 15;
 
-void CMapGrid::CState::Reset()
+void CMapGrid::OnReset()
 {
 	m_GridActive = false;
 	m_GridFactor = 1;
 }
 
-void CMapGrid::Render()
+void CMapGrid::OnRender(CUIRect View)
 {
-	if(!IsEnabled())
+	if(!m_GridActive)
 	{
 		return;
 	}
@@ -29,45 +28,47 @@ void CMapGrid::Render()
 
 	pGroup->MapScreen();
 
-	CScreenRect GroupRect = pGroup->Mapping();
+	float aGroupPoints[4];
+	pGroup->Mapping(aGroupPoints);
 
-	CScreenRect ScreenRect = Graphics()->GetScreen();
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
 
 	const int LineDistance = GridLineDistance();
 
-	const int XOffset = GroupRect.m_TopLeft.x / LineDistance;
-	const int YOffset = GroupRect.m_TopLeft.y / LineDistance;
-	const int XGridOffset = XOffset % Factor();
-	const int YGridOffset = YOffset % Factor();
+	const int XOffset = aGroupPoints[0] / LineDistance;
+	const int YOffset = aGroupPoints[1] / LineDistance;
+	const int XGridOffset = XOffset % m_GridFactor;
+	const int YGridOffset = YOffset % m_GridFactor;
 
-	const int NumColumns = (int)std::ceil(ScreenRect.Width() / LineDistance) + 1;
-	const int NumRows = (int)std::ceil(ScreenRect.Height() / LineDistance) + 1;
+	const int NumColumns = (int)std::ceil((ScreenX1 - ScreenX0) / LineDistance) + 1;
+	const int NumRows = (int)std::ceil((ScreenY1 - ScreenY0) / LineDistance) + 1;
 
 	Graphics()->TextureClear();
 
 	IGraphics::CLineItemBatch LineItemBatch;
-	if(Factor() > 1)
+	if(m_GridFactor > 1)
 	{
 		Graphics()->LinesBatchBegin(&LineItemBatch);
 		Graphics()->SetColor(1.0f, 1.0f, 1.0f, 0.15f);
 		for(int y = 0; y < NumRows; y++)
 		{
-			if((y + YGridOffset) % Factor() == 0)
+			if((y + YGridOffset) % m_GridFactor == 0)
 			{
 				continue;
 			}
 			const float PosY = LineDistance * (y + YOffset);
-			const IGraphics::CLineItem Line = IGraphics::CLineItem(ScreenRect.m_TopLeft.x, PosY, ScreenRect.m_BottomRight.x, PosY);
+			const IGraphics::CLineItem Line = IGraphics::CLineItem(ScreenX0, PosY, ScreenX1, PosY);
 			Graphics()->LinesBatchDraw(&LineItemBatch, &Line, 1);
 		}
 		for(int x = 0; x < NumColumns; x++)
 		{
-			if((x + XGridOffset) % Factor() == 0)
+			if((x + XGridOffset) % m_GridFactor == 0)
 			{
 				continue;
 			}
 			const float PosX = LineDistance * (x + XOffset);
-			const IGraphics::CLineItem Line = IGraphics::CLineItem(PosX, ScreenRect.m_TopLeft.y, PosX, ScreenRect.m_BottomRight.y);
+			const IGraphics::CLineItem Line = IGraphics::CLineItem(PosX, ScreenY0, PosX, ScreenY1);
 			Graphics()->LinesBatchDraw(&LineItemBatch, &Line, 1);
 		}
 		Graphics()->LinesBatchEnd(&LineItemBatch);
@@ -77,22 +78,22 @@ void CMapGrid::Render()
 	Graphics()->SetColor(1.0f, 0.3f, 0.3f, 0.3f);
 	for(int y = 0; y < NumRows; y++)
 	{
-		if((y + YGridOffset) % Factor() != 0)
+		if((y + YGridOffset) % m_GridFactor != 0)
 		{
 			continue;
 		}
 		const float PosY = LineDistance * (y + YOffset);
-		const IGraphics::CLineItem Line = IGraphics::CLineItem(ScreenRect.m_TopLeft.x, PosY, ScreenRect.m_BottomRight.x, PosY);
+		const IGraphics::CLineItem Line = IGraphics::CLineItem(ScreenX0, PosY, ScreenX1, PosY);
 		Graphics()->LinesBatchDraw(&LineItemBatch, &Line, 1);
 	}
 	for(int x = 0; x < NumColumns; x++)
 	{
-		if((x + XGridOffset) % Factor() != 0)
+		if((x + XGridOffset) % m_GridFactor != 0)
 		{
 			continue;
 		}
 		const float PosX = LineDistance * (x + XOffset);
-		const IGraphics::CLineItem Line = IGraphics::CLineItem(PosX, ScreenRect.m_TopLeft.y, PosX, ScreenRect.m_BottomRight.y);
+		const IGraphics::CLineItem Line = IGraphics::CLineItem(PosX, ScreenY0, PosX, ScreenY1);
 		Graphics()->LinesBatchDraw(&LineItemBatch, &Line, 1);
 	}
 	Graphics()->LinesBatchEnd(&LineItemBatch);
@@ -121,29 +122,29 @@ int CMapGrid::GridLineDistance() const
 
 void CMapGrid::SnapToGrid(vec2 &Position) const
 {
-	const int GridDistance = GridLineDistance() * Factor();
+	const int GridDistance = GridLineDistance() * m_GridFactor;
 	Position.x = (int)((Position.x + (Position.x >= 0 ? 1.0f : -1.0f) * GridDistance / 2) / GridDistance) * GridDistance;
 	Position.y = (int)((Position.y + (Position.y >= 0 ? 1.0f : -1.0f) * GridDistance / 2) / GridDistance) * GridDistance;
 }
 
 bool CMapGrid::IsEnabled() const
 {
-	return Map()->m_MapGridState.m_GridActive;
+	return m_GridActive;
 }
 
 void CMapGrid::Toggle()
 {
-	Map()->m_MapGridState.m_GridActive = !Map()->m_MapGridState.m_GridActive;
+	m_GridActive = !m_GridActive;
 }
 
 int CMapGrid::Factor() const
 {
-	return Map()->m_MapGridState.m_GridFactor;
+	return m_GridFactor;
 }
 
 void CMapGrid::SetFactor(int Factor)
 {
-	Map()->m_MapGridState.m_GridFactor = std::clamp(Factor, MIN_GRID_FACTOR, MAX_GRID_FACTOR);
+	m_GridFactor = std::clamp(Factor, MIN_GRID_FACTOR, MAX_GRID_FACTOR);
 }
 
 void CMapGrid::DoSettingsPopup(vec2 Position)

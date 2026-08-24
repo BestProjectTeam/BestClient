@@ -6,7 +6,6 @@
 #include <game/client/components/controls.h>
 #include <game/client/gameclient.h>
 
-#include <algorithm>
 #include <cmath>
 
 bool CCloudInput::IsActive() const
@@ -39,7 +38,7 @@ const CNetObj_PlayerInput &CCloudInput::Input(int Dummy) const
 	return m_aInput[Dummy];
 }
 
-bool CCloudInput::CheckNewInput(CControls &Controls)
+bool CCloudInput::CheckNewInput(const CControls &Controls)
 {
 	bool NewInput[2] = {};
 	for(int Dummy = 0; Dummy < NUM_DUMMIES; Dummy++)
@@ -47,15 +46,11 @@ bool CCloudInput::CheckNewInput(CControls &Controls)
 		CNetObj_PlayerInput NextInput = Controls.m_aInputData[Dummy];
 		if(Dummy == g_Config.m_ClDummy)
 		{
-			const bool LeftPressed = Controls.m_aInputDirectionLeft[Dummy] != 0;
-			const bool RightPressed = Controls.m_aInputDirectionRight[Dummy] != 0;
-			NextInput.m_Direction = Controls.ResolveMovementDirection(Dummy, LeftPressed, RightPressed, /*UpdateState=*/false);
-		}
-
-		if(Dummy == g_Config.m_ClDummy && g_Config.m_ClSubTickAiming)
-		{
-			NextInput.m_TargetX = (int)Controls.m_aMousePos[Dummy].x;
-			NextInput.m_TargetY = (int)Controls.m_aMousePos[Dummy].y;
+			NextInput.m_Direction = 0;
+			if(Controls.m_aInputDirectionLeft[Dummy] && !Controls.m_aInputDirectionRight[Dummy])
+				NextInput.m_Direction = -1;
+			if(!Controls.m_aInputDirectionLeft[Dummy] && Controls.m_aInputDirectionRight[Dummy])
+				NextInput.m_Direction = 1;
 		}
 
 		if(m_aInput[Dummy].m_Direction != NextInput.m_Direction)
@@ -73,6 +68,12 @@ bool CCloudInput::CheckNewInput(CControls &Controls)
 		if(m_aInput[Dummy].m_WantedWeapon != NextInput.m_WantedWeapon)
 			NewInput[Dummy] = true;
 
+		if(Dummy == g_Config.m_ClDummy && g_Config.m_ClSubTickAiming)
+		{
+			NextInput.m_TargetX = (int)Controls.m_aMousePos[Dummy].x;
+			NextInput.m_TargetY = (int)Controls.m_aMousePos[Dummy].y;
+		}
+
 		m_aInput[Dummy] = NextInput;
 	}
 
@@ -86,12 +87,7 @@ void CCloudInput::ApplyOffset(const CGameClient &GameClient, int ClientId, int &
 	if(!GameClient.IsFastInputLocalClient(ClientId) && (!g_Config.m_BcCloudInputOthers || !GameClient.m_ReceivedPreInput))
 		return;
 
-	// Others are only predicted one extra tick (see OthersTickOffset); never apply the full self amount.
-	const float Offset = GameClient.IsFastInputLocalClient(ClientId) ? Amount() : (float)OthersTickOffset();
-	if(Offset <= 0.0f)
-		return;
-
-	const float TotalSmoothTick = (Tick - 1) + Intra + Offset;
+	const float TotalSmoothTick = (Tick - 1) + Intra + Amount();
 	Tick = (int)TotalSmoothTick + 1;
 	Intra = TotalSmoothTick - (int)TotalSmoothTick;
 	if(Intra < 0.0f && Tick > 0)
@@ -106,26 +102,12 @@ bool CCloudInput::TryGetPredPos(const CGameClient &GameClient, int ClientId, int
 	if(!IsActive() || Tick <= 0)
 		return false;
 
-	const int TickOffset = GameClient.IsFastInputLocalClient(ClientId) ? SelfTickOffset() : OthersTickOffset();
-	const int MaxTick = GameClient.Client()->PredGameTick(g_Config.m_ClDummy) + TickOffset;
-	int SampleTick = std::min(Tick, MaxTick);
+	const int MaxTick = GameClient.Client()->PredGameTick(g_Config.m_ClDummy) + SelfTickOffset();
+	if(GameClient.m_aClients[ClientId].m_aPredTick[(Tick - 1) % 200] != Tick - 1 ||
+		GameClient.m_aClients[ClientId].m_aPredTick[Tick % 200] != Tick ||
+		GameClient.m_aClients[ClientId].m_aPredTick[Tick % 200] > MaxTick)
+		return false;
 
-	// Keep the cloud-input feel stable when the prediction ring has a temporary gap.
-	// Use the closest contiguous pair instead of falling back to the regular prediction
-	// position. The requested tick is still capped by the correct local/others horizon.
-	while(SampleTick > 1)
-	{
-		if(GameClient.m_aClients[ClientId].m_aPredTick[(SampleTick - 1) % 200] == SampleTick - 1 &&
-			GameClient.m_aClients[ClientId].m_aPredTick[SampleTick % 200] == SampleTick)
-		{
-			const float SampleIntra = SampleTick == Tick ? Intra : 1.0f;
-			OutPos = mix(
-				GameClient.m_aClients[ClientId].m_aPredPos[(SampleTick - 1) % 200],
-				GameClient.m_aClients[ClientId].m_aPredPos[SampleTick % 200],
-				SampleIntra);
-			return true;
-		}
-		SampleTick--;
-	}
-	return false;
+	OutPos = mix(GameClient.m_aClients[ClientId].m_aPredPos[(Tick - 1) % 200], GameClient.m_aClients[ClientId].m_aPredPos[Tick % 200], Intra);
+	return true;
 }

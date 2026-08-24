@@ -225,8 +225,7 @@ namespace
 		       Module == HudLayout::MODULE_VOICE_TALKERS ||
 		       Module == HudLayout::MODULE_VOICE_STATUS ||
 		       Module == HudLayout::MODULE_MUSIC_PLAYER ||
-		       Module == HudLayout::MODULE_SWAP_TIMER ||
-		       Module == HudLayout::MODULE_EDGE_INFO;
+		       Module == HudLayout::MODULE_SWAP_TIMER;
 	}
 
 	bool PointInRect(vec2 Point, const CUIRect &Rect)
@@ -586,10 +585,6 @@ CHudEditor::SModuleVisual CHudEditor::GetModuleVisual(HudLayout::EModule Module)
 		Visual.m_Rect = GameClient()->m_SwapTimer.GetHudEditorRect();
 		Visual.m_Rounding = 4.0f;
 		break;
-	case HudLayout::MODULE_EDGE_INFO:
-		Visual.m_Rect = GameClient()->m_EdgeHelper.GetHudEditorRect();
-		Visual.m_Rounding = 3.0f;
-		break;
 	default:
 		Visual.m_Rect = GetFallbackModuleRect(Module);
 		Visual.m_Rounding = 4.0f;
@@ -639,7 +634,6 @@ void CHudEditor::CollectModuleVisuals(SModuleVisual *pOut, int &Count) const
 	AddModule(HudLayout::MODULE_VOICE_STATUS);
 	if(g_Config.m_BcSwapTimerStyle == 0)
 		AddModule(HudLayout::MODULE_SWAP_TIMER);
-	AddModule(HudLayout::MODULE_EDGE_INFO);
 }
 
 HudLayout::EModule CHudEditor::HitTestModule(vec2 MousePos) const
@@ -1253,7 +1247,7 @@ void CHudEditor::RenderOverlay(vec2 MousePos)
 {
 	const float Width = HudWidth();
 	const float Height = HudHeight();
-	Graphics()->MapScreen(CScreenRect(vec2(0.0f, 0.0f), vec2(Width, Height)));
+	Graphics()->MapScreen(0.0f, 0.0f, Width, Height);
 	Graphics()->TextureClear();
 	Graphics()->DrawRect(0.0f, 0.0f, Width, Height, ColorRGBA(0.0f, 0.0f, 0.0f, 0.38f), IGraphics::CORNER_ALL, 0.0f);
 
@@ -1276,7 +1270,6 @@ void CHudEditor::RenderOverlay(vec2 MousePos)
 	GameClient()->m_VoiceChat.RenderHudTalkingIndicator(Width, Height, true);
 	GameClient()->m_VoiceChat.RenderHudMuteStatusIndicator(Width, Height, true);
 	GameClient()->m_SwapTimer.RenderPreview();
-	GameClient()->m_EdgeHelper.RenderPreview();
 
 	SModuleVisual aVisuals[MAX_MODULE_VISUALS];
 	int Count = 0;
@@ -1328,7 +1321,7 @@ void CHudEditor::RenderOverlay(vec2 MousePos)
 		if(m_PopupClosePhase <= 0.001f)
 			m_PopupClosing = false;
 	}
-	Graphics()->MapScreen(CScreenRect(vec2(0.0f, 0.0f), vec2(Width, Height)));
+	Graphics()->MapScreen(0.0f, 0.0f, Width, Height);
 	RenderTools()->RenderCursor(MousePos, 12.0f);
 }
 

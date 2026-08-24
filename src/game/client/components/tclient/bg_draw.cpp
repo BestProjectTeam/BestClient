@@ -541,11 +541,7 @@ void CBgDraw::OnRender()
 	MakeSpaceFor(0);
 	// Update age of items, delete old items, render items
 	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
-	const CScreenRect ScreenRect = Graphics()->GetScreen();
-	ScreenX0 = ScreenRect.m_TopLeft.x;
-	ScreenY0 = ScreenRect.m_TopLeft.y;
-	ScreenX1 = ScreenRect.m_BottomRight.x;
-	ScreenY1 = ScreenRect.m_BottomRight.y;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
 	for(CBgDrawItem &Item : *m_pvItems)
 	{
 		// If this item is currently active

@@ -53,7 +53,7 @@ const CAdminPanel::SActionSpec s_aActionSpecs[] = {
 	{CAdminPanel::EAction::MUTE, "muteid", CAdminPanel::AUTH_FALLBACK_HELPER, true, CAdminPanel::EActionField::REASON_DURATION_SECONDS},
 	{CAdminPanel::EAction::BAN, "ban", CAdminPanel::AUTH_FALLBACK_MOD, true, CAdminPanel::EActionField::REASON_DURATION_MINUTES},
 	{CAdminPanel::EAction::KICK, "kick", CAdminPanel::AUTH_FALLBACK_MOD, true, CAdminPanel::EActionField::REASON},
-	{CAdminPanel::EAction::RESPAWN, "respawn", CAdminPanel::AUTH_FALLBACK_MOD, true, CAdminPanel::EActionField::REASON},
+	{CAdminPanel::EAction::RESPAWN, "kill_pl", CAdminPanel::AUTH_FALLBACK_MOD, true, CAdminPanel::EActionField::REASON},
 	{CAdminPanel::EAction::FORCE_PAUSE, "force_pause", CAdminPanel::AUTH_FALLBACK_MOD, true, CAdminPanel::EActionField::DURATION_SECONDS},
 };
 
@@ -337,7 +337,7 @@ bool CAdminPanel::TryBuildActionCommand(char *pBuffer, int BufferSize) const
 	}
 	if(m_ActionPopupType == EAction::RESPAWN)
 	{
-		str_format(pBuffer, BufferSize, "respawn %d %s", m_ActionPopupClientId, m_ActionReasonInput.IsEmpty() ? "Respawned by admin panel" : pReason);
+		str_format(pBuffer, BufferSize, "kill_pl %d %s", m_ActionPopupClientId, m_ActionReasonInput.IsEmpty() ? "Respawned by admin panel" : pReason);
 		return true;
 	}
 	if(m_ActionPopupType == EAction::FORCE_PAUSE)
@@ -459,9 +459,11 @@ void CAdminPanel::RenderPlayerActions(CUIRect View)
 	static vec2 s_ActionScrollOffset(0.0f, 0.0f);
 	CScrollRegionParams ScrollParams;
 	ScrollParams.m_ScrollUnit = 30.0f;
-	ScrollParams.m_ScrollbarThickness = 14.0f;
+	ScrollParams.m_ScrollbarWidth = 14.0f;
 	ScrollParams.m_ScrollbarMargin = 3.0f;
-	s_ActionScroll.Begin(&View, &ScrollParams);
+	s_ActionScroll.Begin(&View, &s_ActionScrollOffset, &ScrollParams);
+	View.y += s_ActionScrollOffset.y;
+
 	auto DoActionPopupButton = [&](CButtonContainer &Button, const SActionSpec &Spec, CUIRect ButtonRect) {
 		const bool Enabled = IsActionEnabled(Spec, m_SelectedClientId);
 		if(s_ActionScroll.AddRect(ButtonRect))
@@ -961,11 +963,13 @@ void CAdminPanel::RenderLogs(CUIRect View)
 
 	CScrollRegionParams ScrollParams;
 	ScrollParams.m_ScrollUnit = 40.0f;
-	ScrollParams.m_ScrollbarThickness = 14.0f;
+	ScrollParams.m_ScrollbarWidth = 14.0f;
 	ScrollParams.m_ScrollbarMargin = 3.0f;
 	ScrollParams.m_ClipBgColor = ColorRGBA(0.0f, 0.0f, 0.0f, 0.18f);
-	s_LogScroll.Begin(&View, &ScrollParams);
+	s_LogScroll.Begin(&View, &s_LogScrollOffset, &ScrollParams);
 	const float ClipH = View.h;
+	View.y += s_LogScrollOffset.y;
+
 	const float LineHeight = 15.0f;
 	const int NumLines = (int)m_RconLogLines.size();
 	int LineIndex = 0;
@@ -1003,7 +1007,7 @@ void CAdminPanel::RenderLogs(CUIRect View)
 	else
 	{
 		// Match CScrollRegion::AddRect content height for the last real line (no phantom spacer).
-		const float ContentH = NumLines * LineHeight + 1.0f;
+		const float ContentH = NumLines * LineHeight + CScrollRegion::HEIGHT_MAGIC_FIX;
 		const float MaxScroll = maximum(0.0f, ContentH - ClipH);
 		m_LogStickToBottom = (-s_LogScrollOffset.y) >= MaxScroll - 2.0f;
 	}

@@ -3,7 +3,6 @@
 #ifndef ENGINE_SERVER_H
 #define ENGINE_SERVER_H
 
-#include "console.h"
 #include "kernel.h"
 #include "message.h"
 
@@ -20,7 +19,6 @@
 #include <generated/protocol7.h>
 #include <generated/protocolglue.h>
 
-#include <algorithm>
 #include <array>
 #include <optional>
 #include <type_traits>
@@ -85,8 +83,7 @@ public:
 	virtual int GetClientVersion(int ClientId) const = 0;
 	virtual int SendMsg(CMsgPacker *pMsg, int Flags, int ClientId) = 0;
 
-	template<class T>
-		requires(!protocol7::is_sixup<T>::value)
+	template<class T, typename std::enable_if<!protocol7::is_sixup<T>::value, int>::type = 0>
 	int SendPackMsg(const T *pMsg, int Flags, int ClientId)
 	{
 		int Result = 0;
@@ -103,8 +100,7 @@ public:
 		return Result;
 	}
 
-	template<class T>
-		requires(protocol7::is_sixup<T>::value)
+	template<class T, typename std::enable_if<protocol7::is_sixup<T>::value, int>::type = 1>
 	int SendPackMsg(const T *pMsg, int Flags, int ClientId)
 	{
 		int Result = 0;
@@ -112,12 +108,10 @@ public:
 		{
 			for(int i = 0; i < MaxClients(); i++)
 				if(ClientIngame(i) && IsSixup(i))
-					Result = SendPackMsgTranslate(pMsg, Flags, i);
+					Result = SendPackMsgOne(pMsg, Flags, i);
 		}
 		else if(IsSixup(ClientId))
-		{
-			Result = SendPackMsgTranslate(pMsg, Flags, ClientId);
-		}
+			Result = SendPackMsgOne(pMsg, Flags, ClientId);
 
 		return Result;
 	}
@@ -128,125 +122,48 @@ public:
 		return SendPackMsgOne(pMsg, Flags, ClientId);
 	}
 
-	int SendPackMsgTranslate(const CNetMsg_Sv_Chat *pMsg, int Flags, int ClientId)
+	int SendPackMsgTranslate(const CNetMsg_Sv_Emoticon *pMsg, int Flags, int ClientId)
 	{
-		protocol7::CNetMsg_Sv_Chat Msg;
-		Msg.m_ClientId = pMsg->m_ClientId;
-		Msg.m_Mode = pMsg->m_Team ? protocol7::CHAT_TEAM : protocol7::CHAT_ALL;
-		Msg.m_pMessage = pMsg->m_pMessage;
-		Msg.m_TargetId = -1;
-		return SendPackMsgTranslateChat(&Msg, Flags, ClientId);
+		CNetMsg_Sv_Emoticon MsgCopy;
+		mem_copy(&MsgCopy, pMsg, sizeof(MsgCopy));
+		return Translate(MsgCopy.m_ClientId, ClientId) && SendPackMsgOne(&MsgCopy, Flags, ClientId);
 	}
 
-	// This function is directly being called from CGameContext.
-	// Whisper will always be managed in 0.7 format and only in this function properly
-	// translated for either 0.6 or 0.7 connection including 128p translation.
-	int SendPackMsgTranslateChat(const protocol7::CNetMsg_Sv_Chat *pMsg, int Flags, int ClientId)
+	int SendPackMsgTranslate(const CNetMsg_Sv_Chat *pMsg, int Flags, int ClientId)
 	{
-		protocol7::CNetMsg_Sv_Chat MsgCopy = *pMsg;
+		CNetMsg_Sv_Chat MsgCopy;
+		mem_copy(&MsgCopy, pMsg, sizeof(MsgCopy));
 
-		// 0.6 whisper send/recv
-		int WhisperSend = TEAM_WHISPER_SEND + (int)protocol7::NUM_CHATS;
-		int WhisperRecv = TEAM_WHISPER_RECV + (int)protocol7::NUM_CHATS;
-		int *pId = MsgCopy.m_Mode == WhisperSend ? &MsgCopy.m_TargetId : &MsgCopy.m_ClientId;
-
-		// 128 player translation
-		char aBuf[512];
-		if(GetClientVersion(ClientId) < VERSION_DDNET_128_PLAYERS)
+		char aBuf[1000];
+		if(MsgCopy.m_ClientId >= 0 && !Translate(MsgCopy.m_ClientId, ClientId))
 		{
-			// force "Name: message" for team messages from other players to not show duplicate messages when dummy is connected
-			if(*pId >= 0 && ((MsgCopy.m_Mode == protocol7::CHAT_TEAM && *pId != ClientId) || MsgCopy.m_Mode == WhisperRecv || !Translate(*pId, ClientId)))
-			{
-				str_format(aBuf, sizeof(aBuf), "%s: %s", ClientName(*pId), MsgCopy.m_pMessage);
-				MsgCopy.m_pMessage = aBuf;
-
-				// with noname and sending a whisper to ourselves show our own client id as targetid because otherwise it would be two times id 63 with same text which gets shown twice the same msg
-				if(MsgCopy.m_Mode == WhisperSend && *pId == ClientId)
-					Translate(*pId, ClientId);
-				else
-					*pId = LEGACY_MAX_CLIENTS - 1;
-			}
+			str_format(aBuf, sizeof(aBuf), "%s: %s", ClientName(MsgCopy.m_ClientId), MsgCopy.m_pMessage);
+			MsgCopy.m_pMessage = aBuf;
+			MsgCopy.m_ClientId = VANILLA_MAX_CLIENTS - 1;
 		}
 
 		if(IsSixup(ClientId))
 		{
-			if(MsgCopy.m_Mode == WhisperSend)
-			{
-				Translate(MsgCopy.m_ClientId, ClientId);
-				MsgCopy.m_Mode = protocol7::CHAT_WHISPER;
-			}
-			else if(MsgCopy.m_Mode == WhisperRecv)
-			{
-				Translate(MsgCopy.m_TargetId, ClientId);
-				MsgCopy.m_Mode = protocol7::CHAT_WHISPER;
-			}
-			return SendPackMsgOne(&MsgCopy, Flags, ClientId);
+			protocol7::CNetMsg_Sv_Chat Msg7;
+			Msg7.m_ClientId = MsgCopy.m_ClientId;
+			Msg7.m_pMessage = MsgCopy.m_pMessage;
+			Msg7.m_Mode = MsgCopy.m_Team > 0 ? protocol7::CHAT_TEAM : protocol7::CHAT_ALL;
+			Msg7.m_TargetId = -1;
+			return SendPackMsgOne(&Msg7, Flags, ClientId);
 		}
 
-		CNetMsg_Sv_Chat Msg;
-		if(MsgCopy.m_Mode == WhisperSend || MsgCopy.m_Mode == WhisperRecv)
-			Msg.m_Team = MsgCopy.m_Mode - protocol7::NUM_CHATS;
-		else
-			Msg.m_Team = (int)(MsgCopy.m_Mode == protocol7::CHAT_TEAM);
-		Msg.m_ClientId = *pId;
-		Msg.m_pMessage = MsgCopy.m_pMessage;
-		return SendPackMsgOne(&Msg, Flags, ClientId);
+		return SendPackMsgOne(&MsgCopy, Flags, ClientId);
 	}
 
 	int SendPackMsgTranslate(const CNetMsg_Sv_KillMsg *pMsg, int Flags, int ClientId)
 	{
-		CNetMsg_Sv_KillMsg MsgCopy = *pMsg;
+		CNetMsg_Sv_KillMsg MsgCopy;
+		mem_copy(&MsgCopy, pMsg, sizeof(MsgCopy));
 		if(!Translate(MsgCopy.m_Victim, ClientId))
 			return 0;
 		if(!Translate(MsgCopy.m_Killer, ClientId))
 			MsgCopy.m_Killer = MsgCopy.m_Victim;
 		return SendPackMsgOne(&MsgCopy, Flags, ClientId);
-	}
-
-	int SendPackMsgTranslate(const CNetMsg_Sv_KillMsgTeam *pMsg, int Flags, int ClientId)
-	{
-		CNetMsg_Sv_KillMsgTeam MsgCopy = *pMsg;
-		if(!Translate(MsgCopy.m_First, ClientId))
-			MsgCopy.m_First = -1;
-		return SendPackMsgOne(&MsgCopy, Flags, ClientId);
-	}
-
-	int SendPackMsgTranslate(const CNetMsg_Sv_Emoticon *pMsg, int Flags, int ClientId)
-	{
-		CNetMsg_Sv_Emoticon MsgCopy = *pMsg;
-		return Translate(MsgCopy.m_ClientId, ClientId) && SendPackMsgOne(&MsgCopy, Flags, ClientId);
-	}
-
-	int SendPackMsgTranslate(const protocol7::CNetMsg_Sv_VoteSet *pMsg, int Flags, int ClientId)
-	{
-		protocol7::CNetMsg_Sv_VoteSet MsgCopy = *pMsg;
-		if(!Translate(MsgCopy.m_ClientId, ClientId))
-			MsgCopy.m_ClientId = -1;
-		return SendPackMsgOne(&MsgCopy, Flags, ClientId);
-	}
-
-	int SendPackMsgTranslate(const protocol7::CNetMsg_Sv_Team *pMsg, int Flags, int ClientId)
-	{
-		protocol7::CNetMsg_Sv_Team MsgCopy = *pMsg;
-		return Translate(MsgCopy.m_ClientId, ClientId) && SendPackMsgOne(&MsgCopy, Flags, ClientId);
-	}
-
-	int SendPackMsgTranslate(const protocol7::CNetMsg_Sv_SkinChange *pMsg, int Flags, int ClientId)
-	{
-		protocol7::CNetMsg_Sv_SkinChange MsgCopy = *pMsg;
-		return Translate(MsgCopy.m_ClientId, ClientId) && SendPackMsgOne(&MsgCopy, Flags, ClientId);
-	}
-
-	int SendPackMsgTranslate(const protocol7::CNetMsg_Sv_ClientInfo *pMsg, int Flags, int ClientId)
-	{
-		protocol7::CNetMsg_Sv_ClientInfo MsgCopy = *pMsg;
-		return (Flags & MSGFLAG_NOTRANSLATE || Translate(MsgCopy.m_ClientId, ClientId)) && SendPackMsgOne(&MsgCopy, Flags, ClientId);
-	}
-
-	int SendPackMsgTranslate(const protocol7::CNetMsg_Sv_ClientDrop *pMsg, int Flags, int ClientId)
-	{
-		protocol7::CNetMsg_Sv_ClientDrop MsgCopy = *pMsg;
-		return (Flags & MSGFLAG_NOTRANSLATE || Translate(MsgCopy.m_ClientId, ClientId)) && SendPackMsgOne(&MsgCopy, Flags, ClientId);
 	}
 
 	int SendPackMsgTranslate(const CNetMsg_Sv_RaceFinish *pMsg, int Flags, int ClientId)
@@ -259,11 +176,9 @@ public:
 			Msg7.m_Time = pMsg->m_Time;
 			Msg7.m_RecordPersonal = pMsg->m_RecordPersonal;
 			Msg7.m_RecordServer = pMsg->m_RecordServer;
-			return Translate(Msg7.m_ClientId, ClientId) && SendPackMsgOne(&Msg7, Flags, ClientId);
+			return SendPackMsgOne(&Msg7, Flags, ClientId);
 		}
-
-		CNetMsg_Sv_RaceFinish MsgCopy = *pMsg;
-		return Translate(MsgCopy.m_ClientId, ClientId) && SendPackMsgOne(&MsgCopy, Flags, ClientId);
+		return SendPackMsgOne(pMsg, Flags, ClientId);
 	}
 
 	template<class T>
@@ -277,32 +192,34 @@ public:
 		return SendMsg(&Packer, Flags, ClientId);
 	}
 
-	bool Translate(int &Target, int ClientId)
+	bool Translate(int &Target, int Client)
 	{
-		// console and server demo pseudo clients operate on untranslated ids (SERVER_DEMO_CLIENT == IConsole::CLIENT_ID_UNSPECIFIED)
-		if(ClientId == SERVER_DEMO_CLIENT || ClientId == IConsole::CLIENT_ID_GAME || ClientId == IConsole::CLIENT_ID_NO_GAME)
+		if(IsSixup(Client))
 			return true;
-		if(GetClientVersion(ClientId) >= VERSION_DDNET_128_PLAYERS)
+		if(GetClientVersion(Client) >= VERSION_DDNET_OLD)
 			return true;
-		if(Target < 0 || Target >= MAX_CLIENTS)
-			return false;
-		int *pMap = GetReverseIdMap(ClientId);
-		if(pMap[Target] == -1)
-			return false;
-		Target = pMap[Target];
-		return true;
+		int *pMap = GetIdMap(Client);
+		bool Found = false;
+		for(int i = 0; i < VANILLA_MAX_CLIENTS; i++)
+		{
+			if(Target == pMap[i])
+			{
+				Target = i;
+				Found = true;
+				break;
+			}
+		}
+		return Found;
 	}
 
-	bool ReverseTranslate(int &Target, int ClientId)
+	bool ReverseTranslate(int &Target, int Client)
 	{
-		// console and server demo pseudo clients operate on untranslated ids (SERVER_DEMO_CLIENT == IConsole::CLIENT_ID_UNSPECIFIED)
-		if(ClientId == SERVER_DEMO_CLIENT || ClientId == IConsole::CLIENT_ID_GAME || ClientId == IConsole::CLIENT_ID_NO_GAME)
+		if(IsSixup(Client))
 			return true;
-		if(GetClientVersion(ClientId) >= VERSION_DDNET_128_PLAYERS)
+		if(GetClientVersion(Client) >= VERSION_DDNET_OLD)
 			return true;
-		if(Target < 0 || Target >= LEGACY_MAX_CLIENTS)
-			return false;
-		int *pMap = GetIdMap(ClientId);
+		Target = std::clamp(Target, 0, VANILLA_MAX_CLIENTS - 1);
+		int *pMap = GetIdMap(Client);
 		if(pMap[Target] == -1)
 			return false;
 		Target = pMap[Target];
@@ -317,19 +234,18 @@ public:
 	virtual void SetClientScore(int ClientId, std::optional<int> Score) = 0;
 	virtual void SetClientFlags(int ClientId, int Flags) = 0;
 
-	virtual std::optional<int> SnapNewId() = 0;
+	virtual int SnapNewId() = 0;
 	virtual void SnapFreeId(int Id) = 0;
-	virtual bool SnapNewItem(int Type, int Id, const void *pData, int Size) = 0;
+	virtual void *SnapNewItem(int Type, int Id, int Size) = 0;
 
 	template<typename T>
-	bool SnapNewItem(int Id, const T &Data)
+	T *SnapNewItem(int Id)
 	{
 		const int Type = protocol7::is_sixup<T>::value ? -T::ms_MsgId : T::ms_MsgId;
-		return SnapNewItem(Type, Id, &Data, sizeof(Data));
+		return static_cast<T *>(SnapNewItem(Type, Id, sizeof(T)));
 	}
 
 	virtual void SnapSetStaticsize(int ItemType, int Size) = 0;
-	virtual void SnapSetStaticsize7(int ItemType, int Size) = 0;
 
 	enum
 	{
@@ -359,7 +275,6 @@ public:
 	virtual void StopDemos() = 0;
 
 	virtual int *GetIdMap(int ClientId) = 0;
-	virtual int *GetReverseIdMap(int ClientId) = 0;
 
 	virtual bool DnsblWhite(int ClientId) = 0;
 	virtual bool DnsblPending(int ClientId) = 0;
@@ -459,7 +374,6 @@ public:
 
 	virtual void OnPreTickTeehistorian() = 0;
 
-	virtual void OnSetTimedOut(int ClientId) = 0;
 	virtual void OnSetAuthed(int ClientId, int Level) = 0;
 	virtual bool PlayerExists(int ClientId) const = 0;
 

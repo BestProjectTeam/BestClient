@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 print("#ifndef GENERATED_WORDLIST_H")
 print("#define GENERATED_WORDLIST_H")
 print("const char g_aFallbackWordlist[][32] = {")

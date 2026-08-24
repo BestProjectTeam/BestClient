@@ -1,5 +1,4 @@
-#include <base/dbg.h>
-#include <base/hash.h>
+#include <base/system.h>
 
 #include <game/mapbugs.h>
 

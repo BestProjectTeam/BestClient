@@ -71,7 +71,7 @@ int CGhostRecorder::Start(const char *pFilename, const char *pMap, const SHA256_
 	Header.m_MapSha256 = MapSha256;
 	io_write(m_File, &Header, sizeof(Header));
 
-	m_LastItem = std::nullopt;
+	m_LastItem.Reset();
 	ResetBuffer();
 
 	log_info_color(LOG_COLOR_GHOST, "ghost_recorder", "Recording to '%s'", pFilename);
@@ -108,23 +108,20 @@ void CGhostRecorder::WriteData(int Type, const void *pData, size_t Size)
 		FlushChunk();
 	}
 
-	CGhostItem Data;
+	CGhostItem Data(Type);
 	mem_copy(Data.m_aData, pData, Size);
-	Data.m_Size = Size;
-	Data.m_Type = Type;
-	if(m_LastItem.has_value() && m_LastItem.value().m_Type == Data.m_Type)
+	if(m_LastItem.m_Type == Data.m_Type)
 	{
-		dbg_assert(m_LastItem.value().m_Size == Data.m_Size, "Size mismatch between current and last item");
-		DiffItem((const uint32_t *)m_LastItem.value().m_aData, (const uint32_t *)Data.m_aData, (uint32_t *)m_pBufferPos, Data.m_Size / sizeof(uint32_t));
+		DiffItem((const uint32_t *)m_LastItem.m_aData, (const uint32_t *)Data.m_aData, (uint32_t *)m_pBufferPos, Size / sizeof(uint32_t));
 	}
 	else
 	{
 		FlushChunk();
-		mem_copy(m_pBufferPos, Data.m_aData, Data.m_Size);
+		mem_copy(m_pBufferPos, Data.m_aData, Size);
 	}
 
 	m_LastItem = Data;
-	m_pBufferPos += Data.m_Size;
+	m_pBufferPos += Size;
 	m_BufferNumItems++;
 	if(m_BufferNumItems >= NUM_ITEMS_PER_CHUNK)
 	{
@@ -142,13 +139,12 @@ void CGhostRecorder::FlushChunk()
 		return;
 	}
 	dbg_assert(Size % sizeof(uint32_t) == 0, "Chunk size invalid");
-	dbg_assert(m_LastItem.has_value(), "Tried to flush chunk without last item");
 
 	Size = CVariableInt::Compress(m_aBuffer, Size, m_aBufferTemp, sizeof(m_aBufferTemp));
 	if(Size < 0)
 	{
 		log_info_color(LOG_COLOR_GHOST, "ghost_recorder", "Failed to write chunk to '%s': error during intpack compression", m_aFilename);
-		m_LastItem = std::nullopt;
+		m_LastItem.Reset();
 		ResetBuffer();
 		return;
 	}
@@ -157,13 +153,13 @@ void CGhostRecorder::FlushChunk()
 	if(Size < 0)
 	{
 		log_info_color(LOG_COLOR_GHOST, "ghost_recorder", "Failed to write chunk to '%s': error during network compression", m_aFilename);
-		m_LastItem = std::nullopt;
+		m_LastItem.Reset();
 		ResetBuffer();
 		return;
 	}
 
 	unsigned char aChunkHeader[4];
-	aChunkHeader[0] = m_LastItem.value().m_Type & 0xff;
+	aChunkHeader[0] = m_LastItem.m_Type & 0xff;
 	aChunkHeader[1] = m_BufferNumItems & 0xff;
 	aChunkHeader[2] = (Size >> 8) & 0xff;
 	aChunkHeader[3] = Size & 0xff;
@@ -171,7 +167,7 @@ void CGhostRecorder::FlushChunk()
 	io_write(m_File, aChunkHeader, sizeof(aChunkHeader));
 	io_write(m_File, m_aBuffer, Size);
 
-	m_LastItem = std::nullopt;
+	m_LastItem.Reset();
 	ResetBuffer();
 }
 
@@ -189,7 +185,7 @@ void CGhostRecorder::Stop(int Ticks, int Time)
 		FlushChunk();
 
 		// write number of ticks and time
-		io_seek(m_File, offsetof(CGhostHeader, m_aNumTicks), EIoSeekOrigin::START);
+		io_seek(m_File, offsetof(CGhostHeader, m_aNumTicks), IOSEEK_START);
 
 		unsigned char aNumTicks[sizeof(int32_t)];
 		uint_to_bytes_be(aNumTicks, Ticks);
@@ -242,31 +238,15 @@ IOHANDLE CGhostLoader::ReadHeader(CGhostHeader &Header, const char *pFilename, c
 		return nullptr;
 	}
 
-	if(io_read(File, &Header, sizeof(Header) - sizeof(SHA256_DIGEST)) != sizeof(Header) - sizeof(SHA256_DIGEST))
+	if(io_read(File, &Header, sizeof(Header)) != sizeof(Header))
 	{
 		log_error_color(LOG_COLOR_GHOST, "ghost_loader", "Failed to read ghost file '%s': failed to read header", pFilename);
 		io_close(File);
 		return nullptr;
 	}
 
-	if(!ValidateHeader(Header, pFilename))
-	{
-		io_close(File);
-		return nullptr;
-	}
-
-	if(Header.m_Version < 6)
-	{
-		mem_zero(&Header.m_MapSha256, sizeof(Header.m_MapSha256));
-	}
-	else if(io_read(File, &Header.m_MapSha256, sizeof(SHA256_DIGEST)) != sizeof(SHA256_DIGEST))
-	{
-		log_error_color(LOG_COLOR_GHOST, "ghost_loader", "Failed to read ghost file '%s': failed to read header map SHA256", pFilename);
-		io_close(File);
-		return nullptr;
-	}
-
-	if(!CheckHeaderMap(Header, pFilename, pMap, MapSha256, MapCrc, LogMapMismatch))
+	if(!ValidateHeader(Header, pFilename) ||
+		!CheckHeaderMap(Header, pFilename, pMap, MapSha256, MapCrc, LogMapMismatch))
 	{
 		io_close(File);
 		return nullptr;
@@ -371,11 +351,16 @@ bool CGhostLoader::Load(const char *pFilename, const char *pMap, const SHA256_DI
 		return false;
 	}
 
+	if(Header.m_Version < 6)
+	{
+		io_skip(File, -(int)sizeof(SHA256_DIGEST));
+	}
+
 	m_File = File;
 	str_copy(m_aFilename, pFilename);
 	m_Header = Header;
 	m_Info = m_Header.ToGhostInfo();
-	m_LastItem = std::nullopt;
+	m_LastItem.Reset();
 	ResetBuffer();
 	return true;
 }
@@ -384,18 +369,13 @@ bool CGhostLoader::ReadChunk(int *pType)
 {
 	if(m_Header.m_Version != 4)
 	{
-		m_LastItem = std::nullopt;
+		m_LastItem.Reset();
 	}
 	ResetBuffer();
 
 	unsigned char aChunkHeader[4];
-	const unsigned ReadHeaderSize = io_read(m_File, aChunkHeader, sizeof(aChunkHeader));
-	if(ReadHeaderSize != sizeof(aChunkHeader))
+	if(io_read(m_File, aChunkHeader, sizeof(aChunkHeader)) != sizeof(aChunkHeader))
 	{
-		if(ReadHeaderSize != 0)
-		{
-			log_error_color(LOG_COLOR_GHOST, "ghost_loader", "Failed to read ghost file '%s': chunk header truncated", m_aFilename);
-		}
 		return false; // EOF
 	}
 
@@ -439,8 +419,7 @@ bool CGhostLoader::ReadNextType(int *pType)
 
 	if(m_BufferCurItem != m_BufferPrevItem && m_BufferCurItem < m_BufferNumItems)
 	{
-		dbg_assert(m_LastItem.has_value(), "Buffer contains items but last item is unset");
-		*pType = m_LastItem.value().m_Type;
+		*pType = m_LastItem.m_Type;
 	}
 	else if(!ReadChunk(pType))
 	{
@@ -475,24 +454,20 @@ bool CGhostLoader::ReadData(int Type, void *pData, size_t Size)
 		return false;
 	}
 
-	CGhostItem Data;
-	Data.m_Size = Size;
-	Data.m_Type = Type;
-	if(m_LastItem.has_value())
+	CGhostItem Data(Type);
+	if(m_LastItem.m_Type == Data.m_Type)
 	{
-		dbg_assert(m_LastItem.value().m_Type == Data.m_Type, "Type mismatch between current and last item");
-		dbg_assert(m_LastItem.value().m_Size == Data.m_Size, "Size mismatch between current and last item");
-		UndiffItem((const uint32_t *)m_LastItem.value().m_aData, (const uint32_t *)m_pBufferPos, (uint32_t *)Data.m_aData, Data.m_Size / sizeof(uint32_t));
+		UndiffItem((const uint32_t *)m_LastItem.m_aData, (const uint32_t *)m_pBufferPos, (uint32_t *)Data.m_aData, Size / sizeof(uint32_t));
 	}
 	else
 	{
-		mem_copy(Data.m_aData, m_pBufferPos, Data.m_Size);
+		mem_copy(Data.m_aData, m_pBufferPos, Size);
 	}
 
-	mem_copy(pData, Data.m_aData, Data.m_Size);
+	mem_copy(pData, Data.m_aData, Size);
 
 	m_LastItem = Data;
-	m_pBufferPos += Data.m_Size;
+	m_pBufferPos += Size;
 	m_BufferCurItem++;
 	return true;
 }

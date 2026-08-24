@@ -2,6 +2,7 @@
 #include "rollback_demo.h"
 
 #include <base/system.h>
+#include <base/types.h>
 
 #include <engine/client.h>
 #include <engine/demo.h>

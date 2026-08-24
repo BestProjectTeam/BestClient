@@ -1,3 +1,5 @@
+#include <base/system.h>
+
 #include <game/version.h>
 
 #include <gtest/gtest.h>

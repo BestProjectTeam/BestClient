@@ -1,8 +1,7 @@
 /* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 
-#include <base/dbg.h>
-#include <base/str.h>
+#include <base/system.h>
 
 #include <engine/kernel.h>
 
@@ -89,7 +88,7 @@ public:
 	IInterface *RequestInterfaceImpl(const char *pName) override
 	{
 		CInterfaceInfo *pInfo = FindInterfaceInfo(pName);
-		dbg_assert(pInfo != nullptr, "Interface '%s' not found", pName);
+		dbg_assert(pInfo != nullptr, "Interface not found");
 		return pInfo->m_pInterface;
 	}
 };

@@ -6,7 +6,7 @@
 #include "graph.h"
 
 #include <base/math.h>
-#include <base/time.h>
+#include <base/system.h>
 
 #include <engine/shared/config.h>
 

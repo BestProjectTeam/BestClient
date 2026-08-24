@@ -79,8 +79,8 @@ class CHud : public CComponent
 	ESpeedChange m_aLastPlayerSpeedChange[2];
 	STextContainerIndex m_aPlayerPositionContainers[2];
 	float m_aPlayerPrevPosition[2];
-	STextContainerIndex m_PlayerCheckpointTextContainerIndex;
-	int m_PlayerPrevCheckpoint = -1;
+	int m_aLastTimeCheckpoint[MAX_CLIENTS] = {};
+	int m_TotalTimeCheckpoints = -1;
 
 	void RenderCursor();
 
@@ -112,9 +112,7 @@ class CHud : public CComponent
 	void RenderMovementInformation(bool ForcePreview = false);
 
 	void UpdateMovementInformationTextContainer(STextContainerIndex &TextContainer, float FontSize, float Value, float &PrevValue);
-	void UpdateMovementInformationTextContainer(STextContainerIndex &TextContainer, float FontSize, int Value, int &PrevValue);
 	void RenderMovementInformationTextContainer(STextContainerIndex &TextContainer, const ColorRGBA &Color, float X, float Y);
-	int GetCheckpointId() const;
 
 	class CMovementInformation
 	{
@@ -137,7 +135,8 @@ class CHud : public CComponent
 		bool m_ShowDummyPos = false;
 		bool m_ShowDummySpeed = false;
 		bool m_ShowDummyAngle = false;
-		int m_Checkpoint = -1;
+		int m_Checkpoint = 0;
+		int m_TotalCheckpoints = 0;
 		CMovementInformation m_Info;
 		CMovementInformation m_DummyInfo;
 	};
@@ -276,7 +275,6 @@ private:
 	mutable int m_FinishPredictionLastPredictTick = -1;
 	mutable int m_FinishPredictionFinishedRaceTick = -1;
 	mutable bool m_FinishPredictionUsingFastPractice = false;
-	mutable bool m_FinishPredictionAnalyseTeleFreeze = false;
 
 	inline int GetDigitsIndex(int Value, int Max);
 

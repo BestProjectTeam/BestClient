@@ -67,7 +67,7 @@ jobs:
       if: contains(matrix.os, 'ubuntu')
       run: |
         sudo apt-get update -y
-        sudo apt-get install pkg-config ninja-build libcurl4-openssl-dev libdbus-1-dev libfreetype6-dev libnotify-dev libogg-dev libopus-dev libopusfile-dev libsdl2-dev libsqlite3-dev libpng-dev libvulkan-dev libglew-dev -y
+        sudo apt-get install pkg-config ninja-build libcurl4-openssl-dev libfreetype6-dev libnotify-dev libogg-dev libopus-dev libopusfile-dev libsdl2-dev libsqlite3-dev libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev libx264-dev libpng-dev libvulkan-dev libglew-dev -y
 
     - name: Install Vulkan SDK
       uses: humbletim/install-vulkan-sdk@v1.2
@@ -100,16 +100,6 @@ jobs:
         }
         $CertPath = Join-Path $env:RUNNER_TEMP "codesign.pfx"
         [IO.File]::WriteAllBytes($CertPath, [Convert]::FromBase64String($env:WINDOWS_CERT_BASE64))
-        $Certificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new(
-          $CertPath,
-          $env:WINDOWS_CERT_PASSWORD,
-          [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
-        )
-        if($Certificate.Subject -eq $Certificate.Issuer) {
-          Write-Warning "Skipping Authenticode signing: a self-signed certificate is not trusted by Windows and can cause the executable to be blocked."
-          Remove-Item $CertPath -Force
-          exit 0
-        }
         $SignTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
           Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
         if(-not $SignTool) { throw "signtool.exe not found" }

@@ -3,7 +3,6 @@
 #include "particles.h"
 
 #include <base/math.h>
-#include <base/dbg.h>
 #include <base/time.h>
 
 #include <engine/demo.h>
@@ -15,7 +14,7 @@
 
 CParticles::CParticles()
 {
-	CParticles::OnReset();
+	OnReset();
 	m_RenderTrail.m_pParts = this;
 	m_RenderTrailExtra.m_pParts = this;
 	m_RenderExplosions.m_pParts = this;
@@ -45,8 +44,17 @@ void CParticles::Add(int Group, CParticle *pPart, float TimePassed)
 	if(GameClient()->OptimizerDisableParticles())
 		return;
 
-	if(GameClient()->IsWorldPaused() || GameClient()->IsDemoPlaybackPaused())
-		return;
+	if(Client()->State() == IClient::STATE_DEMOPLAYBACK)
+	{
+		const IDemoPlayer::CInfo *pInfo = DemoPlayer()->BaseInfo();
+		if(pInfo->m_Paused)
+			return;
+	}
+	else
+	{
+		if(GameClient()->m_Snap.m_pGameInfoObj && GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_PAUSED)
+			return;
+	}
 
 	if(m_FirstFree == -1)
 		return;
@@ -145,15 +153,26 @@ void CParticles::OnRender()
 		return;
 
 	set_new_tick();
-	const int64_t Now = time();
+	int64_t t = time();
 	if(GameClient()->OptimizerDisableParticles())
 	{
-		m_LastRenderTime = Now;
+		m_LastRenderTime = t;
 		return;
 	}
 
-	Update((float)((Now - m_LastRenderTime) / (double)time_freq()) * GameClient()->GetAnimationPlaybackSpeed());
-	m_LastRenderTime = Now;
+	if(Client()->State() == IClient::STATE_DEMOPLAYBACK)
+	{
+		const IDemoPlayer::CInfo *pInfo = DemoPlayer()->BaseInfo();
+		if(!pInfo->m_Paused)
+			Update((float)((t - m_LastRenderTime) / (double)time_freq()) * pInfo->m_Speed);
+	}
+	else
+	{
+		if(GameClient()->m_Snap.m_pGameInfoObj && !(GameClient()->m_Snap.m_pGameInfoObj->m_GameStateFlags & GAMESTATEFLAG_PAUSED))
+			Update((float)((t - m_LastRenderTime) / (double)time_freq()));
+	}
+
+	m_LastRenderTime = t;
 }
 
 void CParticles::OnInit()
@@ -181,19 +200,19 @@ void CParticles::OnInit()
 	Graphics()->QuadContainerUpload(m_ExtraParticleQuadContainerIndex);
 }
 
-bool CParticles::ParticleIsVisibleOnScreen(const vec2 &CurPos, float CurSize) const
+bool CParticles::ParticleIsVisibleOnScreen(const vec2 &CurPos, float CurSize)
 {
-	CScreenRect ScreenRect = Graphics()->GetScreen();
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
 
 	// for simplicity assume the worst case rotation, that increases the bounding box around the particle by its diagonal
 	const float SqrtOf2 = std::sqrt(2);
-	CurSize *= SqrtOf2;
+	CurSize = SqrtOf2 * CurSize;
 
 	// always uses the mid of the particle
 	float SizeHalf = CurSize / 2;
-	ScreenRect.Expand(SizeHalf);
 
-	return ScreenRect.Inside(CurPos);
+	return CurPos.x + SizeHalf >= ScreenX0 && CurPos.x - SizeHalf <= ScreenX1 && CurPos.y + SizeHalf >= ScreenY0 && CurPos.y - SizeHalf <= ScreenY1;
 }
 
 void CParticles::RenderGroup(int Group)
@@ -303,6 +322,7 @@ void CParticles::RenderGroup(int Group)
 	{
 		int i = m_aFirstPart[Group];
 
+		Graphics()->BlendNormal();
 		Graphics()->WrapClamp();
 
 		while(i != -1)
@@ -338,5 +358,6 @@ void CParticles::RenderGroup(int Group)
 			i = m_aParticles[i].m_NextPart;
 		}
 		Graphics()->WrapNormal();
+		Graphics()->BlendNormal();
 	}
 }
