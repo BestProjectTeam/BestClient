@@ -3987,7 +3987,7 @@ CUIRect CHud::GetFinishPredictionRect(bool ForcePreview) const
 	const float PaddingY = 4.0f * Scale;
 	const float Gap = 1.5f * Scale;
 	const bool ShowTime = g_Config.m_BcFinishPredictionShowTime != 0;
-	const bool ShowPercentage = g_Config.m_BcFinishPredictionShowPercentage != 0 || !State.m_HasPredictedTime;
+	const bool ShowPercentage = g_Config.m_BcFinishPredictionShowPercentage != 0;
 	const bool ShowMillis = g_Config.m_BcFinishPredictionShowMillis != 0;
 	if(!ShowTime && !ShowPercentage)
 		return {0.0f, 0.0f, 0.0f, 0.0f};
@@ -4028,7 +4028,7 @@ void CHud::RenderFinishPrediction(bool ForcePreview)
 	const int Corners = HudLayout::BackgroundCorners(IGraphics::CORNER_ALL, Rect.x, Rect.y, Rect.w, Rect.h, m_Width, m_Height);
 	const bool ShowTime = g_Config.m_BcFinishPredictionShowTime != 0;
 	const bool ShowRemaining = g_Config.m_BcFinishPredictionTimeMode == 0;
-	const bool ShowPercentage = g_Config.m_BcFinishPredictionShowPercentage != 0 || !State.m_HasPredictedTime;
+	const bool ShowPercentage = g_Config.m_BcFinishPredictionShowPercentage != 0;
 	const bool ShowMillis = g_Config.m_BcFinishPredictionShowMillis != 0;
 
 	if(Layout.m_BackgroundEnabled)
