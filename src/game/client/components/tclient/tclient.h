@@ -41,8 +41,6 @@ class CTClient : public CComponent
 
 	float m_FinishTextTimeout = 0.0f;
 	void DoFinishCheck();
-	bool m_aFinishFlagShown[MAX_CLIENTS] = {};
-	bool m_aFinishFlagCharacterWasInactive[MAX_CLIENTS] = {};
 
 	bool ServerCommandExists(const char *pCommand);
 
@@ -67,7 +65,6 @@ public:
 	void RenderMiniVoteHud();
 	void RenderCenterLines();
 	void RenderCtfFlag(vec2 Pos, float Alpha);
-	bool HasFinishFlag(int ClientId) const { return m_aFinishFlagShown[ClientId]; }
 
 	bool ChatDoSpecId(const char *pInput);
 	bool InfoTaskDone() { return m_pTClientInfoTask && m_pTClientInfoTask->State() == EHttpState::DONE; }

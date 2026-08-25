@@ -144,17 +144,6 @@ void CTClient::OnMessage(int MsgType, void *pRawMsg)
 	if(Client()->State() == IClient::STATE_DEMOPLAYBACK)
 		return;
 
-	if(MsgType == NETMSGTYPE_SV_RACEFINISH)
-	{
-		const CNetMsg_Sv_RaceFinish *pMsg = static_cast<const CNetMsg_Sv_RaceFinish *>(pRawMsg);
-		if(in_range(pMsg->m_ClientId, 0, MAX_CLIENTS - 1))
-		{
-			m_aFinishFlagShown[pMsg->m_ClientId] = true;
-			m_aFinishFlagCharacterWasInactive[pMsg->m_ClientId] = false;
-		}
-		return;
-	}
-
 	if(MsgType == NETMSGTYPE_SV_CHAT)
 	{
 		CNetMsg_Sv_Chat *pMsg = (CNetMsg_Sv_Chat *)pRawMsg;
@@ -673,26 +662,11 @@ void CTClient::OnStateChange(int OldState, int NewState)
 	SetForcedAspect();
 	for(auto &AirRescuePositions : m_aAirRescuePositions)
 		AirRescuePositions = {};
-	mem_zero(m_aFinishFlagShown, sizeof(m_aFinishFlagShown));
-	mem_zero(m_aFinishFlagCharacterWasInactive, sizeof(m_aFinishFlagCharacterWasInactive));
 }
 
 void CTClient::OnNewSnapshot()
 {
 	SetForcedAspect();
-	for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
-	{
-		if(!m_aFinishFlagShown[ClientId])
-			continue;
-
-		if(!GameClient()->m_Snap.m_aCharacters[ClientId].m_Active)
-			m_aFinishFlagCharacterWasInactive[ClientId] = true;
-		else if(m_aFinishFlagCharacterWasInactive[ClientId])
-		{
-			m_aFinishFlagShown[ClientId] = false;
-			m_aFinishFlagCharacterWasInactive[ClientId] = false;
-		}
-	}
 
 	// Update volleyball
 	bool IsVolleyBall = false;
