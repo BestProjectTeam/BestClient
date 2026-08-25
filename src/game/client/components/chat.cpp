@@ -981,7 +981,7 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 			CLine &Line = m_aLines[LineIndex];
 			if(!Line.m_Initialized || !Line.m_MediaPreviewRectValid || Line.m_MediaState != EMediaState::READY)
 				continue;
-			if(ShouldHideMediaPreview(Line) || ShouldHideNsfwMedia(Line))
+			if(ShouldHideMediaPreview(Line))
 				continue;
 
 			const SRenderRect &Rect = Line.m_MediaPreviewRect;
@@ -3249,17 +3249,6 @@ bool CChat::ShouldHideMediaPreview(const CLine &Line) const
 	return m_HideMediaByBind && !Line.m_MediaRevealed && ShouldDisplayMediaSlot(Line);
 }
 
-// Unlike ShouldHideMediaPreview (a spoiler toggle the user can click through), this is a hard
-// block: if we know a link is nsfw and the browser's "show NSFW" setting is off, there is no
-// click-to-reveal - the only way to see it is to enable that setting.
-bool CChat::ShouldHideNsfwMedia(const CLine &Line) const
-{
-	if(g_Config.m_BcCherryGifsShowNsfw || Line.m_aMediaUrl[0] == '\0')
-		return false;
-	bool Nsfw = false;
-	return GameClient()->m_CherryGifs.TryGetNsfw(Line.m_aMediaUrl, Nsfw) && Nsfw;
-}
-
 void CChat::ResetHiddenMediaReveals()
 {
 	for(auto &Line : m_aLines)
@@ -5295,7 +5284,6 @@ void CChat::OnRender()
 
 			const bool ShowMediaSlot = ShouldDisplayMediaSlot(Line);
 			const bool HideMediaPreview = ShouldHideMediaPreview(Line);
-			const bool HideNsfwMedia = ShouldHideNsfwMedia(Line);
 			const bool HasMediaPreview = Line.m_aMediaPreviewWidth[OffsetType] > 0.0f && Line.m_aMediaPreviewHeight[OffsetType] > 0.0f;
 			const float PreviewX = x + RealMsgPaddingX / 2.0f;
 			const float PreviewY = Line.m_TextYOffset + TextOffsetY + Line.m_aTextHeight[OffsetType] + FontSize() * 0.4f;
@@ -5322,9 +5310,9 @@ void CChat::OnRender()
 				float InnerPreviewH = PreviewH;
 				float InnerPreviewRounding = 0.0f;
 
-				if(HideMediaPreview || HideNsfwMedia)
+				if(HideMediaPreview)
 				{
-					const char *pHiddenLabel = HideNsfwMedia ? "NSFW content hidden" : "hidden media";
+					const char *pHiddenLabel = "hidden media";
 					DrawMediaPreviewFrame(ColorRGBA(0.10f, 0.10f, 0.10f, 0.82f * Blend), InnerPreviewX, InnerPreviewY, InnerPreviewW, InnerPreviewH, InnerPreviewRounding);
 
 					CTextCursor HiddenCursor;

@@ -312,7 +312,6 @@ class CChat : public CComponent
 	bool HasAllowedMediaCandidates(const CLine &Line) const;
 	bool ShouldDisplayMediaSlot(const CLine &Line) const;
 	bool ShouldHideMediaPreview(const CLine &Line) const;
-	bool ShouldHideNsfwMedia(const CLine &Line) const;
 	std::string MediaPlaceholderText(const CLine &Line) const;
 	std::string BuildVisibleMessageText(const CLine &Line, bool UseMediaLabelWhenEmpty) const;
 	std::string BuildPlainTextLine(const CLine &Line, int HoveredTranslateLineIndex = -1) const;

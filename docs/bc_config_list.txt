@@ -68,8 +68,6 @@ bc_chat_open_animation_ms
 bc_chat_save_draft
 bc_chat_typing_animation
 bc_chat_typing_animation_ms
-bc_cherrygifs_show_nsfw
-bc_cherrygifs_sort_top
 bc_cinematic_camera
 bc_cinematic_camera_strength
 bc_clans_allow_local_dev

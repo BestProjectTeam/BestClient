@@ -87,10 +87,6 @@ MACRO_CONFIG_INT(BcChatMediaContentFilter, bc_chat_media_content_filter, 1, 0, 1
 MACRO_CONFIG_STR(BcChatMediaAllowedDomains, bc_chat_media_allowed_domains, 512, "tenor.com; imgur.com; giphy.com; gifs.teeworlds.xyz", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Semicolon-separated allowlist for chat media domains")
 MACRO_CONFIG_INT(BcChatMediaPreviewMaxWidth, bc_chat_media_preview_max_width, 220, 120, 400, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Maximum width of chat media previews")
 
-// CherryGifs provider
-MACRO_CONFIG_INT(BcCherryGifsShowNsfw, bc_cherrygifs_show_nsfw, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Include NSFW gifs in the CherryGifs browser")
-MACRO_CONFIG_INT(BcCherryGifsSortTop, bc_cherrygifs_sort_top, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Sort CherryGifs browser by top instead of new")
-
 // Gif wheel bubble-above-head
 MACRO_CONFIG_INT(BcGifBubbleAboveHead, bc_gif_bubble_above_head, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show a floating gif bubble above the sender when a recognized gif link is posted in chat")
 MACRO_CONFIG_STR(BcGifBubbleDomains, bc_gif_bubble_domains, 256, "gifs.teeworlds.xyz", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Semicolon-separated domains that trigger the above-head gif bubble")

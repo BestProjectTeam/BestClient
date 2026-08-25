@@ -257,7 +257,6 @@ void CGameClient::OnConsoleInit()
 					      &m_Items,
 					      &m_Trails, // TClient
 					      &m_Translate, // BestClient
-					      &m_CherryGifs, // BestClient
 					      &m_HookCombo, // BestClient
 					      &m_3DParticles, // BestClient
 					      &m_QuickBinds, // BestClient

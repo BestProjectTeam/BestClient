@@ -85,7 +85,6 @@
 #include "components/bestclient/3d_particles.h"
 #include "components/bestclient/admin_panel.h"
 #include "components/bestclient/automargin.h"
-#include "components/bestclient/cherry_gifs.h"
 #include "components/bestclient/chat_bubbles.h"
 #include "components/bestclient/cloud_input.h"
 #include "components/bestclient/edgehelper.h"
@@ -246,7 +245,6 @@ public:
 	CBindChat m_BindChat;
 	CBindWheel m_BindWheel;
 	CFastActions m_FastActions; // BestClient
-	CCherryGifs m_CherryGifs; // BestClient
 	CGifBubbles m_GifBubbles; // BestClient
 	CChatBubbles m_ChatBubbles; // BestClient
 	CPhysicBalls m_PhysicBalls; // BestClient (from Entity-Client)

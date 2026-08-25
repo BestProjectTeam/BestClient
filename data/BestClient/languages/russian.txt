@@ -2292,11 +2292,5 @@ unknown argument for /hitothers
 Connection error, see console
 == Ошибка подключения. Подробности в консоли.
 
-CherryGifs error %d: %s
-== Ошибка CherryGifs %d: %s
-
-CherryGifs HTTP error %d
-== Ошибка HTTP CherryGifs: %d
-
 Malformed response (not an object)
 == Сервер вернул некорректный ответ.

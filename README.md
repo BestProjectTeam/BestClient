@@ -104,7 +104,7 @@ The client currently ships with more than **300** `bc_*` config variables, five 
 
 ### Visuals
 
-- **Chat Media** — inline photo/GIF previews, domain filter, CherryGifs, above-head gif bubble
+- **Chat Media** — inline photo/GIF previews, domain filter, above-head gif bubble
 - **Gradient** — gradient nicknames, clans, skins, or all text (skin / custom / rainbow)
 - **Hook Combo** — combo popups and sounds (hook / hammer / both)
 - **Jelly Tee** — tee deformation (self / others)
@@ -277,8 +277,6 @@ bc_chat_open_animation_ms
 bc_chat_save_draft
 bc_chat_typing_animation
 bc_chat_typing_animation_ms
-bc_cherrygifs_show_nsfw
-bc_cherrygifs_sort_top
 bc_cinematic_camera
 bc_cinematic_camera_strength
 bc_clans_allow_local_dev

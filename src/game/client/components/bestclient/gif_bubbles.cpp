@@ -50,8 +50,6 @@ void CGifBubbles::OnRender()
 			continue;
 		if(!GameClient()->m_aClients[ClientId].m_Active || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active)
 			continue;
-		if(Chat.ShouldHideNsfwMedia(*pLine))
-			continue;
 
 		const vec2 RenderPos = GameClient()->m_aClients[ClientId].m_RenderPos;
 		if(!GameClient()->OptimizerAllowRenderPos(RenderPos))

@@ -2845,8 +2845,6 @@ if(CLIENT)
     components/bestclient/clientindicator/presence_cache.cpp
     components/bestclient/clientindicator/presence_cache.h
     components/bestclient/clientindicator/protocol.h
-    components/bestclient/cherry_gifs.cpp
-    components/bestclient/cherry_gifs.h
     components/bestclient/clans/clans.cpp
     components/bestclient/clans/clans.h
     components/bestclient/chat_bubbles.cpp
