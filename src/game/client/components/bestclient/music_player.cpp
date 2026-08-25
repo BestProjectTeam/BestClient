@@ -3211,6 +3211,13 @@ public:
 		const std::string TrackKey = BuildSnapshotTrackKey(Snapshot);
 		const int64_t SnapshotPosition = std::clamp<int64_t>(Snapshot.m_PositionMs, 0, maximum<int64_t>(Snapshot.m_DurationMs, Snapshot.m_PositionMs));
 		const bool NewTrack = TrackKey != m_PlaybackTrackKey;
+		// A duration-only change (e.g. a late mpris:length update from the browser)
+		// is not a new track. Hard-resyncing on it rewinds the anchor to a stale /
+		// frozen snapshot position and replays the lyrics countdown mid-song.
+		const bool TrackIdentityChanged = NewTrack &&
+			(Snapshot.m_ServiceId != m_Snapshot.m_ServiceId ||
+				Snapshot.m_Title != m_Snapshot.m_Title ||
+				Snapshot.m_Artist != m_Snapshot.m_Artist);
 		const bool StateChanged = Snapshot.m_PlaybackState != m_PlaybackAnchorState;
 		const int64_t PredictedPosition = DisplayPositionMs();
 		const int64_t Drift = SnapshotPosition - PredictedPosition;
@@ -3221,12 +3228,16 @@ public:
 		const bool SnapshotSeekedBackwards =
 			m_LastRawSnapshotPositionMs >= 0 &&
 			SnapshotPosition + 500 < m_LastRawSnapshotPositionMs;
+		// Some providers (notably browsers exposing MPRIS) freeze the reported
+		// position and only refresh it on seek. PlaybackStatus flaps around a track
+		// switch then look like a huge backwards jump; rewinding to that frozen
+		// position replays the lyrics countdown. Block backwards hard-resyncs unless
+		// the raw snapshot position itself really moved backwards.
+		const bool StaleRewind = Drift < -1500 && !SnapshotSeekedBackwards;
 		const bool NeedsHardResync =
-			NewTrack ||
+			TrackIdentityChanged ||
 			m_PlaybackAnchorTick == 0 ||
-			StateChanged ||
-			Drift > 1500 ||
-			(Drift < -1500 && SnapshotSeekedBackwards);
+			(!StaleRewind && (StateChanged || Drift > 1500 || Drift < -1500));
 
 		if(NeedsHardResync)
 		{
@@ -3241,7 +3252,9 @@ public:
 		}
 		else
 		{
-			m_PlaybackAnchorPositionMs = SnapshotPosition;
+			// Paused/stopped without a hard resync: hold the predicted position
+			// instead of following the (possibly stale) snapshot position.
+			m_PlaybackAnchorPositionMs = maximum<int64_t>(0, PredictedPosition);
 			m_PlaybackAnchorTick = Now;
 		}
 
