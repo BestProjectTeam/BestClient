@@ -2055,6 +2055,9 @@ void CVoiceChat::CloseServerListPingSocket()
 
 bool CVoiceChat::OpenAudioDevices()
 {
+	if(!Sound()->IsSoundEnabled())
+		return false;
+
 	if(SDL_WasInit(SDL_INIT_AUDIO) == 0)
 	{
 #ifndef SDL_HINT_AUDIO_INCLUDE_MONITORS
@@ -3565,7 +3568,7 @@ bool CVoiceChat::IsInGameOnlyBlocked() const
 
 bool CVoiceChat::ShouldStartVoicePipeline(bool Online) const
 {
-	return Online && g_Config.m_BcVoiceChatEnable != 0;
+	return Online && g_Config.m_BcVoiceChatEnable != 0 && Sound()->IsSoundEnabled();
 }
 
 bool CVoiceChat::HasPendingPlaybackAudio() const
