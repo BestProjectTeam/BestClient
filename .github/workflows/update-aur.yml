@@ -1,0 +1,44 @@
+name: CI-Update AUR Package
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update-aur:
+    name: Update AUR Repository
+    runs-on: archlinux:latest
+    env:
+        SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+    steps:
+      - name: Prepear Container
+        run: |
+          pacman -S base-devel pacman-contrib sudo git curl sed jq
+          useradd -m builder
+          usermod -aG wheel builder
+          sudo -Eu builder mkdir -p ~/.ssh
+          cat > /home/builder/.ssh/id_ed25519 << 'EOF'
+          $SSH_KEY
+          EOF
+          chown 0775 /home/buider/.ssh/id_ed25519
+          sudo -Eu builder git clone ssh://aur@aur.archlinux.org/bestclient.git ~/bestclient
+          
+      - name: Update
+        run: |
+          cd /home/builder/bestclient
+          NEW_VERSION = curl -fsSL https://api.github.com/repos/BestProjectTeam/BestClient/releases/latest |
+            jq -r '.tag_name' |
+            sed 's/^v//
+          sudo -Eu builder sed -i 's/^pkgver=.*/pkgver=$NEW_VERSION/' PKGBUILD
+          sudo -Eu builder updpkgsums
+          sudo -Eu builder makepkg --print-srcinfo > .SRCINFO
+          sudo -Eu builder makepkg -s
+          
+      - name: Push Update
+        run: |
+          cd /home/builder/bestclient
+          sudo -Eu builder git add -A
+          sudo -Eu builder git config --global user.email "github-ci@noreply"
+          sudo -Eu builder git config --global user.name "GitHub CI"
+          git commit -m "bump(update): $NEW_VERSION"
+          git push
+          
