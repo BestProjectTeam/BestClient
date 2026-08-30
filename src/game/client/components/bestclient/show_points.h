@@ -20,6 +20,7 @@ public:
 		None = 0,
 		Ddnet,
 		Ego,
+		Legit,
 	};
 
 	int Sizeof() const override { return sizeof(*this); }
@@ -38,7 +39,7 @@ public:
 private:
 	enum
 	{
-		PROVIDER_COUNT = 2, // Ddnet, Ego
+		PROVIDER_COUNT = 3, // Ddnet, Ego, Legit
 		MAX_CONCURRENT = 3,
 		MAX_QUEUE = 64,
 		SUCCESS_TTL_MS = 10 * 60 * 1000,
