@@ -22,7 +22,7 @@ The client currently ships with more than **300** `bc_*` config variables, five 
 - Telegram: [t.me/bestddnet](https://t.me/bestddnet)
 - Discord: [discord.gg/bestclient](https://discord.gg/bestclient)
 
-## Screenshots
+## Screenshots (taken in version 2.0)
 
 ### Main menu
 
