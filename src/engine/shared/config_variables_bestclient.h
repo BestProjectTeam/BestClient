@@ -356,7 +356,7 @@ MACRO_CONFIG_STR(BcCursorTrailTrailImage, bc_cursor_trail_trail_image, IO_MAX_PA
 MACRO_CONFIG_INT(BcCursorTrailTrailSize, bc_cursor_trail_trail_size, 70, 10, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Cursor trail size")
 MACRO_CONFIG_INT(BcCursorTrailNumberOfFrames, bc_cursor_trail_number_of_frames, 5, 1, 10, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Number of cursor trail frames")
 MACRO_CONFIG_INT(BcCursorTrailOpacity, bc_cursor_trail_opacity, 80, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Cursor trail opacity")
-MACRO_CONFIG_INT(BcCursorTrailSamplingFps, bc_cursor_trail_sampling_fps, 60, 24, 120, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Cursor trail sampling frequency")
+MACRO_CONFIG_INT(BcCursorTrailSamplingFps, bc_cursor_trail_sampling_fps, 120, 24, 120, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Cursor trail sampling frequency")
 MACRO_CONFIG_INT(BcCursorTrailDisableMovement, bc_cursor_trail_disable_movement, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Keep cursor trail stable when the player moves")
 
 // Optimizer

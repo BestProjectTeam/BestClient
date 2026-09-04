@@ -2007,18 +2007,16 @@ void CHud::RenderCursor()
 		const vec2 PlayerPos = GameClient()->m_LocalCharacterPos;
 		if(!m_CursorTrailAnchorValid)
 		{
-			m_CursorTrailStableTargetPos = TargetPos;
-			m_CursorTrailPreviousTargetPos = TargetPos;
 			m_CursorTrailPreviousPlayerPos = PlayerPos;
 			m_CursorTrailAnchorValid = true;
 		}
 		else
 		{
-			m_CursorTrailStableTargetPos += (TargetPos - m_CursorTrailPreviousTargetPos) - (PlayerPos - m_CursorTrailPreviousPlayerPos);
-			m_CursorTrailPreviousTargetPos = TargetPos;
+			const vec2 PlayerDelta = PlayerPos - m_CursorTrailPreviousPlayerPos;
+			for(SCursorTrailPoint &Point : m_vCursorTrail)
+				Point.m_Pos += PlayerDelta;
 			m_CursorTrailPreviousPlayerPos = PlayerPos;
 		}
-		TrailTargetPos = m_CursorTrailStableTargetPos;
 	}
 	else
 		m_CursorTrailAnchorValid = false;

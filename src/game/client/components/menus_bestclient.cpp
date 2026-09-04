@@ -1006,6 +1006,7 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		g_Config.m_BcCursorTrailDisableMovement = DefaultConfig::BcCursorTrailDisableMovement;
 		GameClient()->m_Hud.ReloadCursorTrail();
 	}
+	CursorTrailTitleLabel.VSplitRight(10.0f, &CursorTrailTitleLabel, nullptr);
 	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &CursorTrailTitleLabel, "NEW", 11.0f,
 		ColorRGBA(0.35f, 0.85f, 0.45f, 1.0f), ColorRGBA(0.15f, 0.55f, 0.25f, 1.0f), MarginSmall);
 	Ui()->DoLabel(&CursorTrailTitleLabel, Localize("Cursor Trail"), HeadlineFontSize, TEXTALIGN_ML);

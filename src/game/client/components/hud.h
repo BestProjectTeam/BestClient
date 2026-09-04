@@ -73,8 +73,6 @@ class CHud : public CComponent
 	int m_CursorTrailFrames = -1;
 	int m_CursorTrailDisableMovement = -1;
 	float m_CursorTrailSampleTime = 0.0f;
-	vec2 m_CursorTrailStableTargetPos;
-	vec2 m_CursorTrailPreviousTargetPos;
 	vec2 m_CursorTrailPreviousPlayerPos;
 	bool m_CursorTrailAnchorValid = false;
 	SScoreInfo m_aScoreInfo[2];
