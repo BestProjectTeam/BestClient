@@ -6752,6 +6752,16 @@ bool CGameClient::IsSnapTapBlockedByCommunity() const
 	if(IsBlockedGameType(m_GameInfo.m_aGameType))
 		return true;
 
+	auto IsLegitNetworkName = [](const char *pName) -> bool {
+		return pName != nullptr && pName[0] != '\0' && str_find_nocase(pName, "Legit Network") != nullptr;
+	};
+	if(IsLegitNetworkName(ServerInfo.m_aName))
+		return true;
+	if(m_ConnectServerInfo.has_value() && IsLegitNetworkName(m_ConnectServerInfo->m_aName))
+		return true;
+	if(pEntry && IsLegitNetworkName(pEntry->m_Info.m_aName))
+		return true;
+
 	return false;
 }
 
