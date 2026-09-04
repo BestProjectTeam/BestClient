@@ -23,7 +23,7 @@ bool ParsePoints(CShowPoints::EProvider Provider, const json_value *pRoot, int *
 	if(!IsJsonObject(pRoot) || !pPoints)
 		return false;
 
-	if(Provider == CShowPoints::EProvider::Ego)
+	if(Provider == CShowPoints::EProvider::Ego || Provider == CShowPoints::EProvider::Legit)
 	{
 		const json_value *pPointsVal = json_object_get(pRoot, "points");
 		if(pPointsVal == &json_value_none)
@@ -69,7 +69,11 @@ bool CShowPoints::Enabled() const
 
 int CShowPoints::ProviderIndex(EProvider Provider)
 {
-	return Provider == EProvider::Ego ? 1 : 0;
+	if(Provider == EProvider::Ego)
+		return 1;
+	if(Provider == EProvider::Legit)
+		return 2;
+	return 0;
 }
 
 const char *CShowPoints::CurrentCommunityId() const
@@ -125,6 +129,11 @@ CShowPoints::EProvider CShowPoints::CurrentProvider() const
 		str_find_nocase(ServerInfo.m_aName, "eternal gores"))
 	{
 		return EProvider::Ego;
+	}
+
+	if(str_find_nocase(ServerInfo.m_aName, "Legit Network"))
+	{
+		return EProvider::Legit;
 	}
 
 	return EProvider::None;
@@ -254,6 +263,17 @@ void CShowPoints::StartRequest(const std::string &Name, EProvider Provider)
 		char aEscapedLower[256];
 		EscapeUrl(aEscapedLower, sizeof(aEscapedLower), aLower);
 		str_format(aUrl, sizeof(aUrl), "https://eternal-gores.com/profile/%s.json", aEscapedLower);
+	}
+	else if(Provider == EProvider::Legit)
+	{
+		CServerInfo ServerInfo;
+		mem_zero(&ServerInfo, sizeof(ServerInfo));
+		Client()->GetServerInfo(&ServerInfo);
+		const bool IsDDraceMode = str_find_nocase(ServerInfo.m_aGameType, "DDraceNetwork") != nullptr;
+
+		char aEscaped[256];
+		EscapeUrl(aEscaped, sizeof(aEscaped), Name.c_str());
+		str_format(aUrl, sizeof(aUrl), "https://legit.tw/api_points.php?name=%s&mode=%s", aEscaped, IsDDraceMode ? "ddrace" : "gores");
 	}
 	else
 	{
