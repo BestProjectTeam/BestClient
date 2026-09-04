@@ -349,6 +349,16 @@ MACRO_CONFIG_INT(BcGameMediaBackground, bc_game_media_background, 0, 0, 1, CFGFL
 MACRO_CONFIG_STR(BcMenuMediaBackgroundPath, bc_menu_media_background_path, IO_MAX_PATH_LENGTH, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Path to the custom menu media background file")
 MACRO_CONFIG_INT(BcGameMediaBackgroundOffset, bc_game_media_background_offset, 0, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "How much the custom media background is fixed to the map when rendering the in-game background")
 
+// Cursor trail
+MACRO_CONFIG_INT(BcCursorTrail, bc_cursor_trail, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable cursor trail")
+MACRO_CONFIG_INT(BcCursorTrailMode, bc_cursor_trail_mode, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Cursor trail mode (0=cursor, 1=custom)")
+MACRO_CONFIG_STR(BcCursorTrailTrailImage, bc_cursor_trail_trail_image, IO_MAX_PATH_LENGTH, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Path to the custom cursor trail image")
+MACRO_CONFIG_INT(BcCursorTrailTrailSize, bc_cursor_trail_trail_size, 70, 10, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Cursor trail size")
+MACRO_CONFIG_INT(BcCursorTrailNumberOfFrames, bc_cursor_trail_number_of_frames, 5, 1, 10, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Number of cursor trail frames")
+MACRO_CONFIG_INT(BcCursorTrailOpacity, bc_cursor_trail_opacity, 80, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Cursor trail opacity")
+MACRO_CONFIG_INT(BcCursorTrailSamplingFps, bc_cursor_trail_sampling_fps, 60, 24, 120, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Cursor trail sampling frequency")
+MACRO_CONFIG_INT(BcCursorTrailDisableMovement, bc_cursor_trail_disable_movement, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Keep cursor trail stable when the player moves")
+
 // Optimizer
 MACRO_CONFIG_INT(BcOptimizer, bc_optimizer, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable optimizer features")
 MACRO_CONFIG_INT(BcOptimizerDisableParticles, bc_optimizer_disable_particles, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Disable rendering/updating all particles")

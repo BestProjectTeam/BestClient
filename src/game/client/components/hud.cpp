@@ -672,6 +672,12 @@ void CHud::OnWindowResize()
 
 void CHud::OnReset()
 {
+	m_vCursorTrail.clear();
+	m_CursorTrailMode = -1;
+	m_CursorTrailFrames = -1;
+	m_CursorTrailDisableMovement = -1;
+	m_CursorTrailSampleTime = 0.0f;
+	m_CursorTrailAnchorValid = false;
 	m_TimeCpDiff = 0.0f;
 	m_DDRaceTime = 0;
 	m_FinishTimeLastReceivedTick = 0;
@@ -710,6 +716,7 @@ void CHud::OnReset()
 void CHud::OnInit()
 {
 	OnReset();
+	ReloadCursorTrail();
 
 	m_KeystrokesKeyboardTexture = Graphics()->LoadTexture("BestClient/keystrokes/wasd.png", IStorage::TYPE_ALL);
 	m_KeystrokesMouseTexture = Graphics()->LoadTexture("BestClient/keystrokes/mouse.png", IStorage::TYPE_ALL);
@@ -738,6 +745,17 @@ void CHud::OnInit()
 	PreparePlayerStateQuads();
 
 	Graphics()->QuadContainerUpload(m_HudQuadContainerIndex);
+}
+
+void CHud::ReloadCursorTrail()
+{
+	m_vCursorTrail.clear();
+	if(!m_CursorTrailTexture.IsNullTexture())
+		Graphics()->UnloadTexture(&m_CursorTrailTexture);
+	m_CursorTrailTexture = IGraphics::CTextureHandle();
+	str_copy(m_aCursorTrailPath, g_Config.m_BcCursorTrailTrailImage, sizeof(m_aCursorTrailPath));
+	if(m_aCursorTrailPath[0] != '\0')
+		m_CursorTrailTexture = Graphics()->LoadTexture(m_aCursorTrailPath, IStorage::TYPE_ALL);
 }
 
 void CHud::RenderGameTimer()
@@ -1937,6 +1955,7 @@ void CHud::RenderCursor()
 
 	int CurWeapon = 0;
 	vec2 TargetPos;
+	vec2 TrailTargetPos;
 	float Alpha = 1.0f;
 
 	const vec2 Center = GameClient()->m_Camera.m_Center;
@@ -1981,6 +2000,89 @@ void CHud::RenderCursor()
 		TargetPos = ScreenPos / ClampFactor + Center;
 		if(ClampFactor != 1.0f)
 			Alpha /= 2.0f;
+	}
+	TrailTargetPos = TargetPos;
+	if(g_Config.m_BcCursorTrailDisableMovement && Client()->State() != IClient::STATE_DEMOPLAYBACK && GameClient()->m_Snap.m_pLocalCharacter)
+	{
+		const vec2 PlayerPos = GameClient()->m_LocalCharacterPos;
+		if(!m_CursorTrailAnchorValid)
+		{
+			m_CursorTrailStableTargetPos = TargetPos;
+			m_CursorTrailPreviousTargetPos = TargetPos;
+			m_CursorTrailPreviousPlayerPos = PlayerPos;
+			m_CursorTrailAnchorValid = true;
+		}
+		else
+		{
+			m_CursorTrailStableTargetPos += (TargetPos - m_CursorTrailPreviousTargetPos) - (PlayerPos - m_CursorTrailPreviousPlayerPos);
+			m_CursorTrailPreviousTargetPos = TargetPos;
+			m_CursorTrailPreviousPlayerPos = PlayerPos;
+		}
+		TrailTargetPos = m_CursorTrailStableTargetPos;
+	}
+	else
+		m_CursorTrailAnchorValid = false;
+
+	if(str_comp(m_aCursorTrailPath, g_Config.m_BcCursorTrailTrailImage) != 0)
+		ReloadCursorTrail();
+	if(m_CursorTrailMode != g_Config.m_BcCursorTrailMode || m_CursorTrailFrames != g_Config.m_BcCursorTrailNumberOfFrames || m_CursorTrailDisableMovement != g_Config.m_BcCursorTrailDisableMovement)
+	{
+		m_vCursorTrail.clear();
+		m_CursorTrailSampleTime = 0.0f;
+		m_CursorTrailMode = g_Config.m_BcCursorTrailMode;
+		m_CursorTrailFrames = g_Config.m_BcCursorTrailNumberOfFrames;
+		m_CursorTrailDisableMovement = g_Config.m_BcCursorTrailDisableMovement;
+	}
+	if(!g_Config.m_BcCursorTrail)
+	{
+		m_vCursorTrail.clear();
+		m_CursorTrailSampleTime = 0.0f;
+	}
+	else if(g_Config.m_BcCursorTrailMode == 1 && (g_Config.m_BcCursorTrailTrailImage[0] == '\0' || m_CursorTrailTexture.IsNullTexture()))
+	{
+		m_vCursorTrail.clear();
+		m_CursorTrailSampleTime = 0.0f;
+	}
+	else if(g_Config.m_BcCursorTrailMode == 0 || (g_Config.m_BcCursorTrailTrailImage[0] != '\0' && !m_CursorTrailTexture.IsNullTexture()))
+	{
+		const float TrailSize = Scale * g_Config.m_BcCursorTrailTrailSize / 100.0f;
+		for(SCursorTrailPoint &Point : m_vCursorTrail)
+			Point.m_Age += Client()->RenderFrameTime();
+		constexpr float Lifetime = 0.2f;
+		m_vCursorTrail.erase(std::remove_if(m_vCursorTrail.begin(), m_vCursorTrail.end(), [Lifetime](const SCursorTrailPoint &Point) { return Point.m_Age >= Lifetime; }), m_vCursorTrail.end());
+		m_CursorTrailSampleTime += Client()->RenderFrameTime();
+		const float SampleInterval = 1.0f / g_Config.m_BcCursorTrailSamplingFps;
+		if(m_CursorTrailSampleTime >= SampleInterval && (m_vCursorTrail.empty() || m_vCursorTrail.front().m_Pos != TrailTargetPos))
+		{
+			m_vCursorTrail.insert(m_vCursorTrail.begin(), {TrailTargetPos, 0.0f});
+			m_CursorTrailSampleTime = 0.0f;
+		}
+		while((int)m_vCursorTrail.size() > g_Config.m_BcCursorTrailNumberOfFrames)
+			m_vCursorTrail.pop_back();
+
+		const float TrailAlphaMultiplier = g_Config.m_BcCursorTrailOpacity / 100.0f;
+		for(int i = (int)m_vCursorTrail.size() - 1; i >= 0; --i)
+		{
+			const SCursorTrailPoint &Point = m_vCursorTrail[i];
+			const float TrailAlpha = Alpha * TrailAlphaMultiplier * (1.0f - Point.m_Age / Lifetime);
+			const vec2 &Position = Point.m_Pos;
+			if(g_Config.m_BcCursorTrailMode == 0)
+			{
+				Graphics()->SetColor(1.0f, 1.0f, 1.0f, TrailAlpha);
+				Graphics()->TextureSet(GameClient()->m_GameSkin.m_aSpriteWeaponCursors[CurWeapon]);
+				Graphics()->RenderQuadContainerAsSprite(m_HudQuadContainerIndex, m_aCursorOffset[CurWeapon], Position.x, Position.y, TrailSize, TrailSize);
+			}
+			else
+			{
+				Graphics()->TextureSet(m_CursorTrailTexture);
+				Graphics()->QuadsSetSubset(0, 0, 1, 1);
+				IGraphics::CQuadItem Quad(Position.x, Position.y, 64.0f * TrailSize, 64.0f * TrailSize);
+				Graphics()->QuadsBegin();
+				Graphics()->SetColor(1.0f, 1.0f, 1.0f, TrailAlpha);
+				Graphics()->QuadsDraw(&Quad, 1);
+				Graphics()->QuadsEnd();
+			}
+		}
 	}
 
 	Graphics()->SetColor(1.0f, 1.0f, 1.0f, Alpha);

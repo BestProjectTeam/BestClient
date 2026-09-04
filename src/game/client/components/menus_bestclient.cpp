@@ -975,6 +975,164 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 	Ui()->DoLabel(&Button, pMediaStatusText, 11.0f, TEXTALIGN_ML);
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
 
+	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
+	static float s_CursorTrailRevealPhase = 0.0f;
+	const bool CursorTrailExpanded = g_Config.m_BcCursorTrail != 0;
+	const bool CursorTrailCustom = CursorTrailExpanded && g_Config.m_BcCursorTrailMode == 1;
+	const float CursorTrailTargetHeight = 6.0f * (MarginSmall + LineSize) + (CursorTrailCustom ? MarginSmall + LineSize : 0.0f);
+	UpdateModuleRevealPhase(s_CursorTrailRevealPhase, CursorTrailExpanded, Client()->RenderFrameTime());
+	const float CursorTrailBlockHeight = 2.0f * LineSize + MarginSmall + CursorTrailTargetHeight * BCUiAnimations::EaseOutCubic(s_CursorTrailRevealPhase);
+	CUIRect CursorTrailBlock;
+	Column.HSplitTop(CursorTrailBlockHeight, &CursorTrailBlock, &Column);
+	CUIRect CursorTrailBlockBg = CursorTrailBlock;
+	CursorTrailBlockBg.w += BlockPadding;
+	CursorTrailBlockBg.h += BlockPadding;
+	CursorTrailBlockBg.x -= BlockPadding * 0.5f;
+	CursorTrailBlockBg.y -= BlockPadding * 0.5f;
+	CursorTrailBlockBg.Draw(BlockColor, IGraphics::CORNER_ALL, 10.0f);
+	MainView = CursorTrailBlock;
+	MainView.HSplitTop(LineSize, &Label, &MainView);
+	CUIRect CursorTrailTitleLabel, CursorTrailResetButton;
+	Label.VSplitRight(LineSize + 8.0f, &CursorTrailTitleLabel, &CursorTrailResetButton);
+	static CButtonContainer s_CursorTrailResetButton;
+	if(Ui()->DoButton_FontIcon(&s_CursorTrailResetButton, FontIcon::ARROW_ROTATE_LEFT, 0, &CursorTrailResetButton, BUTTONFLAG_LEFT))
+	{
+		g_Config.m_BcCursorTrailMode = DefaultConfig::BcCursorTrailMode;
+		g_Config.m_BcCursorTrailTrailImage[0] = '\0';
+		g_Config.m_BcCursorTrailTrailSize = DefaultConfig::BcCursorTrailTrailSize;
+		g_Config.m_BcCursorTrailNumberOfFrames = DefaultConfig::BcCursorTrailNumberOfFrames;
+		g_Config.m_BcCursorTrailOpacity = DefaultConfig::BcCursorTrailOpacity;
+		g_Config.m_BcCursorTrailSamplingFps = DefaultConfig::BcCursorTrailSamplingFps;
+		g_Config.m_BcCursorTrailDisableMovement = DefaultConfig::BcCursorTrailDisableMovement;
+		GameClient()->m_Hud.ReloadCursorTrail();
+	}
+	DrawBcMenuBadge(Graphics(), Ui(), TextRender(), &CursorTrailTitleLabel, "NEW", 11.0f,
+		ColorRGBA(0.35f, 0.85f, 0.45f, 1.0f), ColorRGBA(0.15f, 0.55f, 0.25f, 1.0f), MarginSmall);
+	Ui()->DoLabel(&CursorTrailTitleLabel, Localize("Cursor Trail"), HeadlineFontSize, TEXTALIGN_ML);
+	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+	MainView.HSplitTop(LineSize, &Content, &MainView);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcCursorTrail, Localize("Enable"), &g_Config.m_BcCursorTrail, &Content, LineSize);
+
+	if(CursorTrailExpanded && s_CursorTrailRevealPhase > 0.0f)
+	{
+		CUIRect Visible = MainView;
+		Visible.h = CursorTrailTargetHeight * BCUiAnimations::EaseOutCubic(s_CursorTrailRevealPhase);
+		Ui()->ClipEnable(&Visible);
+		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+		MainView.HSplitTop(LineSize, &Content, &MainView);
+		static CUi::SDropDownState s_CursorTrailModeState;
+		static CScrollRegion s_CursorTrailModeScrollRegion;
+		s_CursorTrailModeState.m_SelectionPopupContext.m_pScrollRegion = &s_CursorTrailModeScrollRegion;
+		const char *apCursorTrailModes[] = {Localize("Cursor"), Localize("Custom")};
+		CUIRect ModeLabel, ModeRow;
+		Content.VSplitLeft(110.0f, &ModeLabel, &ModeRow);
+		Ui()->DoLabel(&ModeLabel, Localize("Mode"), 12.0f, TEXTALIGN_ML);
+		g_Config.m_BcCursorTrailMode = Ui()->DoDropDown(&ModeRow, g_Config.m_BcCursorTrailMode, apCursorTrailModes, std::size(apCursorTrailModes), s_CursorTrailModeState);
+		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+		MainView.HSplitTop(LineSize, &Button, &MainView);
+		Ui()->DoScrollbarOption(&g_Config.m_BcCursorTrailTrailSize, &g_Config.m_BcCursorTrailTrailSize, &Button, Localize("Trail size"), 10, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
+		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+		MainView.HSplitTop(LineSize, &Button, &MainView);
+		Ui()->DoScrollbarOption(&g_Config.m_BcCursorTrailNumberOfFrames, &g_Config.m_BcCursorTrailNumberOfFrames, &Button, Localize("Number of frames"), 1, 10);
+		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+		MainView.HSplitTop(LineSize, &Button, &MainView);
+		Ui()->DoScrollbarOption(&g_Config.m_BcCursorTrailOpacity, &g_Config.m_BcCursorTrailOpacity, &Button, Localize("Opacity"), 0, 100, &CUi::ms_LinearScrollbarScale, 0u, "%");
+		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+		MainView.HSplitTop(LineSize, &Button, &MainView);
+		Ui()->DoScrollbarOption(&g_Config.m_BcCursorTrailSamplingFps, &g_Config.m_BcCursorTrailSamplingFps, &Button, Localize("Sampling FPS"), 24, 120);
+		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+		MainView.HSplitTop(LineSize, &Content, &MainView);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcCursorTrailDisableMovement, Localize("Disable movement"), &g_Config.m_BcCursorTrailDisableMovement, &Content, LineSize);
+		if(CursorTrailCustom)
+		{
+			MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+			struct SCursorTrailFileListContext
+			{
+				std::vector<std::string> *m_pLabels;
+				std::vector<std::string> *m_pPaths;
+			};
+			auto CursorTrailFileListScan = [](const char *pName, int IsDir, int StorageType, void *pUser) {
+				(void)StorageType;
+				if(IsDir)
+					return 0;
+				const std::string Ext = MediaDecoder::ExtractExtensionLower(pName);
+				if(Ext != "png" && Ext != "jpg" && Ext != "jpeg" && Ext != "webp" && Ext != "bmp" && Ext != "avif")
+					return 0;
+				auto *pContext = static_cast<SCursorTrailFileListContext *>(pUser);
+				pContext->m_pLabels->emplace_back(pName);
+				pContext->m_pPaths->emplace_back(std::string("BestClient/CTrails/") + pName);
+				return 0;
+			};
+			Storage()->CreateFolder("BestClient", IStorage::TYPE_SAVE);
+			Storage()->CreateFolder("BestClient/CTrails", IStorage::TYPE_SAVE);
+			static std::vector<std::string> s_vCursorTrailFileLabels, s_vCursorTrailFilePaths;
+			s_vCursorTrailFileLabels.clear();
+			s_vCursorTrailFilePaths.clear();
+			SCursorTrailFileListContext CursorTrailFileContext{&s_vCursorTrailFileLabels, &s_vCursorTrailFilePaths};
+			Storage()->ListDirectory(IStorage::TYPE_SAVE, "BestClient/CTrails", CursorTrailFileListScan, &CursorTrailFileContext);
+			std::vector<int> vSortedCursorTrailIndices(s_vCursorTrailFileLabels.size());
+			for(size_t i = 0; i < vSortedCursorTrailIndices.size(); ++i)
+				vSortedCursorTrailIndices[i] = (int)i;
+			std::sort(vSortedCursorTrailIndices.begin(), vSortedCursorTrailIndices.end(), [&](int Left, int Right) {
+				return str_comp_nocase(s_vCursorTrailFileLabels[Left].c_str(), s_vCursorTrailFileLabels[Right].c_str()) < 0;
+			});
+			static std::vector<std::string> s_vCursorTrailDropDownLabels;
+			static std::vector<const char *> s_vCursorTrailDropDownLabelPtrs;
+			s_vCursorTrailDropDownLabels.clear();
+			s_vCursorTrailDropDownLabelPtrs.clear();
+			for(int Index : vSortedCursorTrailIndices)
+				s_vCursorTrailDropDownLabels.push_back(s_vCursorTrailFileLabels[Index]);
+			for(const std::string &LabelString : s_vCursorTrailDropDownLabels)
+				s_vCursorTrailDropDownLabelPtrs.push_back(LabelString.c_str());
+			int SelectedCursorTrailFile = -1;
+			for(size_t i = 0; i < vSortedCursorTrailIndices.size(); ++i)
+				if(str_comp(g_Config.m_BcCursorTrailTrailImage, s_vCursorTrailFilePaths[vSortedCursorTrailIndices[i]].c_str()) == 0)
+					SelectedCursorTrailFile = (int)i;
+			CUIRect CursorTrailPathRow, CursorTrailFolderButton, CursorTrailReloadButton;
+			MainView.HSplitTop(LineSize, &CursorTrailPathRow, &MainView);
+			CursorTrailPathRow.VSplitRight(20.0f, &CursorTrailPathRow, &CursorTrailFolderButton);
+			CursorTrailPathRow.VSplitRight(MarginSmall, &CursorTrailPathRow, nullptr);
+			CursorTrailPathRow.VSplitRight(20.0f, &CursorTrailPathRow, &CursorTrailReloadButton);
+			CursorTrailPathRow.VSplitRight(MarginSmall, &CursorTrailPathRow, nullptr);
+			if(s_vCursorTrailDropDownLabelPtrs.empty())
+			{
+				static CButtonContainer s_CursorTrailEmptyButton;
+				CUIRect CursorTrailPathLabel, CursorTrailEmptyRow;
+				CursorTrailPathRow.VSplitLeft(110.0f, &CursorTrailPathLabel, &CursorTrailEmptyRow);
+				Ui()->DoLabel(&CursorTrailPathLabel, Localize("Trail image"), 12.0f, TEXTALIGN_ML);
+				DoButton_Menu(&s_CursorTrailEmptyButton, Localize("No images in CTrails folder"), -1, &CursorTrailEmptyRow);
+			}
+			else
+			{
+				static CUi::SDropDownState s_CursorTrailFileDropDownState;
+				static CScrollRegion s_CursorTrailFileDropDownScrollRegion;
+				s_CursorTrailFileDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_CursorTrailFileDropDownScrollRegion;
+				CUIRect CursorTrailPathLabel, CursorTrailDropDown;
+				CursorTrailPathRow.VSplitLeft(110.0f, &CursorTrailPathLabel, &CursorTrailDropDown);
+				Ui()->DoLabel(&CursorTrailPathLabel, Localize("Trail image"), 12.0f, TEXTALIGN_ML);
+				const int NewSelectedCursorTrailFile = Ui()->DoDropDown(&CursorTrailDropDown, SelectedCursorTrailFile, s_vCursorTrailDropDownLabelPtrs.data(), s_vCursorTrailDropDownLabelPtrs.size(), s_CursorTrailFileDropDownState);
+				if(NewSelectedCursorTrailFile != SelectedCursorTrailFile && NewSelectedCursorTrailFile >= 0 && NewSelectedCursorTrailFile < (int)vSortedCursorTrailIndices.size())
+				{
+					const int SortedIndex = vSortedCursorTrailIndices[NewSelectedCursorTrailFile];
+					str_copy(g_Config.m_BcCursorTrailTrailImage, s_vCursorTrailFilePaths[SortedIndex].c_str(), sizeof(g_Config.m_BcCursorTrailTrailImage));
+					GameClient()->m_Hud.ReloadCursorTrail();
+				}
+			}
+			static CButtonContainer s_CursorTrailFolderButton, s_CursorTrailReloadButton;
+			if(Ui()->DoButton_FontIcon(&s_CursorTrailReloadButton, FontIcon::ARROW_ROTATE_RIGHT, 0, &CursorTrailReloadButton, BUTTONFLAG_LEFT))
+				GameClient()->m_Hud.ReloadCursorTrail();
+			if(Ui()->DoButton_FontIcon(&s_CursorTrailFolderButton, FontIcon::FOLDER, 0, &CursorTrailFolderButton, BUTTONFLAG_LEFT))
+			{
+				Storage()->CreateFolder("BestClient", IStorage::TYPE_SAVE);
+				Storage()->CreateFolder("BestClient/CTrails", IStorage::TYPE_SAVE);
+				char aBuf[IO_MAX_PATH_LENGTH];
+				Storage()->GetCompletePath(IStorage::TYPE_SAVE, "BestClient/CTrails", aBuf, sizeof(aBuf));
+				Client()->ViewFile(aBuf);
+			}
+		}
+		Ui()->ClipDisable();
+	}
+
 	// Sweat weapon (left column block)
 	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
 

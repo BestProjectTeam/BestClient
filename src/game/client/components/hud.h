@@ -5,6 +5,8 @@
 #include <base/vmath.h>
 
 #include <engine/client.h>
+#include <engine/graphics.h>
+#include <engine/storage.h>
 #include <engine/shared/protocol.h>
 #include <engine/textrender.h>
 
@@ -56,9 +58,25 @@ float GetKeystrokesKeyboardPresetWidthHudPx(int Preset);
 
 class CHud : public CComponent
 {
+	struct SCursorTrailPoint
+	{
+		vec2 m_Pos;
+		float m_Age;
+	};
 	float m_Width, m_Height;
 
 	int m_HudQuadContainerIndex;
+	IGraphics::CTextureHandle m_CursorTrailTexture;
+	char m_aCursorTrailPath[IO_MAX_PATH_LENGTH] = {};
+	std::vector<SCursorTrailPoint> m_vCursorTrail;
+	int m_CursorTrailMode = -1;
+	int m_CursorTrailFrames = -1;
+	int m_CursorTrailDisableMovement = -1;
+	float m_CursorTrailSampleTime = 0.0f;
+	vec2 m_CursorTrailStableTargetPos;
+	vec2 m_CursorTrailPreviousTargetPos;
+	vec2 m_CursorTrailPreviousPlayerPos;
+	bool m_CursorTrailAnchorValid = false;
 	SScoreInfo m_aScoreInfo[2];
 	float m_LastScoreHudLayoutX = 0.0f;
 	float m_LastScoreHudLayoutY = 0.0f;
@@ -190,6 +208,7 @@ class CHud : public CComponent
 	static constexpr float MOVEMENT_INFORMATION_LINE_HEIGHT = 8.0f;
 
 public:
+	void ReloadCursorTrail();
 	// HUD editor integration (bestclient/hud_editor.h): rect getters return the
 	// current on-screen box for a module so the editor can draw a drag handle over
 	// it, and the *Preview variants render the module with placeholder data so it
