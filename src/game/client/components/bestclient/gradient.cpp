@@ -85,6 +85,29 @@ static std::vector<STextColorSplit> BuildMultiColorSplits(const char *pText, con
 }
 } // namespace
 
+bool CBcGradient::AppliesTo(int ClientId, const CGameClient *pGameClient)
+{
+	const int Target = g_Config.m_BcNameplateGradientTarget;
+	if(Target == BC_GRADIENT_TARGET_ALL || ClientId < 0 || ClientId >= MAX_CLIENTS)
+		return true;
+
+	bool Own = false;
+	if(pGameClient->Client()->State() == IClient::STATE_DEMOPLAYBACK)
+	{
+		Own = ClientId == (pGameClient->m_Snap.m_SpecInfo.m_Active ? pGameClient->m_Snap.m_SpecInfo.m_SpectatorId : pGameClient->m_Snap.m_LocalClientId);
+	}
+	else
+	{
+		for(const int LocalId : pGameClient->m_aLocalIds)
+		{
+			if(ClientId == LocalId)
+				Own = true;
+		}
+	}
+
+	return Own == (Target == BC_GRADIENT_TARGET_OWN);
+}
+
 float CBcGradient::AnimatePhase(double GlobalTime)
 {
 	return (float)std::fmod(GlobalTime * (g_Config.m_BcNameplateGradientAnimateSpeed / 100.0), 1.0);
@@ -275,6 +298,7 @@ void CBcGradient::OnRender()
 	const int Everything = g_Config.m_BcNameplateGradientEverything;
 	const int Nick = g_Config.m_BcNameplateGradient;
 	const int Clan = g_Config.m_BcNameplateGradientClan;
+	const int Target = g_Config.m_BcNameplateGradientTarget;
 	const int Mode = g_Config.m_BcNameplateGradientMode;
 	const int ColorCount = g_Config.m_BcNameplateGradientColorCount;
 	const int AnimateSpeed = g_Config.m_BcNameplateGradientAnimateSpeed;
@@ -288,7 +312,7 @@ void CBcGradient::OnRender()
 	{
 		// First frame: just seed tracked values, no rebuild.
 	}
-	else if(Everything != m_LastEverything || Nick != m_LastNick || Clan != m_LastClan)
+	else if(Everything != m_LastEverything || Nick != m_LastNick || Clan != m_LastClan || Target != m_LastTarget)
 	{
 		NeedRefresh = true;
 	}
@@ -300,6 +324,7 @@ void CBcGradient::OnRender()
 	m_LastEverything = Everything;
 	m_LastNick = Nick;
 	m_LastClan = Clan;
+	m_LastTarget = Target;
 	m_LastMode = Mode;
 	m_LastColorCount = ColorCount;
 	m_LastAnimateSpeed = AnimateSpeed;
@@ -319,7 +344,7 @@ void CBcGradient::OnRender()
 	const float Phase = AnimatePhase(Client()->GlobalTime());
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
-		if(!GameClient()->m_Snap.m_aCharacters[i].m_Active)
+		if(!GameClient()->m_Snap.m_aCharacters[i].m_Active || !AppliesTo(i, GameClient()))
 			continue;
 
 		GameClient()->m_aClients[i].UpdateRenderInfo();

@@ -18,6 +18,13 @@ enum
 	BC_GRADIENT_MODE_RAINBOW = 2,
 };
 
+enum
+{
+	BC_GRADIENT_TARGET_OWN = 0,
+	BC_GRADIENT_TARGET_OTHERS = 1,
+	BC_GRADIENT_TARGET_ALL = 2,
+};
+
 class CBcGradient : public CComponent
 {
 	ColorRGBA m_aOriginalBody[MAX_CLIENTS];
@@ -27,6 +34,7 @@ class CBcGradient : public CComponent
 	int m_LastEverything = -1;
 	int m_LastNick = -1;
 	int m_LastClan = -1;
+	int m_LastTarget = -1;
 	int m_LastMode = -1;
 	int m_LastColorCount = -1;
 	int m_LastAnimateSpeed = -1;
@@ -43,6 +51,7 @@ public:
 	void OnShutdown() override;
 	void OnRender() override;
 
+	static bool AppliesTo(int ClientId, const CGameClient *pGameClient);
 	static float AnimatePhase(double GlobalTime);
 	static ColorRGBA SampleRainbow(float Hue);
 	static ColorRGBA SampleCustomGradient(float Position);

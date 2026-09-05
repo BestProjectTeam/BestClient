@@ -405,7 +405,7 @@ protected:
 		{
 			UseGradient = true;
 		}
-		else if(!HasWarColor && g_Config.m_BcNameplateGradient)
+		else if(!HasWarColor && g_Config.m_BcNameplateGradient && (!Data.m_InGame || CBcGradient::AppliesTo(Data.m_ClientId, &This)))
 		{
 			UseGradient = true;
 		}
@@ -525,7 +525,7 @@ protected:
 				m_GradientColor2 = WarData.m_ClanColor2;
 			}
 		}
-		else if(g_Config.m_BcNameplateGradientClan)
+		else if(g_Config.m_BcNameplateGradientClan && (!Data.m_InGame || CBcGradient::AppliesTo(Data.m_ClientId, &This)))
 		{
 			UseGradient = true;
 		}

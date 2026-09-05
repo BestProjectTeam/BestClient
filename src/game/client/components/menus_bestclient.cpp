@@ -403,8 +403,9 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 	static float s_GradientRevealPhase = 0.0f;
 	UpdateModuleRevealPhase(s_GradientRevealPhase, GradientShowModeOptions, Client()->RenderFrameTime());
 	const float GradientHeaderHeight = LineSize + MarginSmall + 4.0f * LineSize;
-	// Expanded: animate speed + mode label/buttons (+ color count label/buttons + pickers when custom)
-	const float GradientExpandedTargetHeight = MarginSmall + LineSize + MarginSmall + LineSize + LineSize + (GradientShowCustomColors ? MarginSmall + LineSize + LineSize + MarginSmall + GradientCustomColorCount * (GradientColorPickerLineSize + GradientColorPickerSpacing) : 0.0f);
+	const float GradientTargetRadioHeight = 2.0f + LineSize;
+	// Expanded: animate speed + mode label/buttons + target radio (+ color count label/buttons + pickers when custom)
+	const float GradientExpandedTargetHeight = MarginSmall + LineSize + MarginSmall + LineSize + LineSize + MarginSmall + GradientTargetRadioHeight + (GradientShowCustomColors ? MarginSmall + LineSize + LineSize + MarginSmall + GradientCustomColorCount * (GradientColorPickerLineSize + GradientColorPickerSpacing) : 0.0f);
 	const float GradientExpandedHeight = GradientExpandedTargetHeight * BCUiAnimations::EaseOutCubic(s_GradientRevealPhase);
 	const float GradientBlockHeight = GradientHeaderHeight + GradientExpandedHeight;
 
@@ -439,6 +440,7 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		g_Config.m_BcNameplateGradientSkin = DefaultConfig::BcNameplateGradientSkin;
 		g_Config.m_BcNameplateGradientEverything = DefaultConfig::BcNameplateGradientEverything;
 		g_Config.m_BcNameplateGradientAnimateSpeed = DefaultConfig::BcNameplateGradientAnimateSpeed;
+		g_Config.m_BcNameplateGradientTarget = DefaultConfig::BcNameplateGradientTarget;
 	}
 	GradientTitleLabel.VSplitRight(MarginSmall, &GradientTitleLabel, nullptr);
 	Ui()->DoLabel(&GradientTitleLabel, Localize("Gradient"), HeadlineFontSize, TEXTALIGN_ML);
@@ -483,6 +485,14 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 			if(DoButton_Menu(&s_GradientModeRainbow, Localize("Rainbow"), g_Config.m_BcNameplateGradientMode == BC_GRADIENT_MODE_RAINBOW, &RainbowButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_R))
 				g_Config.m_BcNameplateGradientMode = BC_GRADIENT_MODE_RAINBOW;
 		}
+
+		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+		static std::vector<CButtonContainer> s_vGradientTargetButtons = {{}, {}, {}};
+		DoLine_RadioMenu(MainView, Localize("Apply to", "Gradient"),
+			s_vGradientTargetButtons,
+			{Localize("Own", "Gradient"), Localize("Others", "Gradient"), Localize("All", "Gradient")},
+			{BC_GRADIENT_TARGET_OWN, BC_GRADIENT_TARGET_OTHERS, BC_GRADIENT_TARGET_ALL},
+			g_Config.m_BcNameplateGradientTarget);
 
 		if(GradientShowCustomColors)
 		{

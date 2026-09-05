@@ -886,7 +886,7 @@ void CHud::RenderScoreHud(bool ForcePreview)
 		CTextCursor Cursor;
 		Cursor.SetPosition(vec2(X, Y));
 		Cursor.m_FontSize = Size;
-		if(Id >= 0 && Id < MAX_CLIENTS && g_Config.m_BcNameplateGradient)
+		if(Id >= 0 && Id < MAX_CLIENTS && g_Config.m_BcNameplateGradient && CBcGradient::AppliesTo(Id, GameClient()))
 		{
 			const float Phase = CBcGradient::AnimatePhase(Client()->GlobalTime());
 			const std::vector<STextColorSplit> vGradientSplits = CBcGradient::BuildAnimatedTextSplits(pName, Id, GameClient(), Phase);

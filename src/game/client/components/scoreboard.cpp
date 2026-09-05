@@ -1001,7 +1001,7 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 						TextRender()->TextColor(WarData.m_NameColor);
 					}
 				}
-				else if(pInfo->m_ClientId >= 0 && g_Config.m_BcNameplateGradient)
+				else if(pInfo->m_ClientId >= 0 && g_Config.m_BcNameplateGradient && CBcGradient::AppliesTo(pInfo->m_ClientId, GameClient()))
 				{
 					const float Phase = CBcGradient::AnimatePhase(Client()->GlobalTime());
 					const std::vector<STextColorSplit> vGradientSplits = CBcGradient::BuildAnimatedTextSplits(ClientData.m_aName, pInfo->m_ClientId, GameClient(), Phase);
@@ -1070,7 +1070,7 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 					}
 				}
 
-				else if(pInfo->m_ClientId >= 0 && g_Config.m_BcNameplateGradientClan)
+				else if(pInfo->m_ClientId >= 0 && g_Config.m_BcNameplateGradientClan && CBcGradient::AppliesTo(pInfo->m_ClientId, GameClient()))
 				{
 					const float Phase = CBcGradient::AnimatePhase(Client()->GlobalTime());
 					Cursor.m_vColorSplits = CBcGradient::BuildAnimatedTextSplits(ClientData.m_aClan, pInfo->m_ClientId, GameClient(), Phase);
