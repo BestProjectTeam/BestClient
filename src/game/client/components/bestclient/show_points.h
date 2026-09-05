@@ -69,8 +69,6 @@ private:
 	mutable char m_aCommunityIdBuf[COMMUNITY_ID_LENGTH] = "";
 
 	static int ProviderIndex(EProvider Provider);
-	static void MakeLowerAscii(char *pBuf, int Size, const char *pSrc);
-
 	const char *CurrentCommunityId() const;
 	bool IsCacheFresh(const SCacheEntry &Entry) const;
 	bool IsQueuedOrInFlight(const std::string &Name) const;

@@ -1025,6 +1025,9 @@ Auto server list refresh
 Short EGO/KoG server name
 == Сокращённое имя EGO/KoG-серверов
 
+Show finished map on EGO
+== Показывать пройденные карты на EGO
+
 Chat Media
 == Медиа в чате
 

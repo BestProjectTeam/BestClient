@@ -88,6 +88,7 @@
 #include "components/bestclient/chat_bubbles.h"
 #include "components/bestclient/cloud_input.h"
 #include "components/bestclient/edgehelper.h"
+#include "components/bestclient/ego_finished_maps.h"
 #include "components/bestclient/physicball.h"
 #include "components/bestclient/process_priority.h"
 #include "components/bestclient/spec_pause_radio.h"
@@ -263,6 +264,7 @@ public:
 	CQuickBinds m_QuickBinds; // BestClient
 	CSelfTimeCp m_SelfTimeCp; // BestClient
 	CShowPoints m_ShowPoints; // BestClient
+	CEgoFinishedMaps m_EgoFinishedMaps; // BestClient
 	CClientIndicator m_ClientIndicator; // BestClient
 	CMusicPlayer m_MusicPlayer; // BestClient
 	CAdminPanel m_AdminPanel; // BestClient

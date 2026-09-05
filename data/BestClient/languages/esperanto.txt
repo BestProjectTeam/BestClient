@@ -1237,6 +1237,9 @@ Auto server list refresh
 Short EGO/KoG server name
 == 
 
+Show finished map on EGO
+== 
+
 Chat Media
 == 
 

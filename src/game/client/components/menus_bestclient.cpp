@@ -3258,7 +3258,7 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	// Browser Utils
 	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
 
-	const float BrowserUtilsBlockHeight = 4.0f * LineSize + 3.0f * MarginSmall;
+	const float BrowserUtilsBlockHeight = 5.0f * LineSize + 4.0f * MarginSmall;
 
 	CUIRect BrowserUtilsBlock;
 	Column.HSplitTop(BrowserUtilsBlockHeight, &BrowserUtilsBlock, &Column);
@@ -3284,6 +3284,10 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	BrowserUtilsBlock.HSplitTop(MarginSmall, nullptr, &BrowserUtilsBlock);
 	BrowserUtilsBlock.HSplitTop(LineSize, &Content, &BrowserUtilsBlock);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcUseShortKogServerName, Localize("Short EGO/KoG server name"), &g_Config.m_BcUseShortKogServerName, &Content, LineSize);
+
+	BrowserUtilsBlock.HSplitTop(MarginSmall, nullptr, &BrowserUtilsBlock);
+	BrowserUtilsBlock.HSplitTop(LineSize, &Content, &BrowserUtilsBlock);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowFinishedMapOnEgo, Localize("Show finished map on EGO"), &g_Config.m_BcShowFinishedMapOnEgo, &Content, LineSize);
 
 	// Chat Filter
 	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);

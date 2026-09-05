@@ -283,6 +283,9 @@ Auto server list refresh
 Short EGO/KoG server name
 == 使用简短的KoG服务器名称
 
+Show finished map on EGO
+== 在EGO服务器上显示已完成的地图
+
 Voice
 == 语音 
 

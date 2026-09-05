@@ -271,6 +271,7 @@ void CGameClient::OnConsoleInit()
 						  &m_MovingTilesForeground, // TClient
 					      &m_SelfTimeCp, // BestClient
 					      &m_ShowPoints, // BestClient
+					      &m_EgoFinishedMaps, // BestClient
 					      &m_Outlines,  // TClient
 					      &m_Mumble, // TClient
 					      &m_Pet, // TClient

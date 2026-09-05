@@ -144,23 +144,6 @@ bool CShowPoints::ActiveOnCurrentServer() const
 	return Enabled() && CurrentProvider() != EProvider::None;
 }
 
-void CShowPoints::MakeLowerAscii(char *pBuf, int Size, const char *pSrc)
-{
-	if(!pBuf || Size <= 0)
-		return;
-
-	int Out = 0;
-	for(int i = 0; pSrc && pSrc[i] && Out + 1 < Size; i++)
-	{
-		const unsigned char C = (unsigned char)pSrc[i];
-		if(C >= 'A' && C <= 'Z')
-			pBuf[Out++] = (char)(C - 'A' + 'a');
-		else
-			pBuf[Out++] = (char)C;
-	}
-	pBuf[Out] = '\0';
-}
-
 bool CShowPoints::IsCacheFresh(const SCacheEntry &Entry) const
 {
 	const int64_t AgeMs = (time_get() - Entry.m_FetchedAt) * 1000 / time_freq();
@@ -258,11 +241,9 @@ void CShowPoints::StartRequest(const std::string &Name, EProvider Provider)
 	char aUrl[512];
 	if(Provider == EProvider::Ego)
 	{
-		char aLower[64];
-		MakeLowerAscii(aLower, sizeof(aLower), Name.c_str());
-		char aEscapedLower[256];
-		EscapeUrl(aEscapedLower, sizeof(aEscapedLower), aLower);
-		str_format(aUrl, sizeof(aUrl), "https://eternal-gores.com/profile/%s.json", aEscapedLower);
+		char aEscaped[256];
+		EscapeUrl(aEscaped, sizeof(aEscaped), Name.c_str());
+		str_format(aUrl, sizeof(aUrl), "https://eternal-gores.com/api/profiles/by-nick/%s", aEscaped);
 	}
 	else if(Provider == EProvider::Legit)
 	{

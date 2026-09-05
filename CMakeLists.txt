@@ -2884,6 +2884,8 @@ if(CLIENT)
     components/bestclient/r_jelly.h
     components/bestclient/self_time_cp.cpp
     components/bestclient/self_time_cp.h
+    components/bestclient/ego_finished_maps.cpp
+    components/bestclient/ego_finished_maps.h
     components/bestclient/show_points.cpp
     components/bestclient/show_points.h
     components/bestclient/subsystem_runtime.h
