@@ -10,11 +10,11 @@
     in {
       packages.${system}.default = pkgs.stdenv.mkDerivation {
         pname = "bestclient";
-        version = "1.5";
+        version = "2.3";
 
         src = pkgs.fetchurl {
-          url = "https://github.com/RoflikBEST/bestdownload/releases/download/v1.5/bestclient.tar.xz";
-          hash = "sha256-fDjtdj6mC76IXJLul0wfj7+7GETU/vveJ8G6S4LskLk";
+          url = "https://github.com/BestProjectTeam/BestClient/releases/download/v2.3/BestClient-linux.tar.xz";
+          hash = "sha256-ngp73/RXIY1nCky3hhrTN+gRlBJVyw9TJJAMNTjpy6o=";
         };
 
         nativeBuildInputs = [ 
@@ -32,6 +32,8 @@
 	        pkgs.vulkan-loader
 	        pkgs.libnotify
         ];
+
+        sourceRoot = "bestclient-2.3-linux_x86_64";
 
         installPhase = ''
         mkdir -p $out/bin $out/share/applications
