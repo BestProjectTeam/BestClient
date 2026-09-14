@@ -8,13 +8,13 @@
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
     in {
-      packages.${system}.default = pkgs.stdenv.mkDerivation {
+      packages.${system}.default = pkgs.stdenv.mkDerivation rec {
         pname = "bestclient";
-        version = "1.5";
+        version = "2.3";
 
         src = pkgs.fetchurl {
-          url = "https://github.com/RoflikBEST/bestdownload/releases/download/v1.5/bestclient.tar.xz";
-          hash = "sha256-fDjtdj6mC76IXJLul0wfj7+7GETU/vveJ8G6S4LskLk";
+          url = "https://github.com/BestProjectTeam/BestClient/releases/download/v${version}/BestClient-linux.tar.xz";
+          hash = "sha256-ngp73/RXIY1nCky3hhrTN+gRlBJVyw9TJJAMNTjpy6o=";
         };
 
         nativeBuildInputs = [ 
@@ -32,6 +32,11 @@
 	        pkgs.vulkan-loader
 	        pkgs.libnotify
         ];
+
+        # Keep URL and sourceRoot derived from `version` so future bumps
+        # only need to touch `version` (plus the src hash, which Nix requires
+        # to be pinned and can never be derived).
+        sourceRoot = "bestclient-${version}-linux_x86_64";
 
         installPhase = ''
         mkdir -p $out/bin $out/share/applications
