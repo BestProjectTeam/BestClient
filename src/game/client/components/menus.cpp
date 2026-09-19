@@ -1004,6 +1004,7 @@ void CMenus::OnInterfacesInit(CGameClient *pClient)
 	m_MenusSettingsControls.OnInterfacesInit(pClient);
 	m_MenusStart.OnInterfacesInit(pClient);
 	m_CommunityIcons.OnInterfacesInit(pClient);
+	m_MapPreviews.OnInterfacesInit(pClient);
 }
 
 void CMenus::OnInit()
@@ -1081,6 +1082,7 @@ void CMenus::OnInit()
 	Storage()->ListDirectory(IStorage::TYPE_ALL, "menuimages", MenuImageScan, this);
 
 	m_CommunityIcons.Load();
+	m_MapPreviews.Load();
 
 	// Quad for the direction arrows above the player
 	m_DirectionQuadContainerIndex = Graphics()->CreateQuadContainer(false);
@@ -1189,6 +1191,7 @@ void CMenus::Render()
 	else
 	{
 		m_CommunityIcons.Update();
+		m_MapPreviews.Update();
 	}
 
 	// Initially add DDNet as favorite community and select its tab.
@@ -2708,6 +2711,7 @@ void CMenus::OnReset()
 void CMenus::OnShutdown()
 {
 	m_MenuMediaBackground.Shutdown();
+	m_MapPreviews.Shutdown();
 	m_CommunityIcons.Shutdown();
 }
 

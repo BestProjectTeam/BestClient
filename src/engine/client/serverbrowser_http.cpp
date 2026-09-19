@@ -522,7 +522,28 @@ bool CServerBrowserHttp::Parse(json_value *pJson, std::vector<CServerInfo> *pvSe
 		}
 		CServerInfo SetInfo = ParsedInfo;
 		SetInfo.m_Location = ParsedLocation;
+		const json_value &MapUrl = Info["map"]["url"];
+		if(MapUrl.type == json_string && !str_has_cc(MapUrl))
+			str_copy(SetInfo.m_aMapUrl, MapUrl);
 		SetInfo.m_NumAddresses = 0;
+
+		// Keep map metadata from the master list. The normal server-browser model
+		// historically discarded these fields, but map preview downloads need the
+		// SHA-256 because maps.ddnet.org uses <name>_<sha256>.map filenames.
+		const json_value &MapSha256 = Info["map"]["sha256"];
+		const json_value &MapSize = Info["map"]["size"];
+		if(MapSha256.type == json_string && MapSize.type == json_integer)
+		{
+			SHA256_DIGEST ParsedMapSha256;
+			const int64_t ParsedMapSize = static_cast<int>(MapSize.u.integer);
+			if(ParsedMapSize > 0 && ParsedMapSize <= 1024ll * 1024ll * 1024ll &&
+				sha256_from_str(&ParsedMapSha256, MapSha256.u.string.ptr) == 0)
+			{
+				SetInfo.m_HasMapSha256 = true;
+				SetInfo.m_MapSha256 = ParsedMapSha256;
+				SetInfo.m_MapSize = (int)ParsedMapSize;
+			}
+		}
 		bool GotVersion6 = false;
 		for(unsigned int a = 0; a < Addresses.u.array.length; a++)
 		{

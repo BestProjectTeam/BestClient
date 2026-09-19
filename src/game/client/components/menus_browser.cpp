@@ -477,6 +477,13 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 	if(vpServerBrowserUiElements.size() < (size_t)NumServers)
 		vpServerBrowserUiElements.resize(NumServers, nullptr);
 
+	std::string HoveredServerAddress;
+	std::string HoveredMapName;
+	int HoveredMapCrc = 0;
+	int HoveredMapSize = 0;
+	bool HoveredMapHasSha256 = false;
+	SHA256_DIGEST HoveredMapSha256{};
+
 	for(int i = 0; i < NumServers; i++)
 	{
 		const CServerInfo *pItem = ServerBrowser()->SortedGet(i);
@@ -500,6 +507,17 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 
 			// don't render invisible items
 			continue;
+		}
+
+		if(Ui()->MouseInside(&ListItem.m_Rect))
+		{
+			HoveredServerAddress = pItem->m_aAddress;
+			HoveredMapName = pItem->m_aMap;
+			HoveredMapCrc = pItem->m_MapCrc;
+			HoveredMapSize = pItem->m_MapSize;
+			HoveredMapHasSha256 = pItem->m_HasMapSha256;
+			if(HoveredMapHasSha256)
+				HoveredMapSha256 = pItem->m_MapSha256;
 		}
 
 		const float FontSize = 12.0f;
@@ -699,6 +717,77 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 				m_ServerBrowserShouldRevealSelection = true;
 			}
 		}
+	}
+
+	if(!Ui()->IsPopupOpen() && !HoveredServerAddress.empty() && !HoveredMapName.empty())
+	{
+		// Hover changes download/generation priority immediately. The 0.65 second
+		// delay below controls only popup visibility.
+		const SHA256_DIGEST *pHoveredMapSha256 = HoveredMapHasSha256 ? &HoveredMapSha256 : nullptr;
+		m_MapPreviews.Prioritize(HoveredMapName.c_str(), HoveredMapCrc, HoveredMapSize, pHoveredMapSha256);
+
+		char aMapId[SHA256_MAXSTRSIZE];
+		if(pHoveredMapSha256 != nullptr)
+			sha256_str(*pHoveredMapSha256, aMapId, sizeof(aMapId));
+		else
+			str_format(aMapId, sizeof(aMapId), "%08x", (unsigned)HoveredMapCrc);
+		std::string HoverKey = HoveredServerAddress;
+		HoverKey.push_back('\n');
+		HoverKey.append(HoveredMapName);
+		HoverKey.push_back('\n');
+		HoverKey.append(aMapId);
+
+		if(HoverKey != m_ServerBrowserPreviewHoverKey)
+		{
+			m_ServerBrowserPreviewHoverKey = HoverKey;
+			m_ServerBrowserPreviewHoverStart = Client()->GlobalTime();
+		}
+		else if(Client()->GlobalTime() - m_ServerBrowserPreviewHoverStart >= 0.65f)
+		{
+			constexpr float PopupWidth = 336.0f;
+			constexpr float PopupHeight = 238.0f;
+			constexpr float PopupMargin = 5.0f;
+			constexpr float CursorGap = 14.0f;
+			const CUIRect *pScreen = Ui()->Screen();
+
+			float PopupX = Ui()->MouseX() + CursorGap;
+			if(PopupX + PopupWidth > pScreen->x + pScreen->w - PopupMargin)
+				PopupX = Ui()->MouseX() - PopupWidth - CursorGap;
+			PopupX = std::clamp(PopupX, pScreen->x + PopupMargin, pScreen->x + pScreen->w - PopupWidth - PopupMargin);
+
+			float PopupY = Ui()->MouseY() + CursorGap;
+			if(PopupY + PopupHeight > pScreen->y + pScreen->h - PopupMargin)
+				PopupY = Ui()->MouseY() - PopupHeight - CursorGap;
+			PopupY = std::clamp(PopupY, pScreen->y + PopupMargin, pScreen->y + pScreen->h - PopupHeight - PopupMargin);
+
+			CUIRect Popup = {PopupX, PopupY, PopupWidth, PopupHeight};
+			CUIRect Shadow = Popup;
+			Shadow.x += 2.0f;
+			Shadow.y += 2.0f;
+			Shadow.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.45f), IGraphics::CORNER_ALL, 7.0f);
+			Popup.Draw(ColorRGBA(0.055f, 0.055f, 0.065f, 0.97f), IGraphics::CORNER_ALL, 7.0f);
+
+			CUIRect Inner, Title, Image;
+			Popup.Margin(8.0f, &Inner);
+			Inner.HSplitTop(18.0f, &Title, &Image);
+			Image.HSplitTop(4.0f, nullptr, &Image);
+			Ui()->DoLabel(&Title, HoveredMapName.c_str(), 13.0f, TEXTALIGN_MC);
+
+			const CMapPreview *pPreview = m_MapPreviews.Find(HoveredMapName.c_str(), HoveredMapCrc, pHoveredMapSha256);
+			if(pPreview != nullptr)
+				m_MapPreviews.Render(pPreview, Image);
+			else
+			{
+				const char *pStatus = m_MapPreviews.StatusText(HoveredMapName.c_str(), HoveredMapCrc, pHoveredMapSha256);
+				Ui()->DoLabel(&Image, pStatus, 12.0f, TEXTALIGN_MC);
+			}
+		}
+	}
+	else
+	{
+		m_MapPreviews.ClearPriority();
+		m_ServerBrowserPreviewHoverKey.clear();
+		m_ServerBrowserPreviewHoverStart = -1.0f;
 	}
 
 	WasListboxItemActivated = s_ListBox.WasItemActivated();

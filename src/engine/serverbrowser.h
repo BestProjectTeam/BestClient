@@ -120,6 +120,9 @@ public:
 	char m_aMap[MAX_MAP_LENGTH];
 	int m_MapCrc;
 	int m_MapSize;
+	bool m_HasMapSha256;
+	SHA256_DIGEST m_MapSha256;
+	char m_aMapUrl[512];
 	char m_aVersion[32];
 	char m_aAddress[MAX_SERVER_ADDRESSES * NETADDR_MAXSTRSIZE];
 	CClient m_aClients[SERVERINFO_MAX_CLIENTS];
