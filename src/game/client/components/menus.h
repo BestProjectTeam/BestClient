@@ -17,6 +17,7 @@
 
 #include <game/client/component.h>
 #include <game/client/components/community_icons.h>
+#include <game/client/components/map_previews.h>
 #include <game/client/components/mapimages.h>
 #include <game/client/components/menu_media_background.h>
 #include <game/client/components/menus_ingame_touch_controls.h>
@@ -603,6 +604,8 @@ protected:
 	// found in menus_browser.cpp
 	int m_SelectedIndex;
 	bool m_ServerBrowserShouldRevealSelection;
+	std::string m_ServerBrowserPreviewHoverKey;
+	float m_ServerBrowserPreviewHoverStart = -1.0f;
 	std::vector<CUIElement *> m_avpServerBrowserUiElements[IServerBrowser::NUM_TYPES];
 	void RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemActivated);
 	void RenderServerbrowserStatusBox(CUIRect StatusBox, bool WasListboxItemActivated);
@@ -916,6 +919,7 @@ public:
 
 private:
 	CCommunityIcons m_CommunityIcons;
+	CMapPreviews m_MapPreviews;
 	CMenusIngameTouchControls m_MenusIngameTouchControls;
 	friend CMenusIngameTouchControls;
 	CMenusSettingsControls m_MenusSettingsControls;
