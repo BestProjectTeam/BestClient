@@ -57,6 +57,14 @@ jobs:
           package-file: "*-win64.zip"
           artifact-name: release-windows
           asset-name: BestClient-windows.zip
+        - name: macos
+          os: macOS-latest
+          # Universal PCH builds split architectures and reject the shared ARM compiler flags.
+          cmake-args: -G Ninja -DCMAKE_BUILD_TYPE=Release -DPREFER_BUNDLED_LIBS=ON -DPRECOMPILE_HEADERS=OFF -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DCMAKE_SYSTEM_IGNORE_PATH=/usr/lib -DCMAKE_FIND_FRAMEWORK=LAST
+          cmake-init-env: CXXFLAGS=
+          package-file: "*-macos.dmg"
+          artifact-name: release-macos
+          asset-name: BestClient-macos.dmg
 
     steps:
     - uses: actions/checkout@v4
@@ -68,6 +76,24 @@ jobs:
       run: |
         sudo apt-get update -y
         sudo apt-get install pkg-config ninja-build libcurl4-openssl-dev libdbus-1-dev libfreetype6-dev libnotify-dev libogg-dev libopus-dev libopusfile-dev libsdl2-dev libsqlite3-dev libpng-dev libvulkan-dev libglew-dev -y
+
+    - name: Prepare macOS
+      if: contains(matrix.os, 'macOS')
+      run: |
+        brew update
+        brew install pkg-config ninja molten-vk vulkan-headers glslang spirv-tools glew libpng opusfile wavpack x264
+        brew upgrade freetype
+        pip3 install --break-system-packages dmgbuild pyobjc-framework-Quartz
+        echo /Library/Frameworks/Python.framework/Versions/3.12/bin >> "$GITHUB_PATH"
+        python3 -c 'import sysconfig; print(sysconfig.get_path("scripts"))' >> "$GITHUB_PATH"
+        sudo rm -rf /Library/Developer/CommandLineTools
+
+    - name: Add Rust macOS targets
+      if: contains(matrix.os, 'macOS')
+      run: |
+        rustup default stable
+        rustup update
+        rustup target add x86_64-apple-darwin aarch64-apple-darwin
 
     - name: Install Vulkan SDK
       uses: humbletim/install-vulkan-sdk@v1.2
@@ -109,12 +135,19 @@ jobs:
         if [[ "${{ matrix.os }}" == windows-latest ]]; then
           export MSYS_ARG_CONV_EXCL="/FI"
           cmake -S . -B build-release ${{ matrix.cmake-args }} -DCMAKE_CXX_FLAGS="/FI$VERSION_FILE"
+        elif [[ "${{ matrix.os }}" == "macOS-latest" ]]; then
+          cmake -E env CXXFLAGS="-include$VERSION_FILE" \
+            cmake -S . -B build-release ${{ matrix.cmake-args }} \
+            -DPNG_LIBRARY="${GITHUB_WORKSPACE}/ddnet-libs/png/mac/libfat/libpng16.16.dylib" \
+            -DPNG_INCLUDEDIR="${GITHUB_WORKSPACE}/ddnet-libs/png/include"
         else
           cmake -E env CXXFLAGS="-include$VERSION_FILE" \
             cmake -S . -B build-release ${{ matrix.cmake-args }}
         fi
         cmake --build build-release --config Release --target game-client
-        cmake --build build-release --config Release --target bestclient-updater
+        if [[ "${{ matrix.os }}" != "macOS-latest" ]]; then
+          cmake --build build-release --config Release --target bestclient-updater
+        fi
 
     # Sign when secrets are present. Without a cert the build still ships unsigned —
     # Defender may false-positive until WINDOWS_CERT_BASE64 / WINDOWS_CERT_PASSWORD are set.
@@ -158,113 +191,10 @@ jobs:
         name: ${{ matrix.artifact-name }}
         path: artifacts/${{ matrix.asset-name }}
 
-  build-android:
-    name: Build Release (android)
-    runs-on: ubuntu-24.04
-    env:
-      CARGO_HTTP_MULTIPLEXING: false
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
-
-    - name: Validate Gradle Wrapper
-      uses: gradle/actions/wrapper-validation@v4
-
-    - name: Prepare Linux
-      run: |
-        sudo apt-get update -y
-        sudo apt-get install ninja-build openjdk-21-jdk openssl
-        curl -LO https://github.com/Kitware/CMake/releases/download/v3.22.1/cmake-3.22.1-Linux-x86_64.tar.gz
-        mkdir -p /home/runner/cmake
-        tar --strip-components 1 -C /home/runner/cmake -xf cmake-3.22.1-Linux-x86_64.tar.gz
-        rustup default 1.92.0
-        cargo install cargo-ndk
-        rustup target add armv7-linux-androideabi
-        rustup target add i686-linux-android
-        rustup target add aarch64-linux-android
-        rustup target add x86_64-linux-android
-        scripts/android/download_android_sdk.sh /home/runner
-
-    - name: Install Vulkan SDK
-      uses: humbletim/install-vulkan-sdk@v1.2
-      with:
-        version: 1.3.296.0
-        cache: true
-
-    - name: Cache Rust dependencies
-      uses: Swatinem/rust-cache@v2
-      with:
-        workspaces: |
-          ./
-
-    - name: Prepare Android signing key
-      env:
-        RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
-        RELEASE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
-        RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
-      run: |
-        TW_KEY_NAME=/home/runner/DDNet.jks
-        # Tag pushes and manual dispatch use the persistent release keystore.
-        if [ -n "$RELEASE_KEYSTORE_BASE64" ] && { [[ "$GITHUB_REF" == refs/tags/* ]] || [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; }; then
-          echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > "$TW_KEY_NAME"
-          TW_KEY_ALIAS="$RELEASE_KEY_ALIAS"
-          TW_KEY_PW="$RELEASE_KEYSTORE_PASSWORD"
-          echo "Signed with persistent release keystore" >> "$GITHUB_STEP_SUMMARY"
-        else
-          TW_KEY_ALIAS=DDNet-Key
-          TW_KEY_PW="$(openssl rand -base64 32)"
-          keytool -genkey -v -keystore "$TW_KEY_NAME" -keyalg RSA -keysize 2048 -validity 10000 -alias "$TW_KEY_ALIAS" -storepass "$TW_KEY_PW" -dname "CN=DDNet CI, OU=DDNet, O=DDNet"
-          echo "Signed with ephemeral CI keystore" >> "$GITHUB_STEP_SUMMARY"
-        fi
-        {
-          echo "TW_KEY_NAME=$TW_KEY_NAME"
-          echo "TW_KEY_ALIAS=$TW_KEY_ALIAS"
-          echo "TW_KEY_PW=$TW_KEY_PW"
-          echo "TW_VERSION_CODE=$(date -u +%Y%m%d%H)"
-        } >> "$GITHUB_ENV"
-
-    - name: Build Android app
-      env:
-        VERSION: ${{ secrets.VERSION }}
-        OFFICIAL_CODE: ${{ secrets.BESTCLIENT_OFFICIAL_CODE }}
-      run: |
-        if [ -z "$VERSION" ]; then
-          echo "secrets.VERSION is required for official release builds" >&2
-          exit 1
-        fi
-        if [ -z "$OFFICIAL_CODE" ]; then
-          echo "secrets.BESTCLIENT_OFFICIAL_CODE is required for official release builds" >&2
-          exit 1
-        fi
-        printf '%s' "$VERSION" | base64 -d > "$GITHUB_WORKSPACE/versioninfo.h"
-        python3 - <<'PY'
-        import os
-        from pathlib import Path
-        code = os.environ["OFFICIAL_CODE"]
-        if any(ch in code for ch in ('\0', '\n', '\r', '"', '\\')):
-            raise SystemExit("BESTCLIENT_OFFICIAL_CODE must not contain quotes, backslashes, or newlines")
-        path = Path(os.environ["GITHUB_WORKSPACE"]) / "versioninfo.h"
-        path.write_text(path.read_text(encoding="utf-8") + f'\n#define BESTCLIENT_OFFICIAL_CODE "{code}"\n', encoding="utf-8")
-        PY
-        export ANDROID_HOME="/home/runner/Android/Sdk"
-        unset ANDROID_SDK_ROOT
-        export PATH=/home/runner/cmake/bin:$PATH
-        scripts/android/cmake_android.sh all DDNet org.ddnet.client Release build-android
-        mkdir artifacts
-        mv build-android/DDNet.apk artifacts/${{ env.CLIENT_NAME }}-android.apk
-
-    - name: Upload Android package
-      uses: actions/upload-artifact@v4
-      with:
-        name: release-android
-        path: artifacts/${{ env.CLIENT_NAME }}-android.apk
-
   publish:
     name: Publish Release Assets
     needs:
       - build-cmake
-      - build-android
     runs-on: ubuntu-latest
     steps:
     - name: Download release packages
@@ -290,7 +220,7 @@ jobs:
         files: |
           artifacts/${{ env.CLIENT_NAME }}-linux.tar.xz
           artifacts/${{ env.CLIENT_NAME }}-windows.zip
-          artifacts/${{ env.CLIENT_NAME }}-android.apk
+          artifacts/${{ env.CLIENT_NAME }}-macos.dmg
 
     - name: Create or update release manually
       if: github.event_name == 'workflow_dispatch'
@@ -303,4 +233,4 @@ jobs:
         files: |
           artifacts/${{ env.CLIENT_NAME }}-linux.tar.xz
           artifacts/${{ env.CLIENT_NAME }}-windows.zip
-          artifacts/${{ env.CLIENT_NAME }}-android.apk
+          artifacts/${{ env.CLIENT_NAME }}-macos.dmg
