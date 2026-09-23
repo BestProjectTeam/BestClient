@@ -1291,6 +1291,122 @@ Mute headphones
 == 静音耳机
 
 [BestClient]
+System default
+== 系统默认
+
+[BestClient]
+Device #%d
+== 设备 #%d
+
+[BestClient]
+Enable voice chat
+== 启用语音聊天
+
+[BestClient]
+In-Game Only
+== 仅在游戏中
+
+[BestClient]
+Use team0
+== 使用 team0
+
+[BestClient]
+Enable your group
+== 启用自己的分组
+
+[BestClient]
+Radius filter
+== 距离过滤
+
+[BestClient]
+Radius (tiles)
+== 半径（格）
+
+[BestClient]
+Activation mode
+== 激活模式
+
+[BestClient]
+Automatic
+== 自动
+
+[BestClient]
+VAD threshold (%)
+== 语音活动检测阈值 (%)
+
+[BestClient]
+VAD release delay (ms)
+== 语音活动检测释放延迟（毫秒）
+
+[BestClient]
+Mic check (loopback)
+== 麦克风测试（听自己）
+
+[BestClient]
+Mic level
+== 麦克风电平
+
+[BestClient]
+Mic gain
+== 麦克风增益
+
+[BestClient]
+Voice volume
+== 语音音量
+
+[BestClient]
+Microphone
+== 麦克风
+
+[BestClient]
+Headphones
+== 耳机
+
+[BestClient]
+Status
+== 状态
+
+[BestClient]
+Connected
+== 已连接
+
+[BestClient]
+Offline
+== 离线
+
+[BestClient]
+Reload servers
+== 重新加载服务器
+
+[BestClient]
+Available servers
+== 可用服务器
+
+[BestClient]
+Loading server list...
+== 正在加载服务器列表...
+
+[BestClient]
+No servers loaded
+== 未加载服务器
+
+[BestClient]
+Voice commands
+== 语音命令
+
+[BestClient]
+!vmute "name" / !vunmute "name"
+== !vmute "名字" / !vunmute "名字"
+
+[BestClient]
+!volume "name" 0-100
+== !volume "名字" 0-100
+
+[BestClient]
+!vradius on/off/<tiles>
+== !vradius on/off/<格数>
+
+[BestClient]
 Client Indicator
 == 客户端标识
 

@@ -422,7 +422,10 @@ void CMenus::RenderSettingsNavNewStyle(CUIRect &TabBar)
 		const ColorRGBA GroupInactive = SettingsNavGroupInactiveColor();
 		const ColorRGBA GroupActive = SettingsNavGroupActiveColor();
 		const ColorRGBA GroupHover = SettingsNavGroupHoverColor();
-		if(DoButton_MenuTab(&s_aGroupButtons[Group], apGroupNames[Group], Expanded || CurGroup == Group, &GroupButton, NavCorners, nullptr, &GroupInactive, &GroupActive, &GroupHover, 10.0f, nullptr, true, IGraphics::CORNER_NONE, -1.0f, ExploreLock ? 0.35f : 1.0f) && !ExploreLock)
+		const ColorRGBA *pGroupInactive = NavOnLeft ? &GroupInactive : nullptr;
+		const ColorRGBA *pGroupActive = NavOnLeft ? &GroupActive : nullptr;
+		const ColorRGBA *pGroupHover = NavOnLeft ? &GroupHover : nullptr;
+		if(DoButton_MenuTab(&s_aGroupButtons[Group], apGroupNames[Group], Expanded || CurGroup == Group, &GroupButton, NavCorners, nullptr, pGroupInactive, pGroupActive, pGroupHover, 10.0f, nullptr, true, IGraphics::CORNER_NONE, -1.0f, ExploreLock ? 0.35f : 1.0f) && !ExploreLock)
 		{
 			s_aExpandedGroup[Group] = !s_aExpandedGroup[Group];
 			if(s_aExpandedGroup[Group])
@@ -477,7 +480,10 @@ void CMenus::RenderSettingsNavNewStyle(CUIRect &TabBar)
 			const ColorRGBA LeafInactive = SettingsNavLeafInactiveColor();
 			const ColorRGBA LeafActive = SettingsNavLeafActiveColor();
 			const ColorRGBA LeafHover = SettingsNavLeafHoverColor();
-			if(DoButton_MenuTab(&s_aLeafButtons[Leaf], LeafName(Leaf), CurLeaf == Leaf, &LeafButton, NavCorners, nullptr, &LeafInactive, &LeafActive, &LeafHover, 10.0f, nullptr, true, IGraphics::CORNER_NONE, -1.0f, ExploreLock && !AssetsLeaf ? 0.35f : 1.0f) && (!ExploreLock || AssetsLeaf))
+			const ColorRGBA *pLeafInactive = NavOnLeft ? &LeafInactive : nullptr;
+			const ColorRGBA *pLeafActive = NavOnLeft ? &LeafActive : nullptr;
+			const ColorRGBA *pLeafHover = NavOnLeft ? &LeafHover : nullptr;
+			if(DoButton_MenuTab(&s_aLeafButtons[Leaf], LeafName(Leaf), CurLeaf == Leaf, &LeafButton, NavCorners, nullptr, pLeafInactive, pLeafActive, pLeafHover, 10.0f, nullptr, true, IGraphics::CORNER_NONE, -1.0f, ExploreLock && !AssetsLeaf ? 0.35f : 1.0f) && (!ExploreLock || AssetsLeaf))
 			{
 				s_aExpandedGroup[Group] = true;
 				SaveSettingsNavExpanded(s_aExpandedGroup);

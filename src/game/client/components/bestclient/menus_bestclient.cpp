@@ -147,19 +147,16 @@ void CMenus::RenderPopupStylePicker(CUIRect Box)
 
 		if(BetterSide)
 		{
-			const ColorRGBA TabInactive = BestClientUiTheme::SettingsNavGroupInactiveColor();
-			const ColorRGBA TabActive = BestClientUiTheme::SettingsNavGroupActiveColor();
-			const ColorRGBA TabHover = BestClientUiTheme::SettingsNavGroupHoverColor();
 			Tabs.HSplitTop(26.0f, &Row, &Tabs);
-			if(DoButton_MenuTab(&s_NewTabDdnet, BcLocalize("DDNet"), s_NewTab == 0, &Row, IGraphics::CORNER_R, nullptr, &TabInactive, &TabActive, &TabHover, 10.0f))
+			if(DoButton_MenuTab(&s_NewTabDdnet, BcLocalize("DDNet"), s_NewTab == 0, &Row, IGraphics::CORNER_R, nullptr, nullptr, nullptr, nullptr, 10.0f))
 				s_NewTab = 0;
 			Tabs.HSplitTop(8.0f, nullptr, &Tabs);
 			Tabs.HSplitTop(26.0f, &Row, &Tabs);
-			if(DoButton_MenuTab(&s_NewTabTclient, "TClient", s_NewTab == 1, &Row, IGraphics::CORNER_R, nullptr, &TabInactive, &TabActive, &TabHover, 10.0f))
+			if(DoButton_MenuTab(&s_NewTabTclient, "TClient", s_NewTab == 1, &Row, IGraphics::CORNER_R, nullptr, nullptr, nullptr, nullptr, 10.0f))
 				s_NewTab = 1;
 			Tabs.HSplitTop(8.0f, nullptr, &Tabs);
 			Tabs.HSplitTop(26.0f, &Row, &Tabs);
-			if(DoButton_MenuTab(&s_NewTabBestClient, BcLocalize("BestClient"), s_NewTab == 2, &Row, IGraphics::CORNER_R, nullptr, &TabInactive, &TabActive, &TabHover, 10.0f))
+			if(DoButton_MenuTab(&s_NewTabBestClient, BcLocalize("BestClient"), s_NewTab == 2, &Row, IGraphics::CORNER_R, nullptr, nullptr, nullptr, nullptr, 10.0f))
 				s_NewTab = 2;
 		}
 		else
@@ -3991,6 +3988,8 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	BrowserUtilsBlock.HSplitTop(LineSize, &Content, &BrowserUtilsBlock);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcMastersrv, BcLocalize("Use BestClient MasterServer"), &g_Config.m_BcMastersrv, &Content, LineSize);
 
+	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
+
 	const bool RollbackDemoExpanded = g_Config.m_ClReplays != 0;
 	const float RollbackDemoHeaderHeight = LineSize + MarginSmall + LineSize;
 	const float RollbackDemoExpandedTargetHeight = MarginSmall + LineSize + MarginSmall + LineSize;
@@ -3998,7 +3997,7 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	const float RollbackDemoBlockHeight = RollbackDemoHeaderHeight + RollbackDemoExpandedHeight;
 
 	CUIRect RollbackDemoBlock;
-	RightColumn.HSplitTop(RollbackDemoBlockHeight, &RollbackDemoBlock, &RightColumn);
+	Column.HSplitTop(RollbackDemoBlockHeight, &RollbackDemoBlock, &Column);
 
 	CUIRect RollbackDemoBlockBg = RollbackDemoBlock;
 	RollbackDemoBlockBg.w += BlockPadding;
@@ -4011,6 +4010,8 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	{
 		CUIRect RollbackMain = RollbackDemoBlock;
 		RollbackMain.HSplitTop(LineSize, &Label, &RollbackMain);
+		Label.VSplitRight(MarginSmall, &Label, nullptr);
+		BcMenuBadges::DrawNew(Graphics(), Ui(), TextRender(), &Label, 4.0f);
 		Ui()->DoLabel(&Label, BcLocalize("Rollback Demo"), HeadlineFontSize, TEXTALIGN_ML);
 		RollbackMain.HSplitTop(MarginSmall, nullptr, &RollbackMain);
 
@@ -4042,7 +4043,7 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 		}
 	}
 
-	RightColumn.HSplitTop(MarginBetweenViews, nullptr, &RightColumn);
+	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
 
 	const bool FocusModeEnabled = g_Config.m_ClFocusMode != 0;
 	const bool FocusModeAutoReplyEnabled = g_Config.m_ClFocusModeAutoReply != 0;
@@ -4052,7 +4053,7 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	const float FocusModeBlockHeight = FocusModeHeaderHeight + FocusModeExpandedHeight;
 
 	CUIRect FocusModeBlock;
-	RightColumn.HSplitTop(FocusModeBlockHeight, &FocusModeBlock, &RightColumn);
+	Column.HSplitTop(FocusModeBlockHeight, &FocusModeBlock, &Column);
 
 	CUIRect FocusModeBlockBg = FocusModeBlock;
 	FocusModeBlockBg.w += BlockPadding;
@@ -4127,8 +4128,6 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 			Ui()->ClipDisable();
 		}
 	}
-
-	RightColumn.HSplitTop(MarginBetweenViews, nullptr, &RightColumn);
 
 	const bool VoiceExpanded = g_Config.m_BcVoiceChatEnable != 0;
 	static float s_VoiceRevealPhase = 0.0f;

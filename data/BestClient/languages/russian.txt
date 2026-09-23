@@ -1291,6 +1291,122 @@ Mute headphones
 == Мут наушников
 
 [BestClient]
+System default
+== Системное по умолчанию
+
+[BestClient]
+Device #%d
+== Устройство #%d
+
+[BestClient]
+Enable voice chat
+== Включить войс-чат
+
+[BestClient]
+In-Game Only
+== Только в игре
+
+[BestClient]
+Use team0
+== Использовать team0
+
+[BestClient]
+Enable your group
+== Включить свою группу
+
+[BestClient]
+Radius filter
+== Фильтр по радиусу
+
+[BestClient]
+Radius (tiles)
+== Радиус (тайлы)
+
+[BestClient]
+Activation mode
+== Режим активации
+
+[BestClient]
+Automatic
+== Автоматически
+
+[BestClient]
+VAD threshold (%)
+== Порог VAD (%)
+
+[BestClient]
+VAD release delay (ms)
+== Задержка отпускания VAD (мс)
+
+[BestClient]
+Mic check (loopback)
+== Проверка микрофона (свой голос)
+
+[BestClient]
+Mic level
+== Уровень микрофона
+
+[BestClient]
+Mic gain
+== Усиление микрофона
+
+[BestClient]
+Voice volume
+== Громкость войса
+
+[BestClient]
+Microphone
+== Микрофон
+
+[BestClient]
+Headphones
+== Наушники
+
+[BestClient]
+Status
+== Статус
+
+[BestClient]
+Connected
+== Подключено
+
+[BestClient]
+Offline
+== Оффлайн
+
+[BestClient]
+Reload servers
+== Обновить серверы
+
+[BestClient]
+Available servers
+== Доступные серверы
+
+[BestClient]
+Loading server list...
+== Загрузка списка серверов...
+
+[BestClient]
+No servers loaded
+== Серверы не загружены
+
+[BestClient]
+Voice commands
+== Команды войса
+
+[BestClient]
+!vmute "name" / !vunmute "name"
+== !vmute "имя" / !vunmute "имя"
+
+[BestClient]
+!volume "name" 0-100
+== !volume "имя" 0-100
+
+[BestClient]
+!vradius on/off/<tiles>
+== !vradius on/off/<тайлы>
+
+[BestClient]
 Client Indicator
 == Индикатор клиента
 
