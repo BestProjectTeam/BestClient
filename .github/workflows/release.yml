@@ -109,20 +109,14 @@ jobs:
 
     - name: Build release binaries
       env:
-        VERSION: ${{ secrets.VERSION }}
         OFFICIAL_CODE: ${{ secrets.BESTCLIENT_OFFICIAL_CODE }}
       shell: bash
       run: |
-        VERSION_FILE="$GITHUB_WORKSPACE/versioninfo.h"
-        if [ -z "$VERSION" ]; then
-          echo "secrets.VERSION is required for official release builds" >&2
-          exit 1
-        fi
+        OFFICIAL_HEADER="$GITHUB_WORKSPACE/versioninfo.h"
         if [ -z "$OFFICIAL_CODE" ]; then
           echo "secrets.BESTCLIENT_OFFICIAL_CODE is required for official release builds" >&2
           exit 1
         fi
-        printf '%s' "$VERSION" | base64 -d > "$VERSION_FILE"
         python3 - <<'PY'
         import os
         from pathlib import Path
@@ -130,18 +124,18 @@ jobs:
         if any(ch in code for ch in ('\0', '\n', '\r', '"', '\\')):
             raise SystemExit("BESTCLIENT_OFFICIAL_CODE must not contain quotes, backslashes, or newlines")
         path = Path(os.environ["GITHUB_WORKSPACE"]) / "versioninfo.h"
-        path.write_text(path.read_text(encoding="utf-8") + f'\n#define BESTCLIENT_OFFICIAL_CODE "{code}"\n', encoding="utf-8")
+        path.write_text(f'#define BESTCLIENT_OFFICIAL_CODE "{code}"\n', encoding="utf-8")
         PY
         if [[ "${{ matrix.os }}" == windows-latest ]]; then
           export MSYS_ARG_CONV_EXCL="/FI"
-          cmake -S . -B build-release ${{ matrix.cmake-args }} -DCMAKE_CXX_FLAGS="/FI$VERSION_FILE"
+          cmake -S . -B build-release ${{ matrix.cmake-args }} -DCMAKE_CXX_FLAGS="/FI$OFFICIAL_HEADER"
         elif [[ "${{ matrix.os }}" == "macOS-latest" ]]; then
-          cmake -E env CXXFLAGS="-include$VERSION_FILE" \
+          cmake -E env CXXFLAGS="-include$OFFICIAL_HEADER" \
             cmake -S . -B build-release ${{ matrix.cmake-args }} \
             -DPNG_LIBRARY="${GITHUB_WORKSPACE}/ddnet-libs/png/mac/libfat/libpng16.16.dylib" \
             -DPNG_INCLUDEDIR="${GITHUB_WORKSPACE}/ddnet-libs/png/include"
         else
-          cmake -E env CXXFLAGS="-include$VERSION_FILE" \
+          cmake -E env CXXFLAGS="-include$OFFICIAL_HEADER" \
             cmake -S . -B build-release ${{ matrix.cmake-args }}
         fi
         cmake --build build-release --config Release --target game-client
