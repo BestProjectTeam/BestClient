@@ -3898,8 +3898,18 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	}
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcSilentTyping, BcLocalize("Silent typing"), &g_Config.m_BcSilentTyping, &ChatQoLBlock, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatAltCommandLayout, BcLocalize("Commands in other layout"), &g_Config.m_BcChatAltCommandLayout, &ChatQoLBlock, LineSize);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatMessageActions, BcLocalize("Reply/copy message menu"), &g_Config.m_BcChatMessageActions, &ChatQoLBlock, LineSize);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcNotifySavesOnMap, BcLocalize("Notify about saves on map"), &g_Config.m_BcNotifySavesOnMap, &ChatQoLBlock, LineSize);
+	{
+		CUIRect MessageActionsRow;
+		ChatQoLBlock.HSplitTop(LineSize, &MessageActionsRow, &ChatQoLBlock);
+		BcMenuBadges::DrawNew(Graphics(), Ui(), TextRender(), &MessageActionsRow, MarginSmall);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatMessageActions, BcLocalize("Reply/copy message menu"), &g_Config.m_BcChatMessageActions, &MessageActionsRow, LineSize);
+	}
+	{
+		CUIRect NotifySavesRow;
+		ChatQoLBlock.HSplitTop(LineSize, &NotifySavesRow, &ChatQoLBlock);
+		BcMenuBadges::DrawNew(Graphics(), Ui(), TextRender(), &NotifySavesRow, MarginSmall);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcNotifySavesOnMap, BcLocalize("Notify about saves on map"), &g_Config.m_BcNotifySavesOnMap, &NotifySavesRow, LineSize);
+	}
 
 	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
 
