@@ -1,0 +1,7 @@
+var i = args.find("D")
+if (i == -1) {
+	throw("Invalid emoticon")
+}
+var emoticon = trim(args.substr(0, i))
+var msg = trim(args.substr(i + 1, -1))
+exec("say " + msg + " " + emoticon)

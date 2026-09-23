@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tater Client</title>
+    <meta name="description" content="Open source DDNet client with additional features" />
+    <meta name="keywords" content="ddnet, tclient, tater, tater client, t-client, ddrace network, ddracenetwork, ddnet client, ddnetclient">
+    <meta name="language" content="English">
+    <meta name="image" content="assets/logo-vert.png" />
+    <meta itemprop="name" content="Tater Client" />
+    <meta itemprop="description" content="Open source DDNet client with additional features" />
+    <meta itemprop="image" content="assets/logo-vert.png" />
+
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://unpkg.com/aos@next/dist/aos.css" />
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <nav data-aos="fade-down" data-aos-duration="1000">
+        <div class="nav-content">
+            <div class="logo">T-CLIENT</div>
+            <div class="nav-links">
+                <a href="/faq">FAQ</a>
+                <span class="divider"></span>
+                <a href="#features">Features</a>
+                <span class="divider"></span>
+                <a href="#download">Download</a>
+                <span class="divider"></span>
+                <a href="https://discord.gg/BgPSapKRkZ" target="_blank" class="discord-link">
+                    Discord
+                    <img class="discord-icon" src="assets/discord.svg" alt="Discord">
+                </a>
+                <span class="divider"></span>
+                <a href="https://github.com/sjrc6/TaterClient-ddnet" target="_blank" class="discord-link">
+                    GitHub
+                    <img class="discord-icon" src="assets/github.svg" alt="GitHub">
+                </a>
+            </div>
+            <div class="donate-icon">
+                <a href="https://ko-fi.com/Totar" target="_blank" class="discord-link">
+                    Support
+                    <img src="assets/donate.png" alt="Donate icon">
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        <header data-aos="zoom-in" data-aos-duration="1000" data-aos-delay="250">
+
+            <picture>
+                <source media="(min-aspect-ratio: 1)" srcset="assets/TClient_Logo_Horizontal.svg">
+                <img src="assets/TClient_Logo_Vertical.svg" alt="T-Client Logo" class="hero-logo" id="heroLogo">
+            </picture>
+            <p class="hero-text">DDNet Client with extended features</p>
+            <div class="scroll-indicator">
+                <p>Scroll down to download</p>
+                <img src="assets/Arrow-down.svg" alt="Scroll down">
+            </div>
+        </header>
+
+        <section id="features" data-aos="fade-up" data-aos-duration="1000" data-aos-delay="500">
+            <h2>Features</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <img src="assets/features/fastinput.png" alt="Fast Inputs">
+                    <div class="feature-content">
+                        <h3>Fast Inputs</h3>
+                        <p>Reduces input delay by 20ms</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <img src="assets/features/outlines.png" alt="Outlines">
+                    <div class="feature-content">
+                        <h3>Outlines</h3>
+                        <p>Renders outlines around certain tiles to make your entities prettier</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <img src="assets/features/profiles.png" alt="Profiles">
+                    <div class="feature-content">
+                        <h3>Profiles</h3>
+                        <p>Save and load player settings, including skin, name, clan and others</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <img src="assets/features/bindwheel.png" alt="BindWheel">
+                    <div class="feature-content">
+                        <h3>Bind Wheel</h3>
+                        <p>Easily execute different binds from a single key</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <img src="assets/features/ftd.png" alt="Frozen Tee Display">
+                    <div class="feature-content">
+                        <h3>Frozen Tee Display</h3>
+                        <p>See all the frozen players on your team</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <img src="assets/features/antilatency.png" alt="Anti Latency Tools">
+                    <div class="feature-content">
+                        <h3>Anti Latency Tools</h3>
+                        <p>Settings to help mitigate ping for gores players</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <img src="assets/features/playerind.png" alt="Player Indicator">
+                    <div class="feature-content">
+                        <h3>Player Indicator</h3>
+                        <p>Track players around you without needing to zoom out<br>(does not work on pvp)</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <img src="assets/features/warlist.png" alt="War List">
+                    <div class="feature-content">
+                        <h3>War List</h3>
+                        <p>Easily manage your block wars or other player groups</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <img src="assets/features/antiping.png" alt="Improved Antiping Smoothing">
+                    <div class="feature-content">
+                        <h3>Improved Antiping Smoothing</h3>
+                        <p>Less jittery antiping</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <img src="assets/features/trails.png" alt="Tee Trails">
+                    <div class="feature-content">
+                        <h3>Tee Trails</h3>
+                        <p>Beautifully rendered trails</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <img src="assets/features/fonts.png" alt="Custom Fonts">
+                    <div class="feature-content">
+                        <h3>Custom Fonts</h3>
+                        <p>Change the font for the entire client</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <img src="assets/features/more.png" alt="Plus More">
+                    <div class="feature-content">
+                        <h3>Plus More</h3>
+                        <p>Over 20 other unique features not listed here</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="latest-release" data-aos="fade-up" data-aos-duration="750">
+            <div class="latest-release">
+                <h2>Latest Release</h2>
+                <div class="changelog-preview">
+                    <div class="release">
+                        <div class="release-header">
+                            <span class="release-version">Loading...</span>
+                            <span class="release-date"></span>
+                        </div>
+                        <div class="release-content">
+                            <p>Loading the latest release information...</p>
+                        </div>
+                    </div>
+                </div>
+                <a href="changelog/" class="changelog-btn">
+                    See Changelog
+                </a>
+            </div>
+        </section>
+
+        <section id="download" data-aos="fade-up" data-aos-duration="500">
+            <div class="download-buttons">
+                <div class="download-version">
+                    <a href="https://github.com/sjrc6/TaterClient-ddnet/releases/latest/download/TClient-windows.zip" target="_blank">
+                        <button class="download-btn win-download">
+                            <img src="assets/windows-icon.svg" alt="Download">
+                            <span>Download</span>
+                        </button>
+                    </a>
+                </div>
+                <div class="download-version">
+                    <a href="https://github.com/sjrc6/TaterClient-ddnet/releases/latest/download/TClient-macOS.dmg" target="_blank">
+                        <button class="mac-download">
+                            <img src="assets/macos-icon.svg" alt="Download">
+                            <span>Download</span>
+                        </button>
+                    </a>
+                </div>
+                <div class="download-version">
+                    <a href="https://github.com/sjrc6/TaterClient-ddnet/releases/latest/download/TClient-ubuntu.tar.xz" target="_blank">
+                        <button class="download-btn linux-download">
+                            <img src="assets/linux-icon.svg" alt="Download">
+                            <span>Download</span>
+                        </button>
+                    </a>
+                </div>
+                <div class="download-version">
+                    <a href="https://github.com/sjrc6/TaterClient-ddnet/releases/latest/download/TClient-android.apk" target="_blank">
+                        <button class="download-btn android-download">
+                            <img src="assets/android-icon.svg" alt="Download">
+                            <span>Download</span>
+                        </button>
+                    </a>
+                </div>
+            </div>
+            <p class="version">Latest: {version}</p>
+        </section>
+    </main>
+
+    <footer>
+        <div class="footer-content">
+            <p>2025 <a href="https://github.com/sjrc6/TaterClient-ddnet" target="_blank">TaterClient</a></p>
+            <span class="divider"></span>
+            <p>Website by <a href="https://github.com/noxygalaxy" target="_blank">@noxygalaxy</a></p>
+        </div>
+    </footer>
+
+    <script src="https://unpkg.com/aos@next/dist/aos.js"></script>
+    <script src="script.js"></script>
+    <script>
+      AOS.init();
+
+      const heroLogo = document.getElementById('heroLogo');
+
+      const sounds = [
+      'assets/sounds/tee_scream1.ogg',
+      'assets/sounds/tee_scream2.ogg'
+      ];
+
+      let clickCount = 0;
+
+      heroLogo.addEventListener('click', () => {
+        const soundToPlay = sounds[clickCount % 2];
+
+        const audio = new Audio(soundToPlay);
+        audio.volume = 0.5;
+        audio.play();
+
+        clickCount++;
+      });
+    </script>
+    <script>
+        async function fetchLatestRelease() {
+            try {
+                const response = await fetch('https://api.github.com/repos/sjrc6/TaterClient-ddnet/releases/latest');
+                if (!response.ok) throw new Error('Failed to fetch release');
+                const release = await response.json();
+                
+                const versionElem = document.querySelector('.changelog-preview .release-version');
+                const dateElem = document.querySelector('.changelog-preview .release-date');
+                const contentElem = document.querySelector('.changelog-preview .release-content');
+                
+                versionElem.textContent = release.name || 'Unnamed Release';
+                dateElem.textContent = new Date(release.published_at).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                contentElem.innerHTML = marked.parse(release.body || 'No description provided.');
+                
+            } catch (error) {
+                console.error('Error fetching latest release:', error);
+            }
+        }
+
+        marked.setOptions({
+            breaks: true,
+            gfm: true
+        });
+
+        fetchLatestRelease();
+    </script>
+</body>
+</html>

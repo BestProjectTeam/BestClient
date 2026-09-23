@@ -1,0 +1,2083 @@
+[BestClient]
+Checkbox
+== 复选框
+
+[BestClient]
+Sample text Aa
+== 示例文本 Aa
+
+[BestClient]
+Legacy
+== 旧界面
+
+[BestClient]
+Better UI
+== 改进界面
+
+[BestClient]
+Choose Legacy
+== 选择旧界面
+
+[BestClient]
+Choose Better UI
+== 选择改进界面
+
+[BestClient]
+Chat Media
+== 聊天媒体
+
+[BestClient]
+Render media previews from chat links
+== 显示聊天链接的媒体预览
+
+[BestClient]
+Show photos in chat media
+== 在聊天媒体中显示图片
+
+[BestClient]
+Show GIFs in chat media
+== 在聊天媒体中显示 GIF
+
+[BestClient]
+Content filtering
+== 内容过滤
+
+[BestClient]
+Allowed media domains
+== 允许的媒体域名
+
+[BestClient]
+Media preview width
+== 媒体预览宽度
+
+[BestClient]
+Hide media bind
+== 隐藏媒体按键
+
+[BestClient]
+Visuals
+== 视觉
+
+[BestClient]
+Gameplay
+== 玩法
+
+[BestClient]
+Others
+== 其他
+
+[BestClient]
+Info
+== 信息
+
+[BestClient]
+high fps intake
+== 高 FPS
+
+[BestClient]
+HUD editor
+== HUD 编辑器
+
+[BestClient]
+Open in HUD editor
+== 在 HUD 编辑器中打开
+
+[BestClient]
+Join a game first
+== 请先进入游戏
+
+[BestClient]
+Visuals QoL
+== 视觉便利
+
+[BestClient]
+Map preview in server list
+== 服务器列表中的地图预览
+
+[BestClient]
+Show real hitbox
+== 显示真实碰撞箱
+
+[BestClient]
+Real hitbox dot color
+== 真实碰撞箱点颜色
+
+[BestClient]
+Show player below indicator
+== 显示下方玩家指示
+
+[BestClient]
+Show current checkpoint in hud
+== 在 HUD 中显示当前检查点
+
+[BestClient]
+Show points in tab
+== 在记分板中显示分数
+
+[BestClient]
+Show spectator nicknames
+== 显示观战者昵称
+
+[BestClient]
+Show vote percentage
+== 显示投票百分比
+
+[BestClient]
+Bestclient discord rpc (restart requires)
+== BestClient Discord RPC（需要重启）
+
+[BestClient]
+Bind/Emote wheel scale
+== 按键/表情轮盘缩放
+
+[BestClient]
+Scoreboard scale
+== 记分板缩放
+
+[BestClient]
+UI scale
+== 界面缩放
+
+[BestClient]
+Jelly Tee
+== 果冻 Tee
+
+[BestClient]
+Enable Jelly Tee
+== 启用果冻 Tee
+
+[BestClient]
+Jelly Others
+== 其他玩家果冻
+
+[BestClient]
+Jelly strength
+== 果冻强度
+
+[BestClient]
+Jelly duration
+== 果冻时长
+
+[BestClient]
+Corner indicator
+== 角落指示
+
+[BestClient]
+Enable corner indicator
+== 启用角落指示
+
+[BestClient]
+Only in team
+== 仅队伍中
+
+[BestClient]
+Show alive teammates
+== 显示存活队友
+
+[BestClient]
+Show frozen teammates
+== 显示冻结队友
+
+[BestClient]
+Indicate last teammate
+== 标出最后一名队友
+
+[BestClient]
+Scale by distance
+== 按距离缩放
+
+[BestClient]
+Ninja skin when frozen
+== 冻结时使用忍者皮肤
+
+[BestClient]
+Alive size
+== 存活大小
+
+[BestClient]
+Frozen size
+== 冻结大小
+
+[BestClient]
+Last teammate size
+== 最后队友大小
+
+[BestClient]
+Use custom colors
+== 使用自定义颜色
+
+[BestClient]
+Alive color
+== 存活颜色
+
+[BestClient]
+Frozen color
+== 冻结颜色
+
+[BestClient]
+Last teammate color
+== 最后队友颜色
+
+[BestClient]
+Chat Bubbles
+== 聊天气泡
+
+[BestClient]
+Show chat bubbles above players
+== 在玩家头顶显示聊天气泡
+
+[BestClient]
+Show chat bubbles above you
+== 在自己头顶显示聊天气泡
+
+[BestClient]
+Show chat bubbles in demo
+== 在演示中显示聊天气泡
+
+[BestClient]
+Chat bubble size
+== 聊天气泡大小
+
+[BestClient]
+Show for
+== 显示时长
+
+[BestClient]
+Fade in
+== 淡入
+
+[BestClient]
+Fade out
+== 淡出
+
+[BestClient]
+Stack animation
+== 堆叠动画
+
+[BestClient]
+Corner rounding
+== 圆角
+
+[BestClient]
+Text
+== 文本
+
+[BestClient]
+Outline
+== 描边
+
+[BestClient]
+Gradient
+== 渐变
+
+[BestClient]
+Gradient nicknames
+== 昵称渐变
+
+[BestClient]
+Gradient clans
+== 战队渐变
+
+[BestClient]
+Gradient skin
+== 皮肤渐变
+
+[BestClient]
+Gradient everything
+== 全部渐变
+
+[BestClient]
+Animate speed
+== 动画速度
+
+[BestClient]
+Mode
+== 模式
+
+[BestClient]
+Skin
+== 皮肤
+
+[BestClient]
+Custom
+== 自定义
+
+[BestClient]
+Color count
+== 颜色数量
+
+[BestClient]
+Color 1
+== 颜色 1
+
+[BestClient]
+Color 2
+== 颜色 2
+
+[BestClient]
+Color 3
+== 颜色 3
+
+[BestClient]
+Color 4
+== 颜色 4
+
+[BestClient]
+Flying Name Plates
+== 飘动名牌
+
+[BestClient]
+Enable flying name plates
+== 启用飘动名牌
+
+[BestClient]
+Hide line
+== 隐藏连线
+
+[BestClient]
+Lift above player
+== 抬到玩家上方
+
+[BestClient]
+Movement drag
+== 移动拖尾
+
+[BestClient]
+Follow speed
+== 跟随速度
+
+[BestClient]
+3D Particles
+== 3D 粒子
+
+[BestClient]
+Enable 3D Particles
+== 启用 3D 粒子
+
+[BestClient]
+Density
+== 密度
+
+[BestClient]
+Particle type
+== 粒子类型
+
+[BestClient]
+Cube
+== 方块
+
+[BestClient]
+Heart
+== 爱心
+
+[BestClient]
+Mixed
+== 混合
+
+[BestClient]
+Size
+== 大小
+
+[BestClient]
+Color mode
+== 颜色模式
+
+[BestClient]
+Glow
+== 发光
+
+[BestClient]
+Media Background
+== 媒体背景
+
+[BestClient]
+Enable to main menu
+== 用于主菜单
+
+[BestClient]
+Enable to game background
+== 用于游戏背景
+
+[BestClient]
+No media files in backgrounds folder
+== backgrounds 文件夹中没有媒体文件
+
+[BestClient]
+Map offset
+== 地图偏移
+
+[BestClient]
+0 keeps the image fixed to the screen. Higher values add camera parallax. Move the camera to see the effect.
+== 0 表示图片固定在屏幕上。数值越大，镜头视差越强。移动镜头即可看到效果。
+
+[BestClient]
+Hidden: overlay entities is 0.
+== 已隐藏：overlay entities 为 0。
+
+[BestClient]
+Cursor Trail
+== 光标拖尾
+
+[BestClient]
+Enable
+== 启用
+
+[BestClient]
+Cursor
+== 光标
+
+[BestClient]
+Trail size
+== 拖尾大小
+
+[BestClient]
+Number of frames
+== 帧数
+
+[BestClient]
+Opacity
+== 不透明度
+
+[BestClient]
+Sampling FPS
+== 采样 FPS
+
+[BestClient]
+Disable movement
+== 禁用移动
+
+[BestClient]
+Trail image
+== 拖尾图片
+
+[BestClient]
+No images in CTrails folder
+== CTrails 文件夹中没有图片
+
+[BestClient]
+Enable better UI
+== 启用改进界面
+
+[BestClient]
+Better checkbox
+== 改进复选框
+
+[BestClient]
+Better scrollbar
+== 改进滚动条
+
+[BestClient]
+Better tab option
+== 改进标签页
+
+[BestClient]
+Left
+== 左侧
+
+[BestClient]
+Right
+== 右侧
+
+[BestClient]
+Better color picker
+== 改进取色器
+
+[BestClient]
+Better font
+== 改进字体
+
+[BestClient]
+UI Themes
+== 界面主题
+
+[BestClient]
+Scrollbar
+== 滚动条
+
+[BestClient]
+Button
+== 按钮
+
+[BestClient]
+Droplist
+== 下拉列表
+
+[BestClient]
+Input field
+== 输入框
+
+[BestClient]
+Function block
+== 功能块
+
+[BestClient]
+UI background
+== 界面背景
+
+[BestClient]
+Settings tabs
+== 设置标签
+
+[BestClient]
+Badge
+== 徽章
+
+[BestClient]
+Binds
+== 按键
+
+[BestClient]
+Accent
+== 强调色
+
+[BestClient]
+Enable colorable background
+== 启用可着色背景
+
+[BestClient]
+Background color
+== 背景颜色
+
+[BestClient]
+Exported!
+== 已导出！
+
+[BestClient]
+Export
+== 导出
+
+[BestClient]
+Imported!
+== 已导入！
+
+[BestClient]
+Import
+== 导入
+
+[BestClient]
+Copy theme to clipboard
+== 复制主题到剪贴板
+
+[BestClient]
+Paste theme from clipboard
+== 从剪贴板粘贴主题
+
+[BestClient]
+Enable motion blur
+== 启用动态模糊
+
+[BestClient]
+Blend strength
+== 混合强度
+
+[BestClient]
+Animations
+== 动画
+
+[BestClient]
+Enable animations
+== 启用动画
+
+[BestClient]
+Settings animation
+== 设置动画
+
+[BestClient]
+Settings (ms)
+== 设置（毫秒）
+
+[BestClient]
+Chat message animations
+== 聊天消息动画
+
+[BestClient]
+Chat message (ms)
+== 聊天消息（毫秒）
+
+[BestClient]
+Chat open animation
+== 聊天打开动画
+
+[BestClient]
+Chat open (ms)
+== 打开聊天（毫秒）
+
+[BestClient]
+Chat typing animation
+== 聊天输入动画
+
+[BestClient]
+Chat typing (ms)
+== 聊天输入（毫秒）
+
+[BestClient]
+Killfeed animation
+== 击杀信息动画
+
+[BestClient]
+Killfeed (ms)
+== 击杀信息（毫秒）
+
+[BestClient]
+Main menu animation
+== 主菜单动画
+
+[BestClient]
+Main menu speed
+== 主菜单速度
+
+[BestClient]
+Music Player
+== 音乐播放器
+
+[BestClient]
+Enable music player
+== 启用音乐播放器
+
+[BestClient]
+Static
+== 静态
+
+[BestClient]
+Cover
+== 封面
+
+[BestClient]
+Static color
+== 静态颜色
+
+[BestClient]
+Visualizer mode
+== 可视化模式
+
+[BestClient]
+Bottom
+== 底部
+
+[BestClient]
+Center
+== 居中
+
+[BestClient]
+Up
+== 向上
+
+[BestClient]
+Text scale
+== 文本缩放
+
+[BestClient]
+Columns
+== 柱状
+
+[BestClient]
+Rounding
+== 圆角
+
+[BestClient]
+Soft
+== 柔和
+
+[BestClient]
+Show song lyrics
+== 显示歌词
+
+[BestClient]
+Show current time
+== 显示当前时间
+
+[BestClient]
+Keystrokes
+== 按键显示
+
+[BestClient]
+Classic
+== 经典
+
+[BestClient]
+Minecraft
+== 我的世界
+
+[BestClient]
+Enable keyboard
+== 启用键盘
+
+[BestClient]
+Full
+== 完整
+
+[BestClient]
+Minimal
+== 精简
+
+[BestClient]
+Micro
+== 微型
+
+[BestClient]
+Only A/D
+== 仅 A/D
+
+[BestClient]
+Pressed opacity
+== 按下不透明度
+
+[BestClient]
+Enable LMB
+== 启用左键
+
+[BestClient]
+Enable RMB
+== 启用右键
+
+[BestClient]
+Enable Space
+== 启用空格
+
+[BestClient]
+Enable mouse
+== 启用鼠标
+
+[BestClient]
+Arrow
+== 箭头
+
+[BestClient]
+Dot Dot
+== 点点
+
+[BestClient]
+Nothing
+== 无
+
+[BestClient]
+Aspect Ratio
+== 宽高比
+
+[BestClient]
+Off (default)
+== 关闭（默认）
+
+[BestClient]
+Preset
+== 预设
+
+[BestClient]
+Game only
+== 仅游戏
+
+[BestClient]
+Game no HUD
+== 游戏无 HUD
+
+[BestClient]
+Custom size
+== 自定义大小
+
+[BestClient]
+Looks like you're on a server where this feature is forbidden
+== 当前服务器似乎禁止此功能
+
+[BestClient]
+Physic Balls
+== 物理球
+
+[BestClient]
+Ball amount: %d
+== 球数量：%d
+
+[BestClient]
+Clear all balls
+== 清除所有球
+
+[BestClient]
+Ball skin
+== 球皮肤
+
+[BestClient]
+Spawn count
+== 生成数量
+
+[BestClient]
+New Ball
+== 新球
+
+[BestClient]
+New Ball Cursor
+== 在光标处生成球
+
+[BestClient]
+ticks
+== tick
+
+[BestClient]
+Inputs
+== 输入
+
+[BestClient]
+Enable Inputs
+== 启用输入
+
+[BestClient]
+Fast
+== 快速
+
+[BestClient]
+Best
+== 最佳
+
+[BestClient]
+Saiko
+== Saiko
+
+[BestClient]
+Delta
+== Delta
+
+[BestClient]
+Cloud
+== Cloud
+
+[BestClient]
+Prediction offset
+== 预测偏移
+
+[BestClient]
+Fast Input others
+== 快速输入（其他玩家）
+
+[BestClient]
+Smoothing
+== 平滑
+
+[BestClient]
+Latency compensation
+== 延迟补偿
+
+[BestClient]
+Interpolation
+== 插值
+
+[BestClient]
+Linear
+== 线性
+
+[BestClient]
+Cubic
+== 三次
+
+[BestClient]
+Smooth
+== 平滑
+
+[BestClient]
+Best input others
+== 最佳输入（其他玩家）
+
+[BestClient]
+Saiko input others
+== Saiko 输入（其他玩家）
+
+[BestClient]
+Delta input others
+== Delta 输入（其他玩家）
+
+[BestClient]
+F input others
+== F 输入（其他玩家）
+
+[BestClient]
+Cloud input others
+== Cloud 输入（其他玩家）
+
+[BestClient]
+Sub-Tick aiming
+== 子 Tick 瞄准
+
+[BestClient]
+Repredict on mid-tick hook direction change (may lag)
+== Tick 中途钩索转向时重新预测（可能卡顿）
+
+[BestClient]
+Auto margin
+== 自动边距
+
+[BestClient]
+Snap Tap
+== Snap Tap
+
+[BestClient]
+Off
+== 关闭
+
+[BestClient]
+Delay
+== 延迟
+
+[BestClient]
+Gores mode
+== Gores 模式
+
+[BestClient]
+Enable gores mode
+== 启用 Gores 模式
+
+[BestClient]
+Disable if you have shotgun, grenade or laser
+== 持有霰弹枪、榴弹或激光时关闭
+
+[BestClient]
+Optimizer
+== 优化器
+
+[BestClient]
+Enable optimizer
+== 启用优化器
+
+[BestClient]
+Disable all particles render
+== 关闭所有粒子渲染
+
+[BestClient]
+Disable map quads render
+== 关闭地图四边形渲染
+
+[BestClient]
+Disable high detail
+== 关闭高细节
+
+[BestClient]
+FPS fog (cull outside limit)
+== FPS 雾（裁掉范围外内容）
+
+[BestClient]
+FPS fog
+== FPS 雾
+
+[BestClient]
+Render FPS fog rectangle
+== 绘制 FPS 雾矩形
+
+[BestClient]
+Cull map tiles outside FPS fog
+== 裁掉 FPS 雾外的地图图块
+
+[BestClient]
+Radius
+== 半径
+
+[BestClient]
+Zoom %
+== 缩放 %
+
+[BestClient]
+Radius (tiles)
+== 半径（图块）
+
+[BestClient]
+Visible area (%)
+== 可见区域（%）
+
+[BestClient]
+Performance
+== 性能
+
+[BestClient]
+High DDNet Process Priority
+== 提高 DDNet 进程优先级
+
+[BestClient]
+Lower Discords Process Priority
+== 降低 Discord 进程优先级
+
+[BestClient]
+Gameplay QoL
+== 玩法便利
+
+[BestClient]
+Automatic update
+== 自动更新
+
+[BestClient]
+Cinematic camera
+== 电影镜头
+
+[BestClient]
+Strength
+== 强度
+
+[BestClient]
+Extend zoom (0.5 steps)
+== 扩展缩放（步进 0.5）
+
+[BestClient]
+Better spectate
+== 改进观战
+
+[BestClient]
+Replace your say /pause bind (default: Q) with +specpause (pause/spec radio)
+== 把 say /pause 按键（默认 Q）换成 +specpause（暂停/观战）
+
+[BestClient]
+Show delay
+== 显示延迟
+
+[BestClient]
+Notify when moved in spec
+== 观战中被移动时通知
+
+[BestClient]
+Notification text
+== 通知文本
+
+[BestClient]
+Lock team automatically after joining
+== 加入后自动锁定队伍
+
+[BestClient]
+Auto lock delay
+== 自动锁定延迟
+
+[BestClient]
+Confirm before quitting
+== 退出前确认
+
+[BestClient]
+Moving/ego tiles prediction
+== 移动/自我图块预测
+
+[BestClient]
+Fast Actions
+== 快速动作
+
+[BestClient]
+Enable Fast Actions
+== 启用快速动作
+
+[BestClient]
+Selected slot
+== 所选槽位
+
+[BestClient]
+Name:
+== 名称：
+
+[BestClient]
+Name (optional)
+== 名称（可选）
+
+[BestClient]
+Clear command
+== 清空命令
+
+[BestClient]
+In game: hold bind key, press 1..6, release key to execute
+== 游戏中：按住绑定键，按 1..6，松开后执行
+
+[BestClient]
+Fast Actions key
+== 快速动作按键
+
+[BestClient]
+Finish Prediction
+== 终点预测
+
+[BestClient]
+Enable finish prediction
+== 启用终点预测
+
+[BestClient]
+Show time
+== 显示时间
+
+[BestClient]
+Time left
+== 剩余时间
+
+[BestClient]
+Finish time
+== 完成时间
+
+[BestClient]
+Show milliseconds
+== 显示毫秒
+
+[BestClient]
+Show percentage
+== 显示百分比
+
+[BestClient]
+Show always
+== 始终显示
+
+[BestClient]
+Consider freeze walls
+== 计入冻结墙
+
+[BestClient]
+Edge Info
+== 边缘信息
+
+[BestClient]
+Show edge info
+== 显示边缘信息
+
+[BestClient]
+Show edge info about freeze
+== 显示冻结边缘信息
+
+[BestClient]
+Show edge info about jumps
+== 显示跳跃边缘信息
+
+[BestClient]
+Color when over freeze
+== 位于冻结上方时的颜色
+
+[BestClient]
+Color when over kill
+== 位于击杀上方时的颜色
+
+[BestClient]
+Color when falling safely
+== 安全下落时的颜色
+
+[BestClient]
+Chat QoL
+== 聊天便利
+
+[BestClient]
+Save unsent messages
+== 保存未发送的消息
+
+[BestClient]
+Silent typing
+== 静默输入
+
+[BestClient]
+Commands in other layout
+== 其他键盘布局下的命令
+
+[BestClient]
+Reply/copy message menu
+== 回复/复制消息菜单
+
+[BestClient]
+Notify about saves on map
+== 地图存档通知
+
+[BestClient]
+Twitch Chat
+== Twitch 聊天
+
+[BestClient]
+Nick
+== 昵称
+
+[BestClient]
+Stop
+== 停止
+
+[BestClient]
+Start
+== 开始
+
+[BestClient]
+Browser Utils
+== 浏览器工具
+
+[BestClient]
+Auto server list refresh
+== 自动刷新服务器列表
+
+[BestClient]
+Seconds
+== 秒
+
+[BestClient]
+Short EGO/KoG server name
+== 缩短 EGO/KoG 服务器名
+
+[BestClient]
+Show finished map on EGO
+== 在 EGO 上显示已完成地图
+
+[BestClient]
+Use BestClient MasterServer
+== 使用 BestClient 主服务器
+
+[BestClient]
+Rollback Demo
+== 回滚演示
+
+[BestClient]
+Enable rollback demo recording
+== 启用回滚演示录制
+
+[BestClient]
+Rollback length
+== 回滚长度
+
+[BestClient]
+Rollback bind
+== 回滚按键
+
+[BestClient]
+Focus Mode
+== 专注模式
+
+[BestClient]
+Enable Focus Mode
+== 启用专注模式
+
+[BestClient]
+Hide Player Names
+== 隐藏玩家名
+
+[BestClient]
+Hide Visual Effects
+== 隐藏视觉效果
+
+[BestClient]
+Hide HUD
+== 隐藏 HUD
+
+[BestClient]
+Hide Song Player
+== 隐藏播放器
+
+[BestClient]
+Hide Unnecessary UI
+== 隐藏多余界面
+
+[BestClient]
+Hide Chat
+== 隐藏聊天
+
+[BestClient]
+Hide Scoreboard
+== 隐藏记分板
+
+[BestClient]
+Auto reply when chat is hidden
+== 聊天隐藏时自动回复
+
+[BestClient]
+Focus mode bind
+== 专注模式按键
+
+[BestClient]
+Voice Moderation
+== 语音管理
+
+[BestClient]
+Voice Binds
+== 语音按键
+
+[BestClient]
+Voice
+== 语音
+
+[BestClient]
+Push-to-talk
+== 按住说话
+
+[BestClient]
+Mute microphone
+== 静音麦克风
+
+[BestClient]
+Mute headphones
+== 静音耳机
+
+[BestClient]
+Client Indicator
+== 客户端标识
+
+[BestClient]
+Show indicator in name plates
+== 在名牌中显示标识
+
+[BestClient]
+Show above yourself
+== 在自己上方显示
+
+[BestClient]
+Name plate indicator size
+== 名牌标识大小
+
+[BestClient]
+Show indicator in scoreboard
+== 在记分板中显示标识
+
+[BestClient]
+Scoreboard indicator size
+== 记分板标识大小
+
+[BestClient]
+Not connected to voice server
+== 未连接到语音服务器
+
+[BestClient]
+Voice Moderator Login
+== 语音管理员登录
+
+[BestClient]
+Mod key:
+== 管理密钥：
+
+[BestClient]
+Authenticating...
+== 验证中...
+
+[BestClient]
+Wrong key
+== 密钥错误
+
+[BestClient]
+Login as Voice Mod
+== 以语音管理员登录
+
+[BestClient]
+Voice players on this server
+== 此服务器上的语音玩家
+
+[BestClient]
+Refresh
+== 刷新
+
+[BestClient]
+No players in current voice room
+== 当前语音房间没有玩家
+
+[BestClient]
+Action
+== 操作
+
+[BestClient]
+slot %d
+== 槽位 %d
+
+[BestClient]
+Mini games
+== 小游戏
+
+[BestClient]
+BestClient Links
+== BestClient 链接
+
+[BestClient]
+Telegram
+== Telegram
+
+[BestClient]
+Check update
+== 检查更新
+
+[BestClient]
+Config Files
+== 配置文件
+
+[BestClient]
+BestClient Settings
+== BestClient 设置
+
+[BestClient]
+BestClient Developers
+== BestClient 开发者
+
+[BestClient]
+Hide Settings Tabs
+== 隐藏设置标签
+
+[BestClient]
+Laser Glow
+== 激光发光
+
+[BestClient]
+Shotgun Glow
+== 霰弹发光
+
+[BestClient]
+Rocket Glow
+== 火箭发光
+
+[BestClient]
+Rocket
+== 火箭
+
+[BestClient]
+Prism
+== 棱镜
+
+[BestClient]
+Pulse
+== 脉冲
+
+[BestClient]
+Crystal
+== 水晶
+
+[BestClient]
+Power
+== 强度
+
+[BestClient]
+Nuke effects
+== 爆炸效果
+
+[BestClient]
+Enable Nuke effects
+== 启用爆炸效果
+
+[BestClient]
+Screen shake
+== 屏幕震动
+
+[BestClient]
+Nuke size
+== 爆炸大小
+
+[BestClient]
+Custom hooks
+== 自定义钩索
+
+[BestClient]
+Hook
+== 钩
+
+[BestClient]
+None
+== 无
+
+[BestClient]
+Whirlwind
+== 旋风
+
+[BestClient]
+Black hole
+== 黑洞
+
+[BestClient]
+Magic
+== 魔法
+
+[BestClient]
+Fire
+== 火焰
+
+[BestClient]
+Troll
+== 恶搞
+
+[BestClient]
+Lightning
+== 闪电
+
+[BestClient]
+Tentacle
+== 触手
+
+[BestClient]
+Style the hook
+== 钩索样式
+
+[BestClient]
+Grow time
+== 生长时间
+
+[BestClient]
+Grab gust
+== 抓取气流
+
+[BestClient]
+Eye
+== 眼睛
+
+[BestClient]
+Wind lines
+== 风线
+
+[BestClient]
+Spin speed
+== 旋转速度
+
+[BestClient]
+Line thickness
+== 线条粗细
+
+[BestClient]
+Wind opacity
+== 风的不透明度
+
+[BestClient]
+Leaves
+== 树叶
+
+[BestClient]
+Dust
+== 尘埃
+
+[BestClient]
+Wind color
+== 风的颜色
+
+[BestClient]
+Disk
+== 圆盘
+
+[BestClient]
+Matter
+== 物质
+
+[BestClient]
+Spin
+== 旋转
+
+[BestClient]
+Disk color
+== 圆盘颜色
+
+[BestClient]
+Runes
+== 符文
+
+[BestClient]
+Sparkles
+== 闪光
+
+[BestClient]
+Spell color
+== 法术颜色
+
+[BestClient]
+Smoke
+== 烟雾
+
+[BestClient]
+Flames
+== 火焰
+
+[BestClient]
+Embers
+== 余烬
+
+[BestClient]
+Fire color
+== 火焰颜色
+
+[BestClient]
+Rays
+== 光线
+
+[BestClient]
+Flow
+== 流动
+
+[BestClient]
+Glitter
+== 闪粉
+
+[BestClient]
+Ribbon width
+== 丝带宽度
+
+[BestClient]
+Wall arcs
+== 贴墙弧线
+
+[BestClient]
+Jitter
+== 抖动
+
+[BestClient]
+Forks
+== 分叉
+
+[BestClient]
+Sparks
+== 火花
+
+[BestClient]
+Lightning color
+== 闪电颜色
+
+[BestClient]
+Suckers
+== 吸盘
+
+[BestClient]
+Writhing
+== 扭动
+
+[BestClient]
+Thickness
+== 粗细
+
+[BestClient]
+Slime
+== 粘液
+
+[BestClient]
+Flesh color
+== 肉色
+
+[BestClient]
+Hook effects
+== 钩索效果
+
+[BestClient]
+Air jump ring
+== 二段跳光环
+
+[BestClient]
+Disable jump particles
+== 关闭跳跃粒子
+
+[BestClient]
+Hammer slash
+== 锤子挥砍
+
+[BestClient]
+Disable hammer particles
+== 关闭锤子粒子
+
+[BestClient]
+Hook lasso
+== 钩索套索
+
+[BestClient]
+Hook box
+== 钩索方框
+
+[BestClient]
+Hook hold
+== 钩索蓄力
+
+[BestClient]
+Hold aura
+== 蓄力光环
+
+[BestClient]
+Hold burst
+== 蓄力爆发
+
+[BestClient]
+Energy motes
+== 能量粒子
+
+[BestClient]
+Weather
+== 天气
+
+[BestClient]
+Snow
+== 雪
+
+[BestClient]
+Rain
+== 雨
+
+[BestClient]
+Fireflies
+== 萤火虫
+
+[BestClient]
+Amount
+== 数量
+
+[BestClient]
+Dust color
+== 尘埃颜色
+
+[BestClient]
+Rain color
+== 雨的颜色
+
+[BestClient]
+Firefly color
+== 萤火虫颜色
+
+[BestClient]
+Dots
+== 圆点
+
+[BestClient]
+Snowflakes
+== 雪花
+
+[BestClient]
+Snow color
+== 雪的颜色
+
+[BestClient]
+Freeze lifesteal
+== 冻结吸血
+
+[BestClient]
+Shield
+== 护盾
+
+[BestClient]
+Reach
+== 范围
+
+[BestClient]
+Frost
+== 冰霜
+
+[BestClient]
+Custom hook color
+== 自定义钩索颜色
+
+[BestClient]
+Cold color
+== 冷色
+
+[BestClient]
+Freeze lightning
+== 冻结闪电
+
+[BestClient]
+Impact
+== 冲击
+
+[BestClient]
+Branches
+== 分支
+
+[BestClient]
+Shake
+== 震动
+
+[BestClient]
+Strike me
+== 劈中自己
+
+[BestClient]
+Join a server to preview the lightning
+== 进入服务器以预览闪电
+
+[BestClient]
+Enabled
+== 已启用
+
+[BestClient]
+Scale
+== 缩放
+
+[BestClient]
+Reset scale
+== 重置缩放
+
+[BestClient]
+Reset position
+== 重置位置
+
+[BestClient]
+Reset all
+== 全部重置
+
+[BestClient]
+disabled
+== 已关闭
+
+[BestClient]
+preview
+== 预览
+
+[BestClient]
+Reset All
+== 全部重置
+
+[BestClient]
+Disabled.
+== 已关闭。
+
+[BestClient]
+Failed to load PNG.
+== PNG 加载失败。
+
+[BestClient]
+Failed to upload PNG.
+== PNG 上传失败。
+
+[BestClient]
+Loaded image.
+== 图片已加载。
+
+[BestClient]
+Failed to read file.
+== 读取文件失败。
+
+[BestClient]
+Failed to upload image.
+== 图片上传失败。
+
+[BestClient]
+Failed to decode image.
+== 图片解码失败。
+
+[BestClient]
+Loaded animated image.
+== 动态图片已加载。
+
+[BestClient]
+Video backgrounds are unavailable in this build.
+== 此版本不支持视频背景。
+
+[BestClient]
+Failed to open video.
+== 打开视频失败。
+
+[BestClient]
+Failed to read video info.
+== 读取视频信息失败。
+
+[BestClient]
+No video stream found.
+== 未找到视频流。
+
+[BestClient]
+Unsupported video codec.
+== 不支持的视频编码。
+
+[BestClient]
+Failed to initialize video decoder.
+== 初始化视频解码器失败。
+
+[BestClient]
+Invalid video dimensions.
+== 视频尺寸无效。
+
+[BestClient]
+Failed to allocate video frames.
+== 分配视频帧失败。
+
+[BestClient]
+Failed to allocate RGBA frame.
+== 分配 RGBA 帧失败。
+
+[BestClient]
+Failed to initialize video scaler.
+== 初始化视频缩放器失败。
+
+[BestClient]
+Failed to decode first video frame.
+== 解码第一帧失败。
+
+[BestClient]
+Loaded video.
+== 视频已加载。
+
+[BestClient]
+No media selected.
+== 未选择媒体。
+
+[BestClient]
+Failed while decoding video.
+== 解码视频时失败。
+
+[BestClient]
+Back to Info
+== 返回信息
+
+[BestClient]
+Press any key to start
+== 按任意键开始
+
+[BestClient]
+Game Over
+== 游戏结束
+
+[BestClient]
+Victory
+== 胜利
+
+[BestClient]
+Draw - Stalemate
+== 和棋 — 僵局
+
+[BestClient]
+Draw - Fifty move rule
+== 和棋 — 五十步规则
+
+[BestClient]
+Draw - Threefold repetition
+== 和棋 — 三次重复
+
+[BestClient]
+Winner: White
+== 胜者：白方
+
+[BestClient]
+Winner: Black
+== 胜者：黑方
+
+[BestClient]
+Turn: White
+== 回合：白方
+
+[BestClient]
+Turn: Black
+== 回合：黑方
+
+[BestClient]
+White Wins
+== 白方胜利
+
+[BestClient]
+Black Wins
+== 黑方胜利
+
+[BestClient]
+All pairs found
+== 全部配对完成
+
+[BestClient]
+You Win
+== 你赢了
+
+[BestClient]
+Bot Wins
+== 机器人赢了
+
+[BestClient]
+All bricks cleared
+== 砖块已全部清除
+
+[BestClient]
+Numbers
+== 数字
+
+[BestClient]
+Clear
+== 清除
+
+[BestClient]
+Sudoku Solved
+== 数独已完成
+
+[BestClient]
+Get $200
+== 领取 $200
+
+[BestClient]
+Multiplier:
+== 倍数：
+
+[BestClient]
+Locked
+== 锁定
+
+[BestClient]
+Not enough funds
+== 余额不足
+
+[BestClient]
+Spinning...
+== 旋转中...
+
+[BestClient]
+SPIN
+== 旋转
+
+[BestClient]
+Type to search settings
+== 输入以搜索设置
+
+[BestClient]
+Element
+== 元素
+
+[BestClient]
+Casino
+== 赌场
+
+[BestClient]
+Snake
+== 贪吃蛇
+
+[BestClient]
+Minesweeper
+== 扫雷
+
+[BestClient]
+Chess
+== 国际象棋
+
+[BestClient]
+Memory
+== 记忆
+
+[BestClient]
+Pong
+== 乒乓
+
+[BestClient]
+Brick Breaker
+== 打砖块
+
+[BestClient]
+Sudoku
+== 数独
+
+[BestClient]
+Spin the reels, bet & win
+== 转动转轮，下注并获胜
+
+[BestClient]
+Arrows/WASD, Space restart
+== 方向键/WASD，空格重新开始
+
+[BestClient]
+LMB open, RMB flag, hover hints
+== 左键打开，右键插旗，悬停提示
+
+[BestClient]
+Font Awesome chess pieces
+== Font Awesome 棋子
+
+[BestClient]
+Find all matching pairs
+== 找出所有配对
+
+[BestClient]
+W/S or Up/Down to move paddle
+== W/S 或上/下移动挡板
+
+[BestClient]
+Break all bricks with the ball
+== 用球打掉所有砖块
+
+[BestClient]
+Click cell, 1-9 place, 0/Del clear
+== 点击格子，1-9 填入，0/Del 清除
+
+[BestClient]
+Easy
+== 简单
+
+[BestClient]
+Medium
+== 中等
+
+[BestClient]
+Hard
+== 困难
+
+[Gradient]
+Apply to
+== 应用到
+
+[Gradient]
+Own
+== 自己
+
+[Gradient]
+Others
+== 其他人
+
+[Gradient]
+All
+== 全部

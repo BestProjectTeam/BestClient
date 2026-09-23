@@ -1,0 +1,2083 @@
+[BestClient]
+Checkbox
+== Чекбокс
+
+[BestClient]
+Sample text Aa
+== Пример текста Aa
+
+[BestClient]
+Legacy
+== Легаси
+
+[BestClient]
+Better UI
+== Улучшенный UI
+
+[BestClient]
+Choose Legacy
+== Выбрать легаси
+
+[BestClient]
+Choose Better UI
+== Выбрать улучшенный UI
+
+[BestClient]
+Chat Media
+== Чат-медиа
+
+[BestClient]
+Render media previews from chat links
+== Рендерить превью медиа из ссылок в чате
+
+[BestClient]
+Show photos in chat media
+== Показывать фото в чат-медиа
+
+[BestClient]
+Show GIFs in chat media
+== Показывать GIF в чат-медиа
+
+[BestClient]
+Content filtering
+== Фильтр контента
+
+[BestClient]
+Allowed media domains
+== Разрешённые домены медиа
+
+[BestClient]
+Media preview width
+== Ширина превью медиа
+
+[BestClient]
+Hide media bind
+== Бинд скрытия медиа
+
+[BestClient]
+Visuals
+== Визуал
+
+[BestClient]
+Gameplay
+== Геймплей
+
+[BestClient]
+Others
+== Другое
+
+[BestClient]
+Info
+== Инфо
+
+[BestClient]
+high fps intake
+== Высокий FPS
+
+[BestClient]
+HUD editor
+== HUD-редактор
+
+[BestClient]
+Open in HUD editor
+== Открыть в HUD-редакторе
+
+[BestClient]
+Join a game first
+== Сначала зайди в игру
+
+[BestClient]
+Visuals QoL
+== Удобства визуала
+
+[BestClient]
+Map preview in server list
+== Превью карты в списке серверов
+
+[BestClient]
+Show real hitbox
+== Показывать реальный хитбокс
+
+[BestClient]
+Real hitbox dot color
+== Цвет точки реального хитбокса
+
+[BestClient]
+Show player below indicator
+== Показывать индикатор игрока снизу
+
+[BestClient]
+Show current checkpoint in hud
+== Показывать текущий чекпоинт в HUD
+
+[BestClient]
+Show points in tab
+== Показывать поинты в табе
+
+[BestClient]
+Show spectator nicknames
+== Показывать ники наблюдателей
+
+[BestClient]
+Show vote percentage
+== Показывать процент голосов
+
+[BestClient]
+Bestclient discord rpc (restart requires)
+== Discord RPC бестклиента (нужен перезапуск)
+
+[BestClient]
+Bind/Emote wheel scale
+== Масштаб колеса биндов/эмоций
+
+[BestClient]
+Scoreboard scale
+== Масштаб скорборда
+
+[BestClient]
+UI scale
+== Масштаб UI
+
+[BestClient]
+Jelly Tee
+== Джелли ти
+
+[BestClient]
+Enable Jelly Tee
+== Включить джелли ти
+
+[BestClient]
+Jelly Others
+== Джелли других
+
+[BestClient]
+Jelly strength
+== Сила джелли
+
+[BestClient]
+Jelly duration
+== Длительность джелли
+
+[BestClient]
+Corner indicator
+== Индикатор углов
+
+[BestClient]
+Enable corner indicator
+== Включить индикатор углов
+
+[BestClient]
+Only in team
+== Только в команде
+
+[BestClient]
+Show alive teammates
+== Показывать живых тиммейтов
+
+[BestClient]
+Show frozen teammates
+== Показывать зафриженных тиммейтов
+
+[BestClient]
+Indicate last teammate
+== Указывать последнего тиммейта
+
+[BestClient]
+Scale by distance
+== Масштаб от дистанции
+
+[BestClient]
+Ninja skin when frozen
+== Ниндзя-скин во фризе
+
+[BestClient]
+Alive size
+== Размер живого
+
+[BestClient]
+Frozen size
+== Размер во фризе
+
+[BestClient]
+Last teammate size
+== Размер последнего тиммейта
+
+[BestClient]
+Use custom colors
+== Свои цвета
+
+[BestClient]
+Alive color
+== Цвет живого
+
+[BestClient]
+Frozen color
+== Цвет фриза
+
+[BestClient]
+Last teammate color
+== Цвет последнего тиммейта
+
+[BestClient]
+Chat Bubbles
+== Чат-баблы
+
+[BestClient]
+Show chat bubbles above players
+== Показывать чат-баблы над игроками
+
+[BestClient]
+Show chat bubbles above you
+== Показывать чат-баблы над тобой
+
+[BestClient]
+Show chat bubbles in demo
+== Показывать чат-баблы в демо
+
+[BestClient]
+Chat bubble size
+== Размер чат-бабла
+
+[BestClient]
+Show for
+== Показывать
+
+[BestClient]
+Fade in
+== Появление
+
+[BestClient]
+Fade out
+== Исчезновение
+
+[BestClient]
+Stack animation
+== Стек-анимация
+
+[BestClient]
+Corner rounding
+== Скругление углов
+
+[BestClient]
+Text
+== Текст
+
+[BestClient]
+Outline
+== Обводка
+
+[BestClient]
+Gradient
+== Градиент
+
+[BestClient]
+Gradient nicknames
+== Градиент ников
+
+[BestClient]
+Gradient clans
+== Градиент кланов
+
+[BestClient]
+Gradient skin
+== Градиент скина
+
+[BestClient]
+Gradient everything
+== Градиент всего
+
+[BestClient]
+Animate speed
+== Скорость анимации
+
+[BestClient]
+Mode
+== Режим
+
+[BestClient]
+Skin
+== Скин
+
+[BestClient]
+Custom
+== Свой
+
+[BestClient]
+Color count
+== Число цветов
+
+[BestClient]
+Color 1
+== Цвет 1
+
+[BestClient]
+Color 2
+== Цвет 2
+
+[BestClient]
+Color 3
+== Цвет 3
+
+[BestClient]
+Color 4
+== Цвет 4
+
+[BestClient]
+Flying Name Plates
+== Летающие неймплейты
+
+[BestClient]
+Enable flying name plates
+== Включить летающие неймплейты
+
+[BestClient]
+Hide line
+== Скрыть линию
+
+[BestClient]
+Lift above player
+== Поднять над игроком
+
+[BestClient]
+Movement drag
+== Драг движения
+
+[BestClient]
+Follow speed
+== Скорость следования
+
+[BestClient]
+3D Particles
+== 3D частицы
+
+[BestClient]
+Enable 3D Particles
+== Включить 3D частицы
+
+[BestClient]
+Density
+== Плотность
+
+[BestClient]
+Particle type
+== Тип частиц
+
+[BestClient]
+Cube
+== Куб
+
+[BestClient]
+Heart
+== Сердце
+
+[BestClient]
+Mixed
+== Микс
+
+[BestClient]
+Size
+== Размер
+
+[BestClient]
+Color mode
+== Режим цвета
+
+[BestClient]
+Glow
+== Свечение
+
+[BestClient]
+Media Background
+== Медиа-фон
+
+[BestClient]
+Enable to main menu
+== Включить в главном меню
+
+[BestClient]
+Enable to game background
+== Включить на фоне игры
+
+[BestClient]
+No media files in backgrounds folder
+== Нет медиафайлов в папке backgrounds
+
+[BestClient]
+Map offset
+== Смещение карты
+
+[BestClient]
+0 keeps the image fixed to the screen. Higher values add camera parallax. Move the camera to see the effect.
+== 0 держит картинку на экране. Выше — параллакс камеры. Подвигай камеру, чтобы увидеть эффект.
+
+[BestClient]
+Hidden: overlay entities is 0.
+== Скрыто: overlay entities = 0.
+
+[BestClient]
+Cursor Trail
+== След курсора
+
+[BestClient]
+Enable
+== Включить
+
+[BestClient]
+Cursor
+== Курсор
+
+[BestClient]
+Trail size
+== Размер следа
+
+[BestClient]
+Number of frames
+== Число кадров
+
+[BestClient]
+Opacity
+== Прозрачность
+
+[BestClient]
+Sampling FPS
+== FPS сэмплинга
+
+[BestClient]
+Disable movement
+== Отключить движение
+
+[BestClient]
+Trail image
+== Картинка следа
+
+[BestClient]
+No images in CTrails folder
+== Нет картинок в папке CTrails
+
+[BestClient]
+Enable better UI
+== Включить улучшенный UI
+
+[BestClient]
+Better checkbox
+== Улучшенный чекбокс
+
+[BestClient]
+Better scrollbar
+== Улучшенный скроллбар
+
+[BestClient]
+Better tab option
+== Улучшенные вкладки
+
+[BestClient]
+Left
+== Слева
+
+[BestClient]
+Right
+== Справа
+
+[BestClient]
+Better color picker
+== Улучшенный выбор цвета
+
+[BestClient]
+Better font
+== Улучшенный шрифт
+
+[BestClient]
+UI Themes
+== Темы UI
+
+[BestClient]
+Scrollbar
+== Скроллбар
+
+[BestClient]
+Button
+== Кнопка
+
+[BestClient]
+Droplist
+== Дроплист
+
+[BestClient]
+Input field
+== Поле ввода
+
+[BestClient]
+Function block
+== Блок функции
+
+[BestClient]
+UI background
+== Фон UI
+
+[BestClient]
+Settings tabs
+== Вкладки настроек
+
+[BestClient]
+Badge
+== Бейдж
+
+[BestClient]
+Binds
+== Бинды
+
+[BestClient]
+Accent
+== Акцент
+
+[BestClient]
+Enable colorable background
+== Включить цветной фон
+
+[BestClient]
+Background color
+== Цвет фона
+
+[BestClient]
+Exported!
+== Экспортировано!
+
+[BestClient]
+Export
+== Экспорт
+
+[BestClient]
+Imported!
+== Импортировано!
+
+[BestClient]
+Import
+== Импорт
+
+[BestClient]
+Copy theme to clipboard
+== Копировать тему в буфер
+
+[BestClient]
+Paste theme from clipboard
+== Вставить тему из буфера
+
+[BestClient]
+Enable motion blur
+== Включить Motion Blur
+
+[BestClient]
+Blend strength
+== Сила смешивания
+
+[BestClient]
+Animations
+== Анимации
+
+[BestClient]
+Enable animations
+== Включить анимации
+
+[BestClient]
+Settings animation
+== Анимация настроек
+
+[BestClient]
+Settings (ms)
+== Настройки (мс)
+
+[BestClient]
+Chat message animations
+== Анимации сообщений чата
+
+[BestClient]
+Chat message (ms)
+== Сообщение чата (мс)
+
+[BestClient]
+Chat open animation
+== Анимация открытия чата
+
+[BestClient]
+Chat open (ms)
+== Открытие чата (мс)
+
+[BestClient]
+Chat typing animation
+== Анимация печати в чате
+
+[BestClient]
+Chat typing (ms)
+== Печать в чате (мс)
+
+[BestClient]
+Killfeed animation
+== Анимация киллфида
+
+[BestClient]
+Killfeed (ms)
+== Киллфид (мс)
+
+[BestClient]
+Main menu animation
+== Анимация главного меню
+
+[BestClient]
+Main menu speed
+== Скорость главного меню
+
+[BestClient]
+Music Player
+== Музыкальный плеер
+
+[BestClient]
+Enable music player
+== Включить музыкальный плеер
+
+[BestClient]
+Static
+== Статик
+
+[BestClient]
+Cover
+== Обложка
+
+[BestClient]
+Static color
+== Статик-цвет
+
+[BestClient]
+Visualizer mode
+== Режим визуалайзера
+
+[BestClient]
+Bottom
+== Снизу
+
+[BestClient]
+Center
+== Центр
+
+[BestClient]
+Up
+== Вверх
+
+[BestClient]
+Text scale
+== Масштаб текста
+
+[BestClient]
+Columns
+== Колонки
+
+[BestClient]
+Rounding
+== Скругление
+
+[BestClient]
+Soft
+== Софт
+
+[BestClient]
+Show song lyrics
+== Показывать текст песни
+
+[BestClient]
+Show current time
+== Показывать текущее время
+
+[BestClient]
+Keystrokes
+== Кейстроки
+
+[BestClient]
+Classic
+== Классика
+
+[BestClient]
+Minecraft
+== Майнкрафт
+
+[BestClient]
+Enable keyboard
+== Включить клавиатуру
+
+[BestClient]
+Full
+== Фулл
+
+[BestClient]
+Minimal
+== Минимал
+
+[BestClient]
+Micro
+== Микро
+
+[BestClient]
+Only A/D
+== Только A/D
+
+[BestClient]
+Pressed opacity
+== Прозрачность нажатия
+
+[BestClient]
+Enable LMB
+== Включить ЛКМ
+
+[BestClient]
+Enable RMB
+== Включить ПКМ
+
+[BestClient]
+Enable Space
+== Включить Space
+
+[BestClient]
+Enable mouse
+== Включить мышь
+
+[BestClient]
+Arrow
+== Стрелка
+
+[BestClient]
+Dot Dot
+== Дот дот
+
+[BestClient]
+Nothing
+== Ничего
+
+[BestClient]
+Aspect Ratio
+== Соотношение сторон
+
+[BestClient]
+Off (default)
+== Выкл (по умолчанию)
+
+[BestClient]
+Preset
+== Пресет
+
+[BestClient]
+Game only
+== Только игра
+
+[BestClient]
+Game no HUD
+== Игра без HUD
+
+[BestClient]
+Custom size
+== Свой размер
+
+[BestClient]
+Looks like you're on a server where this feature is forbidden
+== Похоже, на этом сервере эта фича запрещена
+
+[BestClient]
+Physic Balls
+== Физик боллы
+
+[BestClient]
+Ball amount: %d
+== Количество шаров: %d
+
+[BestClient]
+Clear all balls
+== Убрать все шары
+
+[BestClient]
+Ball skin
+== Скин шара
+
+[BestClient]
+Spawn count
+== Число спавна
+
+[BestClient]
+New Ball
+== Новый шар
+
+[BestClient]
+New Ball Cursor
+== Новый шар на курсоре
+
+[BestClient]
+ticks
+== тики
+
+[BestClient]
+Inputs
+== Инпуты
+
+[BestClient]
+Enable Inputs
+== Включить инпуты
+
+[BestClient]
+Fast
+== Фаст
+
+[BestClient]
+Best
+== Бест
+
+[BestClient]
+Saiko
+== Сайко
+
+[BestClient]
+Delta
+== Дельта
+
+[BestClient]
+Cloud
+== Клауд
+
+[BestClient]
+Prediction offset
+== Предикшен оффсет
+
+[BestClient]
+Fast Input others
+== Фаст инпут других
+
+[BestClient]
+Smoothing
+== Сглаживание
+
+[BestClient]
+Latency compensation
+== Компенсация задержки
+
+[BestClient]
+Interpolation
+== Интерполяция
+
+[BestClient]
+Linear
+== Линейная
+
+[BestClient]
+Cubic
+== Кубическая
+
+[BestClient]
+Smooth
+== Плавная
+
+[BestClient]
+Best input others
+== Бест инпут других
+
+[BestClient]
+Saiko input others
+== Сайко инпут других
+
+[BestClient]
+Delta input others
+== Дельта инпут других
+
+[BestClient]
+F input others
+== F инпут других
+
+[BestClient]
+Cloud input others
+== Клауд инпут других
+
+[BestClient]
+Sub-Tick aiming
+== Сабтик аиминг
+
+[BestClient]
+Repredict on mid-tick hook direction change (may lag)
+== Репредикт при смене направления хука в середине тика (может лагать)
+
+[BestClient]
+Auto margin
+== Автомаргин
+
+[BestClient]
+Snap Tap
+== Снап тап
+
+[BestClient]
+Off
+== Выкл
+
+[BestClient]
+Delay
+== Задержка
+
+[BestClient]
+Gores mode
+== Режим горес
+
+[BestClient]
+Enable gores mode
+== Включить режим горес
+
+[BestClient]
+Disable if you have shotgun, grenade or laser
+== Выключать, если есть дробовик, граната или лазер
+
+[BestClient]
+Optimizer
+== Оптимизатор
+
+[BestClient]
+Enable optimizer
+== Включить оптимизатор
+
+[BestClient]
+Disable all particles render
+== Отключить рендер всех частиц
+
+[BestClient]
+Disable map quads render
+== Отключить рендер квадов карты
+
+[BestClient]
+Disable high detail
+== Отключить высокую детализацию
+
+[BestClient]
+FPS fog (cull outside limit)
+== FPS-туман (отрезать за лимитом)
+
+[BestClient]
+FPS fog
+== FPS-туман
+
+[BestClient]
+Render FPS fog rectangle
+== Рендерить прямоугольник FPS-тумана
+
+[BestClient]
+Cull map tiles outside FPS fog
+== Отсекать тайлы карты за FPS-туманом
+
+[BestClient]
+Radius
+== Радиус
+
+[BestClient]
+Zoom %
+== Зум %
+
+[BestClient]
+Radius (tiles)
+== Радиус (тайлы)
+
+[BestClient]
+Visible area (%)
+== Видимая область (%)
+
+[BestClient]
+Performance
+== Производительность
+
+[BestClient]
+High DDNet Process Priority
+== Высокий приоритет процесса DDNet
+
+[BestClient]
+Lower Discords Process Priority
+== Понизить приоритет процесса Discord
+
+[BestClient]
+Gameplay QoL
+== Удобства геймплея
+
+[BestClient]
+Automatic update
+== Автообновление
+
+[BestClient]
+Cinematic camera
+== Синематик камера
+
+[BestClient]
+Strength
+== Сила
+
+[BestClient]
+Extend zoom (0.5 steps)
+== Расширить зум (шаг 0.5)
+
+[BestClient]
+Better spectate
+== Беттер спектейт
+
+[BestClient]
+Replace your say /pause bind (default: Q) with +specpause (pause/spec radio)
+== Заменить бинд say /pause (по умолчанию: Q) на +specpause (пауза/спек радио)
+
+[BestClient]
+Show delay
+== Показывать задержку
+
+[BestClient]
+Notify when moved in spec
+== Уведомлять, когда тебя двигают в спеке
+
+[BestClient]
+Notification text
+== Текст уведомления
+
+[BestClient]
+Lock team automatically after joining
+== Автолок команды после входа
+
+[BestClient]
+Auto lock delay
+== Задержка автолока
+
+[BestClient]
+Confirm before quitting
+== Подтверждение перед выходом
+
+[BestClient]
+Moving/ego tiles prediction
+== Предикшен мувинг/эго тайлов
+
+[BestClient]
+Fast Actions
+== Фаст экшенс
+
+[BestClient]
+Enable Fast Actions
+== Включить фаст экшенс
+
+[BestClient]
+Selected slot
+== Выбранный слот
+
+[BestClient]
+Name:
+== Имя:
+
+[BestClient]
+Name (optional)
+== Имя (необязательно)
+
+[BestClient]
+Clear command
+== Очистить команду
+
+[BestClient]
+In game: hold bind key, press 1..6, release key to execute
+== В игре: зажми бинд, нажми 1..6, отпусти клавишу, чтобы выполнить
+
+[BestClient]
+Fast Actions key
+== Клавиша фаст экшенс
+
+[BestClient]
+Finish Prediction
+== Финиш предикшен
+
+[BestClient]
+Enable finish prediction
+== Включить финиш предикшен
+
+[BestClient]
+Show time
+== Показывать время
+
+[BestClient]
+Time left
+== Оставшееся время
+
+[BestClient]
+Finish time
+== Время финиша
+
+[BestClient]
+Show milliseconds
+== Показывать миллисекунды
+
+[BestClient]
+Show percentage
+== Показывать процент
+
+[BestClient]
+Show always
+== Показывать всегда
+
+[BestClient]
+Consider freeze walls
+== Учитывать фриз-стены
+
+[BestClient]
+Edge Info
+== Эдж инфо
+
+[BestClient]
+Show edge info
+== Показывать эдж инфо
+
+[BestClient]
+Show edge info about freeze
+== Эдж инфо про фриз
+
+[BestClient]
+Show edge info about jumps
+== Эдж инфо про прыжки
+
+[BestClient]
+Color when over freeze
+== Цвет над фризом
+
+[BestClient]
+Color when over kill
+== Цвет над киллом
+
+[BestClient]
+Color when falling safely
+== Цвет безопасного падения
+
+[BestClient]
+Chat QoL
+== Удобства чата
+
+[BestClient]
+Save unsent messages
+== Сохранять неотправленные сообщения
+
+[BestClient]
+Silent typing
+== Тихая печать
+
+[BestClient]
+Commands in other layout
+== Команды в другой раскладке
+
+[BestClient]
+Reply/copy message menu
+== Меню ответа/копирования сообщения
+
+[BestClient]
+Notify about saves on map
+== Уведомлять о сейвах на карте
+
+[BestClient]
+Twitch Chat
+== Твич-чат
+
+[BestClient]
+Nick
+== Ник
+
+[BestClient]
+Stop
+== Стоп
+
+[BestClient]
+Start
+== Старт
+
+[BestClient]
+Browser Utils
+== Браузер утилиты
+
+[BestClient]
+Auto server list refresh
+== Автообновление списка серверов
+
+[BestClient]
+Seconds
+== Секунды
+
+[BestClient]
+Short EGO/KoG server name
+== Короткое имя сервера EGO/KoG
+
+[BestClient]
+Show finished map on EGO
+== Показывать пройденную карту на EGO
+
+[BestClient]
+Use BestClient MasterServer
+== Использовать мастерсервер BestClient
+
+[BestClient]
+Rollback Demo
+== Роллбэк демо
+
+[BestClient]
+Enable rollback demo recording
+== Включить запись роллбэк демо
+
+[BestClient]
+Rollback length
+== Длина роллбэка
+
+[BestClient]
+Rollback bind
+== Бинд роллбэка
+
+[BestClient]
+Focus Mode
+== Фокус-режим
+
+[BestClient]
+Enable Focus Mode
+== Включить фокус-режим
+
+[BestClient]
+Hide Player Names
+== Скрыть имена игроков
+
+[BestClient]
+Hide Visual Effects
+== Скрыть визуальные эффекты
+
+[BestClient]
+Hide HUD
+== Скрыть HUD
+
+[BestClient]
+Hide Song Player
+== Скрыть плеер
+
+[BestClient]
+Hide Unnecessary UI
+== Скрыть лишний UI
+
+[BestClient]
+Hide Chat
+== Скрыть чат
+
+[BestClient]
+Hide Scoreboard
+== Скрыть скорборд
+
+[BestClient]
+Auto reply when chat is hidden
+== Автоответ, когда чат скрыт
+
+[BestClient]
+Focus mode bind
+== Бинд фокус-режима
+
+[BestClient]
+Voice Moderation
+== Модерация войса
+
+[BestClient]
+Voice Binds
+== Войс-бинды
+
+[BestClient]
+Voice
+== Войс
+
+[BestClient]
+Push-to-talk
+== Пуш-ту-толк
+
+[BestClient]
+Mute microphone
+== Мут микрофона
+
+[BestClient]
+Mute headphones
+== Мут наушников
+
+[BestClient]
+Client Indicator
+== Индикатор клиента
+
+[BestClient]
+Show indicator in name plates
+== Показывать индикатор в неймплейтах
+
+[BestClient]
+Show above yourself
+== Показывать над собой
+
+[BestClient]
+Name plate indicator size
+== Размер индикатора в неймплейте
+
+[BestClient]
+Show indicator in scoreboard
+== Показывать индикатор в скорборде
+
+[BestClient]
+Scoreboard indicator size
+== Размер индикатора в скорборде
+
+[BestClient]
+Not connected to voice server
+== Нет подключения к войс-серверу
+
+[BestClient]
+Voice Moderator Login
+== Вход модератора войса
+
+[BestClient]
+Mod key:
+== Мод-ключ:
+
+[BestClient]
+Authenticating...
+== Проверка...
+
+[BestClient]
+Wrong key
+== Неверный ключ
+
+[BestClient]
+Login as Voice Mod
+== Войти как мод войса
+
+[BestClient]
+Voice players on this server
+== Игроки войса на этом сервере
+
+[BestClient]
+Refresh
+== Обновить
+
+[BestClient]
+No players in current voice room
+== В текущей войс-комнате нет игроков
+
+[BestClient]
+Action
+== Действие
+
+[BestClient]
+slot %d
+== слот %d
+
+[BestClient]
+Mini games
+== Мини-игры
+
+[BestClient]
+BestClient Links
+== Ссылки BestClient
+
+[BestClient]
+Telegram
+== Telegram
+
+[BestClient]
+Check update
+== Чек апдейт
+
+[BestClient]
+Config Files
+== Файлы конфигов
+
+[BestClient]
+BestClient Settings
+== Настройки BestClient
+
+[BestClient]
+BestClient Developers
+== Разработчики BestClient
+
+[BestClient]
+Hide Settings Tabs
+== Скрыть вкладки настроек
+
+[BestClient]
+Laser Glow
+== Свечение лазера
+
+[BestClient]
+Shotgun Glow
+== Свечение дробовика
+
+[BestClient]
+Rocket Glow
+== Свечение рокеты
+
+[BestClient]
+Rocket
+== Рокета
+
+[BestClient]
+Prism
+== Призма
+
+[BestClient]
+Pulse
+== Pulse
+
+[BestClient]
+Crystal
+== Кристалл
+
+[BestClient]
+Power
+== Мощность
+
+[BestClient]
+Nuke effects
+== Эффекты ньюка
+
+[BestClient]
+Enable Nuke effects
+== Включить эффекты ньюка
+
+[BestClient]
+Screen shake
+== Тряска экрана
+
+[BestClient]
+Nuke size
+== Размер ньюка
+
+[BestClient]
+Custom hooks
+== Кастомные хуки
+
+[BestClient]
+Hook
+== Хук
+
+[BestClient]
+None
+== Нет
+
+[BestClient]
+Whirlwind
+== Вихрь
+
+[BestClient]
+Black hole
+== Чёрная дыра
+
+[BestClient]
+Magic
+== Магия
+
+[BestClient]
+Fire
+== Огонь
+
+[BestClient]
+Troll
+== Тролль
+
+[BestClient]
+Lightning
+== Молния
+
+[BestClient]
+Tentacle
+== Щупальце
+
+[BestClient]
+Style the hook
+== Стилизовать хук
+
+[BestClient]
+Grow time
+== Время роста
+
+[BestClient]
+Grab gust
+== Порыв захвата
+
+[BestClient]
+Eye
+== Глаз
+
+[BestClient]
+Wind lines
+== Линии ветра
+
+[BestClient]
+Spin speed
+== Скорость вращения
+
+[BestClient]
+Line thickness
+== Толщина линии
+
+[BestClient]
+Wind opacity
+== Прозрачность ветра
+
+[BestClient]
+Leaves
+== Листья
+
+[BestClient]
+Dust
+== Пыль
+
+[BestClient]
+Wind color
+== Цвет ветра
+
+[BestClient]
+Disk
+== Диск
+
+[BestClient]
+Matter
+== Материя
+
+[BestClient]
+Spin
+== Вращение
+
+[BestClient]
+Disk color
+== Цвет диска
+
+[BestClient]
+Runes
+== Руны
+
+[BestClient]
+Sparkles
+== Искры
+
+[BestClient]
+Spell color
+== Цвет заклинания
+
+[BestClient]
+Smoke
+== Дым
+
+[BestClient]
+Flames
+== Пламя
+
+[BestClient]
+Embers
+== Угли
+
+[BestClient]
+Fire color
+== Цвет огня
+
+[BestClient]
+Rays
+== Лучи
+
+[BestClient]
+Flow
+== Поток
+
+[BestClient]
+Glitter
+== Блёстки
+
+[BestClient]
+Ribbon width
+== Ширина ленты
+
+[BestClient]
+Wall arcs
+== Дуги у стены
+
+[BestClient]
+Jitter
+== Дрожание
+
+[BestClient]
+Forks
+== Развилки
+
+[BestClient]
+Sparks
+== Искры
+
+[BestClient]
+Lightning color
+== Цвет молнии
+
+[BestClient]
+Suckers
+== Присоски
+
+[BestClient]
+Writhing
+== Извивание
+
+[BestClient]
+Thickness
+== Толщина
+
+[BestClient]
+Slime
+== Слизь
+
+[BestClient]
+Flesh color
+== Цвет плоти
+
+[BestClient]
+Hook effects
+== Эффекты хука
+
+[BestClient]
+Air jump ring
+== Кольцо прыжка в воздухе
+
+[BestClient]
+Disable jump particles
+== Отключить частицы прыжка
+
+[BestClient]
+Hammer slash
+== Взмах молота
+
+[BestClient]
+Disable hammer particles
+== Отключить частицы молота
+
+[BestClient]
+Hook lasso
+== Лассо хука
+
+[BestClient]
+Hook box
+== Бокс хука
+
+[BestClient]
+Hook hold
+== Удержание хука
+
+[BestClient]
+Hold aura
+== Аура удержания
+
+[BestClient]
+Hold burst
+== Вспышка удержания
+
+[BestClient]
+Energy motes
+== Частицы энергии
+
+[BestClient]
+Weather
+== Погода
+
+[BestClient]
+Snow
+== Снег
+
+[BestClient]
+Rain
+== Дождь
+
+[BestClient]
+Fireflies
+== Светлячки
+
+[BestClient]
+Amount
+== Количество
+
+[BestClient]
+Dust color
+== Цвет пыли
+
+[BestClient]
+Rain color
+== Цвет дождя
+
+[BestClient]
+Firefly color
+== Цвет светлячков
+
+[BestClient]
+Dots
+== Точки
+
+[BestClient]
+Snowflakes
+== Снежинки
+
+[BestClient]
+Snow color
+== Цвет снега
+
+[BestClient]
+Freeze lifesteal
+== Фриз лайфстил
+
+[BestClient]
+Shield
+== Щит
+
+[BestClient]
+Reach
+== Дальность
+
+[BestClient]
+Frost
+== Мороз
+
+[BestClient]
+Custom hook color
+== Свой цвет хука
+
+[BestClient]
+Cold color
+== Холодный цвет
+
+[BestClient]
+Freeze lightning
+== Фриз-молния
+
+[BestClient]
+Impact
+== Удар
+
+[BestClient]
+Branches
+== Ветки
+
+[BestClient]
+Shake
+== Тряска
+
+[BestClient]
+Strike me
+== Ударить в меня
+
+[BestClient]
+Join a server to preview the lightning
+== Зайди на сервер, чтобы увидеть превью молнии
+
+[BestClient]
+Enabled
+== Включено
+
+[BestClient]
+Scale
+== Масштаб
+
+[BestClient]
+Reset scale
+== Сбросить масштаб
+
+[BestClient]
+Reset position
+== Сбросить позицию
+
+[BestClient]
+Reset all
+== Сбросить всё
+
+[BestClient]
+disabled
+== выключено
+
+[BestClient]
+preview
+== превью
+
+[BestClient]
+Reset All
+== Сбросить всё
+
+[BestClient]
+Disabled.
+== Выключено.
+
+[BestClient]
+Failed to load PNG.
+== Не удалось загрузить PNG.
+
+[BestClient]
+Failed to upload PNG.
+== Не удалось отправить PNG.
+
+[BestClient]
+Loaded image.
+== Картинка загружена.
+
+[BestClient]
+Failed to read file.
+== Не удалось прочитать файл.
+
+[BestClient]
+Failed to upload image.
+== Не удалось отправить картинку.
+
+[BestClient]
+Failed to decode image.
+== Не удалось декодировать картинку.
+
+[BestClient]
+Loaded animated image.
+== Анимированная картинка загружена.
+
+[BestClient]
+Video backgrounds are unavailable in this build.
+== Видеофоны недоступны в этой сборке.
+
+[BestClient]
+Failed to open video.
+== Не удалось открыть видео.
+
+[BestClient]
+Failed to read video info.
+== Не удалось прочитать инфо видео.
+
+[BestClient]
+No video stream found.
+== Видеопоток не найден.
+
+[BestClient]
+Unsupported video codec.
+== Неподдерживаемый видеокодек.
+
+[BestClient]
+Failed to initialize video decoder.
+== Не удалось запустить видео декодер.
+
+[BestClient]
+Invalid video dimensions.
+== Неверный размер видео.
+
+[BestClient]
+Failed to allocate video frames.
+== Не удалось выделить кадры видео.
+
+[BestClient]
+Failed to allocate RGBA frame.
+== Не удалось выделить RGBA-кадр.
+
+[BestClient]
+Failed to initialize video scaler.
+== Не удалось запустить видеоскейлер.
+
+[BestClient]
+Failed to decode first video frame.
+== Не удалось декодировать первый кадр видео.
+
+[BestClient]
+Loaded video.
+== Видео загружено.
+
+[BestClient]
+No media selected.
+== Медиа не выбрано.
+
+[BestClient]
+Failed while decoding video.
+== Ошибка при декодировании видео.
+
+[BestClient]
+Back to Info
+== Назад в инфо
+
+[BestClient]
+Press any key to start
+== Нажми любую клавишу, чтобы начать
+
+[BestClient]
+Game Over
+== Гейм овер
+
+[BestClient]
+Victory
+== Победа
+
+[BestClient]
+Draw - Stalemate
+== Ничья — пат
+
+[BestClient]
+Draw - Fifty move rule
+== Ничья — правило 50 ходов
+
+[BestClient]
+Draw - Threefold repetition
+== Ничья — троекратное повторение
+
+[BestClient]
+Winner: White
+== Победитель: белые
+
+[BestClient]
+Winner: Black
+== Победитель: чёрные
+
+[BestClient]
+Turn: White
+== Ход: белые
+
+[BestClient]
+Turn: Black
+== Ход: чёрные
+
+[BestClient]
+White Wins
+== Победа белых
+
+[BestClient]
+Black Wins
+== Победа чёрных
+
+[BestClient]
+All pairs found
+== Все пары найдены
+
+[BestClient]
+You Win
+== Ты выиграл
+
+[BestClient]
+Bot Wins
+== Бот выиграл
+
+[BestClient]
+All bricks cleared
+== Все кирпичи разбиты
+
+[BestClient]
+Numbers
+== Цифры
+
+[BestClient]
+Clear
+== Очистить
+
+[BestClient]
+Sudoku Solved
+== Судоку решён
+
+[BestClient]
+Get $200
+== Получить $200
+
+[BestClient]
+Multiplier:
+== Множитель:
+
+[BestClient]
+Locked
+== Лок
+
+[BestClient]
+Not enough funds
+== Не хватает средств
+
+[BestClient]
+Spinning...
+== Крутится...
+
+[BestClient]
+SPIN
+== КРУТИТЬ
+
+[BestClient]
+Type to search settings
+== Введи текст для поиска настроек
+
+[BestClient]
+Element
+== Элемент
+
+[BestClient]
+Casino
+== Казино
+
+[BestClient]
+Snake
+== Снейк
+
+[BestClient]
+Minesweeper
+== Майнсвипер
+
+[BestClient]
+Chess
+== Шахматы
+
+[BestClient]
+Memory
+== Мемори
+
+[BestClient]
+Pong
+== Понг
+
+[BestClient]
+Brick Breaker
+== Брик брейкер
+
+[BestClient]
+Sudoku
+== Судоку
+
+[BestClient]
+Spin the reels, bet & win
+== Крути барабаны, ставь и выигрывай
+
+[BestClient]
+Arrows/WASD, Space restart
+== Стрелки/WASD, Space — рестарт
+
+[BestClient]
+LMB open, RMB flag, hover hints
+== ЛКМ открыть, ПКМ флаг, наведение — подсказки
+
+[BestClient]
+Font Awesome chess pieces
+== Фигуры Font Awesome
+
+[BestClient]
+Find all matching pairs
+== Найди все пары
+
+[BestClient]
+W/S or Up/Down to move paddle
+== W/S или вверх/вниз двигают ракетку
+
+[BestClient]
+Break all bricks with the ball
+== Разбей все кирпичи мячом
+
+[BestClient]
+Click cell, 1-9 place, 0/Del clear
+== Клик по клетке, 1-9 поставить, 0/Del стереть
+
+[BestClient]
+Easy
+== Легко
+
+[BestClient]
+Medium
+== Средне
+
+[BestClient]
+Hard
+== Сложно
+
+[Gradient]
+Apply to
+== Применить к
+
+[Gradient]
+Own
+== Свои
+
+[Gradient]
+Others
+== Другие
+
+[Gradient]
+All
+== Все

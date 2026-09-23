@@ -1,0 +1,361 @@
+#include "font_typer.h"
+
+#include "editor.h"
+
+#include <base/log.h>
+#include <base/str.h>
+#include <base/time.h>
+
+#include <engine/keys.h>
+
+#include <game/editor/editor_actions.h>
+
+#include <algorithm>
+
+using namespace std::chrono_literals;
+
+void CFontTyper::CState::Reset()
+{
+	m_Active = false;
+	m_TextIndex = ivec2(0, 0);
+	m_LineStart = std::nullopt;
+	m_pLastLayer = nullptr;
+	m_TilesPlacedSinceActivate = 0;
+}
+
+void CFontTyper::OnInit(CEditor *pEditor)
+{
+	CEditorComponent::OnInit(pEditor);
+
+	m_CursorTextTexture = pEditor->Graphics()->LoadTexture("editor/cursor_text.png", IStorage::TYPE_ALL, 0);
+}
+
+void CFontTyper::SetTile(ivec2 Pos, unsigned char Index, const std::shared_ptr<CLayerTiles> &pLayer)
+{
+	CTile Tile = {
+		Index, // index
+		0, // flags
+		0, // skip
+		0, // reserved
+	};
+	pLayer->SetTile(Pos.x, Pos.y, Tile);
+	Map()->m_FontTyperState.m_TilesPlacedSinceActivate++;
+}
+
+void CFontTyper::PlaceTile(unsigned char Index, const std::shared_ptr<CLayerTiles> &pLayer)
+{
+	CState &State = Map()->m_FontTyperState;
+	// handle cursor behind right column and do line break
+	if(State.m_TextIndex.x == pLayer->m_Width)
+	{
+		if(Index == 0)
+			return;
+		State.m_TextIndex.x = State.m_LineStart.value_or(0);
+		State.m_TextIndex.y++;
+
+		// corner case
+		if(State.m_TextIndex.y >= pLayer->m_Height)
+		{
+			State.m_TextIndex.x = pLayer->m_Width;
+			State.m_TextIndex.y = pLayer->m_Height - 1;
+			return;
+		}
+	}
+
+	if(Index != 0 && (!State.m_LineStart.has_value() || State.m_TextIndex.x < State.m_LineStart))
+		State.m_LineStart = State.m_TextIndex.x;
+	SetTile(State.m_TextIndex, Index, pLayer);
+	State.m_TextIndex.x++;
+}
+
+bool CFontTyper::OnInput(const IInput::CEvent &Event)
+{
+	CState &State = Map()->m_FontTyperState;
+
+	std::shared_ptr<CLayerTiles> pLayer = std::static_pointer_cast<CLayerTiles>(Map()->SelectedLayerType(0, LAYERTYPE_TILES));
+	if(!pLayer)
+	{
+		if(State.m_Active)
+			TextModeOff();
+		return false;
+	}
+	if(pLayer->m_Image == -1)
+		return false;
+
+	if(!State.m_Active)
+	{
+		if(Event.m_Key == KEY_T && Input()->ModifierIsPressed() && !Ui()->IsPopupOpen() && Editor()->m_Dialog == DIALOG_NONE)
+		{
+			if(pLayer && pLayer->m_KnownTextModeLayer)
+			{
+				TextModeOn();
+			}
+			else
+			{
+				m_ConfirmActivatePopupContext.Reset();
+				m_ConfirmActivatePopupContext.YesNoButtons();
+				str_copy(m_ConfirmActivatePopupContext.m_aMessage, "Enable text mode? Pressing letters and numbers on your keyboard will place tiles.");
+				Ui()->ShowPopupConfirm(Ui()->MouseX(), Ui()->MouseY(), &m_ConfirmActivatePopupContext);
+			}
+		}
+		return false;
+	}
+
+	// only handle key down and not also key up
+	if(!(Event.m_Flags & IInput::FLAG_PRESS))
+		return false;
+
+	if(State.m_LineStart.has_value())
+		State.m_LineStart = std::clamp(State.m_LineStart.value(), 0, pLayer->m_Width - 1);
+
+	// handle all ctrl+S binds instead of writing "S"
+	if(Input()->ModifierIsPressed() && Input()->KeyIsPressed(KEY_S))
+	{
+		TextModeOff();
+		return false;
+	}
+
+	if(Input()->ModifierIsPressed() && Input()->KeyIsPressed(KEY_V))
+	{
+		std::string Clipboard = Input()->GetClipboardText();
+		if(!Clipboard.empty())
+		{
+			if(Clipboard.size() > 10000)
+			{
+				Editor()->ShowFileDialogError("The clipboard contains %" PRIzu " characters, please post it in chunks", Clipboard.size());
+				return false;
+			}
+			str_sanitize(Clipboard.data());
+			for(auto &Char : Clipboard)
+			{
+				if(Char == '\r')
+					continue;
+				if(Char == '\t')
+					Char = ' ';
+
+				// handle space
+				if(Char == ' ')
+				{
+					PlaceTile(0, pLayer);
+				}
+				// handle linebreaks
+				else if(Char == '\n')
+				{
+					if(State.m_TextIndex.y < pLayer->m_Height - 1)
+					{
+						State.m_TextIndex.y++;
+						if(State.m_LineStart.has_value())
+							State.m_TextIndex.x = State.m_LineStart.value();
+					}
+				}
+				// handle numbers
+				else if(str_isnum(Char))
+				{
+					if(Char == '0')
+						PlaceTile(KEY_0 - KEY_1 + NUMBER_OFFSET, pLayer);
+					else
+						PlaceTile(Char - '1' + NUMBER_OFFSET, pLayer);
+				}
+				else
+				{
+					Char = str_uppercase(Char);
+					if(Char >= 'A' && Char <= 'Z')
+					{
+						PlaceTile(Char - 'A' + LETTER_OFFSET, pLayer);
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	// letters
+	if(Event.m_Key >= KEY_A && Event.m_Key <= KEY_Z)
+		PlaceTile(Event.m_Key - KEY_A + LETTER_OFFSET, pLayer);
+	// numbers
+	if(Event.m_Key >= KEY_1 && Event.m_Key <= KEY_0)
+		PlaceTile(Event.m_Key - KEY_1 + NUMBER_OFFSET, pLayer);
+	if(Event.m_Key >= KEY_KP_1 && Event.m_Key <= KEY_KP_0)
+		PlaceTile(Event.m_Key - KEY_KP_1 + NUMBER_OFFSET, pLayer);
+
+	// deletion
+	if(Event.m_Key == KEY_BACKSPACE && State.m_TextIndex.x > 0)
+	{
+		State.m_TextIndex.x--;
+		SetTile(State.m_TextIndex, 0, pLayer);
+	}
+	else if(Event.m_Key == KEY_DELETE)
+	{
+		if(State.m_TextIndex.x < pLayer->m_Width)
+			SetTile(State.m_TextIndex, 0, pLayer);
+	}
+
+	// space
+	if(Event.m_Key == KEY_SPACE)
+		PlaceTile(0, pLayer);
+	// newline
+	if(Event.m_Key == KEY_RETURN)
+	{
+		State.m_TextIndex.y++;
+		if(State.m_LineStart.has_value())
+			State.m_TextIndex.x = State.m_LineStart.value();
+	}
+
+	// special key navigation
+	if(Event.m_Key == KEY_HOME)
+	{
+		for(int StartIndex = State.m_LineStart.value_or(0); StartIndex < pLayer->m_Width; ++StartIndex)
+		{
+			State.m_TextIndex.x = StartIndex;
+			if(pLayer->GetTile(StartIndex, State.m_TextIndex.y).m_Index != 0)
+				break;
+		}
+		// no char found
+		if(pLayer->GetTile(State.m_TextIndex.x, State.m_TextIndex.y).m_Index == 0)
+			State.m_TextIndex.x = State.m_LineStart.value_or(0);
+	}
+	else if(Event.m_Key == KEY_END)
+	{
+		int LastIndex = -1;
+		for(int EndIndex = State.m_LineStart.value_or(0); EndIndex < pLayer->m_Width; ++EndIndex)
+		{
+			if(pLayer->GetTile(EndIndex, State.m_TextIndex.y).m_Index)
+				LastIndex = EndIndex;
+		}
+		State.m_TextIndex.x = LastIndex >= 0 ? LastIndex + 1 : State.m_LineStart.value_or(0);
+	}
+
+	// arrow key navigation
+	if(Event.m_Key == KEY_LEFT)
+	{
+		State.m_TextIndex.x--;
+		if(Input()->ModifierIsPressed())
+		{
+			while(State.m_TextIndex.x >= 1 && State.m_TextIndex.x <= pLayer->m_Width - 2 && pLayer->GetTile(State.m_TextIndex.x, State.m_TextIndex.y).m_Index)
+				State.m_TextIndex.x--;
+		}
+	}
+	if(Event.m_Key == KEY_RIGHT)
+	{
+		State.m_TextIndex.x++;
+		if(Input()->ModifierIsPressed())
+		{
+			while(State.m_TextIndex.x >= 1 && State.m_TextIndex.x <= pLayer->m_Width - 2 && pLayer->GetTile(State.m_TextIndex.x, State.m_TextIndex.y).m_Index)
+				State.m_TextIndex.x++;
+		}
+	}
+	if(Event.m_Key == KEY_UP)
+		State.m_TextIndex.y--;
+	if(Event.m_Key == KEY_DOWN)
+		State.m_TextIndex.y++;
+	State.m_TextIndex.x = std::clamp(State.m_TextIndex.x, 0, pLayer->m_Width);
+	State.m_TextIndex.y = std::clamp(State.m_TextIndex.y, 0, pLayer->m_Height - 1);
+	m_CursorRenderTime = time_get_nanoseconds() - 501ms;
+	float Dist = distance(
+		vec2(State.m_TextIndex.x, State.m_TextIndex.y),
+		(Editor()->MapView()->GetWorldOffset() + Editor()->MapView()->GetEditorOffset()) / 32);
+	Dist /= Editor()->MapView()->GetWorldZoom();
+	if(Dist > 10.0f)
+	{
+		Editor()->MapView()->SetWorldOffset(vec2(State.m_TextIndex.x, State.m_TextIndex.y) * 32 - Editor()->MapView()->GetEditorOffset());
+	}
+
+	return false;
+}
+
+void CFontTyper::TextModeOn()
+{
+	std::shared_ptr<CLayerTiles> pLayer = std::static_pointer_cast<CLayerTiles>(Map()->SelectedLayerType(0, LAYERTYPE_TILES));
+	if(!pLayer)
+		return;
+	if(pLayer->m_Image == -1)
+		return;
+
+	SetCursor();
+	Map()->m_FontTyperState.m_TilesPlacedSinceActivate = 0;
+	Map()->m_FontTyperState.m_Active = true;
+	pLayer->m_KnownTextModeLayer = true;
+
+	// hack to not show picker when pressing space
+	Editor()->m_Dialog = DIALOG_PSEUDO_FONT_TYPER;
+}
+
+void CFontTyper::TextModeOff()
+{
+	if(Editor()->m_Dialog == DIALOG_PSEUDO_FONT_TYPER)
+		Editor()->m_Dialog = DIALOG_NONE;
+	if(Map()->m_FontTyperState.m_TilesPlacedSinceActivate)
+		Map()->m_EditorHistory.RecordAction(std::make_shared<CEditorBrushDrawAction>(Map(), Map()->m_SelectedGroup), "Font typer");
+	Map()->m_FontTyperState.Reset();
+}
+
+void CFontTyper::SetCursor()
+{
+	Map()->m_FontTyperState.m_TextIndex.x = (int)(Editor()->MapView()->MouseWorldPos().x / 32);
+	Map()->m_FontTyperState.m_TextIndex.y = (int)(Editor()->MapView()->MouseWorldPos().y / 32);
+	m_CursorRenderTime = time_get_nanoseconds() - 501ms;
+}
+
+void CFontTyper::Render()
+{
+	CState &State = Map()->m_FontTyperState;
+
+	if(m_ConfirmActivatePopupContext.m_Result == CUi::SConfirmPopupContext::CONFIRMED)
+	{
+		TextModeOn();
+		m_ConfirmActivatePopupContext.Reset();
+	}
+	if(m_ConfirmActivatePopupContext.m_Result != CUi::SConfirmPopupContext::UNSET)
+		m_ConfirmActivatePopupContext.Reset();
+
+	if(!State.m_Active)
+		return;
+
+	if(Ui()->ConsumeHotkey(CUi::HOTKEY_ESCAPE))
+		TextModeOff();
+	str_copy(Editor()->m_aTooltip, "Type on your keyboard to insert letters and numbers. Press Escape to end text mode.");
+
+	std::shared_ptr<CLayerTiles> pLayer = std::static_pointer_cast<CLayerTiles>(Map()->SelectedLayerType(0, LAYERTYPE_TILES));
+	if(!pLayer)
+		return;
+
+	// exit if selected layer changes
+	if(State.m_pLastLayer && State.m_pLastLayer != pLayer)
+	{
+		TextModeOff();
+		State.m_pLastLayer = pLayer;
+		return;
+	}
+	// exit if dialog or edit box pops up
+	if(Editor()->m_Dialog != DIALOG_PSEUDO_FONT_TYPER || CLineInput::GetActiveInput())
+	{
+		TextModeOff();
+		return;
+	}
+	State.m_pLastLayer = pLayer;
+	State.m_TextIndex.x = std::clamp(State.m_TextIndex.x, 0, pLayer->m_Width);
+	State.m_TextIndex.y = std::clamp(State.m_TextIndex.y, 0, pLayer->m_Height - 1);
+
+	const auto CurTime = time_get_nanoseconds();
+	if((CurTime - m_CursorRenderTime) > 1s)
+		m_CursorRenderTime = time_get_nanoseconds();
+	if((CurTime - m_CursorRenderTime) > 500ms)
+	{
+		std::shared_ptr<CLayerGroup> pGroup = Map()->SelectedGroup();
+		pGroup->MapScreen();
+		Graphics()->WrapClamp();
+		Graphics()->TextureSet(m_CursorTextTexture);
+		Graphics()->QuadsBegin();
+		Graphics()->SetColor(1, 1, 1, 1);
+		IGraphics::CQuadItem QuadItem(State.m_TextIndex.x * 32, State.m_TextIndex.y * 32, 32.0f, 32.0f);
+		Graphics()->QuadsDrawTL(&QuadItem, 1);
+		Graphics()->QuadsEnd();
+		Graphics()->WrapNormal();
+		Ui()->MapScreen();
+	}
+}
+
+bool CFontTyper::IsActive() const
+{
+	return Map()->m_FontTyperState.m_Active;
+}

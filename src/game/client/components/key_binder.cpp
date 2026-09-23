@@ -1,0 +1,116 @@
+/* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
+/* If you are missing that file, acquire a complete release at teeworlds.com.                */
+#include "key_binder.h"
+
+#include <base/color.h>
+
+#include <engine/font_icons.h>
+
+#include <game/client/components/binds.h>
+// bestclient
+#include <game/client/components/bestclient/ui_theme/style.h>
+// bestclient
+#include <game/client/gameclient.h>
+#include <game/client/ui.h>
+#include <game/localization.h>
+
+bool CKeyBinder::OnInput(const IInput::CEvent &Event)
+{
+	if(!m_TakeKey)
+	{
+		return false;
+	}
+
+	if(Event.m_Flags & IInput::FLAG_RELEASE)
+	{
+		int ModifierCombination = CBinds::GetModifierMask(Input());
+		if(ModifierCombination == CBinds::GetModifierMaskOfKey(Event.m_Key))
+		{
+			ModifierCombination = KeyModifier::NONE;
+		}
+		m_Key = {Event.m_Key, ModifierCombination};
+		m_TakeKey = false;
+	}
+	return true;
+}
+
+CKeyBinder::CKeyReaderResult CKeyBinder::DoKeyReader(CButtonContainer *pReaderButton, CButtonContainer *pClearButton, const CUIRect *pRect, const CBindSlot &CurrentBind, bool Activate)
+{
+	CKeyReaderResult Result = {CurrentBind, false};
+
+	CUIRect KeyReaderButton, ClearButton;
+	pRect->VSplitRight(pRect->h, &KeyReaderButton, &ClearButton);
+
+	const int ClearButtonResult = Ui()->DoButton_FontIcon(
+		pClearButton, FontIcon::TRASH,
+		Result.m_Bind == CBindSlot(KEY_UNKNOWN, KeyModifier::NONE) ? 1 : 0,
+		&ClearButton, BUTTONFLAG_LEFT, IGraphics::CORNER_R);
+
+	const int ButtonResult = Ui()->DoButtonLogic(pReaderButton, 0, &KeyReaderButton, BUTTONFLAG_LEFT | BUTTONFLAG_RIGHT);
+	if(ButtonResult == 1 || Activate)
+	{
+		m_pKeyReaderId = pReaderButton;
+		m_TakeKey = true;
+		m_Key = std::nullopt;
+	}
+	else if(ButtonResult == 2 || ClearButtonResult != 0)
+	{
+		Result.m_Bind = CBindSlot(KEY_UNKNOWN, KeyModifier::NONE);
+	}
+
+	if(m_pKeyReaderId == pReaderButton && m_Key.has_value())
+	{
+		if(m_Key.value().m_Key == KEY_ESCAPE)
+		{
+			Result.m_Aborted = true;
+		}
+		else
+		{
+			Result.m_Bind = m_Key.value();
+		}
+		m_pKeyReaderId = nullptr;
+		m_Key = std::nullopt;
+		Ui()->SetActiveItem(nullptr);
+	}
+
+	char aBuf[64];
+	if(m_pKeyReaderId == pReaderButton && m_TakeKey)
+	{
+		str_copy(aBuf, Localize("Press a key…"));
+	}
+	else if(Result.m_Bind.m_Key == KEY_UNKNOWN)
+	{
+		aBuf[0] = '\0';
+	}
+	else
+	{
+		GameClient()->m_Binds.GetKeyBindName(Result.m_Bind.m_Key, Result.m_Bind.m_ModifierMask, aBuf, sizeof(aBuf));
+	}
+
+	// bestclient
+	const bool TakingKey = m_pKeyReaderId == pReaderButton && m_TakeKey;
+	if(TakingKey && !BestClientUiTheme::IsCustomUiBind())
+		KeyReaderButton.Draw(ColorRGBA(0.0f, 1.0f, 0.0f, 0.4f), IGraphics::CORNER_L, 5.0f);
+	else
+		BestClientUiTheme::DrawUiBind(&KeyReaderButton, ColorRGBA(1.0f, 1.0f, 1.0f, TakingKey ? 0.4f : 0.5f * Ui()->ButtonColorMul(pReaderButton)), TakingKey, IGraphics::CORNER_L, 5.0f);
+	// bestclient
+	CUIRect Label;
+	KeyReaderButton.HMargin(1.0f, &Label);
+	Ui()->DoLabel(&Label, aBuf, Label.h * CUi::ms_FontmodHeight, TEXTALIGN_MC);
+
+	return Result;
+}
+
+bool CKeyBinder::IsActive() const
+{
+	return m_TakeKey;
+}
+
+bool CKeyBinder::AbortPendingKey()
+{
+	if(m_pKeyReaderId == nullptr)
+		return false;
+	m_Key = CBindSlot(KEY_ESCAPE, KeyModifier::NONE);
+	m_TakeKey = false;
+	return true;
+}

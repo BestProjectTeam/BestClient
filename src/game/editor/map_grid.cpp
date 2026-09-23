@@ -1,0 +1,187 @@
+#include "map_grid.h"
+
+#include "editor.h"
+
+#include <engine/graphics.h>
+#include <engine/keys.h>
+
+static constexpr int MIN_GRID_FACTOR = 1;
+static constexpr int MAX_GRID_FACTOR = 15;
+
+void CMapGrid::CState::Reset()
+{
+	m_GridActive = false;
+	m_GridFactor = 1;
+}
+
+void CMapGrid::Render()
+{
+	if(!IsEnabled())
+	{
+		return;
+	}
+
+	std::shared_ptr<CLayerGroup> pGroup = Map()->SelectedGroup();
+	if(!pGroup)
+	{
+		return;
+	}
+
+	pGroup->MapScreen();
+
+	CScreenRect GroupRect = pGroup->Mapping();
+
+	CScreenRect ScreenRect = Graphics()->GetScreen();
+
+	const int LineDistance = GridLineDistance();
+
+	const int XOffset = GroupRect.m_TopLeft.x / LineDistance;
+	const int YOffset = GroupRect.m_TopLeft.y / LineDistance;
+	const int XGridOffset = XOffset % Factor();
+	const int YGridOffset = YOffset % Factor();
+
+	const int NumColumns = (int)std::ceil(ScreenRect.Width() / LineDistance) + 1;
+	const int NumRows = (int)std::ceil(ScreenRect.Height() / LineDistance) + 1;
+
+	Graphics()->TextureClear();
+
+	IGraphics::CLineItemBatch LineItemBatch;
+	if(Factor() > 1)
+	{
+		Graphics()->LinesBatchBegin(&LineItemBatch);
+		Graphics()->SetColor(1.0f, 1.0f, 1.0f, 0.15f);
+		for(int y = 0; y < NumRows; y++)
+		{
+			if((y + YGridOffset) % Factor() == 0)
+			{
+				continue;
+			}
+			const float PosY = LineDistance * (y + YOffset);
+			const IGraphics::CLineItem Line = IGraphics::CLineItem(ScreenRect.m_TopLeft.x, PosY, ScreenRect.m_BottomRight.x, PosY);
+			Graphics()->LinesBatchDraw(&LineItemBatch, &Line, 1);
+		}
+		for(int x = 0; x < NumColumns; x++)
+		{
+			if((x + XGridOffset) % Factor() == 0)
+			{
+				continue;
+			}
+			const float PosX = LineDistance * (x + XOffset);
+			const IGraphics::CLineItem Line = IGraphics::CLineItem(PosX, ScreenRect.m_TopLeft.y, PosX, ScreenRect.m_BottomRight.y);
+			Graphics()->LinesBatchDraw(&LineItemBatch, &Line, 1);
+		}
+		Graphics()->LinesBatchEnd(&LineItemBatch);
+	}
+
+	Graphics()->LinesBatchBegin(&LineItemBatch);
+	Graphics()->SetColor(1.0f, 0.3f, 0.3f, 0.3f);
+	for(int y = 0; y < NumRows; y++)
+	{
+		if((y + YGridOffset) % Factor() != 0)
+		{
+			continue;
+		}
+		const float PosY = LineDistance * (y + YOffset);
+		const IGraphics::CLineItem Line = IGraphics::CLineItem(ScreenRect.m_TopLeft.x, PosY, ScreenRect.m_BottomRight.x, PosY);
+		Graphics()->LinesBatchDraw(&LineItemBatch, &Line, 1);
+	}
+	for(int x = 0; x < NumColumns; x++)
+	{
+		if((x + XGridOffset) % Factor() != 0)
+		{
+			continue;
+		}
+		const float PosX = LineDistance * (x + XOffset);
+		const IGraphics::CLineItem Line = IGraphics::CLineItem(PosX, ScreenRect.m_TopLeft.y, PosX, ScreenRect.m_BottomRight.y);
+		Graphics()->LinesBatchDraw(&LineItemBatch, &Line, 1);
+	}
+	Graphics()->LinesBatchEnd(&LineItemBatch);
+}
+
+int CMapGrid::GridLineDistance() const
+{
+	const float ZoomValue = Editor()->MapView()->Zoom()->GetValue();
+	if(ZoomValue <= 10.0f)
+		return 4;
+	else if(ZoomValue <= 50.0f)
+		return 8;
+	else if(ZoomValue <= 100.0f)
+		return 16;
+	else if(ZoomValue <= 250.0f)
+		return 32;
+	else if(ZoomValue <= 450.0f)
+		return 64;
+	else if(ZoomValue <= 850.0f)
+		return 128;
+	else if(ZoomValue <= 1550.0f)
+		return 256;
+	else
+		return 512;
+}
+
+void CMapGrid::SnapToGrid(vec2 &Position) const
+{
+	const int GridDistance = GridLineDistance() * Factor();
+	Position.x = (int)((Position.x + (Position.x >= 0 ? 1.0f : -1.0f) * GridDistance / 2) / GridDistance) * GridDistance;
+	Position.y = (int)((Position.y + (Position.y >= 0 ? 1.0f : -1.0f) * GridDistance / 2) / GridDistance) * GridDistance;
+}
+
+bool CMapGrid::IsEnabled() const
+{
+	return Map()->m_MapGridState.m_GridActive;
+}
+
+void CMapGrid::Toggle()
+{
+	Map()->m_MapGridState.m_GridActive = !Map()->m_MapGridState.m_GridActive;
+}
+
+int CMapGrid::Factor() const
+{
+	return Map()->m_MapGridState.m_GridFactor;
+}
+
+void CMapGrid::SetFactor(int Factor)
+{
+	Map()->m_MapGridState.m_GridFactor = std::clamp(Factor, MIN_GRID_FACTOR, MAX_GRID_FACTOR);
+}
+
+void CMapGrid::DoSettingsPopup(vec2 Position)
+{
+	Ui()->DoPopupMenu(&m_PopupGridSettingsId, Position.x, Position.y, 120.0f, 37.0f, this, PopupGridSettings);
+}
+
+CUi::EPopupMenuFunctionResult CMapGrid::PopupGridSettings(void *pContext, CUIRect View, bool Active)
+{
+	CMapGrid *pMapGrid = static_cast<CMapGrid *>(pContext);
+
+	enum
+	{
+		PROP_SIZE = 0,
+		NUM_PROPS,
+	};
+	CProperty aProps[] = {
+		{"Size", pMapGrid->Factor(), PROPTYPE_INT, MIN_GRID_FACTOR, MAX_GRID_FACTOR},
+		{nullptr},
+	};
+
+	static int s_aIds[NUM_PROPS];
+	int NewVal;
+	int Prop = pMapGrid->Editor()->DoProperties(&View, aProps, s_aIds, &NewVal);
+
+	if(Prop == PROP_SIZE)
+	{
+		pMapGrid->SetFactor(NewVal);
+	}
+
+	CUIRect Button;
+	View.HSplitBottom(12.0f, &View, &Button);
+
+	static char s_DefaultButton;
+	if(pMapGrid->Editor()->DoButton_Ex(&s_DefaultButton, "Default", 0, &Button, BUTTONFLAG_LEFT, "Reset to normal grid size.", IGraphics::CORNER_ALL))
+	{
+		pMapGrid->SetFactor(1);
+	}
+
+	return CUi::POPUP_KEEP_OPEN;
+}

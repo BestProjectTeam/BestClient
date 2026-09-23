@@ -1,0 +1,31 @@
+PROJECT_NAME           = "DDNet documentation"
+PROJECT_LOGO           = other/icons/DDNet_48x48x32.png
+OUTPUT_DIRECTORY       = docs
+BUILTIN_STL_SUPPORT    = YES
+NUM_PROC_THREADS       = 0
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = YES
+EXTRACT_PRIV_VIRTUAL   = YES
+EXTRACT_STATIC         = YES
+CASE_SENSE_NAMES       = YES
+WARN_LOGFILE           = docs/warn.log
+INPUT                  = src
+RECURSIVE              = YES
+EXCLUDE                = src/engine/external \
+                         src/masterping/target \
+                         src/mastersrv/target
+USE_MDFILE_AS_MAINPAGE = src/README.md
+GENERATE_LATEX         = NO
+MACRO_EXPANSION        = YES
+PREDEFINED             = CONF_FAMILY_UNIX \
+                         CONF_MYSQL \
+                         CONF_DISCORD \
+                         CONF_OPENSSL \
+                         CONF_UPNP \
+                         CONF_VIDEORECORDER \
+                         CONF_ANTIBOT
+HAVE_DOT               = YES
+DOT_IMAGE_FORMAT       = svg
+INTERACTIVE_SVG        = YES
+DOT_GRAPH_MAX_NODES    = 200
+DOT_MULTI_TARGETS      = YES
