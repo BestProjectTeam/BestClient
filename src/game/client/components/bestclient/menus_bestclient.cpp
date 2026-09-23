@@ -3992,6 +3992,7 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 
 	BrowserUtilsBlock.HSplitTop(MarginSmall, nullptr, &BrowserUtilsBlock);
 	BrowserUtilsBlock.HSplitTop(LineSize, &Content, &BrowserUtilsBlock);
+	BcMenuBadges::DrawNew(Graphics(), Ui(), TextRender(), &Content, MarginSmall);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowFinishedMapOnEgo, BcLocalize("Show finished map on EGO"), &g_Config.m_BcShowFinishedMapOnEgo, &Content, LineSize);
 
 	BrowserUtilsBlock.HSplitTop(MarginSmall, nullptr, &BrowserUtilsBlock);
