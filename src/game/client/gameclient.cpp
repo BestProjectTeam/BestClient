@@ -6365,7 +6365,10 @@ void CGameClient::StoreSave(const char *pTeamMembers, const char *pGeneratedCode
 bool CGameClient::CheckNewInput()
 {
 	if(IsCloudInputMode()) // bestclient
-		return m_CloudInput.CheckNewInput(m_Controls); // bestclient
+	{
+		const bool NewInput = m_CloudInput.CheckNewInput(m_Controls);
+		return NewInput;
+	}
 	return m_Controls.CheckNewInput();
 }
 
