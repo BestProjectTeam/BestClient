@@ -3027,6 +3027,8 @@ if(CLIENT)
     components/bestclient/gif_bubbles.h
     components/bestclient/ego_finished_maps.cpp
     components/bestclient/ego_finished_maps.h
+    components/bestclient/legit_finished_maps.cpp
+    components/bestclient/legit_finished_maps.h
     components/bestclient/ego_tiles_prediction.cpp
     components/bestclient/ego_tiles_prediction.h
     components/bestclient/edgehelper.cpp
