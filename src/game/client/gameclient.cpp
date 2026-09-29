@@ -198,6 +198,7 @@ void CGameClient::OnConsoleInit()
 					      &m_BrowserUtils, // bestclient
 					      &m_TwitchChat, // bestclient
 					      &m_EgoFinishedMaps, // bestclient
+					      &m_LegitFinishedMaps, // bestclient
 					      &m_ShowPoints, // bestclient
 					      &m_ClientIndicator, // bestclient
 					      &m_VoiceChat, // bestclient

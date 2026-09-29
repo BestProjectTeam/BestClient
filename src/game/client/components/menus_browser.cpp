@@ -505,7 +505,7 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 					Button.VMargin(4.0f, &Button);
 					Button.VSplitLeft(Button.h, &Icon, &Button);
 					// bestclient
-					if((g_Config.m_BrIndicateFinished && pItem->m_HasRank == CServerInfo::RANK_RANKED) || GameClient()->m_EgoFinishedMaps.IsFinishedMap(pItem))
+					if((g_Config.m_BrIndicateFinished && pItem->m_HasRank == CServerInfo::RANK_RANKED) || GameClient()->m_EgoFinishedMaps.IsFinishedMap(pItem) || GameClient()->m_LegitFinishedMaps.IsFinishedMap(pItem))
 					// bestclient
 					{
 						Icon.Margin(2.0f, &Icon);

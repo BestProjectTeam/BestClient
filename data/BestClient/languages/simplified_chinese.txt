@@ -1211,6 +1211,10 @@ Show finished map on EGO
 == 在 EGO 上显示已完成地图
 
 [BestClient]
+Show finished map on Legit Network
+== 在 Legit Network 上显示已完成地图
+
+[BestClient]
 Use BestClient MasterServer
 == 使用 BestClient 主服务器
 

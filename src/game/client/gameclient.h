@@ -46,6 +46,7 @@
 #include "components/bestclient/music_player.h" // bestclient
 #include "components/bestclient/browser_utils.h" // bestclient
 #include "components/bestclient/ego_finished_maps.h" // bestclient
+#include "components/bestclient/legit_finished_maps.h" // bestclient
 #include "components/bestclient/ego_tiles_prediction.h" // bestclient
 #include "components/bestclient/edgehelper.h" // bestclient
 #include "components/bestclient/fast_practice.h" // bestclient
@@ -261,6 +262,7 @@ public:
 	CBrowserUtils m_BrowserUtils; // bestclient
 	CTwitchChat m_TwitchChat; // bestclient
 	CEgoFinishedMaps m_EgoFinishedMaps; // bestclient
+	CLegitFinishedMaps m_LegitFinishedMaps; // bestclient
 	CEdgeHelper m_EdgeHelper; // bestclient
 	CFinishPrediction m_FinishPrediction; // bestclient
 	CKeystrokes m_Keystrokes; // bestclient
