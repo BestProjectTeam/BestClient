@@ -3962,7 +3962,7 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 
 	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
 
-	const float BrowserUtilsBlockHeight = 6.0f * LineSize + 5.0f * MarginSmall;
+	const float BrowserUtilsBlockHeight = 7.0f * LineSize + 6.0f * MarginSmall;
 
 	CUIRect BrowserUtilsBlock;
 	Column.HSplitTop(BrowserUtilsBlockHeight, &BrowserUtilsBlock, &Column);
@@ -3994,6 +3994,11 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	BrowserUtilsBlock.HSplitTop(LineSize, &Content, &BrowserUtilsBlock);
 	BcMenuBadges::DrawNew(Graphics(), Ui(), TextRender(), &Content, MarginSmall);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowFinishedMapOnEgo, BcLocalize("Show finished map on EGO"), &g_Config.m_BcShowFinishedMapOnEgo, &Content, LineSize);
+
+	BrowserUtilsBlock.HSplitTop(MarginSmall, nullptr, &BrowserUtilsBlock);
+	BrowserUtilsBlock.HSplitTop(LineSize, &Content, &BrowserUtilsBlock);
+	BcMenuBadges::DrawNew(Graphics(), Ui(), TextRender(), &Content, MarginSmall);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowFinishedMapOnLegit, BcLocalize("Show finished map on Legit Network"), &g_Config.m_BcShowFinishedMapOnLegit, &Content, LineSize);
 
 	BrowserUtilsBlock.HSplitTop(MarginSmall, nullptr, &BrowserUtilsBlock);
 	BrowserUtilsBlock.HSplitTop(LineSize, &Content, &BrowserUtilsBlock);

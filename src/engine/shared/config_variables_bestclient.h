@@ -316,6 +316,7 @@ MACRO_CONFIG_INT(BcAutoServerListRefresh, bc_auto_server_list_refresh, 0, 0, 1, 
 MACRO_CONFIG_INT(BcAutoServerListRefreshSeconds, bc_auto_server_list_refresh_seconds, 10, 1, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Auto refresh interval for the server browser list in seconds")
 MACRO_CONFIG_INT(BcUseShortKogServerName, bc_use_short_kog_server_name, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use short names for E-Gores and KoG servers in browser list")
 MACRO_CONFIG_INT(BcShowFinishedMapOnEgo, bc_show_finished_map_on_ego, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show completed EGO maps in the server browser")
+MACRO_CONFIG_INT(BcShowFinishedMapOnLegit, bc_show_finished_map_on_legit, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show completed Legit Network maps in the server browser")
 MACRO_CONFIG_INT(BcMastersrv, bc_mastersrv, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use the BestClient master server mirror for the server browser")
 MACRO_CONFIG_INT(BcServerMapPreview, bc_server_map_preview, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show a live map preview under the selected server")
 MACRO_CONFIG_INT(BrFilterBestclient, br_filter_bestclient, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Filter out servers with no BestClient users")

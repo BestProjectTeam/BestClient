@@ -1203,6 +1203,10 @@ Show finished map on EGO
 == Показывать пройденную карту на EGO
 
 [BestClient]
+Show finished map on Legit Network
+== Показывать пройденную карту на Legit Network
+
+[BestClient]
 Use BestClient MasterServer
 == Использовать мастерсервер BestClient
 
