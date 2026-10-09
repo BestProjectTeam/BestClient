@@ -114,7 +114,6 @@ private:
 	std::vector<SLine> m_vLines;
 	std::shared_ptr<IHttpRequest> m_pRequest;
 	std::unordered_map<std::string, SCacheEntry> m_Cache;
-	int64_t m_OfflineRetryAt = 0;
 	float m_NotFoundDisplayMs = 0.0f;
 	float m_OfflineDisplayMs = 0.0f;
 	float m_TitleMarqueeOffset = 0.0f;

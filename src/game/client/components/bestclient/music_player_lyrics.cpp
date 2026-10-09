@@ -25,7 +25,6 @@ namespace
 	static constexpr float LYRICS_TITLE_MARQUEE_GAP_FACTOR = 2.5f;
 	static constexpr ColorRGBA LYRICS_PASSED_COLOR(1.0f, 1.0f, 1.0f, 1.0f);
 	static constexpr ColorRGBA LYRICS_UPCOMING_COLOR(0.45f, 0.45f, 0.48f, 1.0f);
-	static constexpr int64_t LYRICS_OFFLINE_RETRY_MS = 15000;
 	static constexpr size_t LYRICS_CACHE_MAX = 64;
 
 	static const char *JsonStringOrEmpty(const json_value *pValue)
@@ -114,7 +113,6 @@ void CMusicPlayerLyrics::Reset()
 	m_RequestKey.clear();
 	m_DisplayState = EDisplayState::Idle;
 	m_vLines.clear();
-	m_OfflineRetryAt = 0;
 	ClearActiveTrack();
 }
 
@@ -155,7 +153,6 @@ void CMusicPlayerLyrics::Disable()
 	m_ActiveKey.clear();
 	m_DisplayState = EDisplayState::Idle;
 	m_vLines.clear();
-	m_OfflineRetryAt = 0;
 	ClearActiveTrack();
 }
 
@@ -391,7 +388,6 @@ void CMusicPlayerLyrics::ProcessRequest()
 		m_DisplayState = EDisplayState::Offline;
 		m_vLines.clear();
 		ClearActiveTrack();
-		m_OfflineRetryAt = time_get() + time_freq() * LYRICS_OFFLINE_RETRY_MS / 1000;
 	};
 
 	if(pFinished->State() != EHttpState::DONE || pFinished->StatusCode() == 0)
@@ -504,7 +500,6 @@ void CMusicPlayerLyrics::Update(IHttp *pHttp, const char *pTitle, const char *pA
 		m_ActiveKey = Key;
 		m_vLines.clear();
 		ClearActiveTrack();
-		m_OfflineRetryAt = 0;
 		SyncMediaClock(SnapshotPositionMs, DurationMs, Playing, true);
 
 		const auto It = m_Cache.find(Key);
@@ -520,12 +515,6 @@ void CMusicPlayerLyrics::Update(IHttp *pHttp, const char *pTitle, const char *pA
 	}
 
 	SyncMediaClock(SnapshotPositionMs, DurationMs, Playing, false);
-
-	if(m_DisplayState == EDisplayState::Offline && !m_pRequest)
-	{
-		if(m_OfflineRetryAt == 0 || time_get() >= m_OfflineRetryAt)
-			StartRequest(pHttp, pTitle, pArtist, pAlbum, DurationMs);
-	}
 }
 
 int CMusicPlayerLyrics::FindLineIndex(int64_t PositionMs) const
