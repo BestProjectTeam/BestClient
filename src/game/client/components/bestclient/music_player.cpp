@@ -2815,6 +2815,7 @@ public:
 
 	std::unique_ptr<IMusicPlaybackProvider> m_pProvider;
 	std::unique_ptr<BestClientVisualizer::CRealtimeMusicVisualizer> m_pVisualizer;
+	std::unique_ptr<CVisualizerLevelThread> m_pLevelThread;
 	SNowPlayingSnapshot m_Snapshot;
 	BestClientVisualizer::SVisualizerFrame m_VisualizerData;
 	int64_t m_LastSnapshotTick = 0;
@@ -2840,7 +2841,6 @@ public:
 	int m_ArtWidth = 0;
 	int m_ArtHeight = 0;
 	int64_t m_ArtAnimationStart = 0;
-	CVisualizerLevelThread m_LevelThread;
 	float m_CompactTextSlotWidthAnim = 0.0f;
 	float m_LyricsTimerWidthAnim = 0.0f;
 	float m_LyricsTimerHeightAnim = 0.0f;
@@ -2875,20 +2875,44 @@ public:
 		m_aVisualizerBarColors.fill(ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));
 		m_VisualizerData.m_IsPassiveFallback = true;
 		m_VisualizerData.m_BackendStatus = BestClientVisualizer::EVisualizerBackendStatus::FALLBACK;
+	}
+
+	void EnsureBackgroundServices()
+	{
+		if(!m_pProvider)
+		{
 #if defined(CONF_PLATFORM_LINUX)
 #if BC_MUSICPLAYER_HAS_DBUS
-		m_pProvider = std::make_unique<CLinuxNowPlayingProvider>();
+			m_pProvider = std::make_unique<CLinuxNowPlayingProvider>();
 #else
-		m_pProvider = std::make_unique<CNullNowPlayingProvider>();
+			m_pProvider = std::make_unique<CNullNowPlayingProvider>();
 #endif
-		m_pVisualizer = std::make_unique<BestClientVisualizer::CRealtimeMusicVisualizer>();
 #elif defined(CONF_FAMILY_WINDOWS) && BC_MUSICPLAYER_HAS_WINRT
-		m_pProvider = std::make_unique<CWindowsNowPlayingProvider>();
-		m_pVisualizer = std::make_unique<BestClientVisualizer::CRealtimeMusicVisualizer>();
+			m_pProvider = std::make_unique<CWindowsNowPlayingProvider>();
 #else
-		m_pProvider = std::make_unique<CNullNowPlayingProvider>();
-		m_pVisualizer = std::make_unique<BestClientVisualizer::CRealtimeMusicVisualizer>();
+			m_pProvider = std::make_unique<CNullNowPlayingProvider>();
 #endif
+		}
+		if(!m_pVisualizer)
+			m_pVisualizer = std::make_unique<BestClientVisualizer::CRealtimeMusicVisualizer>();
+		if(!m_pLevelThread)
+			m_pLevelThread = std::make_unique<CVisualizerLevelThread>();
+	}
+
+	void StopBackgroundServices()
+	{
+		if(m_pLevelThread)
+		{
+			m_pLevelThread->Stop();
+			m_pLevelThread.reset();
+		}
+		m_pProvider.reset();
+		m_pVisualizer.reset();
+		m_VisualizerData = BestClientVisualizer::SVisualizerFrame();
+		m_VisualizerData.m_IsPassiveFallback = true;
+		m_VisualizerData.m_BackendStatus = BestClientVisualizer::EVisualizerBackendStatus::FALLBACK;
+		m_LastPollTick = 0;
+		m_LastVisualizerPollTick = 0;
 	}
 
 	void ResetHudState()
@@ -2897,7 +2921,8 @@ public:
 		m_HoverAnim = 0.0f;
 		m_VisualPositionMs = 0.0f;
 		m_VisualTrackKey.clear();
-		m_LevelThread.Reset();
+		if(m_pLevelThread)
+			m_pLevelThread->Reset();
 		m_CompactTextSlotWidthAnim = 0.0f;
 		m_LyricsTimerWidthAnim = 0.0f;
 		m_LyricsTimerHeightAnim = 0.0f;
@@ -3134,11 +3159,9 @@ public:
 
 	void Shutdown(IGraphics *pGraphics)
 	{
-		m_LevelThread.Stop();
+		StopBackgroundServices();
 		Reset(pGraphics);
 		ResetLogoTexture(pGraphics);
-		m_pProvider.reset();
-		m_pVisualizer.reset();
 	}
 
 	void StartArtDecode(CMusicPlayer *pOwner, const unsigned char *pData, size_t DataSize, const char *pContextName)
@@ -3503,6 +3526,9 @@ public:
 
 	void SubmitVisualizerLevels(const SNowPlayingSnapshot &Snapshot, int64_t PositionMs, int RequestedBars)
 	{
+		if(!m_pLevelThread)
+			return;
+
 		RequestedBars = std::clamp(RequestedBars, 2, VISUALIZER_BARS);
 		const bool UseRealtimeVisualizer =
 			Snapshot.m_PlaybackState == EMusicPlaybackState::PLAYING &&
@@ -3531,12 +3557,18 @@ public:
 		Input.m_Artist = Snapshot.m_Artist;
 		Input.m_RequestedBars = RequestedBars;
 		Input.m_TimeSeconds = (float)(time_get() / (double)time_freq());
-		m_LevelThread.Submit(std::move(Input));
+		m_pLevelThread->Submit(std::move(Input));
 	}
 
 	std::array<float, VISUALIZER_BARS> VisualizerLevels() const
 	{
-		return m_LevelThread.Levels();
+		if(!m_pLevelThread)
+		{
+			std::array<float, VISUALIZER_BARS> aLevels{};
+			aLevels.fill(0.18f);
+			return aLevels;
+		}
+		return m_pLevelThread->Levels();
 	}
 
 	void UpdateHudReservation(CMusicPlayer *pOwner)
@@ -3806,6 +3838,21 @@ void CMusicPlayer::RenderHudEditor(bool ForcePreview)
 void CMusicPlayer::OnUpdate()
 {
 	EnsureImpl();
+	if(g_Config.m_BcMusicPlayer == 0)
+	{
+		if(m_pImpl->m_pProvider || m_pImpl->m_pVisualizer || m_pImpl->m_pLevelThread || m_pImpl->m_Snapshot.m_Valid)
+		{
+			const bool HadSnapshot = m_pImpl->m_Snapshot.m_Valid;
+			m_pImpl->StopBackgroundServices();
+			m_pImpl->ResetHudState();
+			m_pImpl->m_Lyrics.Disable();
+			if(HadSnapshot)
+				m_pImpl->ApplySnapshot(SNowPlayingSnapshot(), time_get());
+		}
+		return;
+	}
+
+	m_pImpl->EnsureBackgroundServices();
 	const float HudHeight = HudLayout::CANVAS_HEIGHT;
 	const float HudWidth = HudHeight * Graphics()->ScreenAspect();
 	struct SHudScreenScope
@@ -3873,12 +3920,6 @@ void CMusicPlayer::OnUpdate()
 		m_pImpl->m_LastPollTick = Now;
 	}
 
-	if(g_Config.m_BcMusicPlayer == 0)
-	{
-		m_pImpl->ResetHudState();
-		m_pImpl->m_Lyrics.Disable();
-		return;
-	}
 	m_pImpl->UpdateArtwork(this);
 	const bool LyricsAllowed = Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK;
 	if(LyricsAllowed && g_Config.m_BcMusicPlayerShowLyrics != 0 && m_pImpl->m_Snapshot.m_Valid)
@@ -4204,12 +4245,15 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	const bool NextHovered = ControlsInteractive && Snapshot.m_CanNext &&
 				 (IsPointInsideRect(NextRect, MousePos, HitMargin) || IsPointInsideRect(UiNextRect, UiMousePos, UiHitMargin));
 
-	if(Clicked && PrevHovered)
-		m_pImpl->m_pProvider->Previous();
-	if(Clicked && PlayHovered)
-		m_pImpl->m_pProvider->PlayPause();
-	if(Clicked && NextHovered)
-		m_pImpl->m_pProvider->Next();
+	if(m_pImpl->m_pProvider)
+	{
+		if(Clicked && PrevHovered)
+			m_pImpl->m_pProvider->Previous();
+		if(Clicked && PlayHovered)
+			m_pImpl->m_pProvider->PlayPause();
+		if(Clicked && NextHovered)
+			m_pImpl->m_pProvider->Next();
+	}
 
 	const CUIRect UiTextArea = HudToUiRect(LayoutTextArea, UiScreen, Width, Height);
 	const CUIRect UiTitleRect = HudToUiRect(TitleRect, UiScreen, Width, Height);

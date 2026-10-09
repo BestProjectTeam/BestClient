@@ -44,6 +44,7 @@ constexpr T maximum(T a, T b, T c)
 #include <cstdint>
 #include <cstring>
 #include <mutex>
+#include <new>
 #include <string>
 #include <thread>
 #include <vector>
@@ -155,7 +156,10 @@ public:
 
 	ULONG STDMETHODCALLTYPE Release() override
 	{
-		return --m_RefCount;
+		const ULONG NewRefCount = --m_RefCount;
+		if(NewRefCount == 0)
+			delete this;
+		return NewRefCount;
 	}
 
 	HRESULT STDMETHODCALLTYPE ActivateCompleted(IActivateAudioInterfaceAsyncOperation *pOperation) override
@@ -814,21 +818,28 @@ class CWasapiVisualizerSource final : public IVisualizerSource
 			ActivationParamsVariant.blob.cbSize = sizeof(ActivationParams);
 			ActivationParamsVariant.blob.pBlobData = reinterpret_cast<BYTE *>(&ActivationParams);
 
-			CProcessLoopbackActivationHandler CompletionHandler;
+			auto *pCompletionHandler = new(std::nothrow) CProcessLoopbackActivationHandler();
+			if(pCompletionHandler == nullptr)
+				return false;
+
 			winrt::com_ptr<IActivateAudioInterfaceAsyncOperation> ActivationOperation;
-			HRESULT Hr = ActivateAudioInterfaceAsync(VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK, __uuidof(IAudioClient), &ActivationParamsVariant, &CompletionHandler, ActivationOperation.put());
+			HRESULT Hr = ActivateAudioInterfaceAsync(VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK, __uuidof(IAudioClient), &ActivationParamsVariant, pCompletionHandler, ActivationOperation.put());
 			if(FAILED(Hr))
+			{
+				pCompletionHandler->Release();
 				return false;
+			}
 
-			Hr = CompletionHandler.WaitForCompletion();
-			if(FAILED(Hr))
-				return false;
-
-			IUnknown *pActivatedInterface = CompletionHandler.ActivatedInterface();
-			if(pActivatedInterface == nullptr)
-				return false;
-
-			return SUCCEEDED(pActivatedInterface->QueryInterface(__uuidof(IAudioClient), pAudioClient.put_void()));
+			Hr = pCompletionHandler->WaitForCompletion();
+			bool Started = false;
+			if(SUCCEEDED(Hr))
+			{
+				IUnknown *pActivatedInterface = pCompletionHandler->ActivatedInterface();
+				if(pActivatedInterface != nullptr)
+					Started = SUCCEEDED(pActivatedInterface->QueryInterface(__uuidof(IAudioClient), pAudioClient.put_void()));
+			}
+			pCompletionHandler->Release();
+			return Started;
 		};
 
 		auto TryStartProcessCapture = [&](DWORD TargetProcessId) -> bool {
