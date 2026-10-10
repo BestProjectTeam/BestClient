@@ -117,9 +117,6 @@ bool CChatScroll::OnInput(CChat &Chat, const IInput::CEvent &Event)
 		}
 	}
 
-	if(Chat.m_Mode == CChat::MODE_NONE && Chat.m_Show && (Event.m_Key == KEY_MOUSE_1 || Event.m_Key == KEY_MOUSE_2) && (Event.m_Flags & (IInput::FLAG_PRESS | IInput::FLAG_RELEASE)))
-		return true;
-
 	return false;
 }
 

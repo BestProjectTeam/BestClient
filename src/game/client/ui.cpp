@@ -296,8 +296,11 @@ void CUi::Update()
 	if(Enabled())
 	{
 		CLineInput *pActiveInput = CLineInput::GetActiveInput();
-		if(pActiveInput && m_pLastActiveItem && pActiveInput != m_pLastActiveItem)
+		// bestclient
+		if(pActiveInput && m_pLastActiveItem && pActiveInput != m_pLastActiveItem &&
+			CLineInput::GetActiveInputPriority() <= EInputPriority::UI)
 			pActiveInput->Deactivate();
+		// bestclient
 	}
 	else
 	{

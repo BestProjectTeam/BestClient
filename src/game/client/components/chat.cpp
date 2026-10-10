@@ -1819,7 +1819,7 @@ void CChat::OnRender()
 		HeightLimit = y - 73.0f * LayoutScale;
 
 	// bestclient
-	const bool ChatInteractionActive = (m_Mode != MODE_NONE || m_Show) && !Ui()->IsPopupOpen();
+	const bool ChatInteractionActive = m_Mode != MODE_NONE && !Ui()->IsPopupOpen();
 	// bestclient
 	int OffsetType = IsScoreBoardOpen ? 1 : 0;
 	float RealMsgPaddingX = MessagePaddingX();

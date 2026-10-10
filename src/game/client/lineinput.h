@@ -200,6 +200,9 @@ public:
 	const void *GetClearButtonId() const { return &m_ClearButtonId; }
 
 	bool IsActive() const { return GetActiveInput() == this; }
+	// bestclient
+	static EInputPriority GetActiveInputPriority() { return ms_ActiveInputPriority; }
+	// bestclient
 	void Activate(EInputPriority Priority);
 	void Deactivate() const;
 };
