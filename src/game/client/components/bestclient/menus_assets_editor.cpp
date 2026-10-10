@@ -1387,8 +1387,9 @@ void CMenus::RenderAssetsEditorScreen(CUIRect MainView)
 
 	const vec2 MousePos = Ui()->MousePos();
 	const bool ColorPopupOpen = Ui()->IsPopupOpen(&gs_AssetsEditorColorPopup);
+	const bool PointerOnColorPopup = ColorPopupOpen && Ui()->IsPopupHovered();
 	const bool PopupBlocksPick = Ui()->IsPopupOpen() && !ColorPopupOpen;
-	const bool ClickedLmb = !PopupBlocksPick && Ui()->MouseButtonClicked(0);
+	const bool ClickedLmb = !PopupBlocksPick && !PointerOnColorPopup && Ui()->MouseButtonClicked(0);
 	const bool PreviewReady = m_AssetsEditorState.m_PreviewTexture.IsValid() && m_AssetsEditorState.m_PreviewWidth > 0 && m_AssetsEditorState.m_PreviewHeight > 0;
 	const int TargetWidth = PreviewReady ? m_AssetsEditorState.m_PreviewWidth : m_AssetsEditorState.m_Right.m_Width;
 	const int TargetHeight = PreviewReady ? m_AssetsEditorState.m_PreviewHeight : m_AssetsEditorState.m_Right.m_Height;
@@ -1456,12 +1457,12 @@ void CMenus::RenderAssetsEditorScreen(CUIRect MainView)
 
 	int HoveredDonor = -1;
 	int HoveredTarget = -1;
-	if(HasDonorFitted && !m_AssetsEditorState.m_DragActive)
+	if(HasDonorFitted && !m_AssetsEditorState.m_DragActive && !PointerOnColorPopup)
 		HoveredDonor = AssetsEditorResolveHovered(DonorFitted, m_AssetsEditorState.m_Left.m_Category, m_AssetsEditorState.m_vDonorSlots, MousePos, ClickedLmb, m_AssetsEditorState.m_DonorHover, nullptr);
 	const SAssetsEditorPartSlot *pPreferred = nullptr;
 	if(m_AssetsEditorState.m_DragActive && m_AssetsEditorState.m_DraggedDonorSlot >= 0 && m_AssetsEditorState.m_DraggedDonorSlot < (int)m_AssetsEditorState.m_vDonorSlots.size())
 		pPreferred = &m_AssetsEditorState.m_vDonorSlots[m_AssetsEditorState.m_DraggedDonorSlot];
-	if(HasTargetFitted)
+	if(HasTargetFitted && !PointerOnColorPopup)
 		HoveredTarget = AssetsEditorResolveHovered(TargetFitted, m_AssetsEditorState.m_Right.m_Category, m_AssetsEditorState.m_vTargetSlots, MousePos, ClickedLmb && pPreferred == nullptr, m_AssetsEditorState.m_TargetHover, pPreferred);
 
 	const bool ClickedRmb = !PopupBlocksPick && !Ui()->IsPopupHovered() && Ui()->MouseButtonClicked(1);
