@@ -661,7 +661,6 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 	{
 		CUIRect MapPreviewRow;
 		VisualsQoLBlock.HSplitTop(LineSize, &MapPreviewRow, &VisualsQoLBlock);
-		BcMenuBadges::DrawNew(Graphics(), Ui(), TextRender(), &MapPreviewRow, MarginSmall);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcServerMapPreview, BcLocalize("Map preview in server list"), &g_Config.m_BcServerMapPreview, &MapPreviewRow, LineSize);
 	}
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowRealHitbox, BcLocalize("Show real hitbox"), &g_Config.m_BcShowRealHitbox, &VisualsQoLBlock, LineSize);
@@ -808,7 +807,6 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 	Ui()->DoButtonLogic(&s_CornerIndicatorAuthorBadge, 0, &CornerIndicatorAuthorBadge, BUTTONFLAG_NONE);
 	GameClient()->m_Tooltips.DoToolTip(&s_CornerIndicatorAuthorBadge, &CornerIndicatorAuthorBadge, "blanc");
 	GameClient()->m_Tooltips.SetFadeTime(&s_CornerIndicatorAuthorBadge, 0.0f);
-	BcMenuBadges::DrawNew(Graphics(), Ui(), TextRender(), &CornerIndicatorTitleLabel, 4.0f);
 	Ui()->DoLabel(&CornerIndicatorTitleLabel, BcLocalize("Corner indicator"), HeadlineFontSize, TEXTALIGN_ML);
 	CornerIndicatorView.HSplitTop(MarginSmall, nullptr, &CornerIndicatorView);
 
@@ -1515,7 +1513,6 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 	Ui()->DoButtonLogic(&s_CursorTrailAuthorBadge, 0, &CursorTrailAuthorBadge, BUTTONFLAG_NONE);
 	GameClient()->m_Tooltips.DoToolTip(&s_CursorTrailAuthorBadge, &CursorTrailAuthorBadge, "sneznyyy");
 	GameClient()->m_Tooltips.SetFadeTime(&s_CursorTrailAuthorBadge, 0.0f);
-	BcMenuBadges::DrawNew(Graphics(), Ui(), TextRender(), &CursorTrailTitleLabel, 2.0f);
 	Ui()->DoLabel(&CursorTrailTitleLabel, BcLocalize("Cursor Trail"), HeadlineFontSize, TEXTALIGN_ML);
 	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
 	MainView.HSplitTop(LineSize, &Content, &MainView);
@@ -1684,7 +1681,6 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		BestClientRefreshMenuFont(GameClient());
 	}
 	NewUiTitleLabel.VSplitRight(MarginSmall, &NewUiTitleLabel, nullptr);
-	BcMenuBadges::DrawNew(Graphics(), Ui(), TextRender(), &NewUiTitleLabel, 4.0f);
 	Ui()->DoLabel(&NewUiTitleLabel, BcLocalize("Better UI"), HeadlineFontSize, TEXTALIGN_ML);
 	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
 	MainView.HSplitTop(LineSize, &Content, &MainView);
@@ -1877,7 +1873,6 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		g_Config.m_UiColor = 0xE4A046AFU;
 	}
 	UiThemesTitleLabel.VSplitRight(MarginSmall, &UiThemesTitleLabel, nullptr);
-	BcMenuBadges::DrawNew(Graphics(), Ui(), TextRender(), &UiThemesTitleLabel, 4.0f);
 	Ui()->DoLabel(&UiThemesTitleLabel, BcLocalize("UI Themes"), HeadlineFontSize, TEXTALIGN_ML);
 	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
 	MainView.HSplitTop(LineSize, &Content, &MainView);
@@ -3901,13 +3896,11 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 	{
 		CUIRect MessageActionsRow;
 		ChatQoLBlock.HSplitTop(LineSize, &MessageActionsRow, &ChatQoLBlock);
-		BcMenuBadges::DrawNew(Graphics(), Ui(), TextRender(), &MessageActionsRow, MarginSmall);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcChatMessageActions, BcLocalize("Reply/copy message menu"), &g_Config.m_BcChatMessageActions, &MessageActionsRow, LineSize);
 	}
 	{
 		CUIRect NotifySavesRow;
 		ChatQoLBlock.HSplitTop(LineSize, &NotifySavesRow, &ChatQoLBlock);
-		BcMenuBadges::DrawNew(Graphics(), Ui(), TextRender(), &NotifySavesRow, MarginSmall);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcNotifySavesOnMap, BcLocalize("Notify about saves on map"), &g_Config.m_BcNotifySavesOnMap, &NotifySavesRow, LineSize);
 	}
 
@@ -3992,7 +3985,6 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 
 	BrowserUtilsBlock.HSplitTop(MarginSmall, nullptr, &BrowserUtilsBlock);
 	BrowserUtilsBlock.HSplitTop(LineSize, &Content, &BrowserUtilsBlock);
-	BcMenuBadges::DrawNew(Graphics(), Ui(), TextRender(), &Content, MarginSmall);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowFinishedMapOnEgo, BcLocalize("Show finished map on EGO"), &g_Config.m_BcShowFinishedMapOnEgo, &Content, LineSize);
 
 	BrowserUtilsBlock.HSplitTop(MarginSmall, nullptr, &BrowserUtilsBlock);
@@ -4022,7 +4014,6 @@ void CMenus::RenderSettingsBestClientOthers(CUIRect MainView)
 		CUIRect RollbackMain = RollbackDemoBlock;
 		RollbackMain.HSplitTop(LineSize, &Label, &RollbackMain);
 		Label.VSplitRight(MarginSmall, &Label, nullptr);
-		BcMenuBadges::DrawNew(Graphics(), Ui(), TextRender(), &Label, 4.0f);
 		Ui()->DoLabel(&Label, BcLocalize("Rollback Demo"), HeadlineFontSize, TEXTALIGN_ML);
 		RollbackMain.HSplitTop(MarginSmall, nullptr, &RollbackMain);
 
@@ -4603,8 +4594,6 @@ void CMenus::RenderSettingsBestClientWeaponGlow(CUIRect &Column)
 	Ui()->DoButtonLogic(&s_WeaponGlowAuthorBadge, 0, &AuthorBadge, BUTTONFLAG_NONE);
 	GameClient()->m_Tooltips.DoToolTip(&s_WeaponGlowAuthorBadge, &AuthorBadge, "motya");
 	GameClient()->m_Tooltips.SetFadeTime(&s_WeaponGlowAuthorBadge, 0.0f);
-	if(s_Weapon == 0)
-		BcMenuBadges::DrawNew(Graphics(), Ui(), TextRender(), &Row, 8.0f);
 	Ui()->DoLabel(&Row, apTitles[s_Weapon], 20.0f, TEXTALIGN_ML);
 	Block.HSplitTop(MarginSmall, nullptr, &Block);
 	Block.HSplitTop(LineSize, &Row, &Block);

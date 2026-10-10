@@ -41,7 +41,7 @@ inline constexpr SBadge RClient{
 	ColorRGBA(0.30f, 0.55f, 0.95f, 1.0f), ColorRGBA(0.15f, 0.35f, 0.75f, 1.0f),
 	5.0f};
 inline constexpr SBadge Author{
-	"IDEA", 12.0f,
+	"By", 12.0f,
 	ColorRGBA(0.58f, 0.42f, 0.95f, 1.0f), ColorRGBA(0.38f, 0.20f, 0.78f, 1.0f),
 	5.0f};
 

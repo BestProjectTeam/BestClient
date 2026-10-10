@@ -57,7 +57,6 @@ void CMenus::RenderSettingsBestClientFx(CUIRect &Column, bool HookColumn)
 		Ui()->DoButtonLogic(pAuthor, 0, &AuthorBadge, BUTTONFLAG_NONE);
 		GameClient()->m_Tooltips.DoToolTip(pAuthor, &AuthorBadge, "recidivismnational");
 		GameClient()->m_Tooltips.SetFadeTime(pAuthor, 0.0f);
-		BcMenuBadges::DrawNew(Graphics(), Ui(), TextRender(), &Title, 4.0f);
 		Ui()->DoLabel(&Title, pText, HeadlineFontSize, TEXTALIGN_ML);
 	};
 
