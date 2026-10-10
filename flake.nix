@@ -10,11 +10,11 @@
     in {
       packages.${system}.default = pkgs.stdenv.mkDerivation rec {
         pname = "bestclient";
-        version = "2.3";
+        version = "3.0";
 
         src = pkgs.fetchurl {
           url = "https://github.com/BestProjectTeam/BestClient/releases/download/v${version}/BestClient-linux.tar.xz";
-          hash = "sha256-ngp73/RXIY1nCky3hhrTN+gRlBJVyw9TJJAMNTjpy6o=";
+          hash = "sha256-esKwubZZ0LpVk9FffezuYZaX6YC5GvNNw3aHN0md3P4=";
         };
 
         nativeBuildInputs = [ 

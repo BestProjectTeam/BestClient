@@ -1,0 +1,54 @@
+name: Update flake
+
+on:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v27
+
+      - name: Read current version
+        id: current
+        run: |
+          version=$(sed -n 's/.*version = "\(.*\)";/\1/p' flake.nix | head -1)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve latest release
+        id: latest
+        run: |
+          tag=$(curl -fsSL https://api.github.com/repos/BestProjectTeam/BestClient/releases/latest \
+            | jq -r .tag_name)
+          version=${tag#v}
+          url="https://github.com/BestProjectTeam/BestClient/releases/download/${tag}/BestClient-linux.tar.xz"
+          hash=$(nix store prefetch-file --json "$url" | jq -r .hash)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "hash=$hash" >> "$GITHUB_OUTPUT"
+
+      - name: Update flake.nix
+        if: steps.current.outputs.version != steps.latest.outputs.version
+        run: |
+          sed -i "s|version = \"[^\"]*\";|version = \"${{ steps.latest.outputs.version }}\";|" flake.nix
+          sed -i "s|hash = \"sha256-[^\"]*\";|hash = \"${{ steps.latest.outputs.hash }}\";|" flake.nix
+          git diff --stat
+
+      - name: Build
+        if: steps.current.outputs.version != steps.latest.outputs.version
+        run: nix build --no-link .#default
+
+      - name: Commit
+        if: steps.current.outputs.version != steps.latest.outputs.version
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add flake.nix
+          git commit -m "flake: update bestclient to ${{ steps.latest.outputs.version }}"
+          git push
