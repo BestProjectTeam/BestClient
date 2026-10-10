@@ -65,19 +65,19 @@ bool CTwitchChat::IsActive() const
 
 CTwitchChat::EState CTwitchChat::State() const
 {
-	std::lock_guard<std::mutex> Lock(m_Mutex);
-	return m_State;
+	return m_State.load(std::memory_order_relaxed);
 }
 
 void CTwitchChat::GetStatusText(char *pBuf, int BufSize) const
 {
 	if(!pBuf || BufSize <= 0)
 		return;
-	std::lock_guard<std::mutex> Lock(m_Mutex);
+	std::lock_guard<std::mutex> Lock(m_StatusMutex);
+	const EState State = m_State.load(std::memory_order_relaxed);
 	if(m_aStatusText[0] == '\0')
 		str_copy(pBuf, "Not connected", BufSize);
-	else if(m_State == EState::Connected)
-		str_format(pBuf, BufSize, "%s | %" PRIu64 " msgs", m_aStatusText, m_ReceivedMessages);
+	else if(State == EState::Connected)
+		str_format(pBuf, BufSize, "%s | %" PRIu64 " msgs", m_aStatusText, m_ReceivedMessages.load(std::memory_order_relaxed));
 	else
 		str_copy(pBuf, m_aStatusText, BufSize);
 }
@@ -87,14 +87,13 @@ void CTwitchChat::SetStatus(const char *pMessage)
 	if(!pMessage)
 		return;
 
-	std::lock_guard<std::mutex> Lock(m_Mutex);
+	std::lock_guard<std::mutex> Lock(m_StatusMutex);
 	str_copy(m_aStatusText, pMessage, sizeof(m_aStatusText));
 }
 
 void CTwitchChat::SetState(EState State)
 {
-	std::lock_guard<std::mutex> Lock(m_Mutex);
-	m_State = State;
+	m_State.store(State, std::memory_order_relaxed);
 }
 
 void CTwitchChat::QueueChatMessage(const char *pName, const char *pText)
@@ -102,24 +101,17 @@ void CTwitchChat::QueueChatMessage(const char *pName, const char *pText)
 	if(!pName || !pText || pName[0] == '\0' || pText[0] == '\0')
 		return;
 
-	std::lock_guard<std::mutex> Lock(m_Mutex);
-	if((int)m_MessageQueue.size() >= MAX_QUEUED_MESSAGES)
-		m_MessageQueue.pop_front();
-	m_MessageQueue.push_back({pName, pText});
-	++m_ReceivedMessages;
+	if(!m_MessageQueue.try_enqueue(SQueuedMessage{pName, pText}))
+	{
+		m_DroppedMessages.fetch_add(1, std::memory_order_relaxed);
+	}
+	m_ReceivedMessages.fetch_add(1, std::memory_order_relaxed);
 }
 
 void CTwitchChat::FlushChatMessages()
 {
-	std::deque<SQueuedMessage> Messages;
-	{
-		std::lock_guard<std::mutex> Lock(m_Mutex);
-		if(m_MessageQueue.empty())
-			return;
-		Messages.swap(m_MessageQueue);
-	}
-
-	for(const SQueuedMessage &Message : Messages)
+	SQueuedMessage Message;
+	while(m_MessageQueue.try_dequeue(Message))
 	{
 		char aLine[MAX_CHAT_LENGTH];
 		str_format(aLine, sizeof(aLine), "%s: %s", Message.m_Name.c_str(), Message.m_Text.c_str());
@@ -227,11 +219,15 @@ void CTwitchChat::Start()
 	Stop();
 
 	{
-		std::lock_guard<std::mutex> Lock(m_Mutex);
-		m_State = EState::Connecting;
+		std::lock_guard<std::mutex> Lock(m_StatusMutex);
 		m_aStatusText[0] = '\0';
-		m_ReceivedMessages = 0;
-		m_MessageQueue.clear();
+	}
+	m_State.store(EState::Connecting, std::memory_order_relaxed);
+	m_ReceivedMessages.store(0, std::memory_order_relaxed);
+	m_DroppedMessages.store(0, std::memory_order_relaxed);
+	SQueuedMessage DummyMsg;
+	while(m_MessageQueue.try_dequeue(DummyMsg))
+	{
 	}
 
 	m_StopRequested.store(false, std::memory_order_relaxed);
@@ -249,9 +245,14 @@ void CTwitchChat::Stop()
 		m_Worker.join();
 	m_WorkerRunning.store(false, std::memory_order_relaxed);
 
-	std::lock_guard<std::mutex> Lock(m_Mutex);
-	if(m_State == EState::Connected || m_State == EState::Connecting)
-		m_State = EState::Disconnected;
+	const EState State = m_State.load(std::memory_order_relaxed);
+	if(State == EState::Connected || State == EState::Connecting)
+		m_State.store(EState::Disconnected, std::memory_order_relaxed);
+
+	SQueuedMessage DummyMsg;
+	while(m_MessageQueue.try_dequeue(DummyMsg))
+	{
+	}
 }
 
 void CTwitchChat::WorkerMain(std::string Channel)

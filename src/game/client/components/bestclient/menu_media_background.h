@@ -7,11 +7,14 @@
 
 #include <base/types.h>
 
+#include <engine/external/readerwriterqueue/ReaderWriterQueue.h>
 #include <engine/graphics.h>
 #include <engine/storage.h>
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <thread>
 #include <vector>
 
 struct AVCodecContext;
@@ -64,14 +67,24 @@ public:
 		float m_WorldOffset = 0.0f;
 	};
 
-private:
+	struct SDecodedVideoFrame
+	{
+		std::vector<uint8_t> m_vData;
+		int m_DurationMs = 0;
+	};
+
+	std::thread m_DecoderThread;
+	std::atomic<bool> m_StopRequested{false};
+	std::atomic<bool> m_DecoderFailed{false};
+	moodycamel::ReaderWriterQueue<SDecodedVideoFrame> m_FrameQueue{4};
+
 	void SetStatus(const char *pText);
 	void SetError(const char *pText);
 	void ClearVideoState();
+	void DecoderThreadMain();
+	bool DecodeFrameInternal(SDecodedVideoFrame &OutFrame);
 	bool LoadStaticMedia(const char *pPath, int StorageType);
 	bool LoadVideo(const char *pPath, int StorageType);
-	bool DecodeNextVideoFrame(bool LoopOnEof);
-	bool UploadCurrentVideoFrame(const char *pContextName, int DurationMs);
 	void RenderTextureCover(IGraphics::CTextureHandle Texture, int Width, int Height, float TargetCenterX, float TargetCenterY, float TargetWidth, float TargetHeight);
 
 public:
