@@ -66,14 +66,30 @@ void CMenus::LoadEntities(SCustomEntities *pEntitiesItem, void *pUser)
 	}
 	else
 	{
+		char aFolderPath[IO_MAX_PATH_LENGTH];
+		str_format(aFolderPath, sizeof(aFolderPath), "assets/entities/%s", pEntitiesItem->m_aName);
+		const bool IsFolder = pThis->Storage()->FolderExists(aFolderPath, IStorage::TYPE_ALL);
+
+		bool FallbackLoaded = false;
+		IGraphics::CTextureHandle FallbackTexture;
+
 		for(int i = 0; i < MAP_IMAGE_MOD_TYPE_COUNT; ++i)
 		{
-			str_format(aPath, sizeof(aPath), "assets/entities/%s/%s.png", pEntitiesItem->m_aName, gs_apModEntitiesNames[i]);
-			pEntitiesItem->m_aImages[i].m_Texture = pThis->Graphics()->LoadTexture(aPath, IStorage::TYPE_ALL);
-			if(pEntitiesItem->m_aImages[i].m_Texture.IsNullTexture())
+			if(IsFolder)
 			{
-				str_format(aPath, sizeof(aPath), "assets/entities/%s.png", pEntitiesItem->m_aName);
+				str_format(aPath, sizeof(aPath), "assets/entities/%s/%s.png", pEntitiesItem->m_aName, gs_apModEntitiesNames[i]);
 				pEntitiesItem->m_aImages[i].m_Texture = pThis->Graphics()->LoadTexture(aPath, IStorage::TYPE_ALL);
+			}
+
+			if(!pEntitiesItem->m_aImages[i].m_Texture.IsValid() || pEntitiesItem->m_aImages[i].m_Texture.IsNullTexture())
+			{
+				if(!FallbackLoaded)
+				{
+					str_format(aPath, sizeof(aPath), "assets/entities/%s.png", pEntitiesItem->m_aName);
+					FallbackTexture = pThis->Graphics()->LoadTexture(aPath, IStorage::TYPE_ALL);
+					FallbackLoaded = true;
+				}
+				pEntitiesItem->m_aImages[i].m_Texture = FallbackTexture;
 			}
 			if(!pEntitiesItem->m_RenderTexture.IsValid() || pEntitiesItem->m_RenderTexture.IsNullTexture())
 				pEntitiesItem->m_RenderTexture = pEntitiesItem->m_aImages[i].m_Texture;
@@ -937,10 +953,7 @@ void CMenus::ClearCustomItems(int CurTab)
 	{
 		for(auto &Entity : m_vEntitiesList)
 		{
-			for(auto &Image : Entity.m_aImages)
-			{
-				Graphics()->UnloadTexture(&Image.m_Texture);
-			}
+			AssetsUnloadEntitiesPreview(Entity, Graphics());
 		}
 		m_vEntitiesList.clear();
 
