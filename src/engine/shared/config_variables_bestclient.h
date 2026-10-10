@@ -112,6 +112,7 @@ MACRO_CONFIG_INT(BcPrevInpMousesensSmallSens, bc_prev_inp_mousesens_small_sens, 
 MACRO_CONFIG_INT(BcToggleSmallSens, bc_toggle_small_sens, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use toggle mode for small sens bind")
 
 // Inputs
+MACRO_CONFIG_INT(BcInputDebounce, bc_input_debounce, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Preserve button presses shorter than one simulation tick")
 MACRO_CONFIG_INT(BcInputs, bc_inputs, 0, 0, 6, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Input prediction mode (0 = off, 1 = fast, 2 = best, 3 = saiko, 4 = delta, 5 = f, 6 = cloud)")
 MACRO_CONFIG_INT(BcBestInputAmount, bc_best_input_amount, 0, 0, 1000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Best input prediction amount in 0.01 ticks")
 MACRO_CONFIG_INT(BcBestInputSmoothing, bc_best_input_smoothing, 0, 0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Best input smoothing amount (0-100%)")

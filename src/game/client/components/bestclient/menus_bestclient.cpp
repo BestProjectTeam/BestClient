@@ -2985,7 +2985,7 @@ void CMenus::RenderSettingsBestClientGameplay(CUIRect MainView)
 	const float InputsExpandedTargetHeight = (MarginSmall + LineSize) + InputsModeFieldsHeight;
 	const float InputsExpandedHeight = BC_MODULE_REVEAL(InputsEnabled, InputsExpandedTargetHeight, Client()->RenderFrameTime());
 	const float InputsHeaderHeight = LineSize + MarginSmall + LineSize;
-	const float InputsFooterLines = g_Config.m_ClSubTickAiming ? 2.0f : 3.0f;
+	const float InputsFooterLines = g_Config.m_ClSubTickAiming ? 3.0f : 4.0f;
 	const float InputsBlockHeight = InputsHeaderHeight + InputsExpandedHeight + InputsFooterLines * (MarginSmall + LineSize);
 
 	CUIRect InputsBlock;
@@ -3184,6 +3184,10 @@ void CMenus::RenderSettingsBestClientGameplay(CUIRect MainView)
 	InputsBlock.HSplitTop(MarginSmall, nullptr, &InputsBlock);
 	InputsBlock.HSplitTop(LineSize, &Content, &InputsBlock);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcAutoMargin, BcLocalize("Auto margin"), &g_Config.m_BcAutoMargin, &Content, LineSize);
+
+	InputsBlock.HSplitTop(MarginSmall, nullptr, &InputsBlock);
+	InputsBlock.HSplitTop(LineSize, &Content, &InputsBlock);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcInputDebounce, BcLocalize("Input Debounce"), &g_Config.m_BcInputDebounce, &Content, LineSize);
 
 	LeftColumn.HSplitTop(MarginBetweenViews, nullptr, &LeftColumn);
 
