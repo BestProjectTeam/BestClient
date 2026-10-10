@@ -121,6 +121,15 @@
 	{"Energy motes", SETTINGS_NAV_LEAF_BC_VISUALS, "Hook effects", &g_Config.m_BcGatheredEnergyAmount, &g_Config.m_BcGatheredEnergy},
 
 	{"Weather", SETTINGS_NAV_LEAF_BC_VISUALS, "Visuals", &g_Config.m_BcAtmosphere, nullptr},
+	{"Size", SETTINGS_NAV_LEAF_BC_VISUALS, "Weather", &g_Config.m_BcWeatherSnowSize, &g_Config.m_BcAtmosphere},
+	{"Speed", SETTINGS_NAV_LEAF_BC_VISUALS, "Weather", &g_Config.m_BcWeatherSnowSpeed, &g_Config.m_BcAtmosphere},
+	{"Size", SETTINGS_NAV_LEAF_BC_VISUALS, "Weather", &g_Config.m_BcWeatherRainSize, &g_Config.m_BcAtmosphere},
+	{"Speed", SETTINGS_NAV_LEAF_BC_VISUALS, "Weather", &g_Config.m_BcWeatherRainSpeed, &g_Config.m_BcAtmosphere},
+	{"Tilt", SETTINGS_NAV_LEAF_BC_VISUALS, "Weather", &g_Config.m_BcWeatherRainTilt, &g_Config.m_BcAtmosphere},
+	{"Size", SETTINGS_NAV_LEAF_BC_VISUALS, "Weather", &g_Config.m_BcWeatherFireflySize, &g_Config.m_BcAtmosphere},
+	{"Speed", SETTINGS_NAV_LEAF_BC_VISUALS, "Weather", &g_Config.m_BcWeatherFireflySpeed, &g_Config.m_BcAtmosphere},
+	{"Size", SETTINGS_NAV_LEAF_BC_VISUALS, "Weather", &g_Config.m_BcWeatherDustSize, &g_Config.m_BcAtmosphere},
+	{"Speed", SETTINGS_NAV_LEAF_BC_VISUALS, "Weather", &g_Config.m_BcWeatherDustSpeed, &g_Config.m_BcAtmosphere},
 
 	{"Freeze lifesteal", SETTINGS_NAV_LEAF_BC_VISUALS, "Visuals", &g_Config.m_BcFreezePull, nullptr},
 	{"Shield", SETTINGS_NAV_LEAF_BC_VISUALS, "Freeze lifesteal", &g_Config.m_BcFreezePullShield, &g_Config.m_BcFreezePull},

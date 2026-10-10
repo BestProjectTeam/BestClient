@@ -294,7 +294,10 @@ void CMenus::RenderSettingsBestClientFx(CUIRect &Column, bool HookColumn)
 
 		{
 			const bool Expanded = g_Config.m_BcAtmosphere != 0;
-			const float WeatherExpandedTarget = (g_Config.m_BcWeather == FGF_WEATHER_SNOW ? 4.0f : 3.0f) * Row;
+			float WeatherExpandedRows = 5.0f;
+			if(g_Config.m_BcWeather == FGF_WEATHER_SNOW || g_Config.m_BcWeather == FGF_WEATHER_RAIN)
+				WeatherExpandedRows = 6.0f;
+			const float WeatherExpandedTarget = WeatherExpandedRows * Row;
 			const float ExpandedHeight = BC_MODULE_REVEAL(Expanded, WeatherExpandedTarget, Client()->RenderFrameTime());
 			const float WeatherBlockHeight = LineSize + MarginSmall + LineSize + ExpandedHeight;
 			CUIRect WeatherBlock;
@@ -316,13 +319,22 @@ void CMenus::RenderSettingsBestClientFx(CUIRect &Column, bool HookColumn)
 			{
 				g_Config.m_BcWeather = DefaultConfig::BcWeather;
 				g_Config.m_BcWeatherAmount = DefaultConfig::BcWeatherAmount;
+				g_Config.m_BcWeatherSnowSize = DefaultConfig::BcWeatherSnowSize;
+				g_Config.m_BcWeatherSnowSpeed = DefaultConfig::BcWeatherSnowSpeed;
 				g_Config.m_BcWeatherSnowColor = DefaultConfig::BcWeatherSnowColor;
 				g_Config.m_BcWeatherSnowflakes = DefaultConfig::BcWeatherSnowflakes;
+				g_Config.m_BcWeatherRainSize = DefaultConfig::BcWeatherRainSize;
+				g_Config.m_BcWeatherRainSpeed = DefaultConfig::BcWeatherRainSpeed;
+				g_Config.m_BcWeatherRainTilt = DefaultConfig::BcWeatherRainTilt;
 				g_Config.m_BcWeatherRainColor = DefaultConfig::BcWeatherRainColor;
+				g_Config.m_BcWeatherFireflySize = DefaultConfig::BcWeatherFireflySize;
+				g_Config.m_BcWeatherFireflySpeed = DefaultConfig::BcWeatherFireflySpeed;
 				g_Config.m_BcWeatherFireflyColor = DefaultConfig::BcWeatherFireflyColor;
 				g_Config.m_BcAmbientDust = DefaultConfig::BcAmbientDust;
 				g_Config.m_BcAmbientDustAmount = DefaultConfig::BcAmbientDustAmount;
 				g_Config.m_BcAmbientDustColor = DefaultConfig::BcAmbientDustColor;
+				g_Config.m_BcWeatherDustSize = DefaultConfig::BcWeatherDustSize;
+				g_Config.m_BcWeatherDustSpeed = DefaultConfig::BcWeatherDustSpeed;
 			}
 			GameClient()->m_Tooltips.DoToolTip(&s_WeatherReset, &WeatherResetButton, BcLocalize("Reset to defaults"));
 			static CButtonContainer s_WeatherAuthor;
@@ -349,6 +361,8 @@ void CMenus::RenderSettingsBestClientFx(CUIRect &Column, bool HookColumn)
 				if(g_Config.m_BcWeather == FGF_WEATHER_DUST)
 				{
 					RowSlider(WeatherBlock, &g_Config.m_BcAmbientDustAmount, BcLocalize("Amount"), 25, 200, "%");
+					RowSlider(WeatherBlock, &g_Config.m_BcWeatherDustSize, BcLocalize("Size"), 25, 300, "%");
+					RowSlider(WeatherBlock, &g_Config.m_BcWeatherDustSpeed, BcLocalize("Speed"), 25, 300, "%");
 					static CButtonContainer s_DustColor;
 					RowColor(WeatherBlock, &s_DustColor, BcLocalize("Dust color"), &g_Config.m_BcAmbientDustColor, DefaultConfig::BcAmbientDustColor);
 				}
@@ -357,16 +371,23 @@ void CMenus::RenderSettingsBestClientFx(CUIRect &Column, bool HookColumn)
 					RowSlider(WeatherBlock, &g_Config.m_BcWeatherAmount, BcLocalize("Amount"), 25, 300, "%");
 					if(g_Config.m_BcWeather == FGF_WEATHER_RAIN)
 					{
+						RowSlider(WeatherBlock, &g_Config.m_BcWeatherRainSize, BcLocalize("Size"), 25, 300, "%");
+						RowSlider(WeatherBlock, &g_Config.m_BcWeatherRainSpeed, BcLocalize("Speed"), 25, 300, "%");
+						RowSlider(WeatherBlock, &g_Config.m_BcWeatherRainTilt, BcLocalize("Tilt"), -75, 75, "°");
 						static CButtonContainer s_RainColor;
 						RowColor(WeatherBlock, &s_RainColor, BcLocalize("Rain color"), &g_Config.m_BcWeatherRainColor, DefaultConfig::BcWeatherRainColor);
 					}
 					else if(g_Config.m_BcWeather == FGF_WEATHER_FIREFLIES)
 					{
+						RowSlider(WeatherBlock, &g_Config.m_BcWeatherFireflySize, BcLocalize("Size"), 25, 300, "%");
+						RowSlider(WeatherBlock, &g_Config.m_BcWeatherFireflySpeed, BcLocalize("Speed"), 25, 300, "%");
 						static CButtonContainer s_FireflyColor;
 						RowColor(WeatherBlock, &s_FireflyColor, BcLocalize("Firefly color"), &g_Config.m_BcWeatherFireflyColor, DefaultConfig::BcWeatherFireflyColor);
 					}
 					else
 					{
+						RowSlider(WeatherBlock, &g_Config.m_BcWeatherSnowSize, BcLocalize("Size"), 25, 300, "%");
+						RowSlider(WeatherBlock, &g_Config.m_BcWeatherSnowSpeed, BcLocalize("Speed"), 25, 300, "%");
 						static CUi::SDropDownState s_SnowState;
 						static CScrollRegion s_SnowScroll;
 						const char *apSnow[] = {
