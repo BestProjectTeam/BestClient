@@ -7,11 +7,19 @@
 #include <base/math.h>
 #include <base/mem.h>
 
+#include <engine/engine.h>
 #include <engine/gfx/image_manipulation.h>
 #include <engine/graphics.h>
 #include <engine/map.h>
+#include <engine/shared/jobs.h>
 #include <engine/storage.h>
 #include <engine/textrender.h>
+
+#include <atomic>
+#include <condition_variable>
+#include <memory>
+#include <mutex>
+#include <vector>
 
 #include <generated/client_data.h>
 
@@ -55,6 +63,49 @@ void CMapImages::Unload()
 		Graphics()->UnloadTexture(&m_aTextures[i]);
 	}
 }
+
+namespace {
+
+struct SExternalImageTask
+{
+	int m_Index = -1;
+	int m_LoadFlag = 0;
+	char m_aPath[IO_MAX_PATH_LENGTH]{};
+	CImageInfo m_ImageInfo{};
+	bool m_Success = false;
+};
+
+struct SJobSync
+{
+	std::atomic<int> m_Remaining{0};
+	std::mutex m_Mutex;
+	std::condition_variable m_Cv;
+};
+
+class CMapImageLoadJob : public IJob
+{
+	IGraphics *m_pGraphics;
+	SExternalImageTask *m_pTask;
+	std::shared_ptr<SJobSync> m_pSync;
+
+public:
+	CMapImageLoadJob(IGraphics *pGraphics, SExternalImageTask *pTask, std::shared_ptr<SJobSync> pSync) :
+		m_pGraphics(pGraphics), m_pTask(pTask), m_pSync(std::move(pSync))
+	{
+	}
+
+	void Run() override
+	{
+		m_pTask->m_Success = m_pGraphics->LoadPng(m_pTask->m_ImageInfo, m_pTask->m_aPath, IStorage::TYPE_ALL);
+		if(m_pSync->m_Remaining.fetch_sub(1, std::memory_order_acq_rel) == 1)
+		{
+			std::lock_guard<std::mutex> Lock(m_pSync->m_Mutex);
+			m_pSync->m_Cv.notify_one();
+		}
+	}
+};
+
+} // namespace
 
 void CMapImages::OnMapLoadImpl(class CLayers *pLayers, IMap *pMap)
 {
@@ -102,6 +153,7 @@ void CMapImages::OnMapLoadImpl(class CLayers *pLayers, IMap *pMap)
 
 	// load new textures
 	bool ShowWarning = false;
+	std::vector<std::unique_ptr<SExternalImageTask>> vTasks;
 	for(int i = 0; i < m_Count; i++)
 	{
 		if(aTextureUsedByTileOrQuadLayerFlag[i] == 0)
@@ -147,12 +199,19 @@ void CMapImages::OnMapLoadImpl(class CLayers *pLayers, IMap *pMap)
 					!str_comp(pName, "easter");
 			}
 			str_format(aPath, sizeof(aPath), "mapres/%s%s.png", pName, Translated ? "_0.7" : "");
-			m_aTextures[i] = Graphics()->LoadTexture(aPath, IStorage::TYPE_ALL, LoadFlag);
+			pMap->UnloadData(pImg->m_ImageName);
+
+			auto pTask = std::make_unique<SExternalImageTask>();
+			pTask->m_Index = i;
+			pTask->m_LoadFlag = LoadFlag;
+			str_copy(pTask->m_aPath, aPath);
+			vTasks.push_back(std::move(pTask));
 		}
 		else
 		{
 			if(pImg->m_Width <= 0 || pImg->m_Height <= 0)
 			{
+				pMap->UnloadData(pImg->m_ImageName);
 				log_error("mapimages", "Failed to load map image %d '%s': invalid image dimensions.", i, pName);
 				ShowWarning = true;
 				continue;
@@ -173,14 +232,48 @@ void CMapImages::OnMapLoadImpl(class CLayers *pLayers, IMap *pMap)
 			else
 			{
 				pMap->UnloadData(pImg->m_ImageData);
+				pMap->UnloadData(pImg->m_ImageName);
 				log_error("mapimages", "Failed to load map image %d: failed to load data.", i);
 				ShowWarning = true;
 				continue;
 			}
+			pMap->UnloadData(pImg->m_ImageName);
+			ShowWarning = ShowWarning || m_aTextures[i].IsNullTexture();
 		}
-		pMap->UnloadData(pImg->m_ImageName);
-		ShowWarning = ShowWarning || m_aTextures[i].IsNullTexture();
 	}
+
+	if(!vTasks.empty())
+	{
+		IEngine *pEngine = Engine();
+		if(pEngine && vTasks.size() > 1)
+		{
+			auto pSync = std::make_shared<SJobSync>();
+			pSync->m_Remaining.store((int)vTasks.size(), std::memory_order_relaxed);
+			for(auto &pTask : vTasks)
+			{
+				pEngine->AddJob(std::make_shared<CMapImageLoadJob>(Graphics(), pTask.get(), pSync));
+			}
+			std::unique_lock<std::mutex> Lock(pSync->m_Mutex);
+			pSync->m_Cv.wait(Lock, [&]() { return pSync->m_Remaining.load(std::memory_order_acquire) == 0; });
+		}
+		else
+		{
+			for(auto &pTask : vTasks)
+			{
+				pTask->m_Success = Graphics()->LoadPng(pTask->m_ImageInfo, pTask->m_aPath, IStorage::TYPE_ALL);
+			}
+		}
+
+		for(auto &pTask : vTasks)
+		{
+			if(pTask->m_Success)
+			{
+				m_aTextures[pTask->m_Index] = Graphics()->LoadTextureRawMove(pTask->m_ImageInfo, pTask->m_LoadFlag, pTask->m_aPath);
+			}
+			ShowWarning = ShowWarning || m_aTextures[pTask->m_Index].IsNullTexture();
+		}
+	}
+
 	if(ShowWarning)
 	{
 		Client()->AddWarning(SWarning(Localize("Some map images could not be loaded. Check the local console for details.")));
