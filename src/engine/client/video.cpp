@@ -876,6 +876,14 @@ bool CVideo::AddStream(COutputStream *pStream, AVFormatContext *pFormatContext, 
 {
 	/* find the encoder */
 	*ppCodec = avcodec_find_encoder(CodecId);
+	// bestclient
+	if(!*ppCodec && CodecId == AV_CODEC_ID_H264)
+	{
+		*ppCodec = avcodec_find_encoder(AV_CODEC_ID_MPEG4);
+		if(*ppCodec)
+			CodecId = AV_CODEC_ID_MPEG4;
+	}
+	// bestclient
 	if(!(*ppCodec))
 	{
 		log_error("videorecorder", "Could not find encoder for codec '%s'", avcodec_get_name(CodecId));
@@ -975,13 +983,25 @@ bool CVideo::AddStream(COutputStream *pStream, AVFormatContext *pFormatContext, 
 			 * the motion of the chroma plane does not match the luma plane. */
 			pContext->mb_decision = 2;
 		}
-		if(CodecId == AV_CODEC_ID_H264)
+		// bestclient
+		if(CodecId == AV_CODEC_ID_H264 && pContext->priv_data && av_opt_find(pContext->priv_data, "crf", nullptr, 0, 0))
 		{
 			static const char *s_apPresets[10] = {"ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow", "placebo"};
 			dbg_assert(g_Config.m_ClVideoX264Preset < (int)std::size(s_apPresets), "preset index invalid: %d", g_Config.m_ClVideoX264Preset);
 			dbg_assert(av_opt_set(pContext->priv_data, "preset", s_apPresets[g_Config.m_ClVideoX264Preset], 0) == 0, "invalid option");
 			dbg_assert(av_opt_set_int(pContext->priv_data, "crf", g_Config.m_ClVideoX264Crf, 0) == 0, "invalid option");
 		}
+		else if(CodecId == AV_CODEC_ID_H264 || CodecId == AV_CODEC_ID_MPEG4)
+		{
+			int64_t BitRate = (int64_t)pContext->width * pContext->height * m_FPS / 2;
+			if(BitRate < 16000000)
+				BitRate = 16000000;
+			else if(BitRate > 100000000)
+				BitRate = 100000000;
+			pContext->bit_rate = BitRate;
+			log_info("videorecorder", "Encoding with %s at %d kbps", (*ppCodec)->name, (int)(BitRate / 1000));
+		}
+		// bestclient
 		break;
 
 	default:
