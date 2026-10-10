@@ -77,6 +77,7 @@ public:
 	std::atomic<bool> m_StopRequested{false};
 	std::atomic<bool> m_DecoderFailed{false};
 	moodycamel::ReaderWriterQueue<SDecodedVideoFrame> m_FrameQueue{4};
+	moodycamel::ReaderWriterQueue<std::vector<uint8_t>> m_FreeBufferQueue{4};
 
 	void SetStatus(const char *pText);
 	void SetError(const char *pText);

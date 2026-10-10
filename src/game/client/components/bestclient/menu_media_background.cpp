@@ -222,6 +222,10 @@ void CMenuMediaBackground::ClearVideoState()
 	while(m_FrameQueue.try_dequeue(Dummy))
 	{
 	}
+	std::vector<uint8_t> DummyBuf;
+	while(m_FreeBufferQueue.try_dequeue(DummyBuf))
+	{
+	}
 
 	if(m_pGraphics != nullptr)
 		m_pGraphics->UnloadTexture(&m_VideoTexture);
@@ -476,6 +480,10 @@ void CMenuMediaBackground::DecoderThreadMain()
 		}
 
 		SDecodedVideoFrame Frame;
+		std::vector<uint8_t> RecycledBuffer;
+		if(m_FreeBufferQueue.try_dequeue(RecycledBuffer))
+			Frame.m_vData = std::move(RecycledBuffer);
+
 		if(!DecodeFrameInternal(Frame))
 		{
 			m_DecoderFailed.store(true, std::memory_order_relaxed);
@@ -665,9 +673,10 @@ void CMenuMediaBackground::Update()
 	if(!m_IsLoaded || !m_IsVideo)
 		return;
 
-	const auto Now = time_get_nanoseconds();
 	if(!CSubsystemTicker::ShouldRunPeriodic(time_get(), m_LastDecodeStepTick, time_freq() / 120))
 		return;
+
+	const auto Now = time_get_nanoseconds();
 
 	if(m_DecoderFailed.load(std::memory_order_relaxed))
 	{
@@ -687,6 +696,7 @@ void CMenuMediaBackground::Update()
 				m_pGraphics->UpdateTextureRaw(m_VideoTexture, 0, 0, m_Width, m_Height, Frame.m_vData.data(), false);
 				m_NextFrameTime = Now + std::chrono::milliseconds(std::clamp(Frame.m_DurationMs, 1, MENU_MEDIA_MAX_VIDEO_FRAME_MS));
 			}
+			m_FreeBufferQueue.try_enqueue(std::move(Frame.m_vData));
 		}
 	}
 }

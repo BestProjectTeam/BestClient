@@ -173,9 +173,19 @@ TEST(Thread, SeqlockVisualizerConcurrentReadWrite)
 		do
 		{
 			Seq1 = Seq.load(std::memory_order_acquire);
+			int Spins = 0;
 			while(Seq1 & 1)
 			{
-				std::this_thread::yield();
+				if(++Spins > 32)
+				{
+					std::this_thread::yield();
+					break;
+				}
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+				__builtin_ia32_pause();
+#else
+				std::atomic_thread_fence(std::memory_order_relaxed);
+#endif
 				Seq1 = Seq.load(std::memory_order_acquire);
 			}
 			LocalCopy = SharedData;

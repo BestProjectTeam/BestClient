@@ -50,6 +50,9 @@ bool SendLine(NETSOCKET Socket, const char *pLine)
 
 void CTwitchChat::OnUpdate()
 {
+	if(!m_WorkerRunning.load(std::memory_order_relaxed))
+		return;
+
 	FlushChatMessages();
 }
 
@@ -111,11 +114,13 @@ void CTwitchChat::QueueChatMessage(const char *pName, const char *pText)
 void CTwitchChat::FlushChatMessages()
 {
 	SQueuedMessage Message;
-	while(m_MessageQueue.try_dequeue(Message))
+	int Count = 0;
+	while(Count < 16 && m_MessageQueue.try_dequeue(Message))
 	{
 		char aLine[MAX_CHAT_LENGTH];
 		str_format(aLine, sizeof(aLine), "%s: %s", Message.m_Name.c_str(), Message.m_Text.c_str());
 		GameClient()->m_Chat.AddColoredLine(aLine, TWITCH_CHAT_COLOR);
+		++Count;
 	}
 }
 
