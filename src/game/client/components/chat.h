@@ -193,6 +193,7 @@ class CChat : public CComponent
 	CButtonContainer m_TranslateSettingsOutgoingButton;
 	CButtonContainer m_TranslateSettingsPunctuationButton;
 	SPopupMenuId m_TranslateSettingsPopupId;
+	bool m_TranslateSettingsInputActive = false;
 	bool m_TranslateButtonPressed = false;
 	bool m_TranslateButtonRectValid = false;
 	CUIRect m_TranslateButtonRect;

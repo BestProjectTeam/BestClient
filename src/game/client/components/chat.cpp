@@ -476,7 +476,11 @@ CUi::EPopupMenuFunctionResult CChat::PopupTranslateSettings(void *pContext, CUIR
 		pChat->Ui()->DoLabel(&Label, Localize("API key"), FontSize, TEXTALIGN_ML);
 		pChat->Ui()->DoEditBox(&s_TranslateKey, &Row, FontSize);
 		View.HSplitTop(Gap, nullptr, &View);
+		pChat->m_TranslateSettingsInputActive = s_TranslateEndpoint.IsActive() || s_TranslateKey.IsActive() ||
+			pChat->Ui()->ActiveItem() == &s_TranslateEndpoint || pChat->Ui()->ActiveItem() == &s_TranslateKey;
 	}
+	else
+		pChat->m_TranslateSettingsInputActive = false;
 	View.HSplitTop(RowHeight, &Row, &View);
 	Row.VSplitLeft(90.0f, nullptr, &Row);
 	const int NewBackendIndex = pChat->Ui()->DoDropDown(&Row, BackendIndex, BackendNames.data(), BackendNames.size(), s_BackendState, true);
@@ -1726,7 +1730,15 @@ void CChat::OnRender()
 		float ScrollOffset = m_Input.GetScrollOffset();
 		float ScrollOffsetChange = m_Input.GetScrollOffsetChange();
 
-		m_Input.Activate(EInputPriority::CHAT); // Ensure that the input is active
+		// bestclient
+		if(m_TranslateSettingsInputActive && Ui()->IsPopupOpen(&m_TranslateSettingsPopupId))
+			m_Input.Deactivate();
+		else
+		{
+			m_TranslateSettingsInputActive = false;
+			m_Input.Activate(EInputPriority::CHAT);
+		}
+		// bestclient
 		const CUIRect InputCursorRect = {InputCursor.m_X, InputCursor.m_Y - ScrollOffset, 0.0f, 0.0f};
 		const bool WasChanged = m_Input.WasChanged();
 		const bool WasCursorChanged = m_Input.WasCursorChanged();
