@@ -1464,8 +1464,7 @@ void CMenus::RenderSettingsAssets(CUIRect MainView)
 				if(!Texture.IsValid())
 					Texture = pItem->m_RenderTexture;
 
-				const ColorRGBA EntitiesBackground = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClBackgroundEntitiesColor));
-				BestClientBetterPreview::RenderEntities(Graphics(), Texture, TextureRect, TextureWidth, EntitiesBackground);
+				BestClientBetterPreview::RenderEntities(Graphics(), Texture, TextureRect, TextureWidth);
 			}
 			else if(pItem->m_RenderTexture.IsValid())
 			// bestclient

@@ -11,7 +11,7 @@
 namespace BestClientBetterPreview
 {
 
-void RenderEntities(IGraphics *pGraphics, const IGraphics::CTextureHandle &Texture, const CUIRect &TextureRect, float TextureWidth, ColorRGBA Background)
+void RenderEntities(IGraphics *pGraphics, const IGraphics::CTextureHandle &Texture, const CUIRect &TextureRect, float TextureWidth)
 {
 	if(!Texture.IsValid())
 		return;
@@ -37,12 +37,6 @@ void RenderEntities(IGraphics *pGraphics, const IGraphics::CTextureHandle &Textu
 
 	const float Inset = 1.5f / 1024.0f;
 	const float TileUvSize = 1.0f / 16.0f;
-
-	if(Background.a > 0.0f)
-	{
-		const CUIRect BackdropRect = {OffX, OffY, GridW, GridH};
-		BackdropRect.Draw(Background, IGraphics::CORNER_NONE, 0.0f);
-	}
 
 	pGraphics->WrapClamp();
 	pGraphics->TextureSet(Texture);
