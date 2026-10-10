@@ -1464,8 +1464,6 @@ CUi::EPopupMenuFunctionResult CScoreboard::CScoreboardPopupContext::Render(void 
 	// bestclient
 	if(!pPopupContext->m_IsLocal && g_Config.m_BcVoiceChatEnable)
 	{
-		const float ItemSpacing = 2.0f;
-		const float ButtonSize = 17.5f;
 		View.HSplitTop(ItemSpacing * 2, nullptr, &View);
 		View.HSplitTop(ButtonSize, &Container, &View);
 		const bool VoiceMuted = pScoreboard->GameClient()->m_VoiceChat.IsNameMuted(Client.m_aName);

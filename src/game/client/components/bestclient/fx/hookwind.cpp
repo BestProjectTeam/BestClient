@@ -377,7 +377,7 @@ void CHookWind::Draw(ColorRGBA Tint, float Scale)
 		const float Radius = mix(6.0f, 16.0f, Grip.m_Charge) * Scale * (0.3f + 0.7f * Grip.m_Fade);
 		for(int Arc = 0; Arc < NUM_EYE_ARCS; Arc++)
 		{
-			DrawArc(Grip.m_Pos, Radius, State.m_EyeAngle + Arc * 2.0f * pi / NUM_EYE_ARCS, 1.5f, mix(1.6f, 2.8f, Grip.m_Charge) * Scale * Thickness, 0.5f, State.m_Spin,
+			DrawArc(Grip.m_Pos, Radius, State.m_EyeAngle + Arc * 2.0f * pi / (float)NUM_EYE_ARCS, 1.5f, mix(1.6f, 2.8f, Grip.m_Charge) * Scale * Thickness, 0.5f, State.m_Spin,
 				Tint.WithAlpha(mix(0.4f, 0.8f, Grip.m_Charge) * Grip.m_Fade * Grip.m_Alpha * Opacity));
 		}
 	}

@@ -32,6 +32,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cctype>
 #include <chrono>
 #include <cmath>
@@ -1387,13 +1388,6 @@ namespace
 		return Snapshot.m_Title.empty() ? Localize("No media") : Snapshot.m_Title;
 	}
 
-	static std::string MusicPlayerMiniText(const SNowPlayingSnapshot &Snapshot, const SGameTimerDisplay &GameTimer)
-	{
-		if(GameTimer.m_Valid)
-			return GameTimer.m_Text;
-		return MusicPlayerPrimaryText(Snapshot);
-	}
-
 	static std::string MusicPlayerReferenceDigits(std::string Text)
 	{
 		for(char &Char : Text)
@@ -2072,11 +2066,6 @@ namespace
 		return DefaultPreviewAccentForColorMode(g_Config.m_BcMusicPlayerColorMode);
 	}
 
-	static SMusicPlayerPalette DefaultMusicPlayerThemePalette()
-	{
-		return BuildPaletteFromAccent(DefaultMusicPlayerAccent());
-	}
-
 	static ColorRGBA MusicPlayerPanelColor()
 	{
 		return ColorRGBA(0.0f, 0.0f, 0.0f, 0.4f);
@@ -2707,6 +2696,7 @@ public:
 		{
 			m_aLevels.fill(0.18f);
 			m_aPublished.fill(0.18f);
+			m_PublishSeq.store(0, std::memory_order_relaxed);
 			m_LastStep = std::chrono::steady_clock::now();
 			m_Thread = std::thread([this]() { ThreadMain(); });
 		}
@@ -2735,7 +2725,7 @@ public:
 				std::lock_guard<std::mutex> Lock(m_Mutex);
 				if(m_Shutdown)
 					return;
-				m_aPublished.fill(0.18f);
+				PublishDefault();
 				m_Reset = true;
 			}
 			m_Cv.notify_one();
@@ -2755,11 +2745,49 @@ public:
 
 		std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> Levels() const
 		{
-			std::lock_guard<std::mutex> Lock(m_Mutex);
-			return m_aPublished;
+			std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> Result{};
+			uint32_t Seq1 = 0;
+			uint32_t Seq2 = 0;
+			do
+			{
+				Seq1 = m_PublishSeq.load(std::memory_order_acquire);
+				int Spins = 0;
+				while(Seq1 & 1)
+				{
+					if(++Spins > 32)
+					{
+						std::this_thread::yield();
+						break;
+					}
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+					__builtin_ia32_pause();
+#else
+					std::atomic_thread_fence(std::memory_order_relaxed);
+#endif
+					Seq1 = m_PublishSeq.load(std::memory_order_acquire);
+				}
+				Result = m_aPublished;
+				std::atomic_thread_fence(std::memory_order_acquire);
+				Seq2 = m_PublishSeq.load(std::memory_order_relaxed);
+			} while(Seq1 != Seq2);
+			return Result;
 		}
 
 	private:
+		void PublishLevels(const std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> &Levels)
+		{
+			m_PublishSeq.fetch_add(1, std::memory_order_acq_rel);
+			m_aPublished = Levels;
+			m_PublishSeq.fetch_add(1, std::memory_order_release);
+		}
+
+		void PublishDefault()
+		{
+			std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> Default{};
+			Default.fill(0.18f);
+			PublishLevels(Default);
+		}
+
 		void ThreadMain()
 		{
 			while(true)
@@ -2790,9 +2818,8 @@ public:
 				if(HasInput)
 					AdvanceVisualizerLevels(m_aLevels, Input, Delta);
 
-				std::lock_guard<std::mutex> Lock(m_Mutex);
-				if(!m_Reset)
-					m_aPublished = m_aLevels;
+				if(!Reset)
+					PublishLevels(m_aLevels);
 			}
 		}
 
@@ -2804,6 +2831,8 @@ public:
 		bool m_Reset = false;
 		SVisualizerLevelInput m_Input;
 		std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> m_aLevels{};
+
+		mutable std::atomic<uint32_t> m_PublishSeq{0};
 		std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> m_aPublished{};
 		std::chrono::steady_clock::time_point m_LastStep{};
 	};
@@ -3593,7 +3622,7 @@ public:
 		const float MiniTextSlotWidthBase = ComputeMiniTextSlotWidth(pOwner->TextRender(), m_Snapshot, GameTimer, MiniTitleFont, CompactScale, CompactWidthScale, false);
 		const float CompactTextSlotWidthLyrics = CMusicPlayerLyrics::LyricsTextSlotWidth(CompactScale, CompactWidthScale);
 		const float MiniTextSlotWidthLyrics = CMusicPlayerLyrics::LyricsTextSlotWidth(CompactScale, CompactWidthScale);
-		float CompactTextSlotWidth = CompactTextSlotWidthBase;
+		float CompactTextSlotWidth [[maybe_unused]] = CompactTextSlotWidthBase;
 		float MiniTextSlotWidth = MiniTextSlotWidthBase;
 		const CUIRect UiScreen = *pOwner->Ui()->Screen();
 		if(UiScreen.w <= 0.0f || UiScreen.h <= 0.0f)
@@ -3991,7 +4020,6 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	const float MiniTitleFont = 6.0f * LayoutScale * TextScale;
 	const bool LyricsEnabled = !ForcePreview && g_Config.m_BcMusicPlayerShowLyrics != 0;
 	const float MiniTextSlotWidth = ComputeMiniTextSlotWidth(TextRender(), Snapshot, GameTimer, MiniTitleFont, LayoutScale, LayoutWidthScale, LyricsEnabled);
-	const float MiniTextSlotWidthBase = ComputeMiniTextSlotWidth(TextRender(), Snapshot, GameTimer, MiniTitleFont, LayoutScale, LayoutWidthScale, false);
 	const int NumBars = MusicPlayerVisualizerColumns();
 
 	const CUIRect UiScreen = *Ui()->Screen();

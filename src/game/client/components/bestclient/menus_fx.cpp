@@ -282,9 +282,9 @@ void CMenus::RenderSettingsBestClientFx(CUIRect &Column, bool HookColumn)
 		RowCheck(EffectsBlock, &g_Config.m_BcGatheredEnergy, BcLocalize("Hook hold"));
 		if(HoldHeight > 0.5f)
 		{
-			CUIRect Visible = EffectsBlock;
-			Visible.h = HoldHeight;
-			Ui()->ClipEnable(&Visible);
+			CUIRect VisibleEffects = EffectsBlock;
+			VisibleEffects.h = HoldHeight;
+			Ui()->ClipEnable(&VisibleEffects);
 			RowCheck(EffectsBlock, &g_Config.m_BcGatheredEnergyAura, BcLocalize("Hold aura"));
 			RowCheck(EffectsBlock, &g_Config.m_BcGatheredEnergyBurst, BcLocalize("Hold burst"));
 			RowSlider(EffectsBlock, &g_Config.m_BcGatheredEnergyAmount, BcLocalize("Energy motes"), 25, 300, "%");
@@ -295,25 +295,25 @@ void CMenus::RenderSettingsBestClientFx(CUIRect &Column, bool HookColumn)
 
 		{
 			const bool Expanded = g_Config.m_BcAtmosphere != 0;
-			const float ExpandedTarget = (g_Config.m_BcWeather == FGF_WEATHER_SNOW ? 4.0f : 3.0f) * Row;
-			const float ExpandedHeight = BC_MODULE_REVEAL(Expanded, ExpandedTarget, Client()->RenderFrameTime());
-			const float BlockHeight = LineSize + MarginSmall + LineSize + ExpandedHeight;
-			CUIRect Block;
-			Column.HSplitTop(BlockHeight, &Block, &Column);
-			CUIRect BlockBg = Block;
-			BlockBg.w += BlockPadding;
-			BlockBg.h += BlockPadding;
-			BlockBg.x -= BlockPadding * 0.5f;
-			BlockBg.y -= BlockPadding * 0.5f;
-			BestClientUiTheme::DrawUiBlock(&BlockBg, IGraphics::CORNER_ALL, 10.0f);
-			BestClientSettingsSearch::DrawBlockHighlight(&g_Config.m_BcAtmosphere, &BlockBg);
+			const float WeatherExpandedTarget = (g_Config.m_BcWeather == FGF_WEATHER_SNOW ? 4.0f : 3.0f) * Row;
+			const float ExpandedHeight = BC_MODULE_REVEAL(Expanded, WeatherExpandedTarget, Client()->RenderFrameTime());
+			const float WeatherBlockHeight = LineSize + MarginSmall + LineSize + ExpandedHeight;
+			CUIRect WeatherBlock;
+			Column.HSplitTop(WeatherBlockHeight, &WeatherBlock, &Column);
+			CUIRect WeatherBg = WeatherBlock;
+			WeatherBg.w += BlockPadding;
+			WeatherBg.h += BlockPadding;
+			WeatherBg.x -= BlockPadding * 0.5f;
+			WeatherBg.y -= BlockPadding * 0.5f;
+			BestClientUiTheme::DrawUiBlock(&WeatherBg, IGraphics::CORNER_ALL, 10.0f);
+			BestClientSettingsSearch::DrawBlockHighlight(&g_Config.m_BcAtmosphere, &WeatherBg);
 
-			CUIRect Label;
-			Block.HSplitTop(LineSize, &Label, &Block);
-			CUIRect Title, ResetButton;
-			Label.VSplitRight(LineSize + 8.0f, &Title, &ResetButton);
-			static CButtonContainer s_Reset;
-			if(Ui()->DoButton_FontIcon(&s_Reset, FontIcon::ARROW_ROTATE_LEFT, 0, &ResetButton, BUTTONFLAG_LEFT))
+			CUIRect WeatherLabel;
+			WeatherBlock.HSplitTop(LineSize, &WeatherLabel, &WeatherBlock);
+			CUIRect WeatherTitle, WeatherResetButton;
+			WeatherLabel.VSplitRight(LineSize + 8.0f, &WeatherTitle, &WeatherResetButton);
+			static CButtonContainer s_WeatherReset;
+			if(Ui()->DoButton_FontIcon(&s_WeatherReset, FontIcon::ARROW_ROTATE_LEFT, 0, &WeatherResetButton, BUTTONFLAG_LEFT))
 			{
 				g_Config.m_BcWeather = DefaultConfig::BcWeather;
 				g_Config.m_BcWeatherAmount = DefaultConfig::BcWeatherAmount;
@@ -325,18 +325,18 @@ void CMenus::RenderSettingsBestClientFx(CUIRect &Column, bool HookColumn)
 				g_Config.m_BcAmbientDustAmount = DefaultConfig::BcAmbientDustAmount;
 				g_Config.m_BcAmbientDustColor = DefaultConfig::BcAmbientDustColor;
 			}
-			GameClient()->m_Tooltips.DoToolTip(&s_Reset, &ResetButton, BcLocalize("Reset to defaults"));
+			GameClient()->m_Tooltips.DoToolTip(&s_WeatherReset, &WeatherResetButton, BcLocalize("Reset to defaults"));
 			static CButtonContainer s_WeatherAuthor;
-			DrawFxTitle(Title, BcLocalize("Weather"), &s_WeatherAuthor);
-			Block.HSplitTop(MarginSmall, nullptr, &Block);
+			DrawFxTitle(WeatherTitle, BcLocalize("Weather"), &s_WeatherAuthor);
+			WeatherBlock.HSplitTop(MarginSmall, nullptr, &WeatherBlock);
 			CUIRect Enable;
-			Block.HSplitTop(LineSize, &Enable, &Block);
+			WeatherBlock.HSplitTop(LineSize, &Enable, &WeatherBlock);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcAtmosphere, BcLocalize("Enable"), &g_Config.m_BcAtmosphere, &Enable, LineSize);
 			if(ExpandedHeight > 0.5f)
 			{
-				CUIRect Visible = Block;
-				Visible.h = ExpandedHeight;
-				Ui()->ClipEnable(&Visible);
+				CUIRect WeatherVisible = WeatherBlock;
+				WeatherVisible.h = ExpandedHeight;
+				Ui()->ClipEnable(&WeatherVisible);
 				static CUi::SDropDownState s_WeatherState;
 				static CScrollRegion s_WeatherScroll;
 				const char *apWeather[] = {
@@ -346,25 +346,25 @@ void CMenus::RenderSettingsBestClientFx(CUIRect &Column, bool HookColumn)
 					BcLocalize("Dust"),
 				};
 				g_Config.m_BcWeather = std::clamp(g_Config.m_BcWeather, 0, (int)FGF_WEATHER_DUST);
-				RowDropDown(Block, BcLocalize("Weather"), g_Config.m_BcWeather, apWeather, (int)std::size(apWeather), s_WeatherState, s_WeatherScroll);
+				RowDropDown(WeatherBlock, BcLocalize("Weather"), g_Config.m_BcWeather, apWeather, (int)std::size(apWeather), s_WeatherState, s_WeatherScroll);
 				if(g_Config.m_BcWeather == FGF_WEATHER_DUST)
 				{
-					RowSlider(Block, &g_Config.m_BcAmbientDustAmount, BcLocalize("Amount"), 25, 200, "%");
+					RowSlider(WeatherBlock, &g_Config.m_BcAmbientDustAmount, BcLocalize("Amount"), 25, 200, "%");
 					static CButtonContainer s_DustColor;
-					RowColor(Block, &s_DustColor, BcLocalize("Dust color"), &g_Config.m_BcAmbientDustColor, DefaultConfig::BcAmbientDustColor);
+					RowColor(WeatherBlock, &s_DustColor, BcLocalize("Dust color"), &g_Config.m_BcAmbientDustColor, DefaultConfig::BcAmbientDustColor);
 				}
 				else
 				{
-					RowSlider(Block, &g_Config.m_BcWeatherAmount, BcLocalize("Amount"), 25, 300, "%");
+					RowSlider(WeatherBlock, &g_Config.m_BcWeatherAmount, BcLocalize("Amount"), 25, 300, "%");
 					if(g_Config.m_BcWeather == FGF_WEATHER_RAIN)
 					{
 						static CButtonContainer s_RainColor;
-						RowColor(Block, &s_RainColor, BcLocalize("Rain color"), &g_Config.m_BcWeatherRainColor, DefaultConfig::BcWeatherRainColor);
+						RowColor(WeatherBlock, &s_RainColor, BcLocalize("Rain color"), &g_Config.m_BcWeatherRainColor, DefaultConfig::BcWeatherRainColor);
 					}
 					else if(g_Config.m_BcWeather == FGF_WEATHER_FIREFLIES)
 					{
 						static CButtonContainer s_FireflyColor;
-						RowColor(Block, &s_FireflyColor, BcLocalize("Firefly color"), &g_Config.m_BcWeatherFireflyColor, DefaultConfig::BcWeatherFireflyColor);
+						RowColor(WeatherBlock, &s_FireflyColor, BcLocalize("Firefly color"), &g_Config.m_BcWeatherFireflyColor, DefaultConfig::BcWeatherFireflyColor);
 					}
 					else
 					{
@@ -375,9 +375,9 @@ void CMenus::RenderSettingsBestClientFx(CUIRect &Column, bool HookColumn)
 							BcLocalize("Snowflakes"),
 						};
 						g_Config.m_BcWeatherSnowflakes = std::clamp(g_Config.m_BcWeatherSnowflakes, 0, 1);
-						RowDropDown(Block, BcLocalize("Snow"), g_Config.m_BcWeatherSnowflakes, apSnow, (int)std::size(apSnow), s_SnowState, s_SnowScroll);
+						RowDropDown(WeatherBlock, BcLocalize("Snow"), g_Config.m_BcWeatherSnowflakes, apSnow, (int)std::size(apSnow), s_SnowState, s_SnowScroll);
 						static CButtonContainer s_SnowColor;
-						RowColor(Block, &s_SnowColor, BcLocalize("Snow color"), &g_Config.m_BcWeatherSnowColor, DefaultConfig::BcWeatherSnowColor);
+						RowColor(WeatherBlock, &s_SnowColor, BcLocalize("Snow color"), &g_Config.m_BcWeatherSnowColor, DefaultConfig::BcWeatherSnowColor);
 					}
 				}
 				Ui()->ClipDisable();
@@ -389,25 +389,25 @@ void CMenus::RenderSettingsBestClientFx(CUIRect &Column, bool HookColumn)
 	{
 		const bool Expanded = g_Config.m_BcFreezePull != 0;
 		const bool ShowColdColor = g_Config.m_BcFreezePullHookColor == 0;
-		const float ExpandedTarget = (5.0f + (ShowColdColor ? 1.0f : 0.0f)) * Row;
-		const float ExpandedHeight = BC_MODULE_REVEAL(Expanded, ExpandedTarget, Client()->RenderFrameTime());
-		const float BlockHeight = LineSize + MarginSmall + LineSize + ExpandedHeight;
-		CUIRect Block;
-		Column.HSplitTop(BlockHeight, &Block, &Column);
-		CUIRect BlockBg = Block;
-		BlockBg.w += BlockPadding;
-		BlockBg.h += BlockPadding;
-		BlockBg.x -= BlockPadding * 0.5f;
-		BlockBg.y -= BlockPadding * 0.5f;
-		BestClientUiTheme::DrawUiBlock(&BlockBg, IGraphics::CORNER_ALL, 10.0f);
-		BestClientSettingsSearch::DrawBlockHighlight(&g_Config.m_BcFreezePull, &BlockBg);
+		const float PullExpandedTarget = (5.0f + (ShowColdColor ? 1.0f : 0.0f)) * Row;
+		const float ExpandedHeight = BC_MODULE_REVEAL(Expanded, PullExpandedTarget, Client()->RenderFrameTime());
+		const float PullBlockHeight = LineSize + MarginSmall + LineSize + ExpandedHeight;
+		CUIRect PullBlock;
+		Column.HSplitTop(PullBlockHeight, &PullBlock, &Column);
+		CUIRect PullBg = PullBlock;
+		PullBg.w += BlockPadding;
+		PullBg.h += BlockPadding;
+		PullBg.x -= BlockPadding * 0.5f;
+		PullBg.y -= BlockPadding * 0.5f;
+		BestClientUiTheme::DrawUiBlock(&PullBg, IGraphics::CORNER_ALL, 10.0f);
+		BestClientSettingsSearch::DrawBlockHighlight(&g_Config.m_BcFreezePull, &PullBg);
 
-		CUIRect Label;
-		Block.HSplitTop(LineSize, &Label, &Block);
-		CUIRect Title, ResetButton;
-		Label.VSplitRight(LineSize + 8.0f, &Title, &ResetButton);
-		static CButtonContainer s_Reset;
-		if(Ui()->DoButton_FontIcon(&s_Reset, FontIcon::ARROW_ROTATE_LEFT, 0, &ResetButton, BUTTONFLAG_LEFT))
+		CUIRect PullLabel;
+		PullBlock.HSplitTop(LineSize, &PullLabel, &PullBlock);
+		CUIRect PullTitle, PullResetButton;
+		PullLabel.VSplitRight(LineSize + 8.0f, &PullTitle, &PullResetButton);
+		static CButtonContainer s_PullReset;
+		if(Ui()->DoButton_FontIcon(&s_PullReset, FontIcon::ARROW_ROTATE_LEFT, 0, &PullResetButton, BUTTONFLAG_LEFT))
 		{
 			g_Config.m_BcFreezePullShield = DefaultConfig::BcFreezePullShield;
 			g_Config.m_BcFreezePullRange = DefaultConfig::BcFreezePullRange;
@@ -416,27 +416,27 @@ void CMenus::RenderSettingsBestClientFx(CUIRect &Column, bool HookColumn)
 			g_Config.m_BcFreezePullColor = DefaultConfig::BcFreezePullColor;
 			g_Config.m_BcFreezePullHookColor = DefaultConfig::BcFreezePullHookColor;
 		}
-		GameClient()->m_Tooltips.DoToolTip(&s_Reset, &ResetButton, BcLocalize("Reset to defaults"));
+		GameClient()->m_Tooltips.DoToolTip(&s_PullReset, &PullResetButton, BcLocalize("Reset to defaults"));
 		static CButtonContainer s_PullAuthor;
-		DrawFxTitle(Title, BcLocalize("Freeze lifesteal"), &s_PullAuthor);
-		Block.HSplitTop(MarginSmall, nullptr, &Block);
+		DrawFxTitle(PullTitle, BcLocalize("Freeze lifesteal"), &s_PullAuthor);
+		PullBlock.HSplitTop(MarginSmall, nullptr, &PullBlock);
 		CUIRect Enable;
-		Block.HSplitTop(LineSize, &Enable, &Block);
+		PullBlock.HSplitTop(LineSize, &Enable, &PullBlock);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcFreezePull, BcLocalize("Enable"), &g_Config.m_BcFreezePull, &Enable, LineSize);
 		if(ExpandedHeight > 0.5f)
 		{
-			CUIRect Visible = Block;
-			Visible.h = ExpandedHeight;
-			Ui()->ClipEnable(&Visible);
-			RowCheck(Block, &g_Config.m_BcFreezePullShield, BcLocalize("Shield"));
-			RowSlider(Block, &g_Config.m_BcFreezePullRange, BcLocalize("Reach"), 60, 260, "");
-			RowSlider(Block, &g_Config.m_BcFreezePullStrands, BcLocalize("Amount"), 1, 8, "");
-			RowSlider(Block, &g_Config.m_BcFreezePullSparks, BcLocalize("Frost"), 0, 300, "%");
-			RowCheck(Block, &g_Config.m_BcFreezePullHookColor, BcLocalize("Custom hook color"));
+			CUIRect PullVisible = PullBlock;
+			PullVisible.h = ExpandedHeight;
+			Ui()->ClipEnable(&PullVisible);
+			RowCheck(PullBlock, &g_Config.m_BcFreezePullShield, BcLocalize("Shield"));
+			RowSlider(PullBlock, &g_Config.m_BcFreezePullRange, BcLocalize("Reach"), 60, 260, "");
+			RowSlider(PullBlock, &g_Config.m_BcFreezePullStrands, BcLocalize("Amount"), 1, 8, "");
+			RowSlider(PullBlock, &g_Config.m_BcFreezePullSparks, BcLocalize("Frost"), 0, 300, "%");
+			RowCheck(PullBlock, &g_Config.m_BcFreezePullHookColor, BcLocalize("Custom hook color"));
 			if(ShowColdColor)
 			{
 				static CButtonContainer s_Color;
-				RowColor(Block, &s_Color, BcLocalize("Cold color"), &g_Config.m_BcFreezePullColor, DefaultConfig::BcFreezePullColor);
+				RowColor(PullBlock, &s_Color, BcLocalize("Cold color"), &g_Config.m_BcFreezePullColor, DefaultConfig::BcFreezePullColor);
 			}
 			Ui()->ClipDisable();
 		}
@@ -446,25 +446,25 @@ void CMenus::RenderSettingsBestClientFx(CUIRect &Column, bool HookColumn)
 
 	{
 		const bool Expanded = g_Config.m_BcFreezeLightning != 0;
-		const float ExpandedTarget = 7.0f * Row;
-		const float ExpandedHeight = BC_MODULE_REVEAL(Expanded, ExpandedTarget, Client()->RenderFrameTime());
-		const float BlockHeight = LineSize + MarginSmall + LineSize + ExpandedHeight;
-		CUIRect Block;
-		Column.HSplitTop(BlockHeight, &Block, &Column);
-		CUIRect BlockBg = Block;
-		BlockBg.w += BlockPadding;
-		BlockBg.h += BlockPadding;
-		BlockBg.x -= BlockPadding * 0.5f;
-		BlockBg.y -= BlockPadding * 0.5f;
-		BestClientUiTheme::DrawUiBlock(&BlockBg, IGraphics::CORNER_ALL, 10.0f);
-		BestClientSettingsSearch::DrawBlockHighlight(&g_Config.m_BcFreezeLightning, &BlockBg);
+		const float BoltExpandedTarget = 7.0f * Row;
+		const float ExpandedHeight = BC_MODULE_REVEAL(Expanded, BoltExpandedTarget, Client()->RenderFrameTime());
+		const float BoltBlockHeight = LineSize + MarginSmall + LineSize + ExpandedHeight;
+		CUIRect BoltBlock;
+		Column.HSplitTop(BoltBlockHeight, &BoltBlock, &Column);
+		CUIRect BoltBg = BoltBlock;
+		BoltBg.w += BlockPadding;
+		BoltBg.h += BlockPadding;
+		BoltBg.x -= BlockPadding * 0.5f;
+		BoltBg.y -= BlockPadding * 0.5f;
+		BestClientUiTheme::DrawUiBlock(&BoltBg, IGraphics::CORNER_ALL, 10.0f);
+		BestClientSettingsSearch::DrawBlockHighlight(&g_Config.m_BcFreezeLightning, &BoltBg);
 
-		CUIRect Label;
-		Block.HSplitTop(LineSize, &Label, &Block);
-		CUIRect Title, ResetButton;
-		Label.VSplitRight(LineSize + 8.0f, &Title, &ResetButton);
-		static CButtonContainer s_Reset;
-		if(Ui()->DoButton_FontIcon(&s_Reset, FontIcon::ARROW_ROTATE_LEFT, 0, &ResetButton, BUTTONFLAG_LEFT))
+		CUIRect BoltLabel;
+		BoltBlock.HSplitTop(LineSize, &BoltLabel, &BoltBlock);
+		CUIRect BoltTitle, BoltResetButton;
+		BoltLabel.VSplitRight(LineSize + 8.0f, &BoltTitle, &BoltResetButton);
+		static CButtonContainer s_BoltReset;
+		if(Ui()->DoButton_FontIcon(&s_BoltReset, FontIcon::ARROW_ROTATE_LEFT, 0, &BoltResetButton, BUTTONFLAG_LEFT))
 		{
 			g_Config.m_BcFreezeLightningImpact = DefaultConfig::BcFreezeLightningImpact;
 			g_Config.m_BcFreezeLightningHeight = DefaultConfig::BcFreezeLightningHeight;
@@ -473,29 +473,29 @@ void CMenus::RenderSettingsBestClientFx(CUIRect &Column, bool HookColumn)
 			g_Config.m_BcFreezeLightningShake = DefaultConfig::BcFreezeLightningShake;
 			g_Config.m_BcFreezeLightningColor = DefaultConfig::BcFreezeLightningColor;
 		}
-		GameClient()->m_Tooltips.DoToolTip(&s_Reset, &ResetButton, BcLocalize("Reset to defaults"));
+		GameClient()->m_Tooltips.DoToolTip(&s_BoltReset, &BoltResetButton, BcLocalize("Reset to defaults"));
 		static CButtonContainer s_LightningAuthor;
-		DrawFxTitle(Title, BcLocalize("Freeze lightning"), &s_LightningAuthor);
-		Block.HSplitTop(MarginSmall, nullptr, &Block);
+		DrawFxTitle(BoltTitle, BcLocalize("Freeze lightning"), &s_LightningAuthor);
+		BoltBlock.HSplitTop(MarginSmall, nullptr, &BoltBlock);
 		CUIRect Enable;
-		Block.HSplitTop(LineSize, &Enable, &Block);
+		BoltBlock.HSplitTop(LineSize, &Enable, &BoltBlock);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcFreezeLightning, BcLocalize("Enable"), &g_Config.m_BcFreezeLightning, &Enable, LineSize);
 
 		if(ExpandedHeight > 0.5f)
 		{
-			CUIRect Visible = Block;
-			Visible.h = ExpandedHeight;
-			Ui()->ClipEnable(&Visible);
-			RowCheck(Block, &g_Config.m_BcFreezeLightningImpact, BcLocalize("Impact"));
-			RowSlider(Block, &g_Config.m_BcFreezeLightningHeight, BcLocalize("Height"), 100, 900, "");
-			RowSlider(Block, &g_Config.m_BcFreezeLightningThickness, BcLocalize("Thickness"), 50, 200, "%");
-			RowSlider(Block, &g_Config.m_BcFreezeLightningBranches, BcLocalize("Branches"), 0, 8, "");
-			RowSlider(Block, &g_Config.m_BcFreezeLightningShake, BcLocalize("Shake"), 0, 100, "%");
+			CUIRect BoltVisible = BoltBlock;
+			BoltVisible.h = ExpandedHeight;
+			Ui()->ClipEnable(&BoltVisible);
+			RowCheck(BoltBlock, &g_Config.m_BcFreezeLightningImpact, BcLocalize("Impact"));
+			RowSlider(BoltBlock, &g_Config.m_BcFreezeLightningHeight, BcLocalize("Height"), 100, 900, "");
+			RowSlider(BoltBlock, &g_Config.m_BcFreezeLightningThickness, BcLocalize("Thickness"), 50, 200, "%");
+			RowSlider(BoltBlock, &g_Config.m_BcFreezeLightningBranches, BcLocalize("Branches"), 0, 8, "");
+			RowSlider(BoltBlock, &g_Config.m_BcFreezeLightningShake, BcLocalize("Shake"), 0, 100, "%");
 			static CButtonContainer s_Color;
-			RowColor(Block, &s_Color, BcLocalize("Color"), &g_Config.m_BcFreezeLightningColor, DefaultConfig::BcFreezeLightningColor);
-			Block.HSplitTop(MarginSmall, nullptr, &Block);
+			RowColor(BoltBlock, &s_Color, BcLocalize("Color"), &g_Config.m_BcFreezeLightningColor, DefaultConfig::BcFreezeLightningColor);
+			BoltBlock.HSplitTop(MarginSmall, nullptr, &BoltBlock);
 			CUIRect Preview;
-			Block.HSplitTop(LineSize, &Preview, &Block);
+			BoltBlock.HSplitTop(LineSize, &Preview, &BoltBlock);
 			if(GameClient()->m_Snap.m_pLocalCharacter != nullptr)
 			{
 				static CButtonContainer s_Strike;

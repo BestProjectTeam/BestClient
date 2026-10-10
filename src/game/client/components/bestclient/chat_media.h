@@ -124,7 +124,7 @@ public:
 	void ResetLine(SChatMediaLine &Media, IGraphics *pGraphics);
 	void OnChatLineAdded(CChat &Chat, SChatMediaLine &Media, const char *pText);
 	void Update(CChat &Chat);
-	bool OnInput(CChat &Chat, const IInput::CEvent &Event);
+	bool OnChatInput(CChat &Chat, const IInput::CEvent &Event);
 	void PrepareLineLayout(SChatMediaLine &Media, int OffsetType, float LineWidth, float MaxPreviewHeight, float FontSize, float TextHeight, float &TotalHeight);
 	std::string BuildVisibleMessageText(const SChatMediaLine &Media, const char *pText, bool UseMediaLabelWhenEmpty) const;
 	bool ShouldDisplayMediaSlot(const SChatMediaLine &Media) const;

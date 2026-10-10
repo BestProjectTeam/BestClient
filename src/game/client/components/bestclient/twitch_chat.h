@@ -4,9 +4,10 @@
 
 #include <game/client/component.h>
 
+#include <engine/external/readerwriterqueue/ReaderWriterQueue.h>
+
 #include <atomic>
 #include <cstdint>
-#include <deque>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -47,14 +48,15 @@ private:
 		std::string m_Text;
 	};
 
-	mutable std::mutex m_Mutex;
+	mutable std::mutex m_StatusMutex;
 	std::thread m_Worker;
 	std::atomic<bool> m_StopRequested{false};
 	std::atomic<bool> m_WorkerRunning{false};
-	EState m_State = EState::Disconnected;
+	std::atomic<EState> m_State{EState::Disconnected};
 	char m_aStatusText[MAX_STATUS_LENGTH] = "";
-	uint64_t m_ReceivedMessages = 0;
-	std::deque<SQueuedMessage> m_MessageQueue;
+	std::atomic<uint64_t> m_ReceivedMessages{0};
+	std::atomic<uint64_t> m_DroppedMessages{0};
+	moodycamel::ReaderWriterQueue<SQueuedMessage> m_MessageQueue{MAX_QUEUED_MESSAGES};
 
 	void SetStatus(const char *pMessage);
 	void SetState(EState State);
