@@ -60,6 +60,7 @@ void CChat::CLine::Reset(CChat &This)
 	// bestclient
 	m_CustomColor = std::nullopt;
 	m_BcCopyAsLoad = false;
+	m_BcSavesChat = false;
 	This.GameClient()->m_ChatMedia.ResetLine(m_Media, This.Graphics());
 	// bestclient
 }
@@ -1404,6 +1405,12 @@ void CChat::OnPrepareLines(float y)
 		// bestclient
 		if(Now > Line.m_Time + 16 * time_freq() && !m_PrevShowChat && !GameClient()->m_HudEditor.IsActive())
 			break;
+		if(Line.m_BcSavesChat && Line.m_aText[0] == '\0')
+		{
+			Line.m_aYOffset[0] = 0.0f;
+			Line.m_aYOffset[1] = 0.0f;
+			continue;
+		}
 		// bestclient
 
 		const float LineH = Line.m_aYOffset[OffsetType] >= 0.0f ? Line.m_aYOffset[OffsetType] : FontSize + RealMsgPaddingY;
@@ -1858,6 +1865,8 @@ void CChat::OnRender()
 			break;
 
 		// bestclient
+		if(Line.m_BcSavesChat && Line.m_aText[0] == '\0')
+			continue;
 		const float LineH = Line.m_aYOffset[OffsetType] >= 0.0f ? Line.m_aYOffset[OffsetType] : MeasureFontSize + RealMsgPaddingY;
 		RenderY -= LineH;
 

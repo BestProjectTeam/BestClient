@@ -67,6 +67,7 @@ class CChat : public CComponent
 		std::optional<ColorRGBA> m_CustomColor;
 		// bestclient
 		bool m_BcCopyAsLoad = false;
+		bool m_BcSavesChat = false;
 		// bestclient
 
 		STextContainerIndex m_TextContainerIndex;

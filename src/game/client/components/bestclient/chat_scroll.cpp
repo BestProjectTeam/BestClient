@@ -41,6 +41,8 @@ float CChatScroll::MaxScrollOffset(const CChat &Chat, float Y, float HeightLimit
 		const CChat::CLine &Line = Chat.m_aLines[((Chat.m_CurrentLine - i) + CChat::MAX_LINES) % CChat::MAX_LINES];
 		if(!Line.m_Initialized)
 			break;
+		if(Line.m_BcSavesChat && Line.m_aText[0] == '\0')
+			continue;
 		TotalLines++;
 	}
 
@@ -51,6 +53,8 @@ float CChatScroll::MaxScrollOffset(const CChat &Chat, float Y, float HeightLimit
 		const CChat::CLine &Line = Chat.m_aLines[((Chat.m_CurrentLine - i) + CChat::MAX_LINES) % CChat::MAX_LINES];
 		if(!Line.m_Initialized)
 			break;
+		if(Line.m_BcSavesChat && Line.m_aText[0] == '\0')
+			continue;
 		const float LineH = LineHeight(Chat, i, OffsetType, FontSize, RealMsgPaddingY);
 		if(TempY - LineH < HeightLimit)
 			break;
@@ -60,8 +64,17 @@ float CChatScroll::MaxScrollOffset(const CChat &Chat, float Y, float HeightLimit
 
 	const int MaxLine = std::max(0, TotalLines - std::max(1, VisibleLines));
 	float Offset = 0.0f;
-	for(int i = 0; i < MaxLine; i++)
+	int Counted = 0;
+	for(int i = 0; i < CChat::MAX_LINES && Counted < MaxLine; i++)
+	{
+		const CChat::CLine &Line = Chat.m_aLines[((Chat.m_CurrentLine - i) + CChat::MAX_LINES) % CChat::MAX_LINES];
+		if(!Line.m_Initialized)
+			break;
+		if(Line.m_BcSavesChat && Line.m_aText[0] == '\0')
+			continue;
 		Offset += LineHeight(Chat, i, OffsetType, FontSize, RealMsgPaddingY);
+		Counted++;
+	}
 	return Offset;
 }
 
@@ -252,6 +265,12 @@ void CChatScroll::MeasureHeights(CChat &Chat, float TextBegin, float FontSize, f
 		CChat::CLine &Line = Chat.m_aLines[((Chat.m_CurrentLine - i) + CChat::MAX_LINES) % CChat::MAX_LINES];
 		if(!Line.m_Initialized)
 			break;
+		if(Line.m_BcSavesChat && Line.m_aText[0] == '\0')
+		{
+			Line.m_aYOffset[0] = 0.0f;
+			Line.m_aYOffset[1] = 0.0f;
+			continue;
+		}
 		if(Line.m_aYOffset[OffsetType] >= 0.0f && !ForceRecreate)
 			continue;
 

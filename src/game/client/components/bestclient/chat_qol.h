@@ -14,11 +14,13 @@ public:
 	static bool TryConvertWrongLayoutSlashCommand(const CChat &Chat, const char *pLine, char *pOut, int OutSize);
 	static void ApplySilentTyping(CNetObj_PlayerInput *pInputs, int Count, bool Enabled);
 
+	static void ClearSavesChatOnMapChange(CGameClient *pGameClient);
 	static void NotifySavesOnMapLoad(CGameClient *pGameClient);
 	static bool TryHandleBangCommand(CChat &Chat, const char *pText);
 	static bool TryBangCommandAutocomplete(CChat &Chat);
 	static void ListSavesForCurrentMap(CChat &Chat);
 	static bool TryRenderBangCommandHint(CGameClient *pGameClient, const char *pInput, CTextCursor *pCursor, ITextRender *pTextRender);
+	static void AddSavesChatLine(CChat &Chat, const char *pLine, bool PlaySystemSound, bool CopyAsLoad = false);
 };
 
 #endif

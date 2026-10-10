@@ -161,6 +161,7 @@ void CBestClient::OnConsoleInit()
 
 void CBestClient::OnMapLoad()
 {
+	CChatQoL::ClearSavesChatOnMapChange(GameClient());
 	m_SavesNotifySchedule = true;
 	m_SavesNotifyDeadline = 0;
 }

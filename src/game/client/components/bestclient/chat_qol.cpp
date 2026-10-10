@@ -313,38 +313,72 @@ static const char *DisplaySaveCode(const char *pCode)
 	return pCode && pCode[0] ? pCode : "-";
 }
 
-static void ShowMapSavesList(CChat &Chat, const std::vector<SSaveRow> &vSaves, bool NotifyOnly)
+void CChatQoL::AddSavesChatLine(CChat &Chat, const char *pLine, bool PlaySystemSound, bool CopyAsLoad)
+{
+	Chat.AddColoredLine(pLine, SAVES_CHAT_COLOR, PlaySystemSound, CopyAsLoad);
+	CChat::CLine &Line = Chat.m_aLines[Chat.m_CurrentLine];
+	if(Line.m_Initialized && Line.m_ClientId == CChat::CLIENT_MSG)
+		Line.m_BcSavesChat = true;
+}
+
+static void ShowMapSavesList(CChat &Chat, const std::vector<SSaveRow> &vSaves, bool NotifyOnly, const char *pMapName)
 {
 	const int Total = (int)vSaves.size();
 	if(Total <= 0)
 	{
 		if(!NotifyOnly)
-			Chat.AddColoredLine(Localize("No saves for this map"), SAVES_CHAT_COLOR, true);
+			CChatQoL::AddSavesChatLine(Chat, Localize("No saves for this map"), true);
 		return;
 	}
 
 	char aBuf[256];
 	if(NotifyOnly)
 	{
-		str_format(aBuf, sizeof(aBuf), Localize("Found %d saves on this map. Type !saves to see them"), Total);
-		Chat.AddColoredLine(aBuf, SAVES_CHAT_COLOR, true);
+		str_format(aBuf, sizeof(aBuf), Localize("Found %d saves on %s. Type !saves to see them"), Total, pMapName);
+		CChatQoL::AddSavesChatLine(Chat, aBuf, true);
 		return;
 	}
 
-	str_format(aBuf, sizeof(aBuf), Localize("Saves on this map: %d"), Total);
-	Chat.AddColoredLine(aBuf, SAVES_CHAT_COLOR, true);
+	str_format(aBuf, sizeof(aBuf), Localize("Saves on %s: %d"), pMapName, Total);
+	CChatQoL::AddSavesChatLine(Chat, aBuf, true);
 
 	const int ShowCount = std::min(Total, SAVES_CHAT_LIST_LIMIT);
 	for(int i = 0; i < ShowCount; ++i)
 	{
 		str_format(aBuf, sizeof(aBuf), "%s: %s", vSaves[i].m_aPlayers, DisplaySaveCode(vSaves[i].m_aCode));
-		Chat.AddColoredLine(aBuf, SAVES_CHAT_COLOR, true, true);
+		CChatQoL::AddSavesChatLine(Chat, aBuf, true, true);
 	}
 
 	if(Total > ShowCount)
 	{
 		str_format(aBuf, sizeof(aBuf), Localize("and %d more"), Total - ShowCount);
-		Chat.AddColoredLine(aBuf, SAVES_CHAT_COLOR, true);
+		CChatQoL::AddSavesChatLine(Chat, aBuf, true);
+	}
+}
+
+void CChatQoL::ClearSavesChatOnMapChange(CGameClient *pGameClient)
+{
+	if(!pGameClient)
+		return;
+
+	CChat &Chat = pGameClient->m_Chat;
+	for(CChat::CLine &Line : Chat.m_aLines)
+	{
+		if(!Line.m_Initialized || !Line.m_BcSavesChat || Line.m_aText[0] == '\0')
+			continue;
+
+		Chat.TextRender()->DeleteTextContainer(Line.m_TextContainerIndex);
+		Chat.Graphics()->DeleteQuadContainer(Line.m_QuadContainerIndex);
+		Line.m_TextContainerIndex.Reset();
+		Line.m_QuadContainerIndex = -1;
+		Line.m_aText[0] = '\0';
+		Line.m_aName[0] = '\0';
+		Line.m_aYOffset[0] = 0.0f;
+		Line.m_aYOffset[1] = 0.0f;
+		Line.m_CustomColor = std::nullopt;
+		Line.m_BcCopyAsLoad = false;
+		Line.m_TimesRepeated = 0;
+		pGameClient->m_ChatMedia.ResetLine(Line.m_Media, Chat.Graphics());
 	}
 }
 
@@ -364,7 +398,7 @@ void CChatQoL::NotifySavesOnMapLoad(CGameClient *pGameClient)
 	if(vSaves.empty())
 		return;
 
-	ShowMapSavesList(pGameClient->m_Chat, vSaves, true);
+	ShowMapSavesList(pGameClient->m_Chat, vSaves, true, pMapName);
 }
 
 void CChatQoL::ListSavesForCurrentMap(CChat &Chat)
@@ -376,13 +410,13 @@ void CChatQoL::ListSavesForCurrentMap(CChat &Chat)
 	const char *pMapName = pGameClient->Map()->BaseName();
 	if(!pMapName || pMapName[0] == '\0')
 	{
-		Chat.AddColoredLine(Localize("No saves for this map"), SAVES_CHAT_COLOR, true);
+		CChatQoL::AddSavesChatLine(Chat, Localize("No saves for this map"), true);
 		return;
 	}
 
 	std::vector<SSaveRow> vSaves;
 	CollectMapSaves(pGameClient, pMapName, vSaves);
-	ShowMapSavesList(Chat, vSaves, false);
+	ShowMapSavesList(Chat, vSaves, false, pMapName);
 }
 
 bool CChatQoL::TryHandleBangCommand(CChat &Chat, const char *pText)
