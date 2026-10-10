@@ -754,6 +754,7 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
 
 	const bool CornerIndicatorEnabled = g_Config.m_BcCornerIndicator != 0;
+	const bool CornerIndicatorBlocked = GameClient()->m_AspectRatio.IsBlockedByFng();
 	const bool CornerIndicatorShowSizes = CornerIndicatorEnabled && g_Config.m_BcCornerIndicatorProximity == 0;
 	const bool CornerIndicatorShowCustomColors = CornerIndicatorEnabled && g_Config.m_BcCornerIndicatorCustomColors != 0;
 	const float CornerIndicatorColorPickerLineSize = 25.0f;
@@ -763,7 +764,8 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		(CornerIndicatorShowSizes ? 3.0f * (MarginSmall + LineSize) : 0.0f) +
 		(CornerIndicatorShowCustomColors ? 3.0f * (CornerIndicatorColorPickerSpacing + CornerIndicatorColorPickerLineSize) : 0.0f);
 	const float CornerIndicatorExpandedHeight = BC_MODULE_REVEAL(CornerIndicatorEnabled, CornerIndicatorExpandedTargetHeight, Client()->RenderFrameTime());
-	const float CornerIndicatorBlockHeight = LineSize + MarginSmall + LineSize + CornerIndicatorExpandedHeight;
+	const float CornerIndicatorBlockedHintHeight = CornerIndicatorBlocked ? (MarginSmall + LineSize) : 0.0f;
+	const float CornerIndicatorBlockHeight = LineSize + MarginSmall + LineSize + CornerIndicatorExpandedHeight + CornerIndicatorBlockedHintHeight;
 	CUIRect CornerIndicatorBlock;
 	Column.HSplitTop(CornerIndicatorBlockHeight, &CornerIndicatorBlock, &Column);
 
@@ -873,6 +875,18 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		}
 
 		Ui()->ClipDisable();
+	}
+
+	if(CornerIndicatorBlocked)
+	{
+		CUIRect HintArea, HintRow;
+		CUIRect BlockForHint = CornerIndicatorBlock;
+		BlockForHint.HSplitBottom(CornerIndicatorBlockedHintHeight, nullptr, &HintArea);
+		HintArea.HSplitTop(MarginSmall, nullptr, &HintRow);
+		HintRow.h = LineSize;
+		TextRender()->TextColor(1.0f, 0.4f, 0.4f, 1.0f);
+		Ui()->DoLabel(&HintRow, BcLocalize("Looks like you're on a server where this feature is forbidden"), 14.0f, TEXTALIGN_ML);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
 	}
 
 	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);

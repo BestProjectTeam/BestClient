@@ -46,6 +46,8 @@ void CornerIndicator::Render(CGameClient *pGameClient)
 {
 	if(!pGameClient || !g_Config.m_BcCornerIndicator)
 		return;
+	if(pGameClient->m_AspectRatio.IsBlockedByFng())
+		return;
 
 	const int LocalId = pGameClient->m_Snap.m_LocalClientId;
 	if(LocalId < 0 || pGameClient->m_Snap.m_SpecInfo.m_Active || !pGameClient->m_Snap.m_aCharacters[LocalId].m_Active)

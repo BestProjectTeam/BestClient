@@ -496,7 +496,7 @@ MACRO_CONFIG_STR(ClFocusModeAutoReplyMessage, p_focus_mode_auto_reply_message, 1
 
 // Corner indicator
 MACRO_CONFIG_INT(BcCornerIndicator, bc_corner_indicator, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show the corner indicator for off-screen teammates")
-MACRO_CONFIG_INT(BcCornerIndicatorOnlyInTeam, bc_corner_indicator_only_in_team, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Only show the corner indicator while in a DDRace team")
+MACRO_CONFIG_INT(BcCornerIndicatorOnlyInTeam, bc_corner_indicator_only_in_team, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Only show the corner indicator while in a DDRace team")
 MACRO_CONFIG_INT(BcCornerIndicatorShowAlive, bc_corner_indicator_show_alive, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show alive teammates in the corner indicator")
 MACRO_CONFIG_INT(BcCornerIndicatorShowFrozen, bc_corner_indicator_show_frozen, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show frozen teammates in the corner indicator")
 MACRO_CONFIG_INT(BcCornerIndicatorIndicateLastTeammate, bc_corner_indicator_indicate_last_teammate, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Indicate frozen teammates in the corner indicator when the local player is the last alive")
