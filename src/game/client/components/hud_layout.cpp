@@ -307,7 +307,9 @@ void ConHudLayoutSet(IConsole::IResult *pResult, void *pUserData)
 	Layout.m_Scale = std::clamp(pResult->GetInteger(3), 25, 300);
 	Layout.m_Mode = pResult->GetInteger(4);
 	Layout.m_BackgroundEnabled = pResult->GetInteger(5) != 0;
-	Layout.m_BackgroundColor = (unsigned)pResult->GetInteger(6);
+	// bestclient
+	Layout.m_BackgroundColor = (unsigned)str_toulong_base(pResult->GetString(6), 10);
+	// bestclient
 	if(pResult->NumArguments() > 7)
 		Layout.m_Enabled = pResult->GetInteger(7) != 0;
 	if(pResult->NumArguments() > 8)
@@ -673,7 +675,9 @@ void OnConsoleInit(IConsole *pConsole, IConfigManager *pConfigManager)
 	{
 		pConsole->Register(
 			"hud_layout_set",
-			"s[module] f[x] f[y] i[scale] i[mode] i[background_enabled] i[background_color] ?i[enabled] ?i[alpha]",
+			// bestclient
+			"s[module] f[x] f[y] i[scale] i[mode] i[background_enabled] s[background_color] ?i[enabled] ?i[alpha]",
+			// bestclient
 			CFGFLAG_CLIENT,
 			ConHudLayoutSet,
 			nullptr,
