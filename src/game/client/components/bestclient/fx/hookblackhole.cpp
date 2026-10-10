@@ -214,7 +214,7 @@ void CHookBlackHole::DrawDisk(const CHookGripTracker::CGrip &Grip, const CHoleSt
 
 		for(int i = 0; i < DISK_SAMPLES; i++)
 		{
-			const float Angle = i * 2.0f * pi / DISK_SAMPLES + State.m_DiskAngle * mix(0.6f, 0.35f, Depth);
+			const float Angle = i * 2.0f * pi / (float)DISK_SAMPLES + State.m_DiskAngle * mix(0.6f, 0.35f, Depth);
 			const float Depthwise = std::sin(Angle);
 			if((Depthwise > 0.0f) != FrontHalf)
 				continue;

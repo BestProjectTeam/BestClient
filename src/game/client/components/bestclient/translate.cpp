@@ -162,7 +162,7 @@ bool ExtractOutgoingCommand(const char *pText, const char *pCommand, const char 
 	const char *pEnd = pStart;
 	while(*pEnd && !isspace((unsigned char)*pEnd))
 		++pEnd;
-	if((size_t)(pEnd - pStart) != str_length(pCommand) || str_comp_nocase(std::string(pStart, pEnd - pStart).c_str(), pCommand) != 0)
+	if((size_t)(pEnd - pStart) != (size_t)str_length(pCommand) || str_comp_nocase(std::string(pStart, pEnd - pStart).c_str(), pCommand) != 0)
 		return false;
 	const char *pArgumentsStart = pEnd;
 	while(isspace((unsigned char)*pArgumentsStart))

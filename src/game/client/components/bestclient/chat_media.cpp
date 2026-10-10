@@ -2248,7 +2248,7 @@ vec2 CChatMedia::ChatMousePos() const
 	return UiMousePos * UiToChatScale;
 }
 
-bool CChatMedia::OnInput(CChat &Chat, const IInput::CEvent &Event)
+bool CChatMedia::OnChatInput(CChat &Chat, const IInput::CEvent &Event)
 {
 	if((Event.m_Flags & IInput::FLAG_PRESS) && HasValidFullscreenMedia(Chat))
 	{

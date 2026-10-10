@@ -516,7 +516,7 @@ void CChat::RenderTranslateSettingsButton(const CUIRect &ButtonRect)
 bool CChat::OnInput(const IInput::CEvent &Event)
 {
 	// bestclient
-	if(GameClient()->m_ChatMedia.OnInput(*this, Event))
+	if(GameClient()->m_ChatMedia.OnChatInput(*this, Event))
 		return true;
 	if(CChatScroll::OnInput(*this, Event))
 		return true;
