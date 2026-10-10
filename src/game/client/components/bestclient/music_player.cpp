@@ -51,6 +51,10 @@
 #include <utility>
 #include <vector>
 
+#if defined(_MSC_VER)
+#include <intrin.h>
+#endif
+
 #if !defined(BC_MUSICPLAYER_HAS_DBUS)
 #define BC_MUSICPLAYER_HAS_DBUS 0
 #endif
@@ -2759,7 +2763,9 @@ public:
 						std::this_thread::yield();
 						break;
 					}
-#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+#if defined(_MSC_VER)
+					_mm_pause();
+#elif defined(__x86_64__) || defined(__i386__)
 					__builtin_ia32_pause();
 #else
 					std::atomic_thread_fence(std::memory_order_relaxed);
