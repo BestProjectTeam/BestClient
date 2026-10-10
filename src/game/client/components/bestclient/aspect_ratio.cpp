@@ -102,12 +102,29 @@ void CAspectRatio::BeginFrame()
 {
 	Graphics()->SetScreenAspectOverrideEnabled(true);
 	m_HudAspectDisabled = false;
+	m_MusicPlayerAspectDisabled = false;
 	GameClient()->m_TClient.SetForcedAspect();
 }
 
 void CAspectRatio::PrepareComponent(const CComponent *pComponent)
 {
-	if(UseGameNoHudAspect() && !m_HudAspectDisabled && pComponent == &GameClient()->m_Hud)
+	if(!UseGameNoHudAspect())
+		return;
+
+	if(m_MusicPlayerAspectDisabled && pComponent != &GameClient()->m_MusicPlayer)
+	{
+		Graphics()->SetScreenAspectOverrideEnabled(true);
+		m_MusicPlayerAspectDisabled = false;
+	}
+
+	if(pComponent == &GameClient()->m_MusicPlayer)
+	{
+		Graphics()->SetScreenAspectOverrideEnabled(false);
+		m_MusicPlayerAspectDisabled = true;
+		return;
+	}
+
+	if(!m_HudAspectDisabled && pComponent == &GameClient()->m_Hud)
 	{
 		Graphics()->SetScreenAspectOverrideEnabled(false);
 		m_HudAspectDisabled = true;
