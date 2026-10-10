@@ -385,6 +385,19 @@ void CBestClient::RenderSpecMovedNotify()
 	TextRender()->TextColor(TextRender()->DefaultTextColor());
 }
 
+float BestClientTeeRenderSize(const CGameClient *pGameClient, int ClientId)
+{
+	if(ClientId >= 0)
+	{
+		for(int Dummy = 0; Dummy < NUM_DUMMIES; ++Dummy)
+		{
+			if(pGameClient->m_aLocalIds[Dummy] == ClientId)
+				return 64.0f * g_Config.m_TcTeeScale / 100.0f;
+		}
+	}
+	return 64.0f;
+}
+
 void BestClientRenderRealHitbox(IGraphics *pGraphics, CGameClient *pGameClient, int ClientId, vec2 Position)
 {
 	if(!pGraphics || !pGameClient || !g_Config.m_BcShowRealHitbox)

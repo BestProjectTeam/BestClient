@@ -736,6 +736,9 @@ Hammer Mode:
 Ingame cursor scale
 == Масштаб курсора в игре
 
+Ingame tee scale
+== Масштаб тии в игре
+
 Wheel animate
 == Анимация колеса
 

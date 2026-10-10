@@ -67,6 +67,7 @@ public:
 	void OnClientNameChanged(int ClientId, const char *pNewName, const char *pNewClan);
 };
 
+float BestClientTeeRenderSize(const class CGameClient *pGameClient, int ClientId);
 void BestClientRenderRealHitbox(class IGraphics *pGraphics, class CGameClient *pGameClient, int ClientId, vec2 Position);
 void BestClientRenderVotePercentages(class CUi *pUi, class ITextRender *pTextRender, const class CUIRect &Bars, int Yes, int No, int Total);
 void BestClientRenderIndicatorIcon(class IGraphics *pGraphics, const class CUIRect &Rect, bool Developer = false, bool Fake = false, ColorRGBA Color = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));

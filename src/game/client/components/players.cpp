@@ -540,7 +540,9 @@ void CPlayers::RenderHook(
 		Alpha = std::min(Alpha, 0.5f);
 	// bestclient
 
-	RenderInfo.m_Size = 64.0f;
+	// bestclient
+	RenderInfo.m_Size = BestClientTeeRenderSize(GameClient(), ClientId);
+	// bestclient
 
 	vec2 Position;
 	if(in_range(ClientId, MAX_CLIENTS - 1))
@@ -716,7 +718,9 @@ void CPlayers::RenderPlayer(
 	const float Volume = 1.0f;
 
 	// set size
-	RenderInfo.m_Size = 64.0f;
+	// bestclient
+	RenderInfo.m_Size = BestClientTeeRenderSize(GameClient(), ClientId);
+	// bestclient
 
 	if(ClientId >= 0)
 		Intra = GameClient()->m_aClients[ClientId].m_IsPredicted ? Client()->PredIntraGameTick(g_Config.m_ClDummy) : Client()->IntraGameTick(g_Config.m_ClDummy);

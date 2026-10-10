@@ -257,6 +257,7 @@
 	{"Colored frozen tee skins", SETTINGS_NAV_LEAF_TC_SETTINGS, "Visual", &g_Config.m_TcColorFreeze, nullptr},
 	{"Show katan on frozen players", SETTINGS_NAV_LEAF_TC_SETTINGS, "Visual", &g_Config.m_TcFrozenKatana, nullptr},
 	{"Tiny Tees", SETTINGS_NAV_LEAF_TC_SETTINGS, "Visual", &g_Config.m_TcTinyTees, nullptr},
+	{"Ingame tee scale", SETTINGS_NAV_LEAF_TC_SETTINGS, "Visual", &g_Config.m_TcTeeScale, nullptr},
 	{"White feet", SETTINGS_NAV_LEAF_TC_SETTINGS, "Visual", &g_Config.m_TcWhiteFeet, nullptr},
 
 	{"Anti Latency Tools", SETTINGS_NAV_LEAF_TC_SETTINGS, "Settings", &g_Config.m_TcRemoveAnti, nullptr},
