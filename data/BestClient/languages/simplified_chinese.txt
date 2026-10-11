@@ -779,6 +779,10 @@ Looks like you're on a server where this feature is forbidden
 == 当前服务器似乎禁止此功能
 
 [BestClient]
+Unavailable while camera zoom is disabled
+== 镜头缩放关闭时不可用
+
+[BestClient]
 Physic Balls
 == 物理球
 

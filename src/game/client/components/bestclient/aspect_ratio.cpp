@@ -86,16 +86,21 @@ bool CAspectRatio::IsBlockedByFng() const
 	return GameClient()->m_GameInfo.m_PredictFNG || GameClient()->m_GameInfo.m_EntitiesFNG;
 }
 
+bool CAspectRatio::IsAspectBlocked() const
+{
+	return Client()->State() == IClient::STATE_ONLINE && !GameClient()->m_Camera.ZoomAllowed();
+}
+
 bool CAspectRatio::UseGameNoHudAspect() const
 {
 	const int State = Client()->State();
 	const bool IsActiveGameplay = State == IClient::STATE_ONLINE || State == IClient::STATE_DEMOPLAYBACK;
-	return IsActiveGameplay && !IsBlockedByFng() && g_Config.m_BcCustomAspectRatioApplyMode == 2;
+	return IsActiveGameplay && !IsAspectBlocked() && g_Config.m_BcCustomAspectRatioApplyMode == 2;
 }
 
 bool CAspectRatio::ShouldApplyCustomAspect(bool IsActiveGameplay) const
 {
-	return !IsBlockedByFng() && (g_Config.m_BcCustomAspectRatioApplyMode == 1 || IsActiveGameplay);
+	return !IsAspectBlocked() && (g_Config.m_BcCustomAspectRatioApplyMode == 1 || IsActiveGameplay);
 }
 
 void CAspectRatio::BeginFrame()
@@ -185,7 +190,7 @@ void CAspectRatio::UpdateConfirm()
 		m_Last = Cur;
 	}
 
-	if(m_ConfirmActive && IsBlockedByFng())
+	if(m_ConfirmActive && IsAspectBlocked())
 		m_ConfirmActive = false;
 
 	if(m_ConfirmActive && time_get() >= m_ConfirmDeadline)
@@ -205,7 +210,7 @@ bool CAspectRatio::ConfirmWantsInput() const
 void CAspectRatio::ApplyMenuUiAspect(bool MenuActive)
 {
 	const bool IngameMenu = MenuActive && (Client()->State() == IClient::STATE_ONLINE || Client()->State() == IClient::STATE_DEMOPLAYBACK);
-	const bool UseWindowAspectForUi = IngameMenu && (IsBlockedByFng() || g_Config.m_BcCustomAspectRatioApplyMode != 1);
+	const bool UseWindowAspectForUi = IngameMenu && (IsAspectBlocked() || g_Config.m_BcCustomAspectRatioApplyMode != 1);
 	m_MenuRestoreGraphicsAspect = !UseWindowAspectForUi;
 	Ui()->SetUseGraphicsScreenAspect(m_MenuRestoreGraphicsAspect);
 }

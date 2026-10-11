@@ -2696,7 +2696,7 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 
 	RightColumn.HSplitTop(MarginBetweenViews, nullptr, &RightColumn);
 
-	const bool AspectBlocked = GameClient()->m_AspectRatio.IsBlockedByFng();
+	const bool AspectBlocked = GameClient()->m_AspectRatio.IsAspectBlocked();
 	const int AspectMode = g_Config.m_BcCustomAspectRatioMode >= 0 ? g_Config.m_BcCustomAspectRatioMode : (g_Config.m_BcCustomAspectRatio > 0 ? 1 : 0);
 	const bool AspectCustomMode = AspectMode == 2;
 	const float AspectHeaderHeight = LineSize + MarginSmall + LineSize + MarginSmall + LineSize;
@@ -2886,7 +2886,7 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		MainView.HSplitTop(MarginSmall, nullptr, &MainView);
 		MainView.HSplitTop(LineSize, &Label, &MainView);
 		TextRender()->TextColor(1.0f, 0.4f, 0.4f, 1.0f);
-		Ui()->DoLabel(&Label, BcLocalize("Looks like you're on a server where this feature is forbidden"), 14.0f, TEXTALIGN_ML);
+		Ui()->DoLabel(&Label, BcLocalize("Unavailable while camera zoom is disabled"), 14.0f, TEXTALIGN_ML);
 		TextRender()->TextColor(TextRender()->DefaultTextColor());
 	}
 

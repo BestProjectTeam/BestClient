@@ -41,6 +41,7 @@ public:
 	int Sizeof() const override { return sizeof(*this); }
 
 	bool IsBlockedByFng() const;
+	bool IsAspectBlocked() const;
 	bool UseGameNoHudAspect() const;
 	bool ShouldApplyCustomAspect(bool IsActiveGameplay) const;
 

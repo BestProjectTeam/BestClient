@@ -779,6 +779,10 @@ Looks like you're on a server where this feature is forbidden
 == Похоже, на этом сервере эта фича запрещена
 
 [BestClient]
+Unavailable while camera zoom is disabled
+== Недоступно, пока зум камеры выключен
+
+[BestClient]
 Physic Balls
 == Физик боллы
 
