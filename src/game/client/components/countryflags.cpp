@@ -166,7 +166,10 @@ size_t CCountryFlags::Num() const
 
 const CCountryFlags::CCountryFlag &CCountryFlags::GetByCountryCode(int CountryCode) const
 {
-	dbg_assert(CountryCode >= CountryCode::MINIMUM && CountryCode <= CountryCode::MAXIMUM, "Invalid CountryCode: %d", CountryCode);
+	// bestclient
+	if(!in_range(CountryCode, CountryCode::MINIMUM, CountryCode::MAXIMUM))
+		CountryCode = CountryCode::DEFAULT;
+	// bestclient
 	return GetByIndex(m_aCountryCodeToIndexTable[CountryCode - CountryCode::MINIMUM]);
 }
 

@@ -67,6 +67,8 @@ void CSkinProfiles::AddProfile(int BodyColor, int FeetColor, int CountryFlag, in
 	const char *pAssetHud, const char *pAssetExtras, const char *pAssetCursor, const char *pAssetArrow,
 	const char *pAssetEmoticons, const char *pAssetAudio)
 {
+	if(CountryFlag != -2 && !in_range(CountryFlag, CountryCode::MINIMUM, CountryCode::MAXIMUM))
+		CountryFlag = CountryCode::DEFAULT;
 	CProfile Profile = CProfile(BodyColor, FeetColor, CountryFlag, Emote, pSkinName, pName, pClan,
 		pAssetEntities, pAssetGame, pAssetParticles, pAssetHud, pAssetExtras, pAssetCursor, pAssetArrow,
 		pAssetEmoticons, pAssetAudio);
@@ -90,7 +92,12 @@ void CSkinProfiles::ApplyProfile(int Dummy, const CProfile &Profile)
 	if(g_Config.m_TcProfileClan && (strlen(Profile.m_Clan) != 0 || g_Config.m_TcProfileOverwriteClanWithEmpty))
 		str_copy(Dummy ? g_Config.m_ClDummyClan : g_Config.m_PlayerClan, Profile.m_Clan); // TODO m_ClPlayerClan
 	if(g_Config.m_TcProfileFlag && Profile.m_CountryFlag != -2)
-		(Dummy ? g_Config.m_ClDummyCountry : g_Config.m_PlayerCountry) = Profile.m_CountryFlag;
+	{
+		// bestclient
+		const int CountryFlag = in_range(Profile.m_CountryFlag, CountryCode::MINIMUM, CountryCode::MAXIMUM) ? Profile.m_CountryFlag : CountryCode::DEFAULT;
+		(Dummy ? g_Config.m_ClDummyCountry : g_Config.m_PlayerCountry) = CountryFlag;
+		// bestclient
+	}
 	// bestclient
 	BestClientApplyProfileAssets(GameClient(), Profile);
 	// bestclient
