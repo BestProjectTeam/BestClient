@@ -4353,16 +4353,10 @@ void CEditor::RenderIngameEntities(const CLayerGroup &Group, const CLayerTiles &
 				}
 				else if(Index == ENTITY_HEALTH_1)
 				{
-					if(DDNetOrCustomEntities)
-					{
-						Graphics()->TextureSet(pGameClient->m_GameSkin.m_SpritePickupFreeze);
-						Graphics()->GetSpriteScale(SPRITE_PICKUP_FREEZE, Scale.x, Scale.y);
-					}
-					else
-					{
-						Graphics()->TextureSet(pGameClient->m_GameSkin.m_SpritePickupHealth);
-						Graphics()->GetSpriteScale(SPRITE_PICKUP_HEALTH, Scale.x, Scale.y);
-					}
+					// bestclient
+					Graphics()->TextureSet(pGameClient->m_GameSkin.m_SpritePickupHealth);
+					Graphics()->GetSpriteScale(SPRITE_PICKUP_HEALTH, Scale.x, Scale.y);
+					// bestclient
 					VisualSize = 64;
 				}
 				else if(Index == ENTITY_WEAPON_SHOTGUN)

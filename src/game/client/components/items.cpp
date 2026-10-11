@@ -142,17 +142,12 @@ void CItems::RenderPickup(const CNetObj_Pickup *pPrev, const CNetObj_Pickup *pCu
 	// bestclient
 	if(!GameClient()->OptimizerAllowRenderPos(Pos))
 		return;
-	// bestclient
-	if(pCurrent->m_Type == POWERUP_HEALTH)
+	if(pCurrent->m_Type == POWERUP_HEALTH || pCurrent->m_Type == POWERUP_FREEZE)
 	{
 		QuadOffset = m_PickupHealthOffset;
 		Graphics()->TextureSet(GameClient()->m_GameSkin.m_SpritePickupHealth);
 	}
-	else if(pCurrent->m_Type == POWERUP_FREEZE)
-	{
-		QuadOffset = m_PickupFreezeOffset;
-		Graphics()->TextureSet(GameClient()->m_GameSkin.m_SpritePickupFreeze);
-	}
+	// bestclient
 	else if(pCurrent->m_Type == POWERUP_ARMOR)
 	{
 		QuadOffset = m_PickupArmorOffset;
