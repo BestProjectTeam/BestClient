@@ -14,6 +14,7 @@
 #include <base/time.h>
 
 #include <engine/client.h>
+#include <engine/engine.h>
 #include <engine/font_icons.h>
 #include <engine/graphics.h>
 #include <engine/shared/bestclient_indicator_protocol.h>
@@ -53,7 +54,7 @@ namespace
 	constexpr int VOICE_HEARTBEAT_SECONDS = 5;
 	constexpr int VOICE_SERVER_STALE_SECONDS = 10;
 	constexpr int VOICE_IDLE_SHUTDOWN_SECONDS = 5;
-	constexpr int VOICE_START_RETRY_SECONDS = 5;
+	constexpr int VOICE_CONNECT_RETRY_SECONDS = 60;
 	constexpr float VOICE_TILE_WORLD_SIZE = 32.0f;
 	constexpr int SERVER_LIST_PING_TIMEOUT_SEC = 2;
 	constexpr int SERVER_LIST_PING_INTERVAL_SEC = 30;
@@ -543,6 +544,19 @@ namespace
 		return HudLayout::BackgroundCorners(IGraphics::CORNER_ALL, RectX, RectY, RectW, RectH, CanvasWidth, CanvasHeight);
 	}
 
+	void DrainUdp(NETSOCKET Socket)
+	{
+		if(!Socket)
+			return;
+		NETADDR From = NETADDR_ZEROED;
+		unsigned char *pData = nullptr;
+		int DataSize = 0;
+		do
+		{
+			DataSize = net_udp_recv(Socket, &From, &pData);
+		} while(DataSize > 0);
+	}
+
 }
 
 void CVoiceChat::OnConsoleInit()
@@ -788,7 +802,11 @@ void CVoiceChat::OnUpdate()
 	{
 		StopVoice();
 		if(Online)
+		{
+			m_LastStartAttempt = 0;
+			ResetFailedHostLookup();
 			StartVoice();
+		}
 		str_copy(m_aLastServerAddr, EffectiveServerAddr.c_str(), sizeof(m_aLastServerAddr));
 		m_LastInputDevice = g_Config.m_BcVoiceChatInputDevice;
 		m_LastOutputDevice = g_Config.m_BcVoiceChatOutputDevice;
@@ -800,11 +818,20 @@ void CVoiceChat::OnUpdate()
 	if(!m_Socket)
 	{
 		const int64_t Now = time_get();
-		const int64_t RetryDelay = m_RuntimeState == RUNTIME_RECONNECTING ? time_freq() : VOICE_START_RETRY_SECONDS * time_freq();
-		if(ShouldStartVoicePipeline(Online) && (m_LastStartAttempt == 0 || Now - m_LastStartAttempt > RetryDelay))
+		if(m_pHostLookup && m_pHostLookup->Done() && m_LastStartAttempt == 0 &&
+			str_comp(m_pHostLookup->Hostname(), EffectiveServerAddr.c_str()) == 0 &&
+			(m_pHostLookup->State() != IJob::STATE_DONE || m_pHostLookup->Result() != 0))
 		{
+			dbg_msg("voice", "failed to resolve server address '%s'", EffectiveServerLabel());
 			m_LastStartAttempt = Now;
-			m_RuntimeState = m_RuntimeState == RUNTIME_RECONNECTING ? RUNTIME_RECONNECTING : RUNTIME_STARTING;
+		}
+		const int64_t RetryDelay = VOICE_CONNECT_RETRY_SECONDS * time_freq();
+		const bool Pending = IsHostLookupPending();
+		const bool Due = m_LastStartAttempt == 0 || Now - m_LastStartAttempt > RetryDelay;
+		if(ShouldStartVoicePipeline(Online) && (Pending || Due))
+		{
+			if(Due && !Pending)
+				ResetFailedHostLookup();
 			StartVoice();
 		}
 		if(!m_Socket)
@@ -845,7 +872,7 @@ void CVoiceChat::OnUpdate()
 	const bool TeamChanged = VoiceTeam != m_AdvertisedTeam;
 	const bool NameChanged = m_AdvertisedPlayerName != pCurrentName;
 	const bool IdentityChanged = RoomChanged || GameClientId != m_AdvertisedGameClientId || TeamChanged || NameChanged;
-	const bool NeedsRegistrationHello = !m_Registered && (m_LastHelloTick == 0 || Now - m_LastHelloTick > time_freq());
+	const bool NeedsRegistrationHello = !m_Registered && (m_LastHelloTick == 0 || Now - m_LastHelloTick > VOICE_CONNECT_RETRY_SECONDS * time_freq());
 	const bool NeedsHeartbeatHello = m_Registered && (IdentityChanged || m_LastHeartbeatTick == 0 || Now - m_LastHeartbeatTick > VOICE_HEARTBEAT_SECONDS * time_freq());
 	if(RoomChanged || TeamChanged)
 	{
@@ -876,8 +903,15 @@ void CVoiceChat::OnUpdate()
 		{
 			if(m_SecondaryRegistered && m_SecondaryLastServerPacketTick > 0 && Now - m_SecondaryLastServerPacketTick > VOICE_SERVER_STALE_SECONDS * time_freq())
 			{
-				CloseSecondaryNetworking();
-				OpenSecondaryNetworking();
+				DrainUdp(m_SecondarySocket);
+				m_SecondaryPendingHelloPayload.clear();
+				m_SecondaryRegistered = false;
+				m_SecondaryClientVoiceId = 0;
+				m_SecondaryLastHelloTick = Now;
+				m_SecondaryLastHeartbeatTick = Now;
+				m_SecondaryLastServerPacketTick = 0;
+				m_SecondaryHelloResetPending = true;
+				m_SecondaryChallengeActive = false;
 			}
 
 			ProcessSecondaryNetwork();
@@ -887,7 +921,7 @@ void CVoiceChat::OnUpdate()
 			const bool SecondaryTeamChanged = SecondaryTeam != m_SecondaryAdvertisedTeam;
 			const bool SecondaryNameChanged = m_SecondaryAdvertisedPlayerName != pCurrentName;
 			const bool SecondaryIdentityChanged = SecondaryRoomChanged || GameClientId != m_SecondaryAdvertisedGameClientId || SecondaryTeamChanged || SecondaryNameChanged;
-			const bool SecondaryNeedsRegistrationHello = !m_SecondaryRegistered && (m_SecondaryLastHelloTick == 0 || Now - m_SecondaryLastHelloTick > time_freq());
+			const bool SecondaryNeedsRegistrationHello = !m_SecondaryRegistered && (m_SecondaryLastHelloTick == 0 || Now - m_SecondaryLastHelloTick > VOICE_CONNECT_RETRY_SECONDS * time_freq());
 			const bool SecondaryNeedsHeartbeatHello = m_SecondaryRegistered && (SecondaryIdentityChanged || m_SecondaryLastHeartbeatTick == 0 || Now - m_SecondaryLastHeartbeatTick > VOICE_HEARTBEAT_SECONDS * time_freq());
 			if(SecondaryIdentityChanged)
 				m_SecondaryHelloResetPending = true;
@@ -1026,6 +1060,8 @@ void CVoiceChat::RenderMenuSettingsBlock(const CUIRect &View, float RevealPhase)
 			{
 				if(m_Socket)
 					StopVoice();
+				m_LastStartAttempt = 0;
+				ResetFailedHostLookup();
 				m_RuntimeState = RUNTIME_RECONNECTING;
 				StartVoice();
 			}
@@ -1888,10 +1924,20 @@ CUIRect CVoiceChat::GetHudTalkingIndicatorRect(float HudWidth, float HudHeight, 
 
 void CVoiceChat::StartVoice()
 {
+	const EVoiceNetOpen Net = OpenNetworking();
+	if(Net == EVoiceNetOpen::PENDING)
+	{
+		m_LastStartAttempt = 0;
+		if(m_RuntimeState != RUNTIME_RECONNECTING)
+			m_RuntimeState = RUNTIME_STARTING;
+		return;
+	}
+
 	if(m_LastStartAttempt == 0)
 		m_LastStartAttempt = time_get();
-	m_RuntimeState = m_RuntimeState == RUNTIME_RECONNECTING ? RUNTIME_RECONNECTING : RUNTIME_STARTING;
-	if(!OpenNetworking())
+	if(m_RuntimeState != RUNTIME_RECONNECTING)
+		m_RuntimeState = RUNTIME_STARTING;
+	if(Net != EVoiceNetOpen::READY)
 		return;
 	if(!OpenAudioDevices())
 	{
@@ -1921,14 +1967,53 @@ void CVoiceChat::StopVoice()
 	m_RuntimeState = RUNTIME_STOPPED;
 }
 
-bool CVoiceChat::OpenNetworking()
+bool CVoiceChat::IsHostLookupPending() const
+{
+	if(!m_pHostLookup || m_pHostLookup->Done())
+		return false;
+	const std::string ServerAddress = EffectiveServerAddress();
+	return str_comp(m_pHostLookup->Hostname(), ServerAddress.c_str()) == 0;
+}
+
+void CVoiceChat::ResetFailedHostLookup()
+{
+	if(!m_pHostLookup || !m_pHostLookup->Done())
+		return;
+	if(m_pHostLookup->State() == IJob::STATE_DONE && m_pHostLookup->Result() == 0)
+		return;
+	m_pHostLookup.reset();
+}
+
+CVoiceChat::EVoiceNetOpen CVoiceChat::OpenNetworking()
 {
 	const std::string ServerAddress = EffectiveServerAddress();
-	if(!BestClientVoice::ParseAddress(ServerAddress.c_str(), BestClientVoice::DEFAULT_PORT, m_ServerAddr))
+	NETADDR Resolved = NETADDR_ZEROED;
+	if(net_addr_from_str(&Resolved, ServerAddress.c_str()) == 0)
 	{
-		dbg_msg("voice", "invalid server address '%s'", EffectiveServerLabel());
-		return false;
+		if(Resolved.port == 0)
+			Resolved.port = BestClientVoice::DEFAULT_PORT;
 	}
+	else if(m_pHostLookup && str_comp(m_pHostLookup->Hostname(), ServerAddress.c_str()) == 0)
+	{
+		if(!m_pHostLookup->Done())
+			return EVoiceNetOpen::PENDING;
+		if(m_pHostLookup->State() != IJob::STATE_DONE || m_pHostLookup->Result() != 0)
+		{
+			dbg_msg("voice", "failed to resolve server address '%s'", EffectiveServerLabel());
+			return EVoiceNetOpen::FAILED;
+		}
+		Resolved = m_pHostLookup->Addr();
+		if(Resolved.port == 0)
+			Resolved.port = BestClientVoice::DEFAULT_PORT;
+	}
+	else
+	{
+		m_pHostLookup = std::make_shared<CHostLookup>(ServerAddress.c_str(), NETTYPE_ALL);
+		Engine()->AddJob(m_pHostLookup);
+		return EVoiceNetOpen::PENDING;
+	}
+
+	m_ServerAddr = Resolved;
 
 	NETADDR Bind = NETADDR_ZEROED;
 	Bind.type = NETTYPE_ALL;
@@ -1937,7 +2022,7 @@ bool CVoiceChat::OpenNetworking()
 	if(!m_Socket)
 	{
 		dbg_msg("voice", "failed to open UDP socket");
-		return false;
+		return EVoiceNetOpen::FAILED;
 	}
 	net_set_non_blocking(m_Socket);
 	m_HasServerAddr = true;
@@ -1963,7 +2048,7 @@ bool CVoiceChat::OpenNetworking()
 	m_SecondaryAdvertisedPlayerName.clear();
 	m_SecondaryAdvertisedGameClientId = BestClientVoice::INVALID_GAME_CLIENT_ID - 1;
 	m_SecondaryClientInstanceId = UUID_ZEROED;
-	return true;
+	return EVoiceNetOpen::READY;
 }
 
 void CVoiceChat::CloseNetworking()
@@ -2684,7 +2769,7 @@ void CVoiceChat::ProcessNetwork()
 
 		if(Type == BestClientVoice::PACKET_HELLO_CHALLENGE)
 		{
-			if(m_OfficialRejected)
+			if(m_OfficialRejected || m_PendingHelloPayload.empty())
 				continue;
 			if((int)(Offset + BestClientVoice::CHALLENGE_NONCE_SIZE) > DataSize)
 				continue;
@@ -2696,6 +2781,8 @@ void CVoiceChat::ProcessNetwork()
 
 		if(Type == BestClientVoice::PACKET_HELLO_ACK)
 		{
+			if(m_PendingHelloPayload.empty())
+				continue;
 			uint16_t VoiceId = 0;
 			uint16_t ServerFlags = 0;
 			if(BestClientVoice::ReadU16(pRawData, DataSize, Offset, VoiceId) && BestClientVoice::ReadU16(pRawData, DataSize, Offset, ServerFlags))
@@ -2981,7 +3068,7 @@ void CVoiceChat::ProcessSecondaryNetwork()
 
 		if(Type == BestClientVoice::PACKET_HELLO_CHALLENGE)
 		{
-			if(m_OfficialRejected)
+			if(m_OfficialRejected || m_SecondaryPendingHelloPayload.empty())
 				continue;
 			if((int)(Offset + BestClientVoice::CHALLENGE_NONCE_SIZE) > DataSize)
 				continue;
@@ -2993,6 +3080,8 @@ void CVoiceChat::ProcessSecondaryNetwork()
 
 		if(Type == BestClientVoice::PACKET_HELLO_ACK)
 		{
+			if(m_SecondaryPendingHelloPayload.empty())
+				continue;
 			uint16_t VoiceId = 0;
 			if(BestClientVoice::ReadU16(pRawData, DataSize, Offset, VoiceId))
 			{
@@ -3153,6 +3242,8 @@ void CVoiceChat::ProcessCapture()
 			{
 				dbg_msg("voice", "capture stalled, restarting voice pipeline");
 				StopVoice();
+				m_LastStartAttempt = 0;
+				ResetFailedHostLookup();
 				m_RuntimeState = RUNTIME_RECONNECTING;
 				StartVoice();
 				m_LastProcessCaptureTick = Now;
@@ -3454,10 +3545,38 @@ void CVoiceChat::CleanupPeers()
 
 void CVoiceChat::BeginReconnect()
 {
+	SendGoodbye();
+	SendGoodbyeSecondary();
+	DrainUdp(m_Socket);
+	DrainUdp(m_SecondarySocket);
 	m_RuntimeState = RUNTIME_RECONNECTING;
-	StopVoice();
-	m_RuntimeState = RUNTIME_RECONNECTING;
-	StartVoice();
+	m_Registered = false;
+	m_ClientVoiceId = 0;
+	m_LastHelloTick = time_get();
+	m_LastHeartbeatTick = m_LastHelloTick;
+	m_LastServerPacketTick = 0;
+	m_HelloResetPending = true;
+	m_ChallengeActive = false;
+	m_PendingHelloPayload.clear();
+	m_SecondaryRegistered = false;
+	m_SecondaryClientVoiceId = 0;
+	m_SecondaryLastHelloTick = m_LastHelloTick;
+	m_SecondaryLastHeartbeatTick = m_LastHelloTick;
+	m_SecondaryLastServerPacketTick = 0;
+	m_SecondaryHelloResetPending = true;
+	m_SecondaryChallengeActive = false;
+	m_SecondaryPendingHelloPayload.clear();
+	mem_zero(m_LinkToken, sizeof(m_LinkToken));
+	m_HasLinkToken = false;
+	m_ModAuthed = false;
+	m_ModAuthFailed = false;
+	m_ModAuthPending = false;
+	m_PendingModKey.clear();
+	m_vModPlayers.clear();
+	m_LastModPlayerListReqTick = 0;
+	ClearPeerState();
+	if(m_PlaybackDevice)
+		SDL_ClearQueuedAudio(m_PlaybackDevice);
 }
 
 void CVoiceChat::InvalidatePeerCaches(bool MappingDirty, bool TalkingDirty)
@@ -3948,6 +4067,8 @@ void CVoiceChat::ConVoiceConnect(IConsole::IResult *pResult, void *pUserData)
 	if(pSelf->Client()->State() != IClient::STATE_ONLINE)
 		return;
 	pSelf->StopVoice();
+	pSelf->m_LastStartAttempt = 0;
+	pSelf->ResetFailedHostLookup();
 	pSelf->m_RuntimeState = RUNTIME_RECONNECTING;
 	pSelf->StartVoice();
 	str_copy(pSelf->m_aLastServerAddr, pSelf->EffectiveServerAddress().c_str(), sizeof(pSelf->m_aLastServerAddr));

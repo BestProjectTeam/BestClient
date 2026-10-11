@@ -11,6 +11,7 @@
 #include <base/vmath.h>
 
 #include <engine/console.h>
+#include <engine/shared/host_lookup.h>
 
 #include <SDL_audio.h>
 
@@ -181,10 +182,18 @@ private:
 		bool m_PingInFlight = false;
 	};
 
+	enum class EVoiceNetOpen
+	{
+		FAILED,
+		PENDING,
+		READY,
+	};
+
 	NETSOCKET m_Socket = nullptr;
 	NETSOCKET m_SecondarySocket = nullptr;
 	NETSOCKET m_ServerListPingSocket = nullptr;
 	NETADDR m_ServerAddr = NETADDR_ZEROED;
+	std::shared_ptr<CHostLookup> m_pHostLookup;
 	bool m_HasServerAddr = false;
 	bool m_Registered = false;
 	bool m_SecondaryRegistered = false;
@@ -312,7 +321,9 @@ private:
 	bool ShouldKeepVoicePipelineActive() const;
 	bool ShouldUseSecondaryTeamConnection() const;
 	bool HasPendingPlaybackAudio() const;
-	bool OpenNetworking();
+	bool IsHostLookupPending() const;
+	void ResetFailedHostLookup();
+	EVoiceNetOpen OpenNetworking();
 	bool OpenSecondaryNetworking();
 	void CloseNetworking();
 	void CloseSecondaryNetworking();
