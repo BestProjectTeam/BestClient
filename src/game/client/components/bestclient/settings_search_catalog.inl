@@ -106,6 +106,7 @@
 
 	{"Custom hooks", SETTINGS_NAV_LEAF_BC_VISUALS, "Visuals", &g_Config.m_BcHookStyle, nullptr},
 	{"Style the hook", SETTINGS_NAV_LEAF_BC_VISUALS, "Custom hooks", &g_Config.m_BcHookRope, nullptr},
+	{"Style the tip", SETTINGS_NAV_LEAF_BC_VISUALS, "Custom hooks", &g_Config.m_BcHookTip, nullptr},
 	{"Grow time", SETTINGS_NAV_LEAF_BC_VISUALS, "Custom hooks", &g_Config.m_BcHookChargeTime, nullptr},
 	{"Size", SETTINGS_NAV_LEAF_BC_VISUALS, "Custom hooks", &g_Config.m_BcHookSize, nullptr},
 

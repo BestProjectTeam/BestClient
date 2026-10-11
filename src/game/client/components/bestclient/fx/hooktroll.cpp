@@ -161,39 +161,50 @@ void CHookTroll::OnRender()
 		return;
 	}
 	const float Scale = g_Config.m_BcHookSize / 100.0f;
+	const bool Tip = g_Config.m_BcHookTip != 0;
 
-	m_Tracker.Update(GameClient(), Passed, g_Config.m_BcHookChargeTime / 1000.0f, FADE_TIME,
-		[&](int ClientId, CHookGripTracker::EEvent Event, const CHookGripTracker::CGrip &Grip) {
-			CTrollState &State = m_aStates[ClientId];
-			const float Alpha = Grip.m_Alpha * Near(Grip);
-			switch(Event)
-			{
-			case CHookGripTracker::EEvent::GRAB:
-				State = CTrollState();
-				State.m_Seed = random_float(0.0f, 100.0f);
-				State.m_FaceScaleVel = 9.0f;
-				for(int i = 0; i < 14; i++)
+	if(!Tip)
+	{
+		m_Tracker.Reset();
+		m_NumFaces = 0;
+		for(CTrollState &State : m_aStates)
+			State = CTrollState();
+	}
+	else
+	{
+		m_Tracker.Update(GameClient(), Passed, g_Config.m_BcHookChargeTime / 1000.0f, FADE_TIME,
+			[&](int ClientId, CHookGripTracker::EEvent Event, const CHookGripTracker::CGrip &Grip) {
+				CTrollState &State = m_aStates[ClientId];
+				const float Alpha = Grip.m_Alpha * Near(Grip);
+				switch(Event)
 				{
-					const vec2 Dir = direction(angle(Grip.m_Dir) + random_float(-1.3f, 1.3f));
-					EmitDrip(Grip.m_Pos, Dir * random_float(120.0f, 300.0f) * Scale, random_float(1.5f, 3.2f) * Scale, Alpha);
+				case CHookGripTracker::EEvent::GRAB:
+					State = CTrollState();
+					State.m_Seed = random_float(0.0f, 100.0f);
+					State.m_FaceScaleVel = 9.0f;
+					for(int i = 0; i < 14; i++)
+					{
+						const vec2 Dir = direction(angle(Grip.m_Dir) + random_float(-1.3f, 1.3f));
+						EmitDrip(Grip.m_Pos, Dir * random_float(120.0f, 300.0f) * Scale, random_float(1.5f, 3.2f) * Scale, Alpha);
+					}
+					break;
+				case CHookGripTracker::EEvent::CHARGED:
+					State.m_Laugh = 1.0f;
+					State.m_FaceScaleVel += 6.0f;
+					break;
+				case CHookGripTracker::EEvent::RELEASE:
+					if(State.m_FaceScale > 0.1f && m_NumFaces < MAX_FACES)
+					{
+						const float Size = mix(34.0f, 52.0f, Grip.m_Charge) * State.m_FaceScale * Scale;
+						m_aFaces[m_NumFaces++] = {Grip.m_Pos + Grip.m_Dir * 6.0f, (Grip.m_Dir * 140.0f + vec2(random_float(-60.0f, 60.0f), -200.0f)) * Scale,
+							Size, 0.0f, random_float(-7.0f, 7.0f), 0.0f, Alpha, Grip.m_Dir.x < 0.0f};
+					}
+					for(int i = 0; i < 12; i++)
+						EmitDrip(Grip.m_Pos + vec2(random_float(-10.0f, 10.0f), random_float(-6.0f, 6.0f)) * Scale, vec2(random_float(-50.0f, 50.0f), random_float(-80.0f, 20.0f)) * Scale, random_float(1.8f, 3.6f) * Scale, Alpha);
+					break;
 				}
-				break;
-			case CHookGripTracker::EEvent::CHARGED:
-				State.m_Laugh = 1.0f;
-				State.m_FaceScaleVel += 6.0f;
-				break;
-			case CHookGripTracker::EEvent::RELEASE:
-				if(State.m_FaceScale > 0.1f && m_NumFaces < MAX_FACES)
-				{
-					const float Size = mix(34.0f, 52.0f, Grip.m_Charge) * State.m_FaceScale * Scale;
-					m_aFaces[m_NumFaces++] = {Grip.m_Pos + Grip.m_Dir * 6.0f, (Grip.m_Dir * 140.0f + vec2(random_float(-60.0f, 60.0f), -200.0f)) * Scale,
-						Size, 0.0f, random_float(-7.0f, 7.0f), 0.0f, Alpha, Grip.m_Dir.x < 0.0f};
-				}
-				for(int i = 0; i < 12; i++)
-					EmitDrip(Grip.m_Pos + vec2(random_float(-10.0f, 10.0f), random_float(-6.0f, 6.0f)) * Scale, vec2(random_float(-50.0f, 50.0f), random_float(-80.0f, 20.0f)) * Scale, random_float(1.8f, 3.6f) * Scale, Alpha);
-				break;
-			}
-		});
+			});
+	}
 
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{

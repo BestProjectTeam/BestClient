@@ -78,7 +78,7 @@ void CMenus::RenderSettingsBestClientFx(CUIRect &Column, bool HookColumn)
 		int DetailRows = 0;
 		if(StyleOn)
 		{
-			DetailRows = 3;
+			DetailRows = 4;
 			if(StyleSettingRows > 0)
 				DetailRows += StyleSettingRows;
 		}
@@ -103,6 +103,7 @@ void CMenus::RenderSettingsBestClientFx(CUIRect &Column, bool HookColumn)
 		{
 			g_Config.m_BcHookStyle = DefaultConfig::BcHookStyle;
 			g_Config.m_BcHookRope = DefaultConfig::BcHookRope;
+			g_Config.m_BcHookTip = DefaultConfig::BcHookTip;
 			g_Config.m_BcHookChargeTime = DefaultConfig::BcHookChargeTime;
 			g_Config.m_BcHookSize = DefaultConfig::BcHookSize;
 			g_Config.m_BcHookWindColor = DefaultConfig::BcHookWindColor;
@@ -166,6 +167,7 @@ void CMenus::RenderSettingsBestClientFx(CUIRect &Column, bool HookColumn)
 		if(StyleOn)
 		{
 			RowCheck(Block, &g_Config.m_BcHookRope, BcLocalize("Style the hook"));
+			RowCheck(Block, &g_Config.m_BcHookTip, BcLocalize("Style the tip"));
 			RowSlider(Block, &g_Config.m_BcHookChargeTime, BcLocalize("Grow time"), 200, 4000, "ms");
 			RowSlider(Block, &g_Config.m_BcHookSize, BcLocalize("Size"), 50, 200, "%");
 

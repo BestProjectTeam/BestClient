@@ -1603,6 +1603,10 @@ Style the hook
 == Стилизовать хук
 
 [BestClient]
+Style the tip
+== Стилизовать кончик
+
+[BestClient]
 Grow time
 == Время роста
 

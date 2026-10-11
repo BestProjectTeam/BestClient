@@ -450,34 +450,40 @@ void CHookFire::OnRender()
 
 	const CPalette CurrentPalette = Palette();
 	const float Scale = g_Config.m_BcHookSize / 100.0f;
+	const bool Tip = g_Config.m_BcHookTip != 0;
 
-	m_Tracker.Update(GameClient(), Passed, g_Config.m_BcHookChargeTime / 1000.0f, FADE_TIME,
-		[&](int ClientId, CHookGripTracker::EEvent Event, const CHookGripTracker::CGrip &Grip) {
-			switch(Event)
-			{
-			case CHookGripTracker::EEvent::GRAB:
-				Ignite(ClientId, Grip, Scale);
-				break;
-			case CHookGripTracker::EEvent::CHARGED:
-				Roar(ClientId, Grip, Scale);
-				break;
-			case CHookGripTracker::EEvent::RELEASE:
-				DieDown(Grip, Scale);
-				break;
-			}
-		});
-
-	for(int i = 0; i < MAX_CLIENTS; i++)
+	if(Tip)
 	{
-		const CHookGripTracker::CGrip &Grip = m_Tracker.Grip(i);
-		CFireState &State = m_aStates[i];
-		if(Grip.m_Holding)
+		m_Tracker.Update(GameClient(), Passed, g_Config.m_BcHookChargeTime / 1000.0f, FADE_TIME,
+			[&](int ClientId, CHookGripTracker::EEvent Event, const CHookGripTracker::CGrip &Grip) {
+				switch(Event)
+				{
+				case CHookGripTracker::EEvent::GRAB:
+					Ignite(ClientId, Grip, Scale);
+					break;
+				case CHookGripTracker::EEvent::CHARGED:
+					Roar(ClientId, Grip, Scale);
+					break;
+				case CHookGripTracker::EEvent::RELEASE:
+					DieDown(Grip, Scale);
+					break;
+				}
+			});
+
+		for(int i = 0; i < MAX_CLIENTS; i++)
 		{
-			State.m_Appear = std::min(1.0f, State.m_Appear + Passed / APPEAR_TIME);
-			Burn(i, Grip, Passed, Scale);
+			const CHookGripTracker::CGrip &Grip = m_Tracker.Grip(i);
+			CFireState &State = m_aStates[i];
+			if(Grip.m_Holding)
+			{
+				State.m_Appear = std::min(1.0f, State.m_Appear + Passed / APPEAR_TIME);
+				Burn(i, Grip, Passed, Scale);
+			}
+			State.m_Flare = std::max(0.0f, State.m_Flare - Passed / 0.6f);
 		}
-		State.m_Flare = std::max(0.0f, State.m_Flare - Passed / 0.6f);
 	}
+	else
+		m_Tracker.Reset();
 
 	for(int i = 0; i < m_NumScorches;)
 	{

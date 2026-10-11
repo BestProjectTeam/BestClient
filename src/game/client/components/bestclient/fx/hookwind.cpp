@@ -414,7 +414,7 @@ void CHookWind::OnRender()
 	const float Passed = std::clamp(Time - m_LastTime, 0.0f, 0.1f) * GameClient()->GetAnimationPlaybackSpeed();
 	m_LastTime = Time;
 
-	if(g_Config.m_BcHookStyle != FGF_HOOK_STYLE_WHIRLWIND)
+	if(g_Config.m_BcHookStyle != FGF_HOOK_STYLE_WHIRLWIND || !g_Config.m_BcHookTip)
 	{
 		OnReset();
 		return;

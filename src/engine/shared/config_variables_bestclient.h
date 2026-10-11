@@ -525,6 +525,7 @@ MACRO_CONFIG_INT(BcFreezeLightningShake, bc_freeze_lightning_shake, 35, 0, 100, 
 // Custom hooks
 MACRO_CONFIG_INT(BcHookStyle, bc_hook_style, 0, 0, 8, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Effect where the hook grips the world (0 = none, 1 = whirlwind, 2 = black hole, 3 = magic, 4 = fire, 5 = troll, 6 = rainbow, 7 = lightning, 8 = tentacle)")
 MACRO_CONFIG_INT(BcHookRope, bc_hook_rope, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Draw the hook itself in the style of the hook effect")
+MACRO_CONFIG_INT(BcHookTip, bc_hook_tip, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Draw the effect where the hook grips the world")
 MACRO_CONFIG_INT(BcHookTether, bc_hook_tether, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "A lasso and pulses along the hook when you hook another player")
 MACRO_CONFIG_INT(BcHookLassoBox, bc_hook_lasso_box, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Corner brackets on the player your hook holds")
 MACRO_CONFIG_INT(BcAirJump, bc_air_jump, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "A ring of light under your feet when you jump in the air, colored like the hook")

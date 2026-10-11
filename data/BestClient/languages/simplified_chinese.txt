@@ -1599,6 +1599,10 @@ Style the hook
 == 钩索样式
 
 [BestClient]
+Style the tip
+== 钩尖样式
+
+[BestClient]
 Grow time
 == 生长时间
 

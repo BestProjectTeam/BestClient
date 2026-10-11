@@ -464,7 +464,7 @@ void CHookMagic::OnRender()
 	const float Passed = std::clamp(Time - m_LastTime, 0.0f, 0.1f) * GameClient()->GetAnimationPlaybackSpeed();
 	m_LastTime = Time;
 
-	if(g_Config.m_BcHookStyle != FGF_HOOK_STYLE_MAGIC)
+	if(g_Config.m_BcHookStyle != FGF_HOOK_STYLE_MAGIC || !g_Config.m_BcHookTip)
 	{
 		OnReset();
 		return;
