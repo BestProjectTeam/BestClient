@@ -274,8 +274,7 @@ void CLightning::DrawBolts(const CPalette &Palette)
 		Graphics()->QuadsDraw(&Quad, 1);
 	};
 
-	auto DrawBeams = [&](float Width, ColorRGBA Color, float AlphaScale) {
-		FgfGlow::BeginStrips(Graphics(), m_BeamTexture);
+	auto DrawBeamPaths = [&](float Width, ColorRGBA Color, float AlphaScale) {
 		for(int i = 0; i < m_NumBolts; i++)
 		{
 			const CBolt &Bolt = m_aBolts[i];
@@ -284,13 +283,14 @@ void CLightning::DrawBolts(const CPalette &Palette)
 			for(int b = 0; b < Bolt.m_NumBranches; b++)
 				DrawPath(Bolt.m_aBranches[b], Width * Bolt.m_aBranchWidths[b], true, Color.WithAlpha(0.85f * Alpha));
 		}
-		Graphics()->QuadsEnd();
 	};
 
 	Graphics()->QuadsSetRotation(0.0f);
 
 	Graphics()->BlendNormal();
-	DrawBeams(12.0f * Thickness, Palette.m_Primary, 0.3f);
+	FgfGlow::BeginStrips(Graphics(), m_BeamTexture);
+	DrawBeamPaths(12.0f * Thickness, Palette.m_Primary, 0.3f);
+	Graphics()->QuadsEnd();
 	Graphics()->TextureSet(m_GlowTexture);
 	Graphics()->QuadsBegin();
 	for(int i = 0; i < m_NumBolts; i++)
@@ -300,9 +300,11 @@ void CLightning::DrawBolts(const CPalette &Palette)
 	Graphics()->BlendAdditive();
 	m_Glow.Draw(Graphics(), m_GlowTexture, m_RingTexture);
 
-	DrawBeams(26.0f * Thickness, Palette.m_Secondary, 0.55f);
-	DrawBeams(9.0f * Thickness, Palette.m_Primary, 0.9f);
-	DrawBeams(3.2f * Thickness, Palette.m_Core, 1.0f);
+	FgfGlow::BeginStrips(Graphics(), m_BeamTexture);
+	DrawBeamPaths(26.0f * Thickness, Palette.m_Secondary, 0.55f);
+	DrawBeamPaths(9.0f * Thickness, Palette.m_Primary, 0.9f);
+	DrawBeamPaths(3.2f * Thickness, Palette.m_Core, 1.0f);
+	Graphics()->QuadsEnd();
 
 	Graphics()->TextureSet(m_GlowTexture);
 	Graphics()->QuadsBegin();

@@ -19,9 +19,12 @@ public:
 	void OnReset() override;
 	void OnRender() override;
 
+	static int BuildBolt(vec2 Start, vec2 End, float Seed, float Spread, int Segments, vec2 *pPoints, float *pScales);
 	static void Bolt(IGraphics *pGraphics, vec2 Start, vec2 End, float Seed, float Spread, float Width, ColorRGBA Color, int Segments = 10);
 
 private:
+	static void DrawBolt(IGraphics *pGraphics, const vec2 *pPoints, const float *pScales, int Count, float Width, ColorRGBA Color);
+
 	static constexpr int NUM_ARCS = 5;
 
 	struct CBoltState

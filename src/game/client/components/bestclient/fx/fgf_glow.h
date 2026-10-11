@@ -23,6 +23,7 @@ enum
 };
 
 void DrawStrip(IGraphics *pGraphics, const vec2 *pPoints, const float *pWidths, int NumPoints, ColorRGBA Color);
+void DrawStripScaled(IGraphics *pGraphics, const vec2 *pPoints, const float *pScales, int NumPoints, const float *pLayerWidths, const ColorRGBA *pLayerColors, int NumLayers);
 void BeginStrips(IGraphics *pGraphics, IGraphics::CTextureHandle BeamTexture);
 }
 

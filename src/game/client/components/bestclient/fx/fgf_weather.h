@@ -9,6 +9,8 @@
 #include <game/client/component.h>
 #include "fgf_glow.h"
 
+#include <vector>
+
 enum
 {
 	FGF_WEATHER_SNOW = 0,
@@ -59,8 +61,19 @@ private:
 	float m_SpawnAccumulator = 0.0f;
 	float m_LastTime = 0.0f;
 
+	int m_MaskOriginX = 0;
+	int m_MaskOriginY = 0;
+	int m_MaskWidth = 0;
+	int m_MaskHeight = 0;
+	std::vector<unsigned char> m_Solid;
+	std::vector<int> m_AirTiles;
+	bool m_MaskReady = false;
+
 	CDrop *NewDrop();
 	void Splash(vec2 Pos);
+	void BuildMask(const CScreenRect &View);
+	bool SolidAt(vec2 Pos) const;
+	bool RandomAirPoint(const CScreenRect &View, vec2 &Pos) const;
 	void Spawn(const CScreenRect &View, float Passed, float Time);
 	void Update(const CScreenRect &View, float Passed, float Time);
 	void Draw(float Time);

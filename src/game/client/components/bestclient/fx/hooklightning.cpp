@@ -26,28 +26,40 @@ static float Noise(float Seed)
 	return x - std::floor(x);
 }
 
-void CHookLightning::Bolt(IGraphics *pGraphics, vec2 Start, vec2 End, float Seed, float Spread, float Width, ColorRGBA Color, int Segments)
+int CHookLightning::BuildBolt(vec2 Start, vec2 End, float Seed, float Spread, int Segments, vec2 *pPoints, float *pScales)
 {
 	Segments = std::clamp(Segments, 2, (int)FgfGlow::MAX_STRIP_POINTS - 1);
 	const vec2 Delta = End - Start;
 	const float Length = length(Delta);
 	if(Length < 0.5f)
-		return;
+		return 0;
 	const vec2 Along = Delta / Length;
 	const vec2 Normal(-Along.y, Along.x);
-
-	vec2 aPoints[FgfGlow::MAX_STRIP_POINTS];
-	float aWidths[FgfGlow::MAX_STRIP_POINTS];
 	const int Count = Segments + 1;
 	for(int i = 0; i < Count; i++)
 	{
 		const float Along01 = i / (float)Segments;
 		const float Taper = std::sin(Along01 * pi);
 		const float Offset = (Noise(Seed + i * 3.77f) - 0.5f) * 2.0f * Spread * Taper;
-		aPoints[i] = Start + Along * (Length * Along01) + Normal * Offset;
-		aWidths[i] = Width * mix(0.55f, 1.0f, Taper);
+		pPoints[i] = Start + Along * (Length * Along01) + Normal * Offset;
+		pScales[i] = mix(0.55f, 1.0f, Taper);
 	}
-	FgfGlow::DrawStrip(pGraphics, aPoints, aWidths, Count, Color);
+	return Count;
+}
+
+void CHookLightning::DrawBolt(IGraphics *pGraphics, const vec2 *pPoints, const float *pScales, int Count, float Width, ColorRGBA Color)
+{
+	if(Count < 2)
+		return;
+	FgfGlow::DrawStripScaled(pGraphics, pPoints, pScales, Count, &Width, &Color, 1);
+}
+
+void CHookLightning::Bolt(IGraphics *pGraphics, vec2 Start, vec2 End, float Seed, float Spread, float Width, ColorRGBA Color, int Segments)
+{
+	vec2 aPoints[FgfGlow::MAX_STRIP_POINTS];
+	float aScales[FgfGlow::MAX_STRIP_POINTS];
+	const int Count = BuildBolt(Start, End, Seed, Spread, Segments, aPoints, aScales);
+	DrawBolt(pGraphics, aPoints, aScales, Count, Width, Color);
 }
 
 void CHookLightning::OnInit()

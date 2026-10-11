@@ -40,6 +40,29 @@ static float BeamAlpha(float Dx, float Dy)
 	return GlowFalloff(std::abs(Dy));
 }
 
+namespace
+{
+struct CSharedTextures
+{
+	IGraphics *m_pGraphics = nullptr;
+	IGraphics::CTextureHandle m_Glow;
+	IGraphics::CTextureHandle m_Ring;
+	IGraphics::CTextureHandle m_Disc;
+	IGraphics::CTextureHandle m_Beam;
+	IGraphics::CTextureHandle m_Leaf;
+};
+
+CSharedTextures s_SharedTextures;
+
+void BindGraphics(IGraphics *pGraphics)
+{
+	if(s_SharedTextures.m_pGraphics == pGraphics)
+		return;
+	s_SharedTextures = {};
+	s_SharedTextures.m_pGraphics = pGraphics;
+}
+}
+
 static IGraphics::CTextureHandle CreateTexture(IGraphics *pGraphics, int Width, int Height, float (*pAlpha)(float Dx, float Dy), const char *pName)
 {
 	CImageInfo Image;
@@ -65,26 +88,42 @@ static IGraphics::CTextureHandle CreateTexture(IGraphics *pGraphics, int Width, 
 
 IGraphics::CTextureHandle FgfGlow::CreateGlowTexture(IGraphics *pGraphics)
 {
-	return CreateTexture(pGraphics, 64, 64, GlowAlpha, "fgf_glow");
+	BindGraphics(pGraphics);
+	if(!s_SharedTextures.m_Glow.IsValid())
+		s_SharedTextures.m_Glow = CreateTexture(pGraphics, 64, 64, GlowAlpha, "fgf_glow");
+	return s_SharedTextures.m_Glow;
 }
 
 IGraphics::CTextureHandle FgfGlow::CreateRingTexture(IGraphics *pGraphics)
 {
-	return CreateTexture(pGraphics, 128, 128, RingAlpha, "fgf_ring");
+	BindGraphics(pGraphics);
+	if(!s_SharedTextures.m_Ring.IsValid())
+		s_SharedTextures.m_Ring = CreateTexture(pGraphics, 128, 128, RingAlpha, "fgf_ring");
+	return s_SharedTextures.m_Ring;
 }
 
 IGraphics::CTextureHandle FgfGlow::CreateDiscTexture(IGraphics *pGraphics)
 {
-	return CreateTexture(pGraphics, 128, 128, DiscAlpha, "fgf_disc");
+	BindGraphics(pGraphics);
+	if(!s_SharedTextures.m_Disc.IsValid())
+		s_SharedTextures.m_Disc = CreateTexture(pGraphics, 128, 128, DiscAlpha, "fgf_disc");
+	return s_SharedTextures.m_Disc;
 }
 
 IGraphics::CTextureHandle FgfGlow::CreateBeamTexture(IGraphics *pGraphics)
 {
-	return CreateTexture(pGraphics, 8, 64, BeamAlpha, "fgf_beam");
+	BindGraphics(pGraphics);
+	if(!s_SharedTextures.m_Beam.IsValid())
+		s_SharedTextures.m_Beam = CreateTexture(pGraphics, 8, 64, BeamAlpha, "fgf_beam");
+	return s_SharedTextures.m_Beam;
 }
 
 IGraphics::CTextureHandle FgfGlow::CreateLeafTexture(IGraphics *pGraphics)
 {
+	BindGraphics(pGraphics);
+	if(s_SharedTextures.m_Leaf.IsValid())
+		return s_SharedTextures.m_Leaf;
+
 	const int Size = 64;
 	CImageInfo Image;
 	Image.m_Width = Size;
@@ -118,7 +157,8 @@ IGraphics::CTextureHandle FgfGlow::CreateLeafTexture(IGraphics *pGraphics)
 			pPixel[3] = (uint8_t)round_to_int(Alpha * 255.0f);
 		}
 	}
-	return pGraphics->LoadTextureRawMove(Image, 0, "fgf_leaf");
+	s_SharedTextures.m_Leaf = pGraphics->LoadTextureRawMove(Image, 0, "fgf_leaf");
+	return s_SharedTextures.m_Leaf;
 }
 
 void FgfGlow::BeginStrips(IGraphics *pGraphics, IGraphics::CTextureHandle BeamTexture)
@@ -155,6 +195,38 @@ void FgfGlow::DrawStrip(IGraphics *pGraphics, const vec2 *pPoints, const float *
 
 	pGraphics->SetColor(Color);
 	pGraphics->QuadsDrawFreeform(aQuads, NumPoints - 1);
+}
+
+void FgfGlow::DrawStripScaled(IGraphics *pGraphics, const vec2 *pPoints, const float *pScales, int NumPoints, const float *pLayerWidths, const ColorRGBA *pLayerColors, int NumLayers)
+{
+	NumPoints = std::min<int>(NumPoints, MAX_STRIP_POINTS);
+	if(NumPoints < 2 || NumLayers <= 0)
+		return;
+
+	vec2 aNormals[MAX_STRIP_POINTS];
+	for(int i = 0; i < NumPoints; i++)
+	{
+		const vec2 Tangent = pPoints[std::min(i + 1, NumPoints - 1)] - pPoints[std::max(i - 1, 0)];
+		const float Length = length(Tangent);
+		aNormals[i] = Length > 0.001f ? vec2(-Tangent.y, Tangent.x) / Length : vec2(0.0f, 0.0f);
+	}
+
+	for(int Layer = 0; Layer < NumLayers; Layer++)
+	{
+		IGraphics::CFreeformItem aQuads[MAX_STRIP_POINTS - 1];
+		for(int i = 0; i < NumPoints - 1; i++)
+		{
+			const float WidthFrom = pLayerWidths[Layer] * pScales[i];
+			const float WidthTo = pLayerWidths[Layer] * pScales[i + 1];
+			const vec2 &From = pPoints[i];
+			const vec2 &To = pPoints[i + 1];
+			aQuads[i] = IGraphics::CFreeformItem(
+				To + aNormals[i + 1] * WidthTo, To - aNormals[i + 1] * WidthTo,
+				From + aNormals[i] * WidthFrom, From - aNormals[i] * WidthFrom);
+		}
+		pGraphics->SetColor(pLayerColors[Layer]);
+		pGraphics->QuadsDrawFreeform(aQuads, NumPoints - 1);
+	}
 }
 
 ColorRGBA FgfGlow::Whiten(ColorRGBA Color, float Amount)
@@ -220,8 +292,10 @@ void CGlowParticles::Update(float Passed)
 		}
 		else
 		{
-			Spark.m_Vel.y += Spark.m_Gravity * Passed;
-			Spark.m_Vel *= std::pow(Spark.m_Drag, Passed);
+			if(Spark.m_Gravity != 0.0f)
+				Spark.m_Vel.y += Spark.m_Gravity * Passed;
+			if(Spark.m_Drag != 1.0f)
+				Spark.m_Vel *= std::pow(Spark.m_Drag, Passed);
 			Spark.m_Pos += Spark.m_Vel * Passed;
 		}
 		i++;

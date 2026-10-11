@@ -899,9 +899,12 @@ void CHookRope::RenderBolt(int ClientId, vec2 TeePos, vec2 HookPos, bool Pulling
 	Graphics()->BlendAdditive();
 	FgfGlow::BeginStrips(Graphics(), m_BeamTexture);
 
-	CHookLightning::Bolt(Graphics(), HookPos, TeePos, Seed, Spread, 6.5f * Scale, Color.WithAlpha(0.22f * Alpha), Segments);
-	CHookLightning::Bolt(Graphics(), HookPos, TeePos, Seed, Spread, 2.6f * Scale, Color.WithAlpha(0.85f * Alpha), Segments);
-	CHookLightning::Bolt(Graphics(), HookPos, TeePos, Seed, Spread, 1.0f * Scale, Hot.WithAlpha(0.95f * Alpha), Segments);
+	vec2 aPoints[FgfGlow::MAX_STRIP_POINTS];
+	float aScales[FgfGlow::MAX_STRIP_POINTS];
+	const int Count = CHookLightning::BuildBolt(HookPos, TeePos, Seed, Spread, Segments, aPoints, aScales);
+	const float aWidths[3] = {6.5f * Scale, 2.6f * Scale, 1.0f * Scale};
+	const ColorRGBA aColors[3] = {Color.WithAlpha(0.22f * Alpha), Color.WithAlpha(0.85f * Alpha), Hot.WithAlpha(0.95f * Alpha)};
+	FgfGlow::DrawStripScaled(Graphics(), aPoints, aScales, Count, aWidths, aColors, 3);
 
 	const int Branches = g_Config.m_BcHookBoltBranches;
 	for(int i = 0; i < Branches; i++)

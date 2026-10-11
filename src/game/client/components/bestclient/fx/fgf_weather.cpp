@@ -12,6 +12,7 @@
 #include <game/client/components/particles.h>
 #include <game/client/gameclient.h>
 #include <game/collision.h>
+#include <game/mapitems.h>
 
 #include "own_tee.h"
 
@@ -30,6 +31,107 @@ void CFgfWeather::OnReset()
 	m_NumDrops = 0;
 	m_NumSplashes = 0;
 	m_SpawnAccumulator = 0.0f;
+	m_MaskReady = false;
+	m_Solid.clear();
+	m_AirTiles.clear();
+}
+
+void CFgfWeather::BuildMask(const CScreenRect &View)
+{
+	const float Left = View.m_TopLeft.x - VIEW_MARGIN * 2.0f;
+	const float Right = View.m_BottomRight.x + VIEW_MARGIN * 2.0f;
+	const float Top = View.m_TopLeft.y - VIEW_MARGIN * 2.0f;
+	const float Bottom = View.m_BottomRight.y + VIEW_MARGIN * 2.0f;
+	const int X0 = std::max(0, std::min(round_to_int(Left), round_to_int(Right)) / 32);
+	const int Y0 = std::max(0, std::min(round_to_int(Top), round_to_int(Bottom)) / 32);
+	const int X1 = std::max(round_to_int(Left), round_to_int(Right)) / 32;
+	const int Y1 = std::max(round_to_int(Top), round_to_int(Bottom)) / 32;
+	const int Width = X1 - X0 + 1;
+	const int Height = Y1 - Y0 + 1;
+	if(Width <= 0 || Height <= 0 || Width > 400 || Height > 400)
+	{
+		m_MaskReady = false;
+		m_Solid.clear();
+		m_AirTiles.clear();
+		return;
+	}
+	if(m_MaskReady && m_MaskOriginX == X0 && m_MaskOriginY == Y0 && m_MaskWidth == Width && m_MaskHeight == Height)
+		return;
+
+	const float SpawnLeft = View.m_TopLeft.x - VIEW_MARGIN;
+	const float SpawnRight = View.m_BottomRight.x + VIEW_MARGIN;
+	const float SpawnTop = View.m_TopLeft.y - VIEW_MARGIN;
+	const float SpawnBottom = View.m_BottomRight.y + VIEW_MARGIN;
+
+	m_MaskOriginX = X0;
+	m_MaskOriginY = Y0;
+	m_MaskWidth = Width;
+	m_MaskHeight = Height;
+	m_Solid.assign((size_t)Width * Height, 0);
+	m_AirTiles.clear();
+	m_AirTiles.reserve((size_t)Width * Height / 2);
+
+	for(int y = 0; y < Height; y++)
+	{
+		for(int x = 0; x < Width; x++)
+		{
+			const int TileX = X0 + x;
+			const int TileY = Y0 + y;
+			const int Tile = Collision()->GetTile(TileX * 32 + 16, TileY * 32 + 16);
+			const bool Solid = Tile == TILE_SOLID || Tile == TILE_NOHOOK;
+			const int Index = y * Width + x;
+			m_Solid[Index] = Solid ? 1 : 0;
+			if(Solid)
+				continue;
+			const float TileLeft = TileX * 32.0f;
+			const float TileRight = TileLeft + 31.0f;
+			const float TileTop = TileY * 32.0f;
+			const float TileBottom = TileTop + 31.0f;
+			if(TileRight > SpawnLeft && TileLeft < SpawnRight && TileBottom > SpawnTop && TileTop < SpawnBottom)
+				m_AirTiles.push_back(Index);
+		}
+	}
+	m_MaskReady = true;
+}
+
+bool CFgfWeather::SolidAt(vec2 Pos) const
+{
+	if(!m_MaskReady)
+		return Collision()->CheckPoint(Pos);
+	const int TileX = round_to_int(Pos.x) / 32;
+	const int TileY = round_to_int(Pos.y) / 32;
+	const int LocalX = TileX - m_MaskOriginX;
+	const int LocalY = TileY - m_MaskOriginY;
+	if(LocalX < 0 || LocalY < 0 || LocalX >= m_MaskWidth || LocalY >= m_MaskHeight)
+		return Collision()->CheckPoint(Pos);
+	return m_Solid[LocalY * m_MaskWidth + LocalX] != 0;
+}
+
+bool CFgfWeather::RandomAirPoint(const CScreenRect &View, vec2 &Pos) const
+{
+	if(m_AirTiles.empty())
+		return false;
+	const float SpawnLeft = View.m_TopLeft.x - VIEW_MARGIN;
+	const float SpawnRight = View.m_BottomRight.x + VIEW_MARGIN;
+	const float SpawnTop = View.m_TopLeft.y - VIEW_MARGIN;
+	const float SpawnBottom = View.m_BottomRight.y + VIEW_MARGIN;
+	const int Count = (int)m_AirTiles.size();
+	for(int Attempt = 0; Attempt < 8; Attempt++)
+	{
+		const int Index = m_AirTiles[std::min(Count - 1, (int)(random_float() * Count))];
+		const int TileX = m_MaskOriginX + Index % m_MaskWidth;
+		const int TileY = m_MaskOriginY + Index / m_MaskWidth;
+		const float Left = std::max(SpawnLeft, TileX * 32.0f);
+		const float Right = std::min(SpawnRight, TileX * 32.0f + 31.0f);
+		const float Top = std::max(SpawnTop, TileY * 32.0f);
+		const float Bottom = std::min(SpawnBottom, TileY * 32.0f + 31.0f);
+		if(Right <= Left || Bottom <= Top)
+			continue;
+		Pos = vec2(random_float(Left, Right), random_float(Top, Bottom));
+		if(!SolidAt(Pos))
+			return true;
+	}
+	return false;
 }
 
 CFgfWeather::CDrop *CFgfWeather::NewDrop()
@@ -73,7 +175,7 @@ void CFgfWeather::Spawn(const CScreenRect &View, float Passed, float Time)
 		{
 			const vec2 Pos(random_float(View.m_TopLeft.x - VIEW_MARGIN, View.m_BottomRight.x + VIEW_MARGIN),
 				random_float(View.m_TopLeft.y - VIEW_MARGIN, View.m_BottomRight.y + VIEW_MARGIN));
-			if(Collision()->CheckPoint(Pos))
+			if(SolidAt(Pos))
 				continue;
 			CDrop *pDrop = NewDrop();
 			pDrop->m_Pos = Pos;
@@ -91,13 +193,20 @@ void CFgfWeather::Spawn(const CScreenRect &View, float Passed, float Time)
 	const float AverageLife = Snow ? 5.0f : 0.45f;
 	const float Wanted = (Snow ? 110.0f : 170.0f) * Amount * Area * Height / 800.0f;
 	m_SpawnAccumulator += Passed * Wanted / AverageLife;
+	if(m_MaskReady && m_AirTiles.empty())
+	{
+		m_SpawnAccumulator = 0.0f;
+		return;
+	}
+
+	const int TryLimit = m_MaskReady ? 48 : 400;
 	int Tries = 0;
-	while(m_SpawnAccumulator >= 1.0f && Tries < 400)
+	while(m_SpawnAccumulator >= 1.0f && Tries < TryLimit)
 	{
 		Tries++;
-		const vec2 Pos(random_float(View.m_TopLeft.x - VIEW_MARGIN, View.m_BottomRight.x + VIEW_MARGIN),
+		vec2 Pos(random_float(View.m_TopLeft.x - VIEW_MARGIN, View.m_BottomRight.x + VIEW_MARGIN),
 			random_float(View.m_TopLeft.y - VIEW_MARGIN, View.m_BottomRight.y + VIEW_MARGIN));
-		if(Collision()->CheckPoint(Pos))
+		if(SolidAt(Pos) && !RandomAirPoint(View, Pos))
 			continue;
 		m_SpawnAccumulator -= 1.0f;
 		CDrop *pDrop = NewDrop();
@@ -158,7 +267,7 @@ void CFgfWeather::Update(const CScreenRect &View, float Passed, float Time)
 			}
 
 			const vec2 Next = Drop.m_Pos + Vel * Passed;
-			if(Collision()->CheckPoint(Next))
+			if(SolidAt(Next))
 			{
 				if(m_Kind == FGF_WEATHER_RAIN)
 				{
@@ -344,8 +453,6 @@ void CFgfWeather::OnRender()
 	const float Time = LocalTime();
 	const float Passed = std::clamp(Time - m_LastTime, 0.0f, 0.1f) * GameClient()->GetAnimationPlaybackSpeed();
 	m_LastTime = Time;
-	if(BcFxSuppressed(GameClient()))
-		return;
 
 	if(!g_Config.m_BcAtmosphere)
 	{
@@ -370,6 +477,7 @@ void CFgfWeather::OnRender()
 	const CScreenRect View = Graphics()->MapScreenToWorld(Center.x, Center.y, 100.0f, 100.0f, 100.0f,
 		0.0f, 0.0f, Graphics()->ScreenAspect(), GameClient()->m_Camera.m_Zoom);
 
+	BuildMask(View);
 	Spawn(View, Passed, Time);
 	Update(View, Passed, Time);
 	Draw(Time);

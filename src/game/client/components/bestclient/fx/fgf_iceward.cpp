@@ -43,7 +43,104 @@ void CFgfIceWard::OnReset()
 		Ward = CWard();
 	for(int &Num : m_aNumStrands)
 		Num = 0;
+	for(CScan &Scan : m_aScans)
+		Scan = CScan();
 	m_Frost.Clear();
+}
+
+bool CFgfIceWard::UseTileCache(int ClientId, vec2 Pos, float Reach)
+{
+	CScan &Scan = m_aScans[ClientId];
+	if(Scan.m_Valid && Scan.m_Reach == Reach && distance(Scan.m_Pos, Pos) <= 32.0f)
+		return !Scan.m_Overflow;
+
+	Scan.m_Valid = true;
+	Scan.m_Pos = Pos;
+	Scan.m_Reach = Reach;
+	Scan.m_Overflow = false;
+	Scan.m_Num = 0;
+
+	const float Store = Reach + 64.0f;
+	const int TileX = (int)std::floor(Pos.x / 32.0f);
+	const int TileY = (int)std::floor(Pos.y / 32.0f);
+	const int Radius = std::max(SCAN, (int)std::ceil(Store / 32.0f) + 1);
+	for(int y = -Radius; y <= Radius; y++)
+	{
+		for(int x = -Radius; x <= Radius; x++)
+		{
+			const vec2 Center((TileX + x) * 32.0f + 16.0f, (TileY + y) * 32.0f + 16.0f);
+			if(distance(Center, Pos) > Store || !FreezeAt(Center))
+				continue;
+
+			bool Exposed = false;
+			for(int OffsetY = -1; OffsetY <= 1 && !Exposed; OffsetY++)
+			{
+				for(int OffsetX = -1; OffsetX <= 1; OffsetX++)
+				{
+					if(OffsetX == 0 && OffsetY == 0)
+						continue;
+					if(!FreezeAt(Center + vec2(OffsetX * 32.0f, OffsetY * 32.0f)))
+						Exposed = true;
+				}
+			}
+			if(!Exposed)
+				continue;
+			if(Scan.m_Num >= MAX_CACHED_TILES)
+			{
+				Scan.m_Overflow = true;
+				Scan.m_Num = 0;
+				return false;
+			}
+			Scan.m_aTiles[Scan.m_Num].m_X = (short)(TileX + x);
+			Scan.m_aTiles[Scan.m_Num].m_Y = (short)(TileY + y);
+			Scan.m_Num++;
+		}
+	}
+	return true;
+}
+
+void CFgfIceWard::ConsiderTile(int ClientId, int TileX, int TileY, vec2 Pos, float Reach, int MaxStrands)
+{
+	CWard &Ward = m_aWards[ClientId];
+	CStrand *pStrands = m_aStrands[ClientId];
+	int &Num = m_aNumStrands[ClientId];
+	const vec2 Center(TileX * 32.0f + 16.0f, TileY * 32.0f + 16.0f);
+	if(!FreezeAt(Center))
+		return;
+	const vec2 Near(std::clamp(Pos.x, Center.x - 16.0f, Center.x + 16.0f),
+		std::clamp(Pos.y, Center.y - 16.0f, Center.y + 16.0f));
+	const vec2 Delta = Pos - Near;
+	const float Distance = length(Delta);
+	if(Distance > Reach)
+		return;
+	const vec2 Out = Distance > 0.001f ? Delta / Distance : vec2(0.0f, -1.0f);
+	if(FreezeAt(Near + Out * 20.0f) && Distance > 4.0f)
+		return;
+	if(GameClient()->Collision()->IntersectLine(Near, Pos, nullptr, nullptr))
+		return;
+
+	const float Strength = 1.0f - Distance / Reach;
+	Ward.m_Push += Out * Strength;
+
+	int Slot = Num;
+	if(Num >= MaxStrands)
+	{
+		int Weakest = 0;
+		for(int i = 1; i < Num; i++)
+			if(pStrands[i].m_Strength < pStrands[Weakest].m_Strength)
+				Weakest = i;
+		if(pStrands[Weakest].m_Strength >= Strength)
+			return;
+		Slot = Weakest;
+	}
+	else
+	{
+		Num++;
+	}
+	pStrands[Slot].m_Root = Near;
+	pStrands[Slot].m_Away = Out;
+	pStrands[Slot].m_Strength = Strength;
+	pStrands[Slot].m_Seed = TileX * 37.0f + TileY * 91.0f;
 }
 
 bool CFgfIceWard::FreezeAt(vec2 Pos) const
@@ -56,58 +153,26 @@ bool CFgfIceWard::FreezeAt(vec2 Pos) const
 void CFgfIceWard::Gather(int ClientId, vec2 Pos, float Reach)
 {
 	CWard &Ward = m_aWards[ClientId];
-	CStrand *pStrands = m_aStrands[ClientId];
 	int &Num = m_aNumStrands[ClientId];
 	Num = 0;
 	Ward.m_Push = vec2(0.0f, 0.0f);
 
 	const int MaxStrands = std::clamp(g_Config.m_BcFreezePullStrands, 1, MAX_STRANDS);
+	if(UseTileCache(ClientId, Pos, Reach))
+	{
+		const CScan &Scan = m_aScans[ClientId];
+		for(int i = 0; i < Scan.m_Num; i++)
+			ConsiderTile(ClientId, Scan.m_aTiles[i].m_X, Scan.m_aTiles[i].m_Y, Pos, Reach, MaxStrands);
+		return;
+	}
+
 	const int TileX = (int)std::floor(Pos.x / 32.0f);
 	const int TileY = (int)std::floor(Pos.y / 32.0f);
 	const int Scan = std::max(SCAN, (int)std::ceil(Reach / 32.0f) + 1);
-
 	for(int y = -Scan; y <= Scan; y++)
 	{
 		for(int x = -Scan; x <= Scan; x++)
-		{
-			const vec2 Center((TileX + x) * 32.0f + 16.0f, (TileY + y) * 32.0f + 16.0f);
-			if(!FreezeAt(Center))
-				continue;
-			const vec2 Near(std::clamp(Pos.x, Center.x - 16.0f, Center.x + 16.0f),
-				std::clamp(Pos.y, Center.y - 16.0f, Center.y + 16.0f));
-			const vec2 Delta = Pos - Near;
-			const float Distance = length(Delta);
-			if(Distance > Reach)
-				continue;
-			const vec2 Out = Distance > 0.001f ? Delta / Distance : vec2(0.0f, -1.0f);
-			if(FreezeAt(Near + Out * 20.0f) && Distance > 4.0f)
-				continue;
-			if(GameClient()->Collision()->IntersectLine(Near, Pos, nullptr, nullptr))
-				continue;
-
-			const float Strength = 1.0f - Distance / Reach;
-			Ward.m_Push += Out * Strength;
-
-			int Slot = Num;
-			if(Num >= MaxStrands)
-			{
-				int Weakest = 0;
-				for(int i = 1; i < Num; i++)
-					if(pStrands[i].m_Strength < pStrands[Weakest].m_Strength)
-						Weakest = i;
-				if(pStrands[Weakest].m_Strength >= Strength)
-					continue;
-				Slot = Weakest;
-			}
-			else
-			{
-				Num++;
-			}
-			pStrands[Slot].m_Root = Near;
-			pStrands[Slot].m_Away = Out;
-			pStrands[Slot].m_Strength = Strength;
-			pStrands[Slot].m_Seed = (TileX + x) * 37.0f + (TileY + y) * 91.0f;
-		}
+			ConsiderTile(ClientId, TileX + x, TileY + y, Pos, Reach, MaxStrands);
 	}
 }
 
