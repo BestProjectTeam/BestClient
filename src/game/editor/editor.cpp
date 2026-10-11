@@ -16,6 +16,7 @@
 #include <base/time.h>
 
 #include <engine/client.h>
+#include <engine/client/keyboard.h>
 #include <engine/engine.h>
 #include <engine/font_icons.h>
 #include <engine/gfx/image_loader.h>
@@ -4099,7 +4100,7 @@ void CEditor::RenderPressedKeys(CUIRect View)
 		{
 			if(NKeys)
 				TextRender()->TextEx(&Cursor, " + ", -1);
-			TextRender()->TextEx(&Cursor, Input()->KeyName(i), -1);
+			TextRender()->TextEx(&Cursor, KeyName(i), -1);
 			NKeys++;
 		}
 	}

@@ -416,7 +416,7 @@ void CWeaponVfx::RenderActiveVfx() const
 		if(Alpha <= 0.001f)
 			continue;
 
-		if(GameClient()->m_ParticlesSkinLoaded)
+		if(GameClient()->m_ParticlesSkin.m_Loaded)
 			Graphics()->TextureSet(GameClient()->m_ParticlesSkin.m_SpriteParticleBall);
 		else
 			Graphics()->TextureClear();
@@ -500,8 +500,8 @@ void CWeaponVfx::RenderActiveVfx() const
 	if(HasNukePuffs || std::any_of(std::begin(m_aBlackHoles), std::end(m_aBlackHoles), [](const auto &Effect) { return Effect.m_Active; }) ||
 		std::any_of(std::begin(m_aQuasars), std::end(m_aQuasars), [](const auto &Effect) { return Effect.m_Active; }))
 	{
-		const bool HasPartSkin = GameClient()->m_ParticlesSkinLoaded;
-		const bool HasExtraSkin = GameClient()->m_ExtrasSkinLoaded;
+		const bool HasPartSkin = GameClient()->m_ParticlesSkin.m_Loaded;
+		const bool HasExtraSkin = GameClient()->m_ExtrasSkin.m_Loaded;
 
 		Graphics()->BlendNormal();
 

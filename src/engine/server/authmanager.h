@@ -6,7 +6,6 @@
 
 #include <generated/protocol.h>
 
-#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -45,6 +44,9 @@ public:
 	// but not vice versa.
 	int Rank() const { return m_Rank; }
 
+	// admin is the strongest role with full access
+	bool IsAdmin() const { return m_Rank == RoleRank::ADMIN; }
+
 	CRconRole(const char *pName, int Rank) :
 		m_Rank(Rank)
 	{
@@ -71,7 +73,6 @@ private:
 
 public:
 	static const char *AuthLevelToRoleName(int AuthLevel);
-	static std::optional<int> RoleNameToAuthLevel(const char *pRoleName);
 
 	typedef void (*FListCallback)(const char *pIdent, const char *pRoleName, void *pUser);
 

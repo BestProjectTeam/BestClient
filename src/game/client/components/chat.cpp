@@ -176,9 +176,7 @@ void CChat::Reset()
 	// bestclient
 	DisableMode();
 	m_vServerCommands.clear();
-
-	for(int64_t &LastSoundPlayed : m_aLastSoundPlayed)
-		LastSoundPlayed = 0;
+	std::fill(std::begin(m_aLastSoundPlayed), std::end(m_aLastSoundPlayed), 0);
 }
 
 void CChat::OnRelease()
@@ -575,6 +573,7 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 		{
 			m_Input.Clear();
 			m_pHistoryEntry = nullptr;
+			m_EditingNewLine = true;
 		}
 	}
 	else if(Event.m_Flags & IInput::FLAG_PRESS && (Event.m_Key == KEY_RETURN || Event.m_Key == KEY_KP_ENTER))
@@ -607,6 +606,7 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 				SendChatQueued(pLine);
 		}
 		m_pHistoryEntry = nullptr;
+		m_EditingNewLine = true;
 		DisableMode();
 		GameClient()->OnRelease();
 		m_Input.Clear();

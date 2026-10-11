@@ -676,9 +676,6 @@ Team %d
 Some map images could not be loaded. Check the local console for details.
 == Unele imagini ale hărții nu au putut fi încărcate. Verificați consola pentru detalii.
 
-Uploading map data to GPU
-== Se încarcă datele hărții pe placa grafică (GPU)
-
 Some map sounds could not be loaded. Check the local console for details.
 == Unele sunete ale hărții nu au putut fi încărcate. Verificați consola pentru detalii.
 
@@ -2110,7 +2107,7 @@ All
 == Toate
 
 Name plates offset
-== Offset plăcuțe de nume
+== Decalaj plăcuțe de nume
 
 Show friend icon in name plates
 == Afișați indicatorul de prieten în plăcuțele de nume
@@ -2151,13 +2148,13 @@ Add friend
 
 [Graphics error]
 Out of VRAM. Try setting 'cl_skins_loaded_max' to a lower value or remove custom assets (skins, entities, etc.), especially those with high resolution.
-== 
+== Memorie VRAM epuizată. Încearcă să setezi "cl_skins_loaded_max" la o valoare mai mică sau să elimini elementele personalizate (skin-uri, entități etc.), în special cele cu rezoluție mare.
 
 Press Ctrl+Shift+G to disable debug graphs.
-== 
+== Apăsați Ctrl+Shift+G pentru a dezactiva graficele de depanare.
 
 Team save in progress. You'll be able to load with '/load %s'
-== 
+== Salvarea echipei este în curs. Vei putea încărca folosind '/load %s'
 
 Team save in progress. You'll be able to load with '/load %s' if save is successful or with '/load %s' if it fails
 == 
@@ -2176,6 +2173,10 @@ Following %d: %s
 == 
 
 [Important alert message]
+Tap to dismiss…
+== 
+
+[Important alert message]
 Press Esc or Tab to dismiss…
 == 
 
@@ -2189,6 +2190,9 @@ Server could not be started
 == 
 
 Loading map
+== 
+
+Initializing layers
 == 
 
 Joining Tutorial server
@@ -2596,6 +2600,9 @@ Demo player is currently active.
 The extra menu with the given number is activated.
 == 
 
+Credits
+== 
+
 Censor profanity
 == 
 
@@ -2678,7 +2685,16 @@ Skin could not be found.
 No skins match your filter criteria
 == 
 
+Join
+== 
+
 Download
+== 
+
+'%s' not bound.
+== 
+
+Press '%s' to show cursor.
 == 
 
 Unmute

@@ -36,8 +36,7 @@ void CControls::OnReset()
 	ResetInput(0);
 	ResetInput(1);
 
-	for(int &AmmoCount : m_aAmmoCount)
-		AmmoCount = 0;
+	std::fill(std::begin(m_aAmmoCount), std::end(m_aAmmoCount), 0);
 
 	m_LastSendTime = 0;
 }
@@ -62,8 +61,7 @@ void CControls::ResetInput(int Dummy)
 
 void CControls::OnPlayerDeath()
 {
-	for(int &AmmoCount : m_aAmmoCount)
-		AmmoCount = 0;
+	std::fill(std::begin(m_aAmmoCount), std::end(m_aAmmoCount), 0);
 }
 
 struct CInputState

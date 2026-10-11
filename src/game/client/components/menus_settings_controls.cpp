@@ -43,8 +43,7 @@ bool CBindSlotUiElement::operator<(const CBindSlotUiElement &Other) const
 	{
 		return true;
 	}
-	return m_Bind.m_ModifierMask < Other.m_Bind.m_ModifierMask ||
-	       m_Bind.m_Key < Other.m_Bind.m_Key;
+	return (m_Bind.m_ModifierMask != Other.m_Bind.m_ModifierMask) ? (m_Bind.m_ModifierMask < Other.m_Bind.m_ModifierMask) : (m_Bind.m_Key < Other.m_Bind.m_Key);
 }
 
 std::vector<CBindSlotUiElement>::iterator CBindOption::GetBindSlotElement(const CBindSlot &BindSlot)

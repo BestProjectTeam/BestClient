@@ -54,6 +54,7 @@ class CHeap;
 class CPlayer;
 class CScore;
 class CUnpacker;
+class CRconRole;
 class IAntibot;
 class IGameController;
 class IMap;
@@ -176,7 +177,6 @@ class CGameContext : public IGameServer
 	static void ConchainSpecialMotdupdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainSettingUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainPracticeByDefaultUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
-	static void ConchainTeleOthersAuthLevel(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConDumpLog(IConsole::IResult *pResult, void *pUserData);
 
 	void AddVote(const char *pDescription, const char *pCommand);
@@ -669,7 +669,8 @@ public:
 	void SendRecord(int ClientId);
 	void SendFinish(int ClientId, float Time, std::optional<float> PreviousBestTime);
 	void SendSaveCode(int Team, int TeamSize, int State, const char *pError, const char *pSaveRequester, const char *pServerName, const char *pGeneratedCode, const char *pCode);
-	void OnSetAuthed(int ClientId, int Level) override;
+	// `pRole` being `nullptr` signifies logout.
+	void OnSetAuthed(int ClientId, CRconRole *pRole) override;
 	void ReinitPlayerMap(int ClientId, bool Timeout) override;
 	void OnClientRejoin(int ClientId) override;
 
