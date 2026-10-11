@@ -8,9 +8,12 @@
 #include <engine/keys.h>
 #include <engine/updater.h>
 
+#include <base/io.h>
 #include <base/math.h>
 #include <base/str.h>
 #include <base/time.h>
+
+#include <cstdlib>
 
 #include <game/client/bc_menu_badges.h>
 #include <game/client/bc_ui_animations.h>
@@ -274,7 +277,78 @@ static bool BcUiThemeParseKvColor(const char *pToken, const char *pKey, unsigned
 	return true;
 }
 
-static bool BcUiThemeParseElemLine(const char *pLine, int *pEnable, unsigned *pColor, int *pGradient, unsigned *pGradientColor, int *pAccent, unsigned *pAccentColor, int *pOpacity)
+struct SBcUiThemeElem
+{
+	const char *m_pName;
+	int *m_pEnable;
+	unsigned *m_pColor;
+	int *m_pGradient;
+	unsigned *m_pGradientColor;
+	int *m_pAccent;
+	unsigned *m_pAccentColor;
+	int *m_pAnimate;
+	int *m_pOpacity;
+	int m_DefEnable;
+	unsigned m_DefColor;
+	int m_DefGradient;
+	unsigned m_DefGradientColor;
+	int m_DefAccent;
+	unsigned m_DefAccentColor;
+	int m_DefAnimate;
+	int m_DefOpacity;
+};
+
+static SBcUiThemeElem *BcUiThemeElems(int &Count)
+{
+	static SBcUiThemeElem s_aElems[] = {
+		{"text", &g_Config.m_BcCustomUiText, &g_Config.m_BcCustomUiTextColor, &g_Config.m_BcCustomUiTextGradient, &g_Config.m_BcCustomUiTextGradientColor, &g_Config.m_BcCustomUiTextUseAccent, &g_Config.m_BcCustomUiTextAccentColor, &g_Config.m_BcCustomUiTextAnimateSpeed, nullptr, DefaultConfig::BcCustomUiText, DefaultConfig::BcCustomUiTextColor, DefaultConfig::BcCustomUiTextGradient, DefaultConfig::BcCustomUiTextGradientColor, DefaultConfig::BcCustomUiTextUseAccent, DefaultConfig::BcCustomUiTextAccentColor, DefaultConfig::BcCustomUiTextAnimateSpeed, -1},
+		{"checkbox", &g_Config.m_BcCustomUiCheckbox, &g_Config.m_BcCustomUiCheckboxColor, &g_Config.m_BcCustomUiCheckboxGradient, &g_Config.m_BcCustomUiCheckboxGradientColor, &g_Config.m_BcCustomUiCheckboxUseAccent, &g_Config.m_BcCustomUiCheckboxAccentColor, &g_Config.m_BcCustomUiCheckboxAnimateSpeed, nullptr, DefaultConfig::BcCustomUiCheckbox, DefaultConfig::BcCustomUiCheckboxColor, DefaultConfig::BcCustomUiCheckboxGradient, DefaultConfig::BcCustomUiCheckboxGradientColor, DefaultConfig::BcCustomUiCheckboxUseAccent, DefaultConfig::BcCustomUiCheckboxAccentColor, DefaultConfig::BcCustomUiCheckboxAnimateSpeed, -1},
+		{"scrollbar", &g_Config.m_BcCustomUiScrollbar, &g_Config.m_BcCustomUiScrollbarColor, &g_Config.m_BcCustomUiScrollbarGradient, &g_Config.m_BcCustomUiScrollbarGradientColor, &g_Config.m_BcCustomUiScrollbarUseAccent, &g_Config.m_BcCustomUiScrollbarAccentColor, &g_Config.m_BcCustomUiScrollbarAnimateSpeed, nullptr, DefaultConfig::BcCustomUiScrollbar, DefaultConfig::BcCustomUiScrollbarColor, DefaultConfig::BcCustomUiScrollbarGradient, DefaultConfig::BcCustomUiScrollbarGradientColor, DefaultConfig::BcCustomUiScrollbarUseAccent, DefaultConfig::BcCustomUiScrollbarAccentColor, DefaultConfig::BcCustomUiScrollbarAnimateSpeed, -1},
+		{"button", &g_Config.m_BcCustomUiButton, &g_Config.m_BcCustomUiButtonColor, &g_Config.m_BcCustomUiButtonGradient, &g_Config.m_BcCustomUiButtonGradientColor, &g_Config.m_BcCustomUiButtonUseAccent, &g_Config.m_BcCustomUiButtonAccentColor, &g_Config.m_BcCustomUiButtonAnimateSpeed, nullptr, DefaultConfig::BcCustomUiButton, DefaultConfig::BcCustomUiButtonColor, DefaultConfig::BcCustomUiButtonGradient, DefaultConfig::BcCustomUiButtonGradientColor, DefaultConfig::BcCustomUiButtonUseAccent, DefaultConfig::BcCustomUiButtonAccentColor, DefaultConfig::BcCustomUiButtonAnimateSpeed, -1},
+		{"droplist", &g_Config.m_BcCustomUiDropdown, &g_Config.m_BcCustomUiDropdownColor, &g_Config.m_BcCustomUiDropdownGradient, &g_Config.m_BcCustomUiDropdownGradientColor, &g_Config.m_BcCustomUiDropdownUseAccent, &g_Config.m_BcCustomUiDropdownAccentColor, &g_Config.m_BcCustomUiDropdownAnimateSpeed, nullptr, DefaultConfig::BcCustomUiDropdown, DefaultConfig::BcCustomUiDropdownColor, DefaultConfig::BcCustomUiDropdownGradient, DefaultConfig::BcCustomUiDropdownGradientColor, DefaultConfig::BcCustomUiDropdownUseAccent, DefaultConfig::BcCustomUiDropdownAccentColor, DefaultConfig::BcCustomUiDropdownAnimateSpeed, -1},
+		{"input", &g_Config.m_BcCustomUiEditBox, &g_Config.m_BcCustomUiEditBoxColor, &g_Config.m_BcCustomUiEditBoxGradient, &g_Config.m_BcCustomUiEditBoxGradientColor, &g_Config.m_BcCustomUiEditBoxUseAccent, &g_Config.m_BcCustomUiEditBoxAccentColor, &g_Config.m_BcCustomUiEditBoxAnimateSpeed, nullptr, DefaultConfig::BcCustomUiEditBox, DefaultConfig::BcCustomUiEditBoxColor, DefaultConfig::BcCustomUiEditBoxGradient, DefaultConfig::BcCustomUiEditBoxGradientColor, DefaultConfig::BcCustomUiEditBoxUseAccent, DefaultConfig::BcCustomUiEditBoxAccentColor, DefaultConfig::BcCustomUiEditBoxAnimateSpeed, -1},
+		{"block", &g_Config.m_BcCustomUiBlock, &g_Config.m_BcCustomUiBlockColor, &g_Config.m_BcCustomUiBlockGradient, &g_Config.m_BcCustomUiBlockGradientColor, &g_Config.m_BcCustomUiBlockUseAccent, &g_Config.m_BcCustomUiBlockAccentColor, &g_Config.m_BcCustomUiBlockAnimateSpeed, &g_Config.m_BcCustomUiBlockOpacity, DefaultConfig::BcCustomUiBlock, DefaultConfig::BcCustomUiBlockColor, DefaultConfig::BcCustomUiBlockGradient, DefaultConfig::BcCustomUiBlockGradientColor, DefaultConfig::BcCustomUiBlockUseAccent, DefaultConfig::BcCustomUiBlockAccentColor, DefaultConfig::BcCustomUiBlockAnimateSpeed, DefaultConfig::BcCustomUiBlockOpacity},
+		{"panel", &g_Config.m_BcCustomUiMainPanel, &g_Config.m_BcCustomUiMainPanelColor, &g_Config.m_BcCustomUiMainPanelGradient, &g_Config.m_BcCustomUiMainPanelGradientColor, &g_Config.m_BcCustomUiMainPanelUseAccent, &g_Config.m_BcCustomUiMainPanelAccentColor, &g_Config.m_BcCustomUiMainPanelAnimateSpeed, &g_Config.m_BcCustomUiMainPanelOpacity, DefaultConfig::BcCustomUiMainPanel, DefaultConfig::BcCustomUiMainPanelColor, DefaultConfig::BcCustomUiMainPanelGradient, DefaultConfig::BcCustomUiMainPanelGradientColor, DefaultConfig::BcCustomUiMainPanelUseAccent, DefaultConfig::BcCustomUiMainPanelAccentColor, DefaultConfig::BcCustomUiMainPanelAnimateSpeed, DefaultConfig::BcCustomUiMainPanelOpacity},
+		{"nav", &g_Config.m_BcCustomUiNavTab, &g_Config.m_BcCustomUiNavTabColor, &g_Config.m_BcCustomUiNavTabGradient, &g_Config.m_BcCustomUiNavTabGradientColor, &g_Config.m_BcCustomUiNavTabUseAccent, &g_Config.m_BcCustomUiNavTabAccentColor, &g_Config.m_BcCustomUiNavTabAnimateSpeed, &g_Config.m_BcCustomUiNavTabOpacity, DefaultConfig::BcCustomUiNavTab, DefaultConfig::BcCustomUiNavTabColor, DefaultConfig::BcCustomUiNavTabGradient, DefaultConfig::BcCustomUiNavTabGradientColor, DefaultConfig::BcCustomUiNavTabUseAccent, DefaultConfig::BcCustomUiNavTabAccentColor, DefaultConfig::BcCustomUiNavTabAnimateSpeed, DefaultConfig::BcCustomUiNavTabOpacity},
+		{"badge", &g_Config.m_BcCustomUiBadge, &g_Config.m_BcCustomUiBadgeColor, &g_Config.m_BcCustomUiBadgeGradient, &g_Config.m_BcCustomUiBadgeGradientColor, &g_Config.m_BcCustomUiBadgeUseAccent, &g_Config.m_BcCustomUiBadgeAccentColor, &g_Config.m_BcCustomUiBadgeAnimateSpeed, nullptr, DefaultConfig::BcCustomUiBadge, DefaultConfig::BcCustomUiBadgeColor, DefaultConfig::BcCustomUiBadgeGradient, DefaultConfig::BcCustomUiBadgeGradientColor, DefaultConfig::BcCustomUiBadgeUseAccent, DefaultConfig::BcCustomUiBadgeAccentColor, DefaultConfig::BcCustomUiBadgeAnimateSpeed, -1},
+		{"binds", &g_Config.m_BcCustomUiBind, &g_Config.m_BcCustomUiBindColor, &g_Config.m_BcCustomUiBindGradient, &g_Config.m_BcCustomUiBindGradientColor, &g_Config.m_BcCustomUiBindUseAccent, &g_Config.m_BcCustomUiBindAccentColor, &g_Config.m_BcCustomUiBindAnimateSpeed, nullptr, DefaultConfig::BcCustomUiBind, DefaultConfig::BcCustomUiBindColor, DefaultConfig::BcCustomUiBindGradient, DefaultConfig::BcCustomUiBindGradientColor, DefaultConfig::BcCustomUiBindUseAccent, DefaultConfig::BcCustomUiBindAccentColor, DefaultConfig::BcCustomUiBindAnimateSpeed, -1},
+	};
+	Count = (int)std::size(s_aElems);
+	return s_aElems;
+}
+
+static void BcUiThemeSetAllAnimateSpeeds(int Speed)
+{
+	Speed = std::clamp(Speed, 0, 100);
+	g_Config.m_BcCustomUiGradientAnimateSpeed = Speed;
+	int Count = 0;
+	SBcUiThemeElem *pElems = BcUiThemeElems(Count);
+	for(int i = 0; i < Count; ++i)
+		*pElems[i].m_pAnimate = Speed;
+}
+
+static void BcUiThemeApplyDefaults()
+{
+	g_Config.m_BcCustomUiBackground = DefaultConfig::BcCustomUiBackground;
+	int Count = 0;
+	SBcUiThemeElem *pElems = BcUiThemeElems(Count);
+	for(int i = 0; i < Count; ++i)
+	{
+		const SBcUiThemeElem &Elem = pElems[i];
+		*Elem.m_pEnable = Elem.m_DefEnable;
+		*Elem.m_pColor = Elem.m_DefColor;
+		*Elem.m_pGradient = Elem.m_DefGradient;
+		*Elem.m_pGradientColor = Elem.m_DefGradientColor;
+		*Elem.m_pAccent = Elem.m_DefAccent;
+		*Elem.m_pAccentColor = Elem.m_DefAccentColor;
+		*Elem.m_pAnimate = Elem.m_DefAnimate;
+		if(Elem.m_pOpacity)
+			*Elem.m_pOpacity = Elem.m_DefOpacity;
+	}
+	g_Config.m_BcCustomUiGradientAnimateSpeed = DefaultConfig::BcCustomUiGradientAnimateSpeed;
+}
+
+static bool BcUiThemeParseElemLine(const char *pLine, int *pEnable, unsigned *pColor, int *pGradient, unsigned *pGradientColor, int *pAccent, unsigned *pAccentColor, int *pAnimate, int *pOpacity)
 {
 	char aTok[128];
 	const char *pCursor = pLine;
@@ -292,6 +366,7 @@ static bool BcUiThemeParseElemLine(const char *pLine, int *pEnable, unsigned *pC
 			BcUiThemeParseKvColor(aTok, "gradient_color", pGradientColor) ||
 			BcUiThemeParseKvInt(aTok, "accent", pAccent) ||
 			BcUiThemeParseKvColor(aTok, "accent_color", pAccentColor) ||
+			(pAnimate && BcUiThemeParseKvInt(aTok, "animate", pAnimate)) ||
 			(pOpacity && BcUiThemeParseKvInt(aTok, "opacity", pOpacity));
 	}
 	return true;
@@ -317,7 +392,7 @@ static bool BcUiThemeImportFromText(const char *pText)
 
 		if(str_startswith(aLine, "animate_speed="))
 		{
-			g_Config.m_BcCustomUiGradientAnimateSpeed = std::clamp(str_toint(aLine + 14), 0, 100);
+			BcUiThemeSetAllAnimateSpeeds(str_toint(aLine + 14));
 			continue;
 		}
 		if(str_startswith(aLine, "background="))
@@ -331,27 +406,110 @@ static bool BcUiThemeImportFromText(const char *pText)
 			continue;
 		}
 
-		auto ApplyElem = [&](const char *pName, int *pEnable, unsigned *pColor, int *pGradient, unsigned *pGradientColor, int *pAccent, unsigned *pAccentColor, int *pOpacity = nullptr) {
-			if(str_startswith(aLine, pName) && (aLine[str_length(pName)] == ' ' || aLine[str_length(pName)] == '\t'))
-				BcUiThemeParseElemLine(aLine, pEnable, pColor, pGradient, pGradientColor, pAccent, pAccentColor, pOpacity);
-		};
-		ApplyElem("text", &g_Config.m_BcCustomUiText, &g_Config.m_BcCustomUiTextColor, &g_Config.m_BcCustomUiTextGradient, &g_Config.m_BcCustomUiTextGradientColor, &g_Config.m_BcCustomUiTextUseAccent, &g_Config.m_BcCustomUiTextAccentColor);
-		ApplyElem("checkbox", &g_Config.m_BcCustomUiCheckbox, &g_Config.m_BcCustomUiCheckboxColor, &g_Config.m_BcCustomUiCheckboxGradient, &g_Config.m_BcCustomUiCheckboxGradientColor, &g_Config.m_BcCustomUiCheckboxUseAccent, &g_Config.m_BcCustomUiCheckboxAccentColor);
-		ApplyElem("scrollbar", &g_Config.m_BcCustomUiScrollbar, &g_Config.m_BcCustomUiScrollbarColor, &g_Config.m_BcCustomUiScrollbarGradient, &g_Config.m_BcCustomUiScrollbarGradientColor, &g_Config.m_BcCustomUiScrollbarUseAccent, &g_Config.m_BcCustomUiScrollbarAccentColor);
-		ApplyElem("button", &g_Config.m_BcCustomUiButton, &g_Config.m_BcCustomUiButtonColor, &g_Config.m_BcCustomUiButtonGradient, &g_Config.m_BcCustomUiButtonGradientColor, &g_Config.m_BcCustomUiButtonUseAccent, &g_Config.m_BcCustomUiButtonAccentColor);
-		ApplyElem("droplist", &g_Config.m_BcCustomUiDropdown, &g_Config.m_BcCustomUiDropdownColor, &g_Config.m_BcCustomUiDropdownGradient, &g_Config.m_BcCustomUiDropdownGradientColor, &g_Config.m_BcCustomUiDropdownUseAccent, &g_Config.m_BcCustomUiDropdownAccentColor);
-		ApplyElem("input", &g_Config.m_BcCustomUiEditBox, &g_Config.m_BcCustomUiEditBoxColor, &g_Config.m_BcCustomUiEditBoxGradient, &g_Config.m_BcCustomUiEditBoxGradientColor, &g_Config.m_BcCustomUiEditBoxUseAccent, &g_Config.m_BcCustomUiEditBoxAccentColor);
-		ApplyElem("block", &g_Config.m_BcCustomUiBlock, &g_Config.m_BcCustomUiBlockColor, &g_Config.m_BcCustomUiBlockGradient, &g_Config.m_BcCustomUiBlockGradientColor, &g_Config.m_BcCustomUiBlockUseAccent, &g_Config.m_BcCustomUiBlockAccentColor, &g_Config.m_BcCustomUiBlockOpacity);
-		ApplyElem("panel", &g_Config.m_BcCustomUiMainPanel, &g_Config.m_BcCustomUiMainPanelColor, &g_Config.m_BcCustomUiMainPanelGradient, &g_Config.m_BcCustomUiMainPanelGradientColor, &g_Config.m_BcCustomUiMainPanelUseAccent, &g_Config.m_BcCustomUiMainPanelAccentColor, &g_Config.m_BcCustomUiMainPanelOpacity);
-		ApplyElem("nav", &g_Config.m_BcCustomUiNavTab, &g_Config.m_BcCustomUiNavTabColor, &g_Config.m_BcCustomUiNavTabGradient, &g_Config.m_BcCustomUiNavTabGradientColor, &g_Config.m_BcCustomUiNavTabUseAccent, &g_Config.m_BcCustomUiNavTabAccentColor, &g_Config.m_BcCustomUiNavTabOpacity);
-		ApplyElem("badge", &g_Config.m_BcCustomUiBadge, &g_Config.m_BcCustomUiBadgeColor, &g_Config.m_BcCustomUiBadgeGradient, &g_Config.m_BcCustomUiBadgeGradientColor, &g_Config.m_BcCustomUiBadgeUseAccent, &g_Config.m_BcCustomUiBadgeAccentColor);
-		ApplyElem("binds", &g_Config.m_BcCustomUiBind, &g_Config.m_BcCustomUiBindColor, &g_Config.m_BcCustomUiBindGradient, &g_Config.m_BcCustomUiBindGradientColor, &g_Config.m_BcCustomUiBindUseAccent, &g_Config.m_BcCustomUiBindAccentColor);
+		int Count = 0;
+		SBcUiThemeElem *pElems = BcUiThemeElems(Count);
+		for(int Elem = 0; Elem < Count; ++Elem)
+		{
+			const int NameLen = str_length(pElems[Elem].m_pName);
+			if(str_startswith(aLine, pElems[Elem].m_pName) && (aLine[NameLen] == ' ' || aLine[NameLen] == '\t'))
+				BcUiThemeParseElemLine(aLine, pElems[Elem].m_pEnable, pElems[Elem].m_pColor, pElems[Elem].m_pGradient, pElems[Elem].m_pGradientColor, pElems[Elem].m_pAccent, pElems[Elem].m_pAccentColor, pElems[Elem].m_pAnimate, pElems[Elem].m_pOpacity);
+		}
 	}
-	g_Config.m_BcCustomUiBlockOpacity = std::clamp(g_Config.m_BcCustomUiBlockOpacity, 0, 100);
-	g_Config.m_BcCustomUiMainPanelOpacity = std::clamp(g_Config.m_BcCustomUiMainPanelOpacity, 0, 100);
-	g_Config.m_BcCustomUiNavTabOpacity = std::clamp(g_Config.m_BcCustomUiNavTabOpacity, 0, 100);
+	int Count = 0;
+	SBcUiThemeElem *pElems = BcUiThemeElems(Count);
+	for(int Elem = 0; Elem < Count; ++Elem)
+	{
+		*pElems[Elem].m_pAnimate = std::clamp(*pElems[Elem].m_pAnimate, 0, 100);
+		if(pElems[Elem].m_pOpacity)
+			*pElems[Elem].m_pOpacity = std::clamp(*pElems[Elem].m_pOpacity, 0, 100);
+	}
 	return true;
 }
+
+namespace BestClientUiTheme
+{
+
+void AppendExport(char *pBuf, int Size, bool SkipDefaults)
+{
+	pBuf[0] = '\0';
+	auto AppendLine = [&](const char *pLine) {
+		str_append(pBuf, pLine, Size);
+		str_append(pBuf, "\n", Size);
+	};
+	AppendLine("BC_UI_THEME_EXPORT v1");
+	const int HeaderLen = str_length(pBuf);
+
+	if(!SkipDefaults || g_Config.m_BcCustomUiBackground != DefaultConfig::BcCustomUiBackground)
+	{
+		char aLine[128];
+		str_format(aLine, sizeof(aLine), "background=%d", g_Config.m_BcCustomUiBackground);
+		AppendLine(aLine);
+	}
+	if(!SkipDefaults || g_Config.m_UiColor != DefaultConfig::UiColor)
+	{
+		char aLine[128];
+		str_format(aLine, sizeof(aLine), "ui_color=$%08X", g_Config.m_UiColor);
+		AppendLine(aLine);
+	}
+
+	int Count = 0;
+	const SBcUiThemeElem *pElems = BcUiThemeElems(Count);
+	for(int Elem = 0; Elem < Count; ++Elem)
+	{
+		const SBcUiThemeElem &Field = pElems[Elem];
+		const int Opacity = Field.m_pOpacity ? *Field.m_pOpacity : -1;
+		const int DefOpacity = Field.m_pOpacity ? Field.m_DefOpacity : -1;
+		if(SkipDefaults && *Field.m_pEnable == Field.m_DefEnable && *Field.m_pColor == Field.m_DefColor && *Field.m_pGradient == Field.m_DefGradient && *Field.m_pGradientColor == Field.m_DefGradientColor && *Field.m_pAccent == Field.m_DefAccent && *Field.m_pAccentColor == Field.m_DefAccentColor && *Field.m_pAnimate == Field.m_DefAnimate && Opacity == DefOpacity)
+			continue;
+		char aLine[320];
+		if(Opacity >= 0)
+			str_format(aLine, sizeof(aLine), "%s enable=%d color=$%08X gradient=%d gradient_color=$%08X accent=%d accent_color=$%08X opacity=%d animate=%d", Field.m_pName, *Field.m_pEnable, *Field.m_pColor, *Field.m_pGradient, *Field.m_pGradientColor, *Field.m_pAccent, *Field.m_pAccentColor, Opacity, *Field.m_pAnimate);
+		else
+			str_format(aLine, sizeof(aLine), "%s enable=%d color=$%08X gradient=%d gradient_color=$%08X accent=%d accent_color=$%08X animate=%d", Field.m_pName, *Field.m_pEnable, *Field.m_pColor, *Field.m_pGradient, *Field.m_pGradientColor, *Field.m_pAccent, *Field.m_pAccentColor, *Field.m_pAnimate);
+		AppendLine(aLine);
+	}
+
+	if(SkipDefaults && str_length(pBuf) == HeaderLen)
+		pBuf[0] = '\0';
+}
+
+void SaveFile(IStorage *pStorage)
+{
+	if(!pStorage)
+		return;
+	char aBuf[8192];
+	AppendExport(aBuf, sizeof(aBuf), true);
+	IOHANDLE File = pStorage->OpenFile(FILE_NAME, IOFLAG_WRITE, IStorage::TYPE_SAVE);
+	if(!File)
+		return;
+	if(aBuf[0] != '\0')
+		io_write(File, aBuf, str_length(aBuf));
+	io_close(File);
+}
+
+void LoadFile(IStorage *pStorage)
+{
+	if(!pStorage)
+		return;
+	if(!pStorage->FileExists(FILE_NAME, IStorage::TYPE_SAVE))
+	{
+		if(g_Config.m_BcCustomUiGradientAnimateSpeed != DefaultConfig::BcCustomUiGradientAnimateSpeed)
+			BcUiThemeSetAllAnimateSpeeds(g_Config.m_BcCustomUiGradientAnimateSpeed);
+		return;
+	}
+	IOHANDLE File = pStorage->OpenFile(FILE_NAME, IOFLAG_READ, IStorage::TYPE_SAVE);
+	if(!File)
+		return;
+	char *pData = io_read_all_str(File);
+	io_close(File);
+	if(!pData)
+		return;
+	BcUiThemeApplyDefaults();
+	BcUiThemeImportFromText(pData);
+	free(pData);
+}
+
+} // namespace BestClientUiTheme
 
 void CMenus::RenderSettingsBestClientChatMediaBlock(CUIRect &Column)
 {
@@ -1812,79 +1970,9 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 	GameClient()->m_Tooltips.DoToolTip(&s_UiThemesResetButton, &UiThemesResetButton, BcLocalize("Reset to defaults"));
 	if(UiThemesResetClicked)
 	{
-		g_Config.m_BcUiThemeElement = 0;
-		g_Config.m_BcCustomUiBackground = 0;
-		g_Config.m_BcCustomUiText = 0;
-		g_Config.m_BcCustomUiTextColor = 0xFFFFFFFFU;
-		g_Config.m_BcCustomUiTextGradient = 0;
-		g_Config.m_BcCustomUiTextGradientColor = 0xFFA0A0A0U;
-		g_Config.m_BcCustomUiTextUseAccent = 0;
-		g_Config.m_BcCustomUiTextAccentColor = 0xFFFFFFFFU;
-		g_Config.m_BcCustomUiCheckbox = 0;
-		g_Config.m_BcCustomUiCheckboxColor = 0xFFFFFFFFU;
-		g_Config.m_BcCustomUiCheckboxGradient = 0;
-		g_Config.m_BcCustomUiCheckboxGradientColor = 0xFFA0A0A0U;
-		g_Config.m_BcCustomUiCheckboxUseAccent = 0;
-		g_Config.m_BcCustomUiCheckboxAccentColor = 0xFFFFFFFFU;
-		g_Config.m_BcCustomUiScrollbar = 0;
-		g_Config.m_BcCustomUiScrollbarColor = 0xFFFFFFFFU;
-		g_Config.m_BcCustomUiScrollbarGradient = 0;
-		g_Config.m_BcCustomUiScrollbarGradientColor = 0xFFA0A0A0U;
-		g_Config.m_BcCustomUiScrollbarUseAccent = 0;
-		g_Config.m_BcCustomUiScrollbarAccentColor = 0xFFFFFFFFU;
-		g_Config.m_BcCustomUiButton = 0;
-		g_Config.m_BcCustomUiButtonColor = 0xFFFFFFFFU;
-		g_Config.m_BcCustomUiButtonGradient = 0;
-		g_Config.m_BcCustomUiButtonGradientColor = 0xFFA0A0A0U;
-		g_Config.m_BcCustomUiButtonUseAccent = 0;
-		g_Config.m_BcCustomUiButtonAccentColor = 0xFFFFFFFFU;
-		g_Config.m_BcCustomUiDropdown = 0;
-		g_Config.m_BcCustomUiDropdownColor = 0xFFFFFFFFU;
-		g_Config.m_BcCustomUiDropdownGradient = 0;
-		g_Config.m_BcCustomUiDropdownGradientColor = 0xFFA0A0A0U;
-		g_Config.m_BcCustomUiDropdownUseAccent = 0;
-		g_Config.m_BcCustomUiDropdownAccentColor = 0xFFFFFFFFU;
-		g_Config.m_BcCustomUiEditBox = 0;
-		g_Config.m_BcCustomUiEditBoxColor = 0xFFFFFFFFU;
-		g_Config.m_BcCustomUiEditBoxGradient = 0;
-		g_Config.m_BcCustomUiEditBoxGradientColor = 0xFFA0A0A0U;
-		g_Config.m_BcCustomUiEditBoxUseAccent = 0;
-		g_Config.m_BcCustomUiEditBoxAccentColor = 0xFFFFFFFFU;
-		g_Config.m_BcCustomUiBlock = 0;
-		g_Config.m_BcCustomUiBlockColor = 0xFF000000U;
-		g_Config.m_BcCustomUiBlockGradient = 0;
-		g_Config.m_BcCustomUiBlockGradientColor = 0xFF000000U;
-		g_Config.m_BcCustomUiBlockUseAccent = 0;
-		g_Config.m_BcCustomUiBlockAccentColor = 0xFF000000U;
-		g_Config.m_BcCustomUiBlockOpacity = 25;
-		g_Config.m_BcCustomUiMainPanel = 0;
-		g_Config.m_BcCustomUiMainPanelColor = 0xFF000000U;
-		g_Config.m_BcCustomUiMainPanelGradient = 0;
-		g_Config.m_BcCustomUiMainPanelGradientColor = 0xFF000000U;
-		g_Config.m_BcCustomUiMainPanelUseAccent = 0;
-		g_Config.m_BcCustomUiMainPanelAccentColor = 0xFF000000U;
-		g_Config.m_BcCustomUiMainPanelOpacity = 50;
-		g_Config.m_BcCustomUiNavTab = 0;
-		g_Config.m_BcCustomUiNavTabColor = 0xFF000000U;
-		g_Config.m_BcCustomUiNavTabGradient = 0;
-		g_Config.m_BcCustomUiNavTabGradientColor = 0xFF000000U;
-		g_Config.m_BcCustomUiNavTabUseAccent = 0;
-		g_Config.m_BcCustomUiNavTabAccentColor = 0xFF000000U;
-		g_Config.m_BcCustomUiNavTabOpacity = 50;
-		g_Config.m_BcCustomUiBadge = 0;
-		g_Config.m_BcCustomUiBadgeColor = 0xFFFFFFFFU;
-		g_Config.m_BcCustomUiBadgeGradient = 0;
-		g_Config.m_BcCustomUiBadgeGradientColor = 0xFFA0A0A0U;
-		g_Config.m_BcCustomUiBadgeUseAccent = 0;
-		g_Config.m_BcCustomUiBadgeAccentColor = 0xFFFFFFFFU;
-		g_Config.m_BcCustomUiBind = 0;
-		g_Config.m_BcCustomUiBindColor = 0xFFFFFFFFU;
-		g_Config.m_BcCustomUiBindGradient = 0;
-		g_Config.m_BcCustomUiBindGradientColor = 0xFFA0A0A0U;
-		g_Config.m_BcCustomUiBindUseAccent = 0;
-		g_Config.m_BcCustomUiBindAccentColor = 0xFFFFFFFFU;
-		g_Config.m_BcCustomUiGradientAnimateSpeed = 35;
-		g_Config.m_UiColor = 0xE4A046AFU;
+		g_Config.m_BcUiThemeElement = DefaultConfig::BcUiThemeElement;
+		BcUiThemeApplyDefaults();
+		g_Config.m_UiColor = DefaultConfig::UiColor;
 	}
 	UiThemesTitleLabel.VSplitRight(MarginSmall, &UiThemesTitleLabel, nullptr);
 	Ui()->DoLabel(&UiThemesTitleLabel, BcLocalize("UI Themes"), HeadlineFontSize, TEXTALIGN_ML);
@@ -1914,6 +2002,10 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 			&g_Config.m_BcCustomUiTextGradientColor, &g_Config.m_BcCustomUiCheckboxGradientColor, &g_Config.m_BcCustomUiScrollbarGradientColor, &g_Config.m_BcCustomUiButtonGradientColor,
 			&g_Config.m_BcCustomUiDropdownGradientColor, &g_Config.m_BcCustomUiEditBoxGradientColor, &g_Config.m_BcCustomUiBlockGradientColor, &g_Config.m_BcCustomUiMainPanelGradientColor,
 			&g_Config.m_BcCustomUiNavTabGradientColor, &g_Config.m_BcCustomUiBadgeGradientColor, &g_Config.m_BcCustomUiBindGradientColor};
+		int *apAnimate[] = {
+			&g_Config.m_BcCustomUiTextAnimateSpeed, &g_Config.m_BcCustomUiCheckboxAnimateSpeed, &g_Config.m_BcCustomUiScrollbarAnimateSpeed, &g_Config.m_BcCustomUiButtonAnimateSpeed,
+			&g_Config.m_BcCustomUiDropdownAnimateSpeed, &g_Config.m_BcCustomUiEditBoxAnimateSpeed, &g_Config.m_BcCustomUiBlockAnimateSpeed, &g_Config.m_BcCustomUiMainPanelAnimateSpeed,
+			&g_Config.m_BcCustomUiNavTabAnimateSpeed, &g_Config.m_BcCustomUiBadgeAnimateSpeed, &g_Config.m_BcCustomUiBindAnimateSpeed};
 		int *apUseAccent[] = {
 			&g_Config.m_BcCustomUiTextUseAccent, &g_Config.m_BcCustomUiCheckboxUseAccent, &g_Config.m_BcCustomUiScrollbarUseAccent, &g_Config.m_BcCustomUiButtonUseAccent,
 			&g_Config.m_BcCustomUiDropdownUseAccent, &g_Config.m_BcCustomUiEditBoxUseAccent, &g_Config.m_BcCustomUiBlockUseAccent, &g_Config.m_BcCustomUiMainPanelUseAccent,
@@ -1981,7 +2073,7 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 			{
 				MainView.HSplitTop(MarginSmall, nullptr, &MainView);
 				MainView.HSplitTop(LineSize, &Button, &MainView);
-				Ui()->DoScrollbarOption(&g_Config.m_BcCustomUiGradientAnimateSpeed, &g_Config.m_BcCustomUiGradientAnimateSpeed, &Button, BcLocalize("Animate speed"), 0, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_DELAYUPDATE, "%");
+				Ui()->DoScrollbarOption(apAnimate[Elem], apAnimate[Elem], &Button, BcLocalize("Animate speed"), 0, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_DELAYUPDATE, "%");
 			}
 
 			MainView.HSplitTop(MarginSmall, nullptr, &MainView);
@@ -2063,41 +2155,8 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		const char *pImportLabel = (s_UiThemeImportFeedbackTime != 0 && Now - s_UiThemeImportFeedbackTime < FeedbackDuration) ? BcLocalize("Imported!") : BcLocalize("Import");
 		if(DoButton_Menu(&s_UiThemeExportButton, pExportLabel, 0, &ExportButton, BUTTONFLAG_LEFT))
 		{
-			char aBuf[4096];
-			aBuf[0] = '\0';
-			auto AppendLine = [&](const char *pLine) {
-				str_append(aBuf, pLine, sizeof(aBuf));
-				str_append(aBuf, "\n", sizeof(aBuf));
-			};
-			auto AppendElem = [&](const char *pName, int Enable, unsigned Color, int Gradient, unsigned GradientColor, int Accent, unsigned AccentColor, int Opacity = -1) {
-				char aLine[256];
-				if(Opacity >= 0)
-					str_format(aLine, sizeof(aLine), "%s enable=%d color=$%08X gradient=%d gradient_color=$%08X accent=%d accent_color=$%08X opacity=%d", pName, Enable, Color, Gradient, GradientColor, Accent, AccentColor, Opacity);
-				else
-					str_format(aLine, sizeof(aLine), "%s enable=%d color=$%08X gradient=%d gradient_color=$%08X accent=%d accent_color=$%08X", pName, Enable, Color, Gradient, GradientColor, Accent, AccentColor);
-				AppendLine(aLine);
-			};
-			AppendLine("BC_UI_THEME_EXPORT v1");
-			{
-				char aLine[128];
-				str_format(aLine, sizeof(aLine), "animate_speed=%d", g_Config.m_BcCustomUiGradientAnimateSpeed);
-				AppendLine(aLine);
-				str_format(aLine, sizeof(aLine), "background=%d", g_Config.m_BcCustomUiBackground);
-				AppendLine(aLine);
-				str_format(aLine, sizeof(aLine), "ui_color=$%08X", g_Config.m_UiColor);
-				AppendLine(aLine);
-			}
-			AppendElem("text", g_Config.m_BcCustomUiText, g_Config.m_BcCustomUiTextColor, g_Config.m_BcCustomUiTextGradient, g_Config.m_BcCustomUiTextGradientColor, g_Config.m_BcCustomUiTextUseAccent, g_Config.m_BcCustomUiTextAccentColor);
-			AppendElem("checkbox", g_Config.m_BcCustomUiCheckbox, g_Config.m_BcCustomUiCheckboxColor, g_Config.m_BcCustomUiCheckboxGradient, g_Config.m_BcCustomUiCheckboxGradientColor, g_Config.m_BcCustomUiCheckboxUseAccent, g_Config.m_BcCustomUiCheckboxAccentColor);
-			AppendElem("scrollbar", g_Config.m_BcCustomUiScrollbar, g_Config.m_BcCustomUiScrollbarColor, g_Config.m_BcCustomUiScrollbarGradient, g_Config.m_BcCustomUiScrollbarGradientColor, g_Config.m_BcCustomUiScrollbarUseAccent, g_Config.m_BcCustomUiScrollbarAccentColor);
-			AppendElem("button", g_Config.m_BcCustomUiButton, g_Config.m_BcCustomUiButtonColor, g_Config.m_BcCustomUiButtonGradient, g_Config.m_BcCustomUiButtonGradientColor, g_Config.m_BcCustomUiButtonUseAccent, g_Config.m_BcCustomUiButtonAccentColor);
-			AppendElem("droplist", g_Config.m_BcCustomUiDropdown, g_Config.m_BcCustomUiDropdownColor, g_Config.m_BcCustomUiDropdownGradient, g_Config.m_BcCustomUiDropdownGradientColor, g_Config.m_BcCustomUiDropdownUseAccent, g_Config.m_BcCustomUiDropdownAccentColor);
-			AppendElem("input", g_Config.m_BcCustomUiEditBox, g_Config.m_BcCustomUiEditBoxColor, g_Config.m_BcCustomUiEditBoxGradient, g_Config.m_BcCustomUiEditBoxGradientColor, g_Config.m_BcCustomUiEditBoxUseAccent, g_Config.m_BcCustomUiEditBoxAccentColor);
-			AppendElem("block", g_Config.m_BcCustomUiBlock, g_Config.m_BcCustomUiBlockColor, g_Config.m_BcCustomUiBlockGradient, g_Config.m_BcCustomUiBlockGradientColor, g_Config.m_BcCustomUiBlockUseAccent, g_Config.m_BcCustomUiBlockAccentColor, g_Config.m_BcCustomUiBlockOpacity);
-			AppendElem("panel", g_Config.m_BcCustomUiMainPanel, g_Config.m_BcCustomUiMainPanelColor, g_Config.m_BcCustomUiMainPanelGradient, g_Config.m_BcCustomUiMainPanelGradientColor, g_Config.m_BcCustomUiMainPanelUseAccent, g_Config.m_BcCustomUiMainPanelAccentColor, g_Config.m_BcCustomUiMainPanelOpacity);
-			AppendElem("nav", g_Config.m_BcCustomUiNavTab, g_Config.m_BcCustomUiNavTabColor, g_Config.m_BcCustomUiNavTabGradient, g_Config.m_BcCustomUiNavTabGradientColor, g_Config.m_BcCustomUiNavTabUseAccent, g_Config.m_BcCustomUiNavTabAccentColor, g_Config.m_BcCustomUiNavTabOpacity);
-			AppendElem("badge", g_Config.m_BcCustomUiBadge, g_Config.m_BcCustomUiBadgeColor, g_Config.m_BcCustomUiBadgeGradient, g_Config.m_BcCustomUiBadgeGradientColor, g_Config.m_BcCustomUiBadgeUseAccent, g_Config.m_BcCustomUiBadgeAccentColor);
-			AppendElem("binds", g_Config.m_BcCustomUiBind, g_Config.m_BcCustomUiBindColor, g_Config.m_BcCustomUiBindGradient, g_Config.m_BcCustomUiBindGradientColor, g_Config.m_BcCustomUiBindUseAccent, g_Config.m_BcCustomUiBindAccentColor);
+			char aBuf[8192];
+			BestClientUiTheme::AppendExport(aBuf, sizeof(aBuf), false);
 			Input()->SetClipboardText(aBuf);
 			s_UiThemeExportFeedbackTime = Now;
 		}

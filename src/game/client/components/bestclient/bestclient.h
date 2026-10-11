@@ -15,6 +15,7 @@
 #include <memory>
 
 class IHttpRequest;
+class IConfigManager;
 
 class CTeeRenderInfo;
 
@@ -49,6 +50,7 @@ class CBestClient : public CComponent
 
 	void UpdateFindHours();
 	void ResetFindHours();
+	static void SaveUiThemeFileCallback(IConfigManager *pConfigManager, void *pUserData);
 
 public:
 	int Sizeof() const override { return sizeof(*this); }

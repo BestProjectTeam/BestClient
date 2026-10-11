@@ -147,14 +147,25 @@ void BestClientRefreshMenuFont(CGameClient *pGameClient)
 	pGameClient->m_MapImages.SetTextureScale(g_Config.m_ClTextEntitiesSize);
 }
 
+void CBestClient::SaveUiThemeFileCallback(IConfigManager *, void *pUserData)
+{
+	CBestClient *pThis = static_cast<CBestClient *>(pUserData);
+	BestClientUiTheme::SaveFile(pThis->Storage());
+}
+
 void CBestClient::OnInit()
 {
 	m_MenuMediaBackground.Init(Graphics(), Storage());
 	BestClientApplyMenuFont(TextRender());
+	BestClientUiTheme::LoadFile(Storage());
 }
 
 void CBestClient::OnConsoleInit()
 {
+	IConfigManager *pConfigManager = Kernel()->RequestInterface<IConfigManager>();
+	if(pConfigManager)
+		pConfigManager->RegisterCallback(SaveUiThemeFileCallback, this, ConfigDomain::BESTCLIENT);
+
 	Console()->Register("bc_saves", "", CFGFLAG_CLIENT, [](IConsole::IResult *, void *pUserData) {
 		CBestClient *pThis = static_cast<CBestClient *>(pUserData);
 		CChatQoL::ListSavesForCurrentMap(pThis->GameClient()->m_Chat);

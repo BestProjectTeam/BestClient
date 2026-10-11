@@ -933,7 +933,7 @@ void CUi::DoLabelStreamed(CUIElement::SUIElementRect &RectEl, const CUIRect *pRe
 	int GradientPhaseBucket = -1;
 	if(g_Config.m_BcNameplateGradientEverything || BestClientUiTheme::IsCustomUiTextGradient())
 	{
-		const float Phase = BestClientUiTheme::IsCustomUiTextGradient() ? BestClientUiTheme::UiGradientPhase() : CBcGradient::AnimatePhase(Client()->GlobalTime());
+		const float Phase = BestClientUiTheme::IsCustomUiTextGradient() ? BestClientUiTheme::UiGradientPhase(BestClientUiTheme::TextAnimateSpeed()) : CBcGradient::AnimatePhase(Client()->GlobalTime());
 		GradientPhaseBucket = (int)(Phase * 64.0f) % 64;
 		if(RectEl.m_GradientPhaseBucket != GradientPhaseBucket)
 			NeedsRecreate = true;

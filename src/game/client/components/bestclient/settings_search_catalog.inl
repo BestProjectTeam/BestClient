@@ -190,7 +190,7 @@
 	{"Binds", SETTINGS_NAV_LEAF_BC_VISUALS, "UI Themes", &g_Config.m_BcCustomUiBind, &g_Config.m_BcUiThemes},
 	{"Gradient", SETTINGS_NAV_LEAF_BC_VISUALS, "UI Themes", &g_Config.m_BcCustomUiTextGradient, &g_Config.m_BcUiThemes},
 	{"Accent", SETTINGS_NAV_LEAF_BC_VISUALS, "UI Themes", &g_Config.m_BcCustomUiTextUseAccent, &g_Config.m_BcUiThemes},
-	{"Animate speed", SETTINGS_NAV_LEAF_BC_VISUALS, "UI Themes", &g_Config.m_BcCustomUiGradientAnimateSpeed, &g_Config.m_BcUiThemes},
+	{"Animate speed", SETTINGS_NAV_LEAF_BC_VISUALS, "UI Themes", &g_Config.m_BcCustomUiTextAnimateSpeed, &g_Config.m_BcUiThemes},
 	{"Opacity", SETTINGS_NAV_LEAF_BC_VISUALS, "UI Themes", &g_Config.m_BcCustomUiBlockOpacity, &g_Config.m_BcUiThemes},
 
 	{"Inputs", SETTINGS_NAV_LEAF_BC_GAMEPLAY, "Gameplay", &g_Config.m_BcInputs, nullptr},

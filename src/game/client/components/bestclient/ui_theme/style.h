@@ -112,10 +112,17 @@ inline bool CatOn(int Flag)
 	return IsCustomUiColor() && Flag != 0;
 }
 
-inline int ThemeAnimateSpeed()
-{
-	return g_Config.m_BcCustomUiGradientAnimateSpeed;
-}
+inline int TextAnimateSpeed() { return g_Config.m_BcCustomUiTextAnimateSpeed; }
+inline int CheckboxAnimateSpeed() { return g_Config.m_BcCustomUiCheckboxAnimateSpeed; }
+inline int ScrollbarAnimateSpeed() { return g_Config.m_BcCustomUiScrollbarAnimateSpeed; }
+inline int ButtonAnimateSpeed() { return g_Config.m_BcCustomUiButtonAnimateSpeed; }
+inline int DropdownAnimateSpeed() { return g_Config.m_BcCustomUiDropdownAnimateSpeed; }
+inline int EditBoxAnimateSpeed() { return g_Config.m_BcCustomUiEditBoxAnimateSpeed; }
+inline int BlockAnimateSpeed() { return g_Config.m_BcCustomUiBlockAnimateSpeed; }
+inline int PanelAnimateSpeed() { return g_Config.m_BcCustomUiMainPanelAnimateSpeed; }
+inline int NavAnimateSpeed() { return g_Config.m_BcCustomUiNavTabAnimateSpeed; }
+inline int BadgeAnimateSpeed() { return g_Config.m_BcCustomUiBadgeAnimateSpeed; }
+inline int BindAnimateSpeed() { return g_Config.m_BcCustomUiBindAnimateSpeed; }
 
 inline int ThemeBlockOpacity()
 {
@@ -217,9 +224,8 @@ inline unsigned PickChromeColor(unsigned BaseColor, unsigned AccentColor, bool A
 	return (UseAccent && AccentState) ? AccentColor : BaseColor;
 }
 
-inline float UiGradientPhase()
+inline float UiGradientPhase(int Speed)
 {
-	const int Speed = ThemeAnimateSpeed();
 	if(Speed <= 0)
 		return 0.0f;
 	const double T = (double)time_get() / (double)time_freq();
@@ -245,9 +251,9 @@ inline ColorRGBA SampleTwoStopColor(unsigned Color1, unsigned Color2, float Posi
 		From.a + LocalT * (To.a - From.a));
 }
 
-inline void SampleWaveCorners(unsigned Color1, unsigned Color2, float Alpha, float Lum, ColorRGBA &TL, ColorRGBA &TR, ColorRGBA &BL, ColorRGBA &BR, bool Vertical = false)
+inline void SampleWaveCorners(unsigned Color1, unsigned Color2, float Alpha, float Lum, ColorRGBA &TL, ColorRGBA &TR, ColorRGBA &BL, ColorRGBA &BR, int AnimateSpeed, bool Vertical = false)
 {
-	const float Phase = UiGradientPhase();
+	const float Phase = UiGradientPhase(AnimateSpeed);
 	auto At = [&](float U, float V) {
 		const ColorRGBA C = SampleTwoStopColor(Color1, Color2, (Vertical ? V : U) - Phase);
 		return ColorRGBA(C.r * Lum, C.g * Lum, C.b * Lum, Alpha * C.a);
@@ -269,7 +275,7 @@ inline ColorRGBA TintAchromatic(ColorRGBA Color, unsigned ConfigColor, bool Enab
 	return ColorRGBA(C.r * Lum, C.g * Lum, C.b * Lum, Color.a * C.a);
 }
 
-inline void DrawChromeRect(const CUIRect *pRect, ColorRGBA BaseTint, unsigned CfgBase, unsigned CfgGrad, bool UseGrad, unsigned CfgAccent, bool AccentState, bool UseAccent, bool Enabled, int Corners, float Rounding, bool VerticalGrad = false)
+inline void DrawChromeRect(const CUIRect *pRect, ColorRGBA BaseTint, unsigned CfgBase, unsigned CfgGrad, bool UseGrad, unsigned CfgAccent, bool AccentState, bool UseAccent, bool Enabled, int Corners, float Rounding, int AnimateSpeed, bool VerticalGrad = false)
 {
 	if(!Enabled)
 	{
@@ -287,7 +293,7 @@ inline void DrawChromeRect(const CUIRect *pRect, ColorRGBA BaseTint, unsigned Cf
 		if(absolute(BaseTint.r - BaseTint.g) <= 0.02f && absolute(BaseTint.g - BaseTint.b) <= 0.02f)
 			Lum = BaseTint.r;
 		ColorRGBA TL, TR, BL, BR;
-		SampleWaveCorners(CfgBase, CfgGrad, BaseTint.a, Lum, TL, TR, BL, BR, VerticalGrad);
+		SampleWaveCorners(CfgBase, CfgGrad, BaseTint.a, Lum, TL, TR, BL, BR, AnimateSpeed, VerticalGrad);
 		pRect->Draw4(TL, TR, BL, BR, Corners, Rounding);
 		return;
 	}
@@ -312,7 +318,7 @@ inline std::vector<STextColorSplit> BuildUiTextGradientSplits(const char *pText)
 	if(Count == 0)
 		return vSplits;
 
-	const float Phase = UiGradientPhase();
+	const float Phase = UiGradientPhase(TextAnimateSpeed());
 	const unsigned C1 = TextColor();
 	const unsigned C2 = TextGradColor();
 	vSplits.reserve(Count);
@@ -332,7 +338,7 @@ inline std::vector<STextColorSplit> BuildUiTextGradientSplits(const char *pText)
 
 inline void DrawUiCheckbox(const CUIRect *pRect, ColorRGBA Color, bool AccentState, int Corners, float Rounding)
 {
-	DrawChromeRect(pRect, Color, CheckboxColor(), CheckboxGradColor(), CheckboxGrad(), CheckboxAccentColor(), AccentState, CheckboxAccent(), IsCustomUiCheckbox(), Corners, Rounding);
+	DrawChromeRect(pRect, Color, CheckboxColor(), CheckboxGradColor(), CheckboxGrad(), CheckboxAccentColor(), AccentState, CheckboxAccent(), IsCustomUiCheckbox(), Corners, Rounding, CheckboxAnimateSpeed());
 }
 
 inline ColorRGBA UiScrollbar(ColorRGBA Color, bool AccentState = false)
@@ -342,7 +348,7 @@ inline ColorRGBA UiScrollbar(ColorRGBA Color, bool AccentState = false)
 
 inline void DrawUiScrollbar(const CUIRect *pRect, ColorRGBA Color, bool AccentState, int Corners, float Rounding, bool VerticalGrad = false)
 {
-	DrawChromeRect(pRect, Color, ScrollbarColor(), ScrollbarGradColor(), ScrollbarGrad(), ScrollbarAccentColor(), AccentState, ScrollbarAccent(), IsCustomUiScrollbar(), Corners, Rounding, VerticalGrad);
+	DrawChromeRect(pRect, Color, ScrollbarColor(), ScrollbarGradColor(), ScrollbarGrad(), ScrollbarAccentColor(), AccentState, ScrollbarAccent(), IsCustomUiScrollbar(), Corners, Rounding, ScrollbarAnimateSpeed(), VerticalGrad);
 }
 
 inline ColorRGBA UiButton(float Alpha = 1.0f, bool AccentState = false)
@@ -357,7 +363,7 @@ inline ColorRGBA UiButton(ColorRGBA Color, bool AccentState = false)
 
 inline void DrawUiButton(const CUIRect *pRect, ColorRGBA Color, bool AccentState, int Corners, float Rounding)
 {
-	DrawChromeRect(pRect, Color, ButtonColor(), ButtonGradColor(), ButtonGrad(), ButtonAccentColor(), AccentState, ButtonAccent(), IsCustomUiButton(), Corners, Rounding);
+	DrawChromeRect(pRect, Color, ButtonColor(), ButtonGradColor(), ButtonGrad(), ButtonAccentColor(), AccentState, ButtonAccent(), IsCustomUiButton(), Corners, Rounding, ButtonAnimateSpeed());
 }
 
 inline ColorRGBA UiDropdown(float Alpha = 1.0f, bool AccentState = false)
@@ -372,12 +378,12 @@ inline ColorRGBA UiDropdown(ColorRGBA Color, bool AccentState = false)
 
 inline void DrawUiDropdown(const CUIRect *pRect, ColorRGBA Color, bool AccentState, int Corners, float Rounding)
 {
-	DrawChromeRect(pRect, Color, DropdownColor(), DropdownGradColor(), DropdownGrad(), DropdownAccentColor(), AccentState, DropdownAccent(), IsCustomUiDropdown(), Corners, Rounding);
+	DrawChromeRect(pRect, Color, DropdownColor(), DropdownGradColor(), DropdownGrad(), DropdownAccentColor(), AccentState, DropdownAccent(), IsCustomUiDropdown(), Corners, Rounding, DropdownAnimateSpeed());
 }
 
 inline void DrawUiEditBox(const CUIRect *pRect, ColorRGBA Color, bool AccentState, int Corners, float Rounding)
 {
-	DrawChromeRect(pRect, Color, EditBoxColor(), EditBoxGradColor(), EditBoxGrad(), EditBoxAccentColor(), AccentState, EditBoxAccent(), IsCustomUiEditBox(), Corners, Rounding);
+	DrawChromeRect(pRect, Color, EditBoxColor(), EditBoxGradColor(), EditBoxGrad(), EditBoxAccentColor(), AccentState, EditBoxAccent(), IsCustomUiEditBox(), Corners, Rounding, EditBoxAnimateSpeed());
 }
 
 inline ColorRGBA UiBlockColor()
@@ -400,7 +406,7 @@ inline void DrawUiBlock(const CUIRect *pRect, int Corners = IGraphics::CORNER_AL
 	if(IsCustomUiBlock() && BlockGrad() && !BlockAccent())
 	{
 		ColorRGBA TL, TR, BL, BR;
-		SampleWaveCorners(BlockColor(), BlockGradColor(), Alpha, 1.0f, TL, TR, BL, BR);
+		SampleWaveCorners(BlockColor(), BlockGradColor(), Alpha, 1.0f, TL, TR, BL, BR, BlockAnimateSpeed());
 		pRect->Draw4(TL, TR, BL, BR, Corners, Rounding);
 		return;
 	}
@@ -436,7 +442,7 @@ inline void DrawUiMainPanel(const CUIRect *pRect, ColorRGBA Base, bool AccentSta
 	{
 		const float OpacityScale = ThemePanelOpacity() / 50.0f;
 		ColorRGBA TL, TR, BL, BR;
-		SampleWaveCorners(PanelColor(), PanelGradColor(), Base.a * OpacityScale, 1.0f, TL, TR, BL, BR);
+		SampleWaveCorners(PanelColor(), PanelGradColor(), Base.a * OpacityScale, 1.0f, TL, TR, BL, BR, PanelAnimateSpeed());
 		pRect->Draw4(TL, TR, BL, BR, Corners, Rounding);
 		return;
 	}
@@ -472,7 +478,7 @@ inline void DrawUiNavTab(const CUIRect *pRect, ColorRGBA Base, bool AccentState,
 	{
 		const float OpacityScale = ThemeNavOpacity() / 50.0f;
 		ColorRGBA TL, TR, BL, BR;
-		SampleWaveCorners(NavColor(), NavGradColor(), Base.a * OpacityScale, 1.0f, TL, TR, BL, BR);
+		SampleWaveCorners(NavColor(), NavGradColor(), Base.a * OpacityScale, 1.0f, TL, TR, BL, BR, NavAnimateSpeed());
 		pRect->Draw4(TL, TR, BL, BR, Corners, Rounding);
 		return;
 	}
@@ -487,7 +493,7 @@ inline void DrawUiBadge(const CUIRect *pRect, float LeftAlpha, float RightAlpha,
 	if(IsCustomUiBadgeGradient() && !(AccentState && BadgeAccent()))
 	{
 		ColorRGBA TL, TR, BL, BR;
-		SampleWaveCorners(Base, BadgeGradColor(), 1.0f, 1.0f, TL, TR, BL, BR);
+		SampleWaveCorners(Base, BadgeGradColor(), 1.0f, 1.0f, TL, TR, BL, BR, BadgeAnimateSpeed());
 		TL.a *= LeftAlpha;
 		TR.a *= RightAlpha;
 		BL.a *= LeftAlpha;
@@ -506,7 +512,7 @@ inline void DrawUiBadge(const CUIRect *pRect, float LeftAlpha, float RightAlpha,
 
 inline void DrawUiBind(const CUIRect *pRect, ColorRGBA Color, bool AccentState, int Corners, float Rounding)
 {
-	DrawChromeRect(pRect, Color, BindColor(), BindGradColor(), BindGrad(), BindAccentColor(), AccentState, BindAccent(), IsCustomUiBind(), Corners, Rounding);
+	DrawChromeRect(pRect, Color, BindColor(), BindGradColor(), BindGrad(), BindAccentColor(), AccentState, BindAccent(), IsCustomUiBind(), Corners, Rounding, BindAnimateSpeed());
 }
 
 inline unsigned DarkenConfigColor(unsigned ConfigColor, float Factor = 0.65f)
@@ -515,6 +521,15 @@ inline unsigned DarkenConfigColor(unsigned ConfigColor, float Factor = 0.65f)
 	return color_cast<ColorHSLA>(ColorRGBA(C.r * Factor, C.g * Factor, C.b * Factor, C.a)).Pack(true);
 }
 
+} // namespace BestClientUiTheme
+
+class IStorage;
+namespace BestClientUiTheme
+{
+inline constexpr const char *FILE_NAME = "ui_theme.cfg";
+void AppendExport(char *pBuf, int Size, bool SkipDefaults);
+void SaveFile(IStorage *pStorage);
+void LoadFile(IStorage *pStorage);
 } // namespace BestClientUiTheme
 
 #endif
