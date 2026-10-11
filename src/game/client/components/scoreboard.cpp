@@ -11,6 +11,8 @@
 #include <engine/demo.h>
 #include <engine/font_icons.h>
 #include <engine/graphics.h>
+#include <engine/http.h> // bestclient
+#include <engine/serverbrowser.h> // bestclient
 #include <engine/shared/config.h>
 #include <engine/textrender.h>
 
@@ -451,9 +453,8 @@ void CScoreboard::RenderSpectators(CUIRect Spectators)
 				// bestclient
 				m_ScoreboardPopupContext.m_VoiceVolumePreview = -1;
 				m_ScoreboardPopupContext.m_VoiceVolumeDirty = false;
-				const float VoiceExtra = (!m_ScoreboardPopupContext.m_IsLocal && g_Config.m_BcVoiceChatEnable) ? 48.0f : 0.0f;
 				Ui()->DoPopupMenu(&m_ScoreboardPopupContext, Ui()->MouseX(), Ui()->MouseY(), 150.0f,
-					(m_ScoreboardPopupContext.m_IsLocal ? 30.0f : 60.0f) + VoiceExtra, &m_ScoreboardPopupContext, CScoreboardPopupContext::Render);
+					BestClientScoreboardPlayerPopupHeight(GameClient(), m_ScoreboardPopupContext.m_IsLocal, true, m_ScoreboardPopupContext.m_ClientId), &m_ScoreboardPopupContext, CScoreboardPopupContext::Render);
 				// bestclient
 			}
 
@@ -738,9 +739,8 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 					// bestclient
 					m_ScoreboardPopupContext.m_VoiceVolumePreview = -1;
 					m_ScoreboardPopupContext.m_VoiceVolumeDirty = false;
-					const float VoiceExtra = (!m_ScoreboardPopupContext.m_IsLocal && g_Config.m_BcVoiceChatEnable) ? 48.0f : 0.0f;
 					Ui()->DoPopupMenu(&m_ScoreboardPopupContext, Ui()->MouseX(), Ui()->MouseY(), 150.0f,
-						(m_ScoreboardPopupContext.m_IsLocal ? 58.5f : 87.5f) + VoiceExtra, &m_ScoreboardPopupContext, CScoreboardPopupContext::Render);
+						BestClientScoreboardPlayerPopupHeight(GameClient(), m_ScoreboardPopupContext.m_IsLocal, false, m_ScoreboardPopupContext.m_ClientId), &m_ScoreboardPopupContext, CScoreboardPopupContext::Render);
 					// bestclient
 				}
 
@@ -1423,16 +1423,52 @@ CUi::EPopupMenuFunctionResult CScoreboard::CScoreboardPopupContext::Render(void 
 			Client.m_EmoticonIgnore ^= 1;
 		}
 		pScoreboard->GameClient()->m_Tooltips.DoToolTip(&pPopupContext->m_EmoticonAction, &Action, Client.m_EmoticonIgnore ? Localize("Unmute emoticons") : Localize("Mute emoticons"));
+
+		// bestclient
+		View.HSplitTop(ItemSpacing * 2, nullptr, &View);
+		View.HSplitTop(ActionSize, &Container, &View);
+		Container.VSplitLeft(ActionSize, &Action, &Container);
+
+		const CWarDataCache &WarData = pScoreboard->GameClient()->m_WarList.GetWarData(Client.ClientId());
+		const bool IsInTeamList = WarData.m_WarGroupMatches.size() > 2 && WarData.m_WarGroupMatches[2];
+		const bool TeamHot = pUi->HotItem() == &pPopupContext->m_TeamAction;
+		ColorRGBA TeamActionColor = TeamHot ? (IsInTeamList ? ColorRGBA(1.0f, 0.42f, 0.42f, 0.8f * pUi->ButtonColorMul(&pPopupContext->m_TeamAction)) : ColorRGBA(0.53f, 0.78f, 0.53f, 0.8f * pUi->ButtonColorMul(&pPopupContext->m_TeamAction))) : (IsInTeamList ? ColorRGBA(0.53f, 0.78f, 0.53f, 0.8f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f));
+		if(pUi->DoButton_FontIcon(&pPopupContext->m_TeamAction, FontIcon::ICON_USERS, IsInTeamList, &Action, BUTTONFLAG_LEFT, ActionCorners, true, TeamActionColor))
+		{
+			if(IsInTeamList)
+				pScoreboard->GameClient()->m_WarList.RemoveWarEntryInGame(2, Client.m_aName, false);
+			else
+				pScoreboard->GameClient()->m_WarList.AddWarEntryInGame(2, Client.m_aName, "", false);
+		}
+		pScoreboard->GameClient()->m_Tooltips.DoToolTip(&pPopupContext->m_TeamAction, &Action, IsInTeamList ? Localize("Remove from teammates") : Localize("Add to teammates"));
+
+		Container.VSplitLeft(ActionSpacing, nullptr, &Container);
+		Container.VSplitLeft(ActionSize, &Action, &Container);
+
+		const bool IsInWarList = WarData.m_WarGroupMatches.size() > 1 && WarData.m_WarGroupMatches[1];
+		const bool WarHot = pUi->HotItem() == &pPopupContext->m_WarAction;
+		ColorRGBA WarActionColor = WarHot ? (IsInWarList ? ColorRGBA(0.53f, 0.78f, 0.53f, 0.8f * pUi->ButtonColorMul(&pPopupContext->m_WarAction)) : ColorRGBA(1.0f, 0.42f, 0.42f, 0.8f * pUi->ButtonColorMul(&pPopupContext->m_WarAction))) : (IsInWarList ? ColorRGBA(1.0f, 0.42f, 0.42f, 0.8f) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f));
+		if(pUi->DoButton_FontIcon(&pPopupContext->m_WarAction, FontIcon::FLAG_CHECKERED, IsInWarList, &Action, BUTTONFLAG_LEFT, ActionCorners, true, WarActionColor))
+		{
+			if(IsInWarList)
+				pScoreboard->GameClient()->m_WarList.RemoveWarEntryInGame(1, Client.m_aName, false);
+			else
+				pScoreboard->GameClient()->m_WarList.AddWarEntryInGame(1, Client.m_aName, "", false);
+		}
+		pScoreboard->GameClient()->m_Tooltips.DoToolTip(&pPopupContext->m_WarAction, &Action, IsInWarList ? Localize("Remove from warlist") : Localize("Add to warlist"));
+		// bestclient
 	}
 
 	const float ButtonSize = 17.5f;
-	View.HSplitTop(ItemSpacing * 2, nullptr, &View);
-	View.HSplitTop(ButtonSize, &Container, &View);
 
 	bool IsSpectating = pScoreboard->GameClient()->m_Snap.m_SpecInfo.m_Active && pScoreboard->GameClient()->m_Snap.m_SpecInfo.m_SpectatorId == pPopupContext->m_ClientId;
 	ColorRGBA SpectateButtonColor = ColorRGBA(1.0f, 1.0f, 1.0f, (IsSpectating ? 0.25f : 0.5f) * pUi->ButtonColorMul(&pPopupContext->m_SpectateButton));
 	if(!pPopupContext->m_IsSpectating)
 	{
+		// bestclient
+		View.HSplitTop(ItemSpacing * 2, nullptr, &View);
+		View.HSplitTop(ButtonSize, &Container, &View);
+		// bestclient
 		if(pUi->DoButton_PopupMenu(&pPopupContext->m_SpectateButton, Localize("Spectate"), &Container, FontSize, TEXTALIGN_MC, 0.0f, false, true, SpectateButtonColor))
 		{
 			if(IsSpectating)
@@ -1462,6 +1498,59 @@ CUi::EPopupMenuFunctionResult CScoreboard::CScoreboardPopupContext::Render(void 
 	}
 
 	// bestclient
+	auto AddTextButton = [&](CButtonContainer *pButton, const char *pLabel, auto &&OnClick) {
+		View.HSplitTop(ItemSpacing * 2, nullptr, &View);
+		View.HSplitTop(ButtonSize, &Container, &View);
+		const ColorRGBA ButtonColor = ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f * pUi->ButtonColorMul(pButton));
+		if(pUi->DoButton_PopupMenu(pButton, pLabel, &Container, FontSize, TEXTALIGN_MC, 0.0f, false, true, ButtonColor))
+			OnClick();
+	};
+	auto SayNamed = [&](const char *pCommand) {
+		char aEscapedCommand[2 * MAX_NAME_LENGTH + 64];
+		str_format(aEscapedCommand, sizeof(aEscapedCommand), "say %s \"", pCommand);
+		char *pDst = aEscapedCommand + str_length(aEscapedCommand);
+		str_escape(&pDst, Client.m_aName, aEscapedCommand + sizeof(aEscapedCommand));
+		str_append(aEscapedCommand, "\"");
+		pScoreboard->Console()->ExecuteLine(aEscapedCommand, IConsole::CLIENT_ID_UNSPECIFIED);
+	};
+
+	AddTextButton(&pPopupContext->m_ProfileButton, Localize("Profile"), [&]() {
+		const CServerInfo &ServerInfo = pScoreboard->Client()->ServerInfo();
+		char aEncodedName[256];
+		EscapeUrl(aEncodedName, sizeof(aEncodedName), Client.m_aName);
+		char aLink[512];
+		if(str_comp(ServerInfo.m_aCommunityId, "kog") == 0)
+			str_format(aLink, sizeof(aLink), "https://kog.tw/#p=players&player=%s", aEncodedName);
+		else if(str_comp(ServerInfo.m_aCommunityId, "unique") == 0)
+			str_format(aLink, sizeof(aLink), "https://uniqueclan.net/ranks/player/%s", aEncodedName);
+		else
+			str_format(aLink, sizeof(aLink), "https://ddnet.org/players/%s", aEncodedName);
+		pScoreboard->Client()->ViewLink(aLink);
+	});
+	AddTextButton(&pPopupContext->m_WhisperButton, Localize("Whisper"), [&]() {
+		char aWhisperBuf[256];
+		str_copy(aWhisperBuf, "chat all \"/whisper ", sizeof(aWhisperBuf));
+		char *pDst = aWhisperBuf + str_length(aWhisperBuf);
+		str_escape(&pDst, Client.m_aName, aWhisperBuf + sizeof(aWhisperBuf) - 2);
+		str_append(aWhisperBuf, " \"");
+		pScoreboard->Console()->ExecuteLine(aWhisperBuf, IConsole::CLIENT_ID_UNSPECIFIED);
+	});
+	AddTextButton(&pPopupContext->m_CopySkinButton, Localize("Copy Skin"), [&]() {
+		pScoreboard->GameClient()->m_BestClient.CopyPlayerSkin(pPopupContext->m_ClientId);
+	});
+	AddTextButton(&pPopupContext->m_VoteKickButton, Localize("Vote Kick"), [&]() {
+		pScoreboard->GameClient()->m_Voting.CallvoteKick(pPopupContext->m_ClientId, "");
+	});
+	AddTextButton(&pPopupContext->m_FindHoursButton, Localize("Find Hours"), [&]() {
+		pScoreboard->GameClient()->m_BestClient.FetchFindHours(Client.m_aName);
+	});
+	AddTextButton(&pPopupContext->m_ClipNameButton, Localize("Clip Name"), [&]() {
+		pScoreboard->Input()->SetClipboardText(Client.m_aName);
+	});
+	AddTextButton(&pPopupContext->m_SwapButton, Localize("/Swap"), [&]() {
+		SayNamed("/swap");
+	});
+
 	if(!pPopupContext->m_IsLocal && g_Config.m_BcVoiceChatEnable)
 	{
 		View.HSplitTop(ItemSpacing * 2, nullptr, &View);
@@ -1502,6 +1591,41 @@ CUi::EPopupMenuFunctionResult CScoreboard::CScoreboardPopupContext::Render(void 
 			pScoreboard->GameClient()->m_VoiceChat.TryHandleChatCommand(aCmd);
 			pPopupContext->m_VoiceVolumeDirty = false;
 		}
+	}
+
+	const int LocalId = pScoreboard->GameClient()->m_aLocalIds[g_Config.m_ClDummy];
+	const int LocalTeam = LocalId >= 0 ? pScoreboard->GameClient()->m_Teams.Team(LocalId) : TEAM_FLOCK;
+	const int TargetTeam = pScoreboard->GameClient()->m_Teams.Team(pPopupContext->m_ClientId);
+	const bool LocalInTeam = LocalTeam != TEAM_FLOCK && LocalTeam != TEAM_SUPER;
+	const bool TargetInTeam = TargetTeam != TEAM_FLOCK && TargetTeam != TEAM_SUPER;
+	const bool LocalIsTarget = LocalId == pPopupContext->m_ClientId;
+	if(LocalInTeam || TargetInTeam)
+	{
+		View.HSplitTop(ItemSpacing * 4, nullptr, &View);
+		auto AddTeamButton = [&](CButtonContainer *pButton, const char *pLabel, auto &&OnClick) {
+			View.HSplitTop(ItemSpacing * 2, nullptr, &View);
+			View.HSplitTop(ButtonSize, &Container, &View);
+			const ColorRGBA ButtonColor = pUi->HotItem() == pButton ? ColorRGBA(0.31f, 0.52f, 0.78f, 0.8f) : ColorRGBA(0.32f, 0.32f, 0.72f, 0.8f);
+			if(pUi->DoButton_PopupMenu(pButton, pLabel, &Container, FontSize, TEXTALIGN_MC, 0.0f, false, true, ButtonColor))
+				OnClick();
+		};
+
+		if(LocalInTeam && LocalTeam == TargetTeam)
+			AddTeamButton(&pPopupContext->m_TeamExitButton, Localize("Exit"), [&]() { pScoreboard->Console()->ExecuteLine("say /team 0", IConsole::CLIENT_ID_UNSPECIFIED); });
+		if(TargetInTeam && LocalTeam != TargetTeam)
+		{
+			AddTeamButton(&pPopupContext->m_TeamJoinButton, Localize("Join"), [&]() {
+				char aCmd[64];
+				str_format(aCmd, sizeof(aCmd), "say /team %d", TargetTeam);
+				pScoreboard->Console()->ExecuteLine(aCmd, IConsole::CLIENT_ID_UNSPECIFIED);
+			});
+		}
+		if(LocalInTeam && TargetTeam != LocalTeam)
+			AddTeamButton(&pPopupContext->m_TeamInviteButton, Localize("Invite"), [&]() { SayNamed("/invite"); });
+		if(!LocalIsTarget && LocalInTeam && TargetTeam == LocalTeam)
+			AddTeamButton(&pPopupContext->m_TeamKickButton, Localize("Kick"), [&]() { pScoreboard->GameClient()->m_Voting.CallvoteKick(pPopupContext->m_ClientId, ""); });
+		if(LocalInTeam && LocalTeam == TargetTeam)
+			AddTeamButton(&pPopupContext->m_TeamLockButton, Localize("Lock"), [&]() { pScoreboard->Console()->ExecuteLine("say /lock", IConsole::CLIENT_ID_UNSPECIFIED); });
 	}
 	// bestclient
 

@@ -12,6 +12,10 @@
 
 #include "menu_media_background.h"
 
+#include <memory>
+
+class IHttpRequest;
+
 class CTeeRenderInfo;
 
 constexpr float BESTCLIENT_LOCAL_HAMMER_HIT_RADIUS = 120.0f;
@@ -40,6 +44,12 @@ class CBestClient : public CComponent
 	bool m_SavesNotifySchedule = false;
 	int64_t m_SavesNotifyDeadline = 0;
 
+	std::shared_ptr<IHttpRequest> m_pFindHoursTask;
+	char m_aFindHoursPlayer[MAX_NAME_LENGTH]{};
+
+	void UpdateFindHours();
+	void ResetFindHours();
+
 public:
 	int Sizeof() const override { return sizeof(*this); }
 
@@ -65,7 +75,12 @@ public:
 	void RenderSpecMovedNotify();
 
 	void OnClientNameChanged(int ClientId, const char *pNewName, const char *pNewClan);
+
+	void CopyPlayerSkin(int ClientId);
+	void FetchFindHours(const char *pName);
 };
+
+float BestClientScoreboardPlayerPopupHeight(const class CGameClient *pGameClient, bool IsLocal, bool IsSpectatorRow, int ClientId);
 
 float BestClientTeeRenderSize(const class CGameClient *pGameClient, int ClientId);
 void BestClientRenderRealHitbox(class IGraphics *pGraphics, class CGameClient *pGameClient, int ClientId, vec2 Position);

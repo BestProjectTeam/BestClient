@@ -10,7 +10,9 @@
 #include <engine/editor.h>
 #include <engine/friends.h>
 #include <engine/graphics.h>
+#include <engine/http.h>
 #include <engine/shared/config.h>
+#include <engine/shared/json.h>
 #include <engine/storage.h>
 #include <engine/textrender.h>
 
@@ -168,6 +170,8 @@ void CBestClient::OnMapLoad()
 
 void CBestClient::OnUpdate()
 {
+	UpdateFindHours();
+
 	if(!g_Config.m_BcNotifySavesOnMap || Client()->State() == IClient::STATE_DEMOPLAYBACK)
 	{
 		m_SavesNotifySchedule = false;
@@ -193,6 +197,7 @@ void CBestClient::OnUpdate()
 
 void CBestClient::OnShutdown()
 {
+	ResetFindHours();
 	m_MenuMediaBackground.Shutdown();
 	m_SavesNotifySchedule = false;
 	m_SavesNotifyDeadline = 0;
@@ -200,6 +205,7 @@ void CBestClient::OnShutdown()
 
 void CBestClient::OnReset()
 {
+	ResetFindHours();
 	for(int Dummy = 0; Dummy < NUM_DUMMIES; ++Dummy)
 	{
 		m_aAutoTeamLockLastTeam[Dummy] = TEAM_FLOCK;
@@ -561,4 +567,180 @@ void CBestClient::EnsureAudioDefaultPack()
 		free(pData);
 		return 0;
 	}, Storage());
+}
+
+namespace
+{
+bool JsonIntField(const json_value *pValue, int *pOut)
+{
+	if(!pValue || pValue == &json_value_none || !pOut)
+		return false;
+	if(pValue->type == json_integer)
+	{
+		*pOut = (int)pValue->u.integer;
+		return true;
+	}
+	if(pValue->type == json_double)
+	{
+		*pOut = (int)pValue->u.dbl;
+		return true;
+	}
+	return false;
+}
+}
+
+void CBestClient::ResetFindHours()
+{
+	if(m_pFindHoursTask)
+	{
+		m_pFindHoursTask->Abort();
+		m_pFindHoursTask = nullptr;
+	}
+}
+
+void CBestClient::FetchFindHours(const char *pName)
+{
+	if(!pName || pName[0] == '\0')
+		return;
+	if(m_pFindHoursTask && !m_pFindHoursTask->Done())
+	{
+		GameClient()->Echo(Localize("Request already in progress"));
+		return;
+	}
+
+	str_copy(m_aFindHoursPlayer, pName, sizeof(m_aFindHoursPlayer));
+
+	char aEncoded[256];
+	EscapeUrl(aEncoded, sizeof(aEncoded), pName);
+	char aUrl[512];
+	str_format(aUrl, sizeof(aUrl), "https://ddstats.tw/player/json?player=%s", aEncoded);
+
+	m_pFindHoursTask = HttpGet(aUrl);
+	m_pFindHoursTask->Timeout(CTimeout{20000, 0, 500, 10});
+	m_pFindHoursTask->LogProgress(HTTPLOG::FAILURE);
+	m_pFindHoursTask->FailOnErrorStatus(false);
+	Http()->Run(m_pFindHoursTask);
+}
+
+void CBestClient::UpdateFindHours()
+{
+	if(!m_pFindHoursTask || !m_pFindHoursTask->Done())
+		return;
+
+	std::shared_ptr<IHttpRequest> pTask = std::move(m_pFindHoursTask);
+	if(pTask->State() != EHttpState::DONE || pTask->StatusCode() != 200)
+	{
+		if(pTask->State() != EHttpState::ABORTED)
+			GameClient()->Echo(Localize("Find hours failed"));
+		return;
+	}
+
+	json_value *pRoot = pTask->ResultJson();
+	int Seconds = 0;
+	int Points = 0;
+	bool Ok = false;
+	if(pRoot && pRoot->type == json_object)
+	{
+		const json_value *pGeneral = json_object_get(pRoot, "general_activity");
+		const json_value *pProfile = json_object_get(pRoot, "profile");
+		if(pGeneral && pGeneral != &json_value_none && pGeneral->type == json_object &&
+			pProfile && pProfile != &json_value_none && pProfile->type == json_object)
+		{
+			Ok = JsonIntField(json_object_get(pGeneral, "total_seconds_played"), &Seconds) &&
+			     JsonIntField(json_object_get(pProfile, "points"), &Points);
+		}
+	}
+	if(pRoot)
+		json_value_free(pRoot);
+
+	if(!Ok)
+	{
+		GameClient()->Echo(Localize("Find hours failed"));
+		return;
+	}
+
+	char aBuf[128];
+	str_format(aBuf, sizeof(aBuf), Localize("Player %s has %d hours and %d points"), m_aFindHoursPlayer, Seconds / 3600, Points);
+	GameClient()->Echo(aBuf);
+}
+
+void CBestClient::CopyPlayerSkin(int ClientId)
+{
+	if(ClientId < 0 || ClientId >= MAX_CLIENTS)
+		return;
+
+	const CGameClient::CClientData &ClientData = GameClient()->m_aClients[ClientId];
+	if(ClientData.m_aSkinName[0] == '\0')
+	{
+		GameClient()->Echo(Localize("No skin found"));
+		return;
+	}
+
+	if(g_Config.m_ClDummy)
+	{
+		str_copy(g_Config.m_ClDummySkin, ClientData.m_aSkinName, sizeof(g_Config.m_ClDummySkin));
+		g_Config.m_ClDummyUseCustomColor = ClientData.m_UseCustomColor;
+		g_Config.m_ClDummyColorBody = ClientData.m_ColorBody;
+		g_Config.m_ClDummyColorFeet = ClientData.m_ColorFeet;
+		GameClient()->SendDummyInfo(false);
+	}
+	else
+	{
+		str_copy(g_Config.m_ClPlayerSkin, ClientData.m_aSkinName, sizeof(g_Config.m_ClPlayerSkin));
+		g_Config.m_ClPlayerUseCustomColor = ClientData.m_UseCustomColor;
+		g_Config.m_ClPlayerColorBody = ClientData.m_ColorBody;
+		g_Config.m_ClPlayerColorFeet = ClientData.m_ColorFeet;
+		GameClient()->SendInfo(false);
+	}
+
+	char aBuf[128];
+	str_format(aBuf, sizeof(aBuf), Localize("Copied skin from %s"), ClientData.m_aName);
+	GameClient()->Echo(aBuf);
+}
+
+float BestClientScoreboardPlayerPopupHeight(const CGameClient *pGameClient, bool IsLocal, bool IsSpectatorRow, int ClientId)
+{
+	constexpr float OuterPopupPadding = 2.0f * (1.0f + 4.0f);
+	constexpr float InnerMargin = 10.0f;
+	constexpr float LabelHeight = 12.0f;
+	constexpr float ItemSpacing = 2.0f;
+	constexpr float ButtonHeight = 17.5f;
+	constexpr float QuickActionHeight = 25.0f + ItemSpacing * 2.0f;
+	constexpr float ButtonRow = ButtonHeight + ItemSpacing * 2.0f;
+
+	int ExtraButtonRows = 0;
+	const int LocalId = pGameClient->m_aLocalIds[g_Config.m_ClDummy];
+	const int LocalTeam = LocalId >= 0 && LocalId < MAX_CLIENTS ? pGameClient->m_Teams.Team(LocalId) : TEAM_FLOCK;
+	const int TargetTeam = ClientId >= 0 && ClientId < MAX_CLIENTS ? pGameClient->m_Teams.Team(ClientId) : TEAM_FLOCK;
+	const bool LocalInTeam = LocalTeam != TEAM_FLOCK && LocalTeam != TEAM_SUPER;
+	const bool TargetInTeam = TargetTeam != TEAM_FLOCK && TargetTeam != TEAM_SUPER;
+	const bool LocalIsTarget = LocalId == ClientId;
+	if(LocalInTeam || TargetInTeam)
+	{
+		if(LocalInTeam && LocalTeam == TargetTeam)
+			ExtraButtonRows++;
+		if(TargetInTeam && LocalTeam != TargetTeam)
+			ExtraButtonRows++;
+		if(LocalInTeam && TargetTeam != LocalTeam)
+			ExtraButtonRows++;
+		if(!LocalIsTarget && LocalInTeam && TargetTeam == LocalTeam)
+			ExtraButtonRows++;
+		if(LocalInTeam && LocalTeam == TargetTeam)
+			ExtraButtonRows++;
+	}
+
+	int ButtonRows = 7;
+	if(!IsSpectatorRow)
+		ButtonRows++;
+	if(!IsLocal && g_Config.m_BcVoiceChatEnable)
+		ButtonRows += 2;
+	ButtonRows += ExtraButtonRows;
+
+	float Height = OuterPopupPadding + InnerMargin + LabelHeight;
+	if(!IsLocal)
+		Height += QuickActionHeight * 2.0f;
+	Height += ButtonRows * ButtonRow;
+	if(ExtraButtonRows != 0)
+		Height += ItemSpacing * 4.0f;
+	return Height;
 }

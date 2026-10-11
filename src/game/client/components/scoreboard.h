@@ -55,8 +55,22 @@ class CScoreboard : public CComponent
 
 		CButtonContainer m_SpectateButton;
 		// bestclient
+		CButtonContainer m_TeamAction;
+		CButtonContainer m_WarAction;
+		CButtonContainer m_ProfileButton;
+		CButtonContainer m_WhisperButton;
+		CButtonContainer m_CopySkinButton;
+		CButtonContainer m_VoteKickButton;
+		CButtonContainer m_FindHoursButton;
+		CButtonContainer m_ClipNameButton;
+		CButtonContainer m_SwapButton;
 		CButtonContainer m_VoiceMuteButton;
 		CButtonContainer m_VoiceVolumeSlider;
+		CButtonContainer m_TeamExitButton;
+		CButtonContainer m_TeamJoinButton;
+		CButtonContainer m_TeamInviteButton;
+		CButtonContainer m_TeamKickButton;
+		CButtonContainer m_TeamLockButton;
 		int m_VoiceVolumePreview = -1;
 		bool m_VoiceVolumeDirty = false;
 		// bestclient
