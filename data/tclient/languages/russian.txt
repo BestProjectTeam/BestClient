@@ -60,10 +60,10 @@ Show skin names in nameplate
 == Показывать название скина около имени
 
 Freeze stars
-== Звёзды при заморозки
+== Звёзды при заморозке
 
 Color frozen tee skins
-== Цветные замороженые скины
+== Цветные замороженные скины
 
 Render all custom colored feet as white feet skin
 == Все ноги в белые ноги выбранного скина
@@ -222,7 +222,7 @@ Render tiny tees instead of circles
 == Показывать маленьких тии вместо кругов
 
 Use warlist groups for indicator
-== Использовать группы из Списка воинов для индикатора
+== Использовать группы из Списка войн для индикатора
 
 Indicator size
 == Размер индикатора
@@ -327,7 +327,7 @@ Use right mouse to swap with selected
 == Используй ПКМ чтобы заменить выделенный
 
 Use middle mouse select without copy
-== Используй колесико мыши чтобы выбрать без копированния
+== Используй колесико мыши чтобы выбрать без копирования
 
 Reset position of mouse when opening bindwheel
 == Сбрасывать позицию мыши при открытии

@@ -140,11 +140,11 @@ UI scale
 
 [BestClient]
 Jelly Tee
-== Джелли ти
+== Джелли тии
 
 [BestClient]
 Enable Jelly Tee
-== Включить джелли ти
+== Включить джелли тии
 
 [BestClient]
 Jelly Others
@@ -1524,11 +1524,11 @@ Shotgun Glow
 
 [BestClient]
 Rocket Glow
-== Свечение рокеты
+== Свечение ракеты
 
 [BestClient]
 Rocket
-== Рокета
+== Ракета
 
 [BestClient]
 Prism
@@ -1536,7 +1536,7 @@ Prism
 
 [BestClient]
 Pulse
-== Pulse
+== Пульс
 
 [BestClient]
 Crystal
