@@ -1811,6 +1811,7 @@ void CMenus::RenderPopupFullscreen(CUIRect Screen)
 		if(DoButton_Menu(&s_ButtonAbort, Localize("Abort"), 0, &Abort) || Ui()->ConsumeHotkey(CUi::HOTKEY_ESCAPE))
 		{
 			m_DemoRenderInput.Clear();
+			m_aDemoTeeRenderFilename[0] = '\0';
 			m_Popup = POPUP_NONE;
 		}
 
@@ -2546,7 +2547,14 @@ void CMenus::PopupConfirmDemoReplaceVideo()
 	str_format(aBuf, sizeof(aBuf), "%s/%s.demo", m_aCurrentDemoFolder, m_aCurrentDemoSelectionName);
 	char aVideoName[IO_MAX_PATH_LENGTH];
 	str_copy(aVideoName, m_DemoRenderInput.GetString());
+	const bool PreserveCutEdits = str_comp(m_aDemoTeeRenderFilename, aBuf) == 0;
+	const auto RenderOverrides = PreserveCutEdits ? m_aDemoTeeRenderOverrides : m_aDemoTeeOverrides;
 	const char *pError = Client()->DemoPlayer_Render(aBuf, m_DemolistStorageType, aVideoName, m_Speed, m_StartPaused);
+	if(!pError && PreserveCutEdits)
+	{
+		m_aDemoTeeOverrides = RenderOverrides;
+		m_aDemoTeeRenderFilename[0] = '\0';
+	}
 	m_Speed = DEMO_SPEED_INDEX_DEFAULT;
 	m_StartPaused = false;
 	m_LastPauseChange = -1.0f;
@@ -2678,7 +2686,7 @@ void CMenus::OnShutdown()
 
 bool CMenus::OnCursorMove(float x, float y, IInput::ECursorType CursorType)
 {
-	if(!m_MenuActive && !s_AspectConfirmWantsInput)
+	if(!m_MenuActive && !Ui()->IsPopupOpen() && !s_AspectConfirmWantsInput)
 		return false;
 
 	Ui()->ConvertMouseMove(&x, &y, CursorType);
@@ -2704,6 +2712,17 @@ void CMenus::OnStateChange(int NewState, int OldState)
 	Ui()->SetActiveItem(nullptr);
 	if(NewState != IClient::STATE_DEMOPLAYBACK)
 		Ui()->ClosePopupMenu(&m_DemoCameraEffectsPopupId);
+	if(NewState != IClient::STATE_DEMOPLAYBACK)
+	{
+		Ui()->ClosePopupMenu(&m_DemoTeeEditorPopupId, true);
+		m_aDemoTeeOverrides = {};
+		m_DemoTeeSelectedClient = -1;
+	}
+	else if(OldState != IClient::STATE_DEMOPLAYBACK)
+	{
+		m_aDemoTeeOverrides = {};
+		m_DemoTeeSelectedClient = -1;
+	}
 
 	if(OldState == IClient::STATE_ONLINE || OldState == IClient::STATE_OFFLINE)
 		TextRender()->DeleteTextContainer(m_MotdTextContainerIndex);

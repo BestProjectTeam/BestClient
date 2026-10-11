@@ -5,6 +5,7 @@
 
 #include <base/color.h>
 #include <base/math.h>
+#include <base/str.h>
 
 #include <engine/client/enums.h>
 #include <engine/demo.h>
@@ -679,6 +680,16 @@ void CPlayers::RenderPlayer(
 	Player = *pPlayerChar;
 
 	CTeeRenderInfo RenderInfo = *pRenderInfo;
+	const CMenus::SDemoTeeOverride *pDemoTeeOverride = ClientId >= 0 ? GameClient()->m_Menus.DemoTeeOverride(ClientId) : nullptr;
+	if(ClientId >= 0 && Client()->State() == IClient::STATE_DEMOPLAYBACK && pDemoTeeOverride != nullptr &&
+		pDemoTeeOverride->m_OverrideAppearance &&
+		str_comp(pDemoTeeOverride->m_aOriginalName, GameClient()->m_aClients[ClientId].m_aName) == 0)
+	{
+		if(const CSkin *pSkin = GameClient()->m_Skins.FindLocalSkin(pDemoTeeOverride->m_aSkinName))
+			RenderInfo.Apply(pSkin);
+		RenderInfo.m_aSixup[g_Config.m_ClDummy].Reset();
+		RenderInfo.ApplyColors(pDemoTeeOverride->m_UseCustomColors, pDemoTeeOverride->m_BodyColor, pDemoTeeOverride->m_FeetColor);
+	}
 
 	bool Local = GameClient()->m_Snap.m_LocalClientId == ClientId;
 	bool OtherTeam = GameClient()->IsOtherTeam(ClientId);
@@ -1125,6 +1136,17 @@ void CPlayers::RenderPlayer(
 	}
 
 	RenderTools()->RenderTee(&State, &RenderInfo, Player.m_Emote, Direction, Position, Alpha, JellyDeform.m_BodyScale, JellyDeform.m_FeetScale, JellyDeform.m_BodyAngle, JellyDeform.m_FeetAngle);
+
+	if(ClientId >= 0 && Client()->State() == IClient::STATE_DEMOPLAYBACK && ClientId == GameClient()->m_Menus.SelectedDemoTeeId() &&
+		pDemoTeeOverride != nullptr && str_comp(pDemoTeeOverride->m_aOriginalName, GameClient()->m_aClients[ClientId].m_aName) == 0)
+	{
+		Graphics()->TextureClear();
+		Graphics()->QuadsBegin();
+		Graphics()->SetColor(0.42f, 0.64f, 1.0f, 0.32f);
+		Graphics()->DrawCircle(Position.x, Position.y, 43.0f, 32);
+		Graphics()->QuadsEnd();
+		Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
+	}
 
 	if(g_Config.m_BcShowRealHitbox &&
 		ClientId >= 0 &&

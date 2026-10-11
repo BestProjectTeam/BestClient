@@ -24,6 +24,7 @@
 #include <game/client/components/menus_start.h>
 #include <game/client/components/skins7.h>
 #include <game/client/components/tclient/warlist.h>
+#include <game/client/demo_tee_edit.h>
 #include <game/client/lineinput.h>
 #include <game/client/ui.h>
 #include <game/voting.h>
@@ -53,6 +54,8 @@ class CMenus : public CComponent
 	static ColorRGBA ms_ColorTabbarHover;
 
 public:
+	using SDemoTeeOverride = ::SDemoTeeOverride;
+
 	int DoButton_Toggle(const void *pId, int Checked, const CUIRect *pRect, bool Active, unsigned Flags = BUTTONFLAG_LEFT);
 	int DoButton_Menu(CButtonContainer *pButtonContainer, const char *pText, int Checked, const CUIRect *pRect, unsigned Flags = BUTTONFLAG_LEFT, const char *pImageName = nullptr, int Corners = IGraphics::CORNER_ALL, float Rounding = 5.0f, float FontFactor = 0.0f, ColorRGBA Color = ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f));
 	int DoButton_MenuEx(CButtonContainer *pButtonContainer, const char *pText, int Checked, const CUIRect *pRect, unsigned Flags, const char *pImageName, int Corners, float Rounding, float FontFactor, ColorRGBA Color, bool AlwaysColoredImage);
@@ -559,6 +562,7 @@ protected:
 	static constexpr int DEFAULT_SKIP_DURATION_INDEX = 3;
 	int m_SkipDurationIndex = DEFAULT_SKIP_DURATION_INDEX;
 	static bool DemoFilterChat(const void *pData, int Size, void *pUser);
+	static void DemoApplyTeeOverrides(void *pData, int Size, bool Sixup, void *pUser);
 	bool FetchHeader(CDemoItem &Item);
 	void FetchAllHeaders();
 	void HandleDemoSeeking(float PositionToSeek, float TimeToSeek);
@@ -566,6 +570,20 @@ protected:
 	void RenderDemoPlayerSliceSavePopup(CUIRect MainView);
 	SPopupMenuId m_DemoCameraEffectsPopupId;
 	static CUi::EPopupMenuFunctionResult PopupDemoCameraEffects(void *pContext, CUIRect View, bool Active);
+	std::array<SDemoTeeOverride, MAX_CLIENTS> m_aDemoTeeOverrides{};
+#if defined(CONF_VIDEORECORDER)
+	std::array<SDemoTeeOverride, MAX_CLIENTS> m_aDemoTeeRenderOverrides{};
+	char m_aDemoTeeRenderFilename[IO_MAX_PATH_LENGTH] = "";
+#endif
+	int m_DemoTeeSelectedClient = -1;
+	CLineInput m_DemoTeeNameInput;
+	SPopupMenuId m_DemoTeeEditorPopupId;
+	SPopupMenuId m_DemoTeeSkinPickerPopupId;
+	CLineInputBuffered<MAX_SKIN_LENGTH> m_DemoTeeSkinSearchInput;
+	bool m_DemoTeeSkinPickerResetScroll = true;
+	void OpenDemoTeeEditor(int ClientId);
+	static CUi::EPopupMenuFunctionResult PopupDemoTeeEditor(void *pContext, CUIRect View, bool Active);
+	static CUi::EPopupMenuFunctionResult PopupDemoTeeSkinPicker(void *pContext, CUIRect View, bool Active);
 	bool m_DemoBrowserListInitialized = false;
 	void RenderDemoBrowser(CUIRect MainView);
 	void RenderDemoBrowserList(CUIRect ListView, bool &WasListboxItemActivated);
@@ -728,6 +746,13 @@ public:
 	bool IsInit() const { return m_IsInit; }
 
 	bool IsActive() const { return m_MenuActive; }
+	const SDemoTeeOverride *DemoTeeOverride(int ClientId) const
+	{
+		if(ClientId < 0 || ClientId >= MAX_CLIENTS || !m_aDemoTeeOverrides[ClientId].m_Active)
+			return nullptr;
+		return &m_aDemoTeeOverrides[ClientId];
+	}
+	int SelectedDemoTeeId() const { return m_DemoTeeSelectedClient; }
 	void SetActive(bool Active);
 
 	void OnInterfacesInit(CGameClient *pClient) override;

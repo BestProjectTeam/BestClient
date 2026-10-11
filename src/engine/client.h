@@ -34,6 +34,7 @@ enum
 };
 
 typedef bool (*CLIENTFUNC_FILTER)(const void *pData, int DataSize, void *pUser);
+typedef void (*CLIENTFUNC_SNAPSHOT)(void *pData, int DataSize, bool Sixup, void *pUser);
 struct CChecksumData;
 
 class IClient : public IInterface
@@ -313,7 +314,7 @@ public:
 
 	virtual void DemoSliceBegin() = 0;
 	virtual void DemoSliceEnd() = 0;
-	virtual void DemoSlice(const char *pDstPath, CLIENTFUNC_FILTER pfnFilter, void *pUser) = 0;
+	virtual bool DemoSlice(const char *pDstPath, CLIENTFUNC_FILTER pfnFilter, void *pUser, CLIENTFUNC_SNAPSHOT pfnSnapshot = nullptr, void *pSnapshotUser = nullptr) = 0;
 
 	enum class EInfoState
 	{

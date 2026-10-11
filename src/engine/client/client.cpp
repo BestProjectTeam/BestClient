@@ -4075,12 +4075,13 @@ void CClient::SaveReplay(const int Length, const char *pFilename)
 	}
 }
 
-void CClient::DemoSlice(const char *pDstPath, CLIENTFUNC_FILTER pfnFilter, void *pUser)
+bool CClient::DemoSlice(const char *pDstPath, CLIENTFUNC_FILTER pfnFilter, void *pUser, CLIENTFUNC_SNAPSHOT pfnSnapshot, void *pSnapshotUser)
 {
 	if(m_DemoPlayer.IsPlaying())
 	{
-		m_DemoEditor.Slice(m_DemoPlayer.Filename(), pDstPath, g_Config.m_ClDemoSliceBegin, g_Config.m_ClDemoSliceEnd, pfnFilter, pUser);
+		return m_DemoEditor.Slice(m_DemoPlayer.Filename(), pDstPath, g_Config.m_ClDemoSliceBegin, g_Config.m_ClDemoSliceEnd, pfnFilter, pUser, pfnSnapshot, pSnapshotUser);
 	}
+	return false;
 }
 
 const char *CClient::DemoPlayer_Play(const char *pFilename, int StorageType)

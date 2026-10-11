@@ -1391,6 +1391,8 @@ public:
 	bool m_Stop;
 	int m_StartTick;
 	int m_EndTick;
+	DEMOFUNC_SNAPSHOT m_pfnSnapshot;
+	void *m_pSnapshotUser;
 
 	void OnDemoPlayerSnapshot(void *pData, int Size) override
 	{
@@ -1399,7 +1401,17 @@ public:
 		if(m_EndTick != -1 && pInfo->m_Info.m_CurrentTick > m_EndTick)
 			m_Stop = true;
 		else if(m_StartTick == -1 || pInfo->m_Info.m_CurrentTick >= m_StartTick)
-			m_pDemoRecorder->RecordSnapshot(pInfo->m_Info.m_CurrentTick, pData, Size);
+		{
+			if(m_pfnSnapshot)
+			{
+				CSnapshotBuffer Snapshot;
+				mem_copy(&Snapshot, pData, Size);
+				m_pfnSnapshot(&Snapshot, Size, m_pDemoPlayer->IsSixup(), m_pSnapshotUser);
+				m_pDemoRecorder->RecordSnapshot(pInfo->m_Info.m_CurrentTick, &Snapshot, Size);
+			}
+			else
+				m_pDemoRecorder->RecordSnapshot(pInfo->m_Info.m_CurrentTick, pData, Size);
+		}
 	}
 
 	void OnDemoPlayerMessage(void *pData, int Size) override
@@ -1420,7 +1432,7 @@ void CDemoEditor::Init(class CSnapshotDelta *pSnapshotDelta, class IConsole *pCo
 	m_pStorage = pStorage;
 }
 
-bool CDemoEditor::Slice(const char *pDemo, const char *pDst, int StartTick, int EndTick, DEMOFUNC_FILTER pfnFilter, void *pUser)
+bool CDemoEditor::Slice(const char *pDemo, const char *pDst, int StartTick, int EndTick, DEMOFUNC_FILTER pfnFilter, void *pUser, DEMOFUNC_SNAPSHOT pfnSnapshot, void *pSnapshotUser)
 {
 	CDemoPlayer DemoPlayer(m_pSnapshotDelta, false);
 	if(DemoPlayer.Load(m_pStorage, m_pConsole, pDemo, IStorage::TYPE_ALL_OR_ABSOLUTE) == -1)
@@ -1459,6 +1471,8 @@ bool CDemoEditor::Slice(const char *pDemo, const char *pDst, int StartTick, int 
 	Listener.m_Stop = false;
 	Listener.m_StartTick = StartTick;
 	Listener.m_EndTick = EndTick;
+	Listener.m_pfnSnapshot = pfnSnapshot;
+	Listener.m_pSnapshotUser = pSnapshotUser;
 	DemoPlayer.SetListener(&Listener);
 
 	DemoPlayer.Play();
@@ -1480,7 +1494,8 @@ bool CDemoEditor::Slice(const char *pDemo, const char *pDst, int StartTick, int 
 		}
 	}
 
+	const bool Success = DemoPlayer.ErrorMessage()[0] == '\0';
 	DemoPlayer.Stop();
-	DemoRecorder.Stop(IDemoRecorder::EStopMode::KEEP_FILE);
-	return true;
+	DemoRecorder.Stop(Success ? IDemoRecorder::EStopMode::KEEP_FILE : IDemoRecorder::EStopMode::REMOVE_FILE);
+	return Success;
 }

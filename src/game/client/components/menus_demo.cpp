@@ -19,15 +19,295 @@
 
 #include <generated/client_data.h>
 
+#include <game/client/animstate.h>
 #include <game/client/components/console.h>
+#include <game/client/demo_tee_selection.h>
 #include <game/client/gameclient.h>
 #include <game/client/ui.h>
 #include <game/client/ui_listbox.h>
 #include <game/localization.h>
 
+#include <algorithm>
 #include <chrono>
+#include <vector>
 
 using namespace std::chrono_literals;
+
+void CMenus::OpenDemoTeeEditor(int ClientId)
+{
+	if(Client()->State() != IClient::STATE_DEMOPLAYBACK || ClientId < 0 || ClientId >= MAX_CLIENTS ||
+		!GameClient()->m_Snap.m_aCharacters[ClientId].m_Active || GameClient()->m_Snap.m_apPlayerInfos[ClientId] == nullptr)
+		return;
+
+	const CGameClient::CClientData &ClientData = GameClient()->m_aClients[ClientId];
+	SDemoTeeOverride &Override = m_aDemoTeeOverrides[ClientId];
+	if(!Override.m_Active || str_comp(Override.m_aOriginalName, ClientData.m_aName) != 0)
+	{
+		Override = {};
+		Override.m_Active = true;
+		str_copy(Override.m_aOriginalName, ClientData.m_aName);
+		str_copy(Override.m_aOriginalSkinName, ClientData.m_aSkinName[0] == '\0' ? "default" : ClientData.m_aSkinName);
+		str_copy(Override.m_aName, ClientData.m_aName);
+		str_copy(Override.m_aSkinName, Override.m_aOriginalSkinName);
+		Override.m_UseCustomColors = ClientData.m_UseCustomColor != 0;
+		Override.m_OriginalUseCustomColors = Override.m_UseCustomColors;
+		Override.m_BodyColor = Override.m_OriginalBodyColor = (unsigned int)ClientData.m_ColorBody;
+		Override.m_FeetColor = Override.m_OriginalFeetColor = (unsigned int)ClientData.m_ColorFeet;
+	}
+
+	Ui()->ClosePopupMenu(&m_DemoTeeEditorPopupId, true);
+	Ui()->SetActiveItem(nullptr);
+	m_DemoTeeSelectedClient = ClientId;
+	m_DemoTeeNameInput.SetBuffer(nullptr, 0, 0);
+	m_DemoTeeNameInput.SetBuffer(Override.m_aName, sizeof(Override.m_aName), sizeof(g_Config.m_PlayerName));
+	m_DemoTeeNameInput.Set(Override.m_aName);
+
+	const CUIRect *pScreen = Ui()->Screen();
+	const float PopupWidth = std::min(620.0f, pScreen->w - 16.0f);
+	const float PopupHeight = std::min(304.0f, pScreen->h - 16.0f);
+	const float Margin = 8.0f;
+	float PopupX = Ui()->MouseX() + 12.0f;
+	float PopupY = Ui()->MouseY() + 12.0f;
+	if(PopupX + PopupWidth > pScreen->x + pScreen->w - Margin)
+		PopupX = Ui()->MouseX() - PopupWidth - 12.0f;
+	if(PopupY + PopupHeight > pScreen->y + pScreen->h - Margin)
+		PopupY = Ui()->MouseY() - PopupHeight - 12.0f;
+	PopupX = std::clamp(PopupX, pScreen->x + Margin, std::max(pScreen->x + Margin, pScreen->x + pScreen->w - PopupWidth - Margin));
+	PopupY = std::clamp(PopupY, pScreen->y + Margin, std::max(pScreen->y + Margin, pScreen->y + pScreen->h - PopupHeight - Margin));
+	Ui()->DoPopupMenu(&m_DemoTeeEditorPopupId, PopupX, PopupY, PopupWidth, PopupHeight, this, PopupDemoTeeEditor);
+}
+
+CUi::EPopupMenuFunctionResult CMenus::PopupDemoTeeEditor(void *pContext, CUIRect View, bool Active)
+{
+	CMenus *pMenus = static_cast<CMenus *>(pContext);
+	const int ClientId = pMenus->m_DemoTeeSelectedClient;
+	if(pMenus->Client()->State() != IClient::STATE_DEMOPLAYBACK ||
+		ClientId < 0 || ClientId >= MAX_CLIENTS || pMenus->m_Popup != POPUP_NONE)
+		return CUi::POPUP_CLOSE_CURRENT_AND_DESCENDANTS;
+	if(!Active)
+		return CUi::POPUP_KEEP_OPEN;
+
+	CMenus::SDemoTeeOverride &Override = pMenus->m_aDemoTeeOverrides[ClientId];
+	const CGameClient::CClientData &ClientData = pMenus->GameClient()->m_aClients[ClientId];
+	if(!Override.m_Active || str_comp(Override.m_aOriginalName, ClientData.m_aName) != 0)
+		return CUi::POPUP_CLOSE_CURRENT_AND_DESCENDANTS;
+
+	constexpr float Gap = 6.0f;
+	View.Margin(8.0f, &View);
+	CUIRect Header, CloseButton;
+	View.HSplitTop(24.0f, &Header, &View);
+	Header.VSplitRight(28.0f, &Header, &CloseButton);
+	char aTitle[MAX_NAME_LENGTH + 64];
+	str_format(aTitle, sizeof(aTitle), "%s · %s", Localize("Demo tee editor"), Override.m_aOriginalName);
+	pMenus->Ui()->DoLabel(&Header, aTitle, 15.0f, TEXTALIGN_ML);
+	static CButtonContainer s_DemoTeeCloseButton;
+	if(pMenus->DoButton_Menu(&s_DemoTeeCloseButton, "×", 0, &CloseButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f))
+		return CUi::POPUP_CLOSE_CURRENT_AND_DESCENDANTS;
+
+	View.HSplitTop(Gap, nullptr, &View);
+	CUIRect Identity;
+	View.HSplitTop(66.0f, &Identity, &View);
+	Identity.Draw(ColorRGBA(0.11f, 0.12f, 0.15f, 0.95f), IGraphics::CORNER_ALL, 5.0f);
+	Identity.Margin(5.0f, &Identity);
+	CUIRect Preview, Details;
+	Identity.VSplitLeft(60.0f, &Preview, &Details);
+	Preview.Draw(ColorRGBA(0.20f, 0.21f, 0.25f, 1.0f), IGraphics::CORNER_ALL, 4.0f);
+	Preview.Margin(2.0f, &Preview);
+	CTeeRenderInfo PreviewInfo = ClientData.m_RenderInfo;
+	if(const CSkin *pSkin = pMenus->GameClient()->m_Skins.FindLocalSkin(Override.m_aSkinName))
+		PreviewInfo.Apply(pSkin);
+	if(Override.m_OverrideAppearance)
+	{
+		PreviewInfo.m_aSixup[g_Config.m_ClDummy].Reset();
+		PreviewInfo.ApplyColors(Override.m_UseCustomColors, Override.m_BodyColor, Override.m_FeetColor);
+	}
+	PreviewInfo.m_Size = 46.0f;
+	vec2 OffsetToMid;
+	CRenderTools::GetRenderTeeOffsetToRenderedTee(CAnimState::GetIdle(), &PreviewInfo, OffsetToMid);
+	pMenus->RenderTools()->RenderTee(CAnimState::GetIdle(), &PreviewInfo, EMOTE_NORMAL, vec2(1.0f, 0.0f), vec2(Preview.x + Preview.w / 2.0f, Preview.y + Preview.h / 2.0f + OffsetToMid.y));
+
+	Details.VSplitLeft(8.0f, nullptr, &Details);
+	CUIRect NameRow, SkinRow, Label, Input;
+	Details.HSplitTop(25.0f, &NameRow, &Details);
+	NameRow.VSplitLeft(66.0f, &Label, &Input);
+	pMenus->Ui()->DoLabel(&Label, Localize("Name"), 13.0f, TEXTALIGN_ML);
+	Input.Draw(ColorRGBA(0.06f, 0.07f, 0.09f, 0.95f), IGraphics::CORNER_ALL, 4.0f);
+	Input.Margin(3.0f, &Input);
+	pMenus->Ui()->DoEditBox(&pMenus->m_DemoTeeNameInput, &Input, 13.0f);
+
+	Details.HSplitTop(5.0f, nullptr, &Details);
+	Details.HSplitTop(25.0f, &SkinRow, nullptr);
+	CUIRect SkinButton;
+	SkinRow.VSplitLeft(66.0f, &Label, &SkinButton);
+	pMenus->Ui()->DoLabel(&Label, Localize("Skin"), 13.0f, TEXTALIGN_ML);
+	static CButtonContainer s_DemoTeeSkinButton;
+	static CButtonContainer s_DemoTeePreviewButton;
+	pMenus->GameClient()->m_Tooltips.DoToolTip(&s_DemoTeePreviewButton, &Preview, Localize("Choose a skin"));
+	if(pMenus->DoButton_Menu(&s_DemoTeeSkinButton, Override.m_aSkinName, 0, &SkinButton) ||
+		pMenus->Ui()->DoButtonLogic(&s_DemoTeePreviewButton, 0, &Preview, BUTTONFLAG_LEFT))
+	{
+		pMenus->m_DemoTeeSkinSearchInput.Clear();
+		pMenus->m_DemoTeeSkinPickerResetScroll = true;
+		pMenus->m_DemoTeeSkinSearchInput.SetEmptyText(Localize("Search"));
+		const CUIRect *pScreen = pMenus->Ui()->Screen();
+		const float PickerWidth = std::min(340.0f, pScreen->w - 16.0f);
+		const float PickerHeight = std::min(330.0f, pScreen->h - 16.0f);
+		float PickerX = SkinButton.x + SkinButton.w + 4.0f;
+		float PickerY = SkinButton.y;
+		if(PickerX + PickerWidth > pScreen->x + pScreen->w - 8.0f)
+			PickerX = SkinButton.x - PickerWidth - 4.0f;
+		PickerX = std::clamp(PickerX, pScreen->x + 8.0f, std::max(pScreen->x + 8.0f, pScreen->x + pScreen->w - PickerWidth - 8.0f));
+		PickerY = std::clamp(PickerY, pScreen->y + 8.0f, std::max(pScreen->y + 8.0f, pScreen->y + pScreen->h - PickerHeight - 8.0f));
+		pMenus->Ui()->DoPopupMenu(&pMenus->m_DemoTeeSkinPickerPopupId, PickerX, PickerY, PickerWidth, PickerHeight, pMenus, PopupDemoTeeSkinPicker);
+	}
+
+	View.HSplitTop(Gap, nullptr, &View);
+	CUIRect ColorsTitle;
+	View.HSplitTop(20.0f, &ColorsTitle, &View);
+	if(pMenus->DoButton_CheckBox(&Override.m_UseCustomColors, Localize("Custom colors"), Override.m_UseCustomColors, &ColorsTitle))
+	{
+		Override.m_UseCustomColors = !Override.m_UseCustomColors;
+		Override.m_OverrideAppearance = true;
+	}
+	CUIRect Colors;
+	View.HSplitTop(96.0f, &Colors, &View);
+	Colors.Draw(ColorRGBA(0.11f, 0.12f, 0.15f, 0.95f), IGraphics::CORNER_ALL, 5.0f);
+	Colors.Margin(4.0f, &Colors);
+	CUIRect Body, Feet;
+	Colors.VSplitMid(&Body, &Feet, 8.0f);
+	Body.HSplitTop(18.0f, &Label, &Body);
+	pMenus->Ui()->DoLabel(&Label, Localize("Body"), 12.0f, TEXTALIGN_ML);
+	if(pMenus->RenderHslaScrollbars(&Body, &Override.m_BodyColor, false, ColorHSLA::DARKEST_LGT))
+	{
+		Override.m_UseCustomColors = true;
+		Override.m_OverrideAppearance = true;
+	}
+	Feet.HSplitTop(18.0f, &Label, &Feet);
+	pMenus->Ui()->DoLabel(&Label, Localize("Feet"), 12.0f, TEXTALIGN_ML);
+	if(pMenus->RenderHslaScrollbars(&Feet, &Override.m_FeetColor, false, ColorHSLA::DARKEST_LGT))
+	{
+		Override.m_UseCustomColors = true;
+		Override.m_OverrideAppearance = true;
+	}
+
+	View.HSplitTop(Gap, nullptr, &View);
+	CUIRect Footer, ResetButton;
+	View.HSplitTop(22.0f, &Footer, nullptr);
+	Footer.VSplitLeft(96.0f, &ResetButton, &Footer);
+	static CButtonContainer s_DemoTeeResetButton;
+	if(pMenus->DoButton_Menu(&s_DemoTeeResetButton, Localize("Reset"), 0, &ResetButton))
+	{
+		pMenus->m_DemoTeeNameInput.Set(Override.m_aOriginalName);
+		str_copy(Override.m_aSkinName, Override.m_aOriginalSkinName);
+		Override.m_BodyColor = Override.m_OriginalBodyColor;
+		Override.m_FeetColor = Override.m_OriginalFeetColor;
+		Override.m_UseCustomColors = Override.m_OriginalUseCustomColors;
+		Override.m_OverrideAppearance = false;
+	}
+	Footer.VSplitLeft(8.0f, nullptr, &Footer);
+	pMenus->Ui()->DoLabel(&Footer, Localize("Changes apply only to this demo"), 10.0f, TEXTALIGN_ML);
+
+	return CUi::POPUP_KEEP_OPEN;
+}
+
+CUi::EPopupMenuFunctionResult CMenus::PopupDemoTeeSkinPicker(void *pContext, CUIRect View, bool Active)
+{
+	CMenus *pMenus = static_cast<CMenus *>(pContext);
+	const int ClientId = pMenus->m_DemoTeeSelectedClient;
+	if(pMenus->Client()->State() != IClient::STATE_DEMOPLAYBACK || !pMenus->m_MenuActive ||
+		ClientId < 0 || ClientId >= MAX_CLIENTS || pMenus->m_Popup != POPUP_NONE)
+		return CUi::POPUP_CLOSE_CURRENT;
+	if(!Active)
+		return CUi::POPUP_KEEP_OPEN;
+
+	const CMenus::SDemoTeeOverride &Override = pMenus->m_aDemoTeeOverrides[ClientId];
+	const CGameClient::CClientData &ClientData = pMenus->GameClient()->m_aClients[ClientId];
+	if(!Override.m_Active || str_comp(Override.m_aOriginalName, ClientData.m_aName) != 0)
+		return CUi::POPUP_CLOSE_CURRENT;
+
+	View.Margin(6.0f, &View);
+	CUIRect Title, Search, Rows;
+	View.HSplitTop(18.0f, &Title, &View);
+	pMenus->Ui()->DoLabel(&Title, Localize("Choose a skin"), 13.0f, TEXTALIGN_ML);
+	View.HSplitTop(4.0f, nullptr, &View);
+	View.HSplitTop(22.0f, &Search, &Rows);
+	Search.Draw(ColorRGBA(0.06f, 0.07f, 0.09f, 0.95f), IGraphics::CORNER_ALL, 4.0f);
+	Search.Margin(2.0f, &Search);
+	const bool SearchChanged = pMenus->Ui()->DoEditBox_Search(&pMenus->m_DemoTeeSkinSearchInput, &Search, 12.0f, false);
+	Rows.HSplitTop(5.0f, nullptr, &Rows);
+
+	const auto &vpLocalSkins = pMenus->GameClient()->m_Skins.LocalSkinList();
+	std::vector<CSkins::CSkinContainer *> vpFilteredEntries;
+	int SelectedIndex = -1;
+	for(CSkins::CSkinContainer *pSkinContainer : vpLocalSkins)
+	{
+		if(pSkinContainer == nullptr || pSkinContainer->IsSpecial() ||
+			pSkinContainer->State() == CSkins::CSkinContainer::EState::ERROR ||
+			pSkinContainer->State() == CSkins::CSkinContainer::EState::NOT_FOUND)
+			continue;
+		if(pMenus->m_DemoTeeSkinSearchInput.GetString()[0] != '\0' &&
+			str_utf8_find_nocase(pSkinContainer->Name(), pMenus->m_DemoTeeSkinSearchInput.GetString(), nullptr) == nullptr)
+			continue;
+		if(str_comp(pSkinContainer->Name(), Override.m_aSkinName) == 0)
+			SelectedIndex = vpFilteredEntries.size();
+		vpFilteredEntries.push_back(pSkinContainer);
+	}
+
+	static CListBox s_DemoTeeSkinList;
+	if(SearchChanged || pMenus->m_DemoTeeSkinPickerResetScroll)
+		s_DemoTeeSkinList.Reset();
+	if(pMenus->m_DemoTeeSkinPickerResetScroll)
+	{
+		s_DemoTeeSkinList.ScrollToSelected();
+		pMenus->m_DemoTeeSkinPickerResetScroll = false;
+	}
+	s_DemoTeeSkinList.DoStart(42.0f, vpFilteredEntries.size(), 1, 2, SelectedIndex, &Rows);
+	const CSkin *pDefaultSkin = pMenus->GameClient()->m_Skins.Find("default");
+	for(size_t i = 0; i < vpFilteredEntries.size(); ++i)
+	{
+		CSkins::CSkinContainer *pSkinContainer = vpFilteredEntries[i];
+		const CListboxItem Item = s_DemoTeeSkinList.DoNextItem(pSkinContainer, (int)i == SelectedIndex);
+		if(!Item.m_Visible)
+			continue;
+
+		pSkinContainer->RequestLoad();
+		const CSkin *pSkin = pSkinContainer->State() == CSkins::CSkinContainer::EState::LOADED ? pSkinContainer->Skin().get() : pDefaultSkin;
+		CUIRect Preview, Label;
+		Item.m_Rect.VSplitLeft(42.0f, &Preview, &Label);
+		Preview.Draw(ColorRGBA(0.20f, 0.21f, 0.25f, 1.0f), IGraphics::CORNER_ALL, 4.0f);
+		CTeeRenderInfo PreviewInfo = ClientData.m_RenderInfo;
+		PreviewInfo.Apply(pSkin);
+		PreviewInfo.m_aSixup[g_Config.m_ClDummy].Reset();
+		PreviewInfo.ApplyColors(Override.m_UseCustomColors, Override.m_BodyColor, Override.m_FeetColor);
+		PreviewInfo.m_Size = 34.0f;
+		vec2 OffsetToMid;
+		CRenderTools::GetRenderTeeOffsetToRenderedTee(CAnimState::GetIdle(), &PreviewInfo, OffsetToMid);
+		pMenus->RenderTools()->RenderTee(CAnimState::GetIdle(), &PreviewInfo, EMOTE_NORMAL, vec2(1.0f, 0.0f), vec2(Preview.x + Preview.w / 2.0f, Preview.y + Preview.h / 2.0f + OffsetToMid.y));
+		Label.VSplitLeft(8.0f, nullptr, &Label);
+		pMenus->Ui()->DoLabel(&Label, pSkinContainer->Name(), 12.0f, TEXTALIGN_ML);
+	}
+
+	const int NewSelected = s_DemoTeeSkinList.DoEnd();
+	if((s_DemoTeeSkinList.WasItemSelected() || s_DemoTeeSkinList.WasItemActivated()) &&
+		NewSelected >= 0 && (size_t)NewSelected < vpFilteredEntries.size())
+	{
+		CSkins::CSkinContainer *pSkinContainer = vpFilteredEntries[NewSelected];
+		str_copy(pMenus->m_aDemoTeeOverrides[ClientId].m_aSkinName, pSkinContainer->Name());
+		pMenus->m_aDemoTeeOverrides[ClientId].m_OverrideAppearance = true;
+		pSkinContainer->RequestLoad();
+		return CUi::POPUP_CLOSE_CURRENT;
+	}
+
+	if(vpFilteredEntries.empty())
+		pMenus->Ui()->DoLabel(&Rows, Localize("No skins match your filter criteria"), 12.0f, TEXTALIGN_MC);
+	return CUi::POPUP_KEEP_OPEN;
+}
+
+void CMenus::DemoApplyTeeOverrides(void *pData, int Size, bool Sixup, void *pUser)
+{
+	const auto *pMenus = static_cast<const CMenus *>(pUser);
+	ApplyDemoTeeOverrides(pData, Size, Sixup, pMenus->m_aDemoTeeOverrides);
+}
 
 bool CMenus::DemoFilterChat(const void *pData, int Size, void *pUser)
 {
@@ -287,6 +567,8 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 	{
 		if(Ui()->IsPopupOpen(&m_DemoCameraEffectsPopupId))
 			Ui()->ClosePopupMenu(&m_DemoCameraEffectsPopupId);
+		if(Ui()->IsPopupOpen(&m_DemoTeeEditorPopupId))
+			Ui()->ClosePopupMenu(&m_DemoTeeEditorPopupId, true);
 		HandleDemoSeeking(PositionToSeek, TimeToSeek);
 		return;
 	}
@@ -309,6 +591,35 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 		Corners |= IGraphics::CORNER_BR;
 	DemoControls.Draw(ms_ColorTabbarActive, Corners, 10.0f);
 	const CUIRect DemoControlsDragRect = DemoControls;
+
+	const bool CanSelectDemoTee = !Ui()->IsPopupOpen() ||
+		(Ui()->IsPopupOpen(&m_DemoTeeEditorPopupId) && !Ui()->IsPopupHovered());
+	if(m_Popup == POPUP_NONE && !GameClient()->m_GameConsole.IsActive() &&
+		!GameClient()->m_AspectRatio.ConfirmWantsInput() && CanSelectDemoTee &&
+		Ui()->MouseButtonClicked(1) && !DemoControlsDragRect.Inside(Ui()->MousePos()))
+	{
+		vec2 WorldSize;
+		GameClient()->m_AspectRatio.BeginCursorGameAspect();
+		Graphics()->CalcScreenParams(Graphics()->ScreenAspect(), GameClient()->m_Camera.m_Zoom, &WorldSize.x, &WorldSize.y);
+		GameClient()->m_AspectRatio.EndCursorGameAspect();
+		const CUIRect *pScreen = Ui()->Screen();
+		const vec2 MouseWorldPos = DemoTeeSelection::MouseToWorld(Ui()->MousePos() - vec2(pScreen->x, pScreen->y),
+			vec2(pScreen->w, pScreen->h), GameClient()->m_Camera.m_Center, WorldSize);
+		const float Radius = std::max(32.0f, 8.0f * std::max(WorldSize.x / std::max(1, Graphics()->WindowWidth()), WorldSize.y / std::max(1, Graphics()->WindowHeight())));
+		std::vector<DemoTeeSelection::SCandidate> vCandidates;
+		for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
+		{
+			if(!GameClient()->m_Snap.m_aCharacters[ClientId].m_Active ||
+				GameClient()->m_Snap.m_apPlayerInfos[ClientId] == nullptr ||
+				GameClient()->m_Snap.m_apPrevPlayerInfos[ClientId] == nullptr)
+				continue;
+
+			vCandidates.push_back({ClientId, GameClient()->m_aClients[ClientId].m_RenderPos});
+		}
+		const int NearestClientId = DemoTeeSelection::Pick(vCandidates, MouseWorldPos, Radius, m_DemoTeeSelectedClient);
+		if(NearestClientId >= 0)
+			OpenDemoTeeEditor(NearestClientId);
+	}
 
 	CUIRect SeekBar, ButtonBar, NameBar, SpeedBar;
 	DemoControls.Margin(5.0f, &DemoControls);
@@ -978,13 +1289,44 @@ void CMenus::RenderDemoPlayerSliceSavePopup(CUIRect MainView)
 		if(str_endswith(m_aCurrentDemoSelectionName, ".demo"))
 			m_aCurrentDemoSelectionName[str_length(m_aCurrentDemoSelectionName) - str_length(".demo")] = '\0';
 
-		Client()->DemoSlice(aPath, CMenus::DemoFilterChat, &s_RemoveChat);
+		if(Client()->IsSixup() && std::any_of(m_aDemoTeeOverrides.begin(), m_aDemoTeeOverrides.end(), [](const SDemoTeeOverride &Override) { return Override.m_Active && (Override.m_OverrideAppearance || str_comp(Override.m_aName, Override.m_aOriginalName) != 0); }))
+		{
+			static CUi::SMessagePopupContext s_UnsupportedPopupContext;
+			s_UnsupportedPopupContext.ErrorColor();
+			str_copy(s_UnsupportedPopupContext.m_aMessage, Localize("Exporting tee edits from 0.7 demos is not supported"));
+			Ui()->ShowPopupMessage(Ui()->MouseX(), Ui()->MouseY(), &s_UnsupportedPopupContext);
+			s_ConfirmPopupContext.Reset();
+			return;
+		}
+		if(!Client()->DemoSlice(aPath, CMenus::DemoFilterChat, &s_RemoveChat, CMenus::DemoApplyTeeOverrides, this))
+		{
+			static CUi::SMessagePopupContext s_ErrorPopupContext;
+			s_ErrorPopupContext.ErrorColor();
+			str_copy(s_ErrorPopupContext.m_aMessage, Localize("Unable to save demo"));
+			Ui()->ShowPopupMessage(Ui()->MouseX(), Ui()->MouseY(), &s_ErrorPopupContext);
+			s_ConfirmPopupContext.Reset();
+			return;
+		}
 		DemolistPopulate();
 		DemolistOnUpdate(false);
 		m_DemoPlayerState = DEMOPLAYER_NONE;
 #if defined(CONF_VIDEORECORDER)
 		if(s_RenderCut)
 		{
+			m_aDemoTeeRenderOverrides = m_aDemoTeeOverrides;
+			str_copy(m_aDemoTeeRenderFilename, aPath);
+			// The exported snapshots already contain the new names and appearance.
+			for(auto &Override : m_aDemoTeeRenderOverrides)
+			{
+				str_copy(Override.m_aOriginalName, Override.m_aName);
+				if(Override.m_OverrideAppearance)
+				{
+					str_copy(Override.m_aOriginalSkinName, Override.m_aSkinName);
+					Override.m_OriginalUseCustomColors = Override.m_UseCustomColors;
+					Override.m_OriginalBodyColor = Override.m_BodyColor;
+					Override.m_OriginalFeetColor = Override.m_FeetColor;
+				}
+			}
 			m_Popup = POPUP_RENDER_DEMO;
 			m_StartPaused = false;
 			m_DemoRenderInput.Set(m_aCurrentDemoSelectionName);

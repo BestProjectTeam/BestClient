@@ -2901,6 +2901,9 @@ if(CLIENT)
     components/touch_controls.h
     components/voting.cpp
     components/voting.h
+    demo_tee_edit.cpp
+    demo_tee_edit.h
+    demo_tee_selection.h
     gameclient.cpp
     gameclient.h
     laser_data.cpp
@@ -3595,6 +3598,8 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     compression_test.cpp
     csv_test.cpp
     datafile_test.cpp
+    demo_tee_edit_test.cpp
+    demo_tee_selection_test.cpp
     editor_test.cpp
     fs_test.cpp
     gameworld_test.cpp
@@ -3646,6 +3651,8 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     src/engine/client/serverbrowser_ping_cache.cpp
     src/engine/client/serverbrowser_ping_cache.h
     src/engine/client/sqlite.cpp
+    src/game/client/demo_tee_edit.cpp
+    src/game/client/demo_tee_edit.h
   )
 
   set(TARGET_TESTRUNNER testrunner)

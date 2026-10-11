@@ -34,9 +34,10 @@ CSkins::CAbstractSkinLoadJob::~CAbstractSkinLoadJob()
 	m_Data.m_InfoGrayscale.Free();
 }
 
-CSkins::CSkinLoadJob::CSkinLoadJob(CSkins *pSkins, const char *pName, int StorageType) :
+CSkins::CSkinLoadJob::CSkinLoadJob(CSkins *pSkins, const char *pName, int StorageType, bool Cached) :
 	CAbstractSkinLoadJob(pSkins, pName),
-	m_StorageType(StorageType)
+	m_StorageType(StorageType),
+	m_Cached(Cached)
 {
 }
 
@@ -49,6 +50,8 @@ CSkins::CSkinContainer::CSkinContainer(CSkins *pSkins, const char *pName, EType 
 	m_Vanilla = IsVanillaSkin(m_aName);
 	m_Special = IsSpecialSkin(m_aName);
 	m_AlwaysLoaded = m_Vanilla; // Vanilla skins are loaded immediately and not unloaded
+	m_CacheAvailable = Type == EType::CACHED;
+	m_CacheOnly = Type == EType::CACHED;
 }
 
 CSkins::CSkinContainer::~CSkinContainer()
@@ -121,10 +124,11 @@ CSkins::CSkinContainer::EState CSkins::CSkinContainer::DetermineInitialState() c
 		// Load immediately if it should always be loaded
 		return EState::PENDING;
 	}
-	else if((g_Config.m_ClVanillaSkinsOnly && !m_Vanilla) ||
-		(m_Type == EType::DOWNLOAD && !g_Config.m_ClDownloadSkins))
+	else if(m_Type == EType::DOWNLOAD &&
+		((g_Config.m_ClVanillaSkinsOnly && !m_Vanilla) || !g_Config.m_ClDownloadSkins))
 	{
-		// Fail immediately if it shouldn't be loaded
+		// Disk skins remain available to the demo editor. Normal lookups enforce the settings.
+		// Fail immediately if the skin should not be downloaded.
 		return EState::NOT_FOUND;
 	}
 	else
@@ -158,6 +162,7 @@ void CSkins::CSkinContainer::SetState(EState State)
 	}
 
 	m_pSkins->m_SkinList.ForceRefresh();
+	m_pSkins->m_LocalSkinListNeedsUpdate = true;
 }
 
 bool CSkins::CSkinListEntry::operator<(const CSkins::CSkinListEntry &Other) const
@@ -215,6 +220,7 @@ class CSkinScanUser
 public:
 	CSkins *m_pThis;
 	CSkins::TSkinLoadedCallback m_SkinLoadedCallback;
+	bool m_CachedSkins;
 };
 
 int CSkins::SkinScan(const char *pName, int IsDir, int StorageType, void *pUser)
@@ -242,10 +248,15 @@ int CSkins::SkinScan(const char *pName, int IsDir, int StorageType, void *pUser)
 		return 0;
 	}
 
-	CSkinContainer SkinContainer(pSelf, aSkinName, CSkinContainer::EType::LOCAL, StorageType);
+	if(pSelf->m_Skins.find(aSkinName) != pSelf->m_Skins.end())
+	{
+		return 0;
+	}
+	CSkinContainer SkinContainer(pSelf, aSkinName, pUserReal->m_CachedSkins ? CSkins::CSkinContainer::EType::CACHED : CSkins::CSkinContainer::EType::LOCAL, StorageType);
 	auto &&pSkinContainer = std::make_unique<CSkinContainer>(std::move(SkinContainer));
 	pSkinContainer->SetState(pSkinContainer->DetermineInitialState());
 	pSelf->m_Skins.insert({pSkinContainer->Name(), std::move(pSkinContainer)});
+	pSelf->m_LocalSkinListNeedsUpdate = true;
 	pUserReal->m_SkinLoadedCallback();
 	return 0;
 }
@@ -602,10 +613,20 @@ void CSkins::UpdateStartLoading(CSkinLoadingStats &Stats)
 		switch(pSkinContainer->Type())
 		{
 		case CSkinContainer::EType::LOCAL:
-			pSkinContainer->m_pLoadJob = std::make_shared<CSkinLoadJob>(this, pSkinContainer->Name(), pSkinContainer->StorageType());
+			pSkinContainer->m_pLoadJob = std::make_shared<CSkinLoadJob>(this, pSkinContainer->Name(), pSkinContainer->StorageType(), false);
+			break;
+		case CSkinContainer::EType::CACHED:
+			pSkinContainer->m_pLoadJob = std::make_shared<CSkinLoadJob>(this, pSkinContainer->Name(), pSkinContainer->StorageType(), true);
 			break;
 		case CSkinContainer::EType::DOWNLOAD:
-			pSkinContainer->m_pLoadJob = std::make_shared<CSkinDownloadJob>(this, pSkinContainer->Name());
+			if(pSkinContainer->m_CacheAvailable)
+			{
+				pSkinContainer->m_pLoadJob = std::make_shared<CSkinLoadJob>(this, pSkinContainer->Name(), pSkinContainer->StorageType(), true);
+			}
+			else
+			{
+				pSkinContainer->m_pLoadJob = std::make_shared<CSkinDownloadJob>(this, pSkinContainer->Name());
+			}
 			break;
 		default:
 			dbg_assert_failed("pSkinContainer->Type() invalid");
@@ -637,6 +658,11 @@ void CSkins::UpdateFinishLoading(CSkinLoadingStats &Stats, std::chrono::nanoseco
 		Stats.m_NumLoading--;
 		if(pSkinContainer->m_pLoadJob->State() == IJob::STATE_DONE && pSkinContainer->m_pLoadJob->m_Data.m_Info.m_pData)
 		{
+			if(pSkinContainer->Type() == CSkinContainer::EType::DOWNLOAD)
+			{
+				pSkinContainer->m_CacheAvailable = true;
+				m_LocalSkinListNeedsUpdate = true;
+			}
 			LoadSkinFinish(pSkinContainer.get(), pSkinContainer->m_pLoadJob->m_Data);
 			GameClient()->OnSkinUpdate(pSkinContainer->Name());
 			pSkinContainer->m_pLoadJob = nullptr;
@@ -693,6 +719,8 @@ void CSkins::Refresh(TSkinLoadedCallback &&SkinLoadedCallback)
 	}
 	m_Skins.clear();
 	m_SkinsUsageList.clear();
+	m_vLocalSkins.clear();
+	m_LocalSkinListNeedsUpdate = true;
 
 	LoadSkinDirect("default");
 	SkinLoadedCallback();
@@ -700,7 +728,10 @@ void CSkins::Refresh(TSkinLoadedCallback &&SkinLoadedCallback)
 	CSkinScanUser SkinScanUser;
 	SkinScanUser.m_pThis = this;
 	SkinScanUser.m_SkinLoadedCallback = SkinLoadedCallback;
+	SkinScanUser.m_CachedSkins = false;
 	Storage()->ListDirectory(IStorage::TYPE_ALL, "skins", SkinScan, &SkinScanUser);
+	SkinScanUser.m_CachedSkins = true;
+	Storage()->ListDirectory(IStorage::TYPE_SAVE, "downloadedskins", SkinScan, &SkinScanUser);
 }
 
 CSkins::CSkinLoadingStats CSkins::LoadingStats() const
@@ -760,10 +791,15 @@ CSkins::CSkinList &CSkins::SkinList()
 		const bool SelectedMain = str_comp(pSkinContainer->Name(), g_Config.m_ClPlayerSkin) == 0;
 		const bool SelectedDummy = str_comp(pSkinContainer->Name(), g_Config.m_ClDummySkin) == 0;
 		const bool Favorite = IsFavorite(pSkinContainer->Name());
+		if(pSkinContainer->m_CacheOnly && !SelectedMain && !SelectedDummy && !Favorite)
+		{
+			continue;
+		}
 
 		// Don't include skins in the list that couldn't be found in the database except the current player
 		// and dummy skins to avoid showing a lot of not-found entries while the user is typing a skin name.
-		if(pSkinContainer->m_State == CSkinContainer::EState::NOT_FOUND &&
+		if((pSkinContainer->m_State == CSkinContainer::EState::NOT_FOUND ||
+			(g_Config.m_ClVanillaSkinsOnly && !pSkinContainer->m_Vanilla)) &&
 			!pSkinContainer->IsSpecial() &&
 			!SelectedMain &&
 			!SelectedDummy &&
@@ -790,6 +826,43 @@ CSkins::CSkinList &CSkins::SkinList()
 	std::sort(m_SkinList.m_vSkins.begin(), m_SkinList.m_vSkins.end());
 	m_SkinList.m_NeedsUpdate = false;
 	return m_SkinList;
+}
+
+const std::vector<CSkins::CSkinContainer *> &CSkins::LocalSkinList()
+{
+	if(!m_LocalSkinListNeedsUpdate)
+	{
+		return m_vLocalSkins;
+	}
+
+	m_vLocalSkins.clear();
+	m_vLocalSkins.reserve(m_Skins.size());
+	for(auto &[_, pSkinContainer] : m_Skins)
+	{
+		if(pSkinContainer->Type() == CSkinContainer::EType::LOCAL ||
+			pSkinContainer->Type() == CSkinContainer::EType::CACHED ||
+			pSkinContainer->m_CacheAvailable)
+		{
+			m_vLocalSkins.push_back(pSkinContainer.get());
+		}
+	}
+	std::sort(m_vLocalSkins.begin(), m_vLocalSkins.end(), [](const CSkinContainer *pLeft, const CSkinContainer *pRight) {
+		return *pLeft < *pRight;
+	});
+	m_LocalSkinListNeedsUpdate = false;
+	return m_vLocalSkins;
+}
+
+const CSkin *CSkins::FindLocalSkin(const char *pName)
+{
+	const auto SkinIt = m_Skins.find(pName);
+	if(SkinIt == m_Skins.end())
+		return nullptr;
+	CSkinContainer *pContainer = SkinIt->second.get();
+	if(pContainer->Type() == CSkinContainer::EType::DOWNLOAD && !pContainer->m_CacheAvailable)
+		return nullptr;
+	pContainer->RequestLoad();
+	return pContainer->State() == CSkinContainer::EState::LOADED ? pContainer->Skin().get() : nullptr;
 }
 
 const CSkin *CSkins::Find(const char *pName)
@@ -837,6 +910,14 @@ const CSkins::CSkinContainer *CSkins::FindContainerImpl(const char *pName)
 		auto &&pSkinContainer = std::make_unique<CSkinContainer>(std::move(SkinContainer));
 		pSkinContainer->SetState(pSkinContainer->DetermineInitialState());
 		ExistingSkin = m_Skins.insert({pSkinContainer->Name(), std::move(pSkinContainer)}).first;
+	}
+	if((g_Config.m_ClVanillaSkinsOnly && !ExistingSkin->second->m_Vanilla) ||
+		(ExistingSkin->second->Type() == CSkinContainer::EType::CACHED && !g_Config.m_ClDownloadSkins))
+		return nullptr;
+	if(ExistingSkin->second->m_CacheOnly)
+	{
+		ExistingSkin->second->m_CacheOnly = false;
+		m_SkinList.ForceRefresh();
 	}
 	ExistingSkin->second->RequestLoad();
 	return ExistingSkin->second.get();
@@ -912,7 +993,9 @@ void CSkins::RandomizeSkin(int Dummy)
 	std::vector<const CSkinContainer *> vpConsideredSkins;
 	for(const auto &[_, pSkinContainer] : m_Skins)
 	{
-		if(pSkinContainer->m_State == CSkinContainer::EState::ERROR ||
+		if(pSkinContainer->m_CacheOnly ||
+			(g_Config.m_ClVanillaSkinsOnly && !pSkinContainer->m_Vanilla) ||
+			pSkinContainer->m_State == CSkinContainer::EState::ERROR ||
 			pSkinContainer->m_State == CSkinContainer::EState::NOT_FOUND ||
 			pSkinContainer->IsSpecial())
 		{
@@ -952,7 +1035,7 @@ const char *CSkins::SkinPrefix() const
 void CSkins::CSkinLoadJob::Run()
 {
 	char aPath[IO_MAX_PATH_LENGTH];
-	str_format(aPath, sizeof(aPath), "skins/%s.png", m_aName);
+	str_format(aPath, sizeof(aPath), "%s/%s.png", m_Cached ? "downloadedskins" : "skins", m_aName);
 	if(m_pSkins->Graphics()->LoadPng(m_Data.m_Info, aPath, m_StorageType))
 	{
 		if(State() == IJob::STATE_ABORTED)
