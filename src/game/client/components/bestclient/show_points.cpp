@@ -20,12 +20,25 @@ bool IsJsonObject(const json_value *pValue)
 	return pValue && pValue != &json_value_none && pValue->type == json_object;
 }
 
+CShowPoints::EProvider LegitProviderFromGameType(const char *pGameType)
+{
+	if(!pGameType || !pGameType[0])
+		return CShowPoints::EProvider::None;
+	if(str_find_nocase(pGameType, "ddrace") != nullptr)
+		return CShowPoints::EProvider::LegitDdrace;
+	if(str_find_nocase(pGameType, "gores") != nullptr)
+		return CShowPoints::EProvider::LegitGores;
+	return CShowPoints::EProvider::None;
+}
+
 bool ParsePoints(CShowPoints::EProvider Provider, const json_value *pRoot, int *pPoints)
 {
 	if(!IsJsonObject(pRoot) || !pPoints)
 		return false;
 
-	if(Provider == CShowPoints::EProvider::Ego || Provider == CShowPoints::EProvider::Legit)
+	if(Provider == CShowPoints::EProvider::Ego ||
+		Provider == CShowPoints::EProvider::LegitGores ||
+		Provider == CShowPoints::EProvider::LegitDdrace)
 	{
 		const json_value *pPointsVal = json_object_get(pRoot, "points");
 		if(pPointsVal == &json_value_none)
@@ -71,10 +84,18 @@ bool CShowPoints::Enabled() const
 
 int CShowPoints::ProviderIndex(EProvider Provider)
 {
-	if(Provider == EProvider::Ego)
+	switch(Provider)
+	{
+	case EProvider::Ego:
 		return 1;
-	if(Provider == EProvider::Legit)
+	case EProvider::LegitGores:
 		return 2;
+	case EProvider::LegitDdrace:
+		return 3;
+	case EProvider::None:
+	case EProvider::Ddnet:
+		return 0;
+	}
 	return 0;
 }
 
@@ -111,6 +132,8 @@ CShowPoints::EProvider CShowPoints::CurrentProvider() const
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return EProvider::None;
 
+	const CServerInfo &ServerInfo = Client()->ServerInfo();
+	const IServerBrowser::CServerEntry *pEntry = ServerBrowser()->Find(Client()->ServerAddress());
 	const char *pCommunityId = CurrentCommunityId();
 	if(pCommunityId[0] != '\0')
 	{
@@ -120,7 +143,6 @@ CShowPoints::EProvider CShowPoints::CurrentProvider() const
 			return EProvider::Ego;
 	}
 
-	const CServerInfo &ServerInfo = Client()->ServerInfo();
 	if(str_find_nocase(ServerInfo.m_aName, "EGO |") ||
 		str_find_nocase(ServerInfo.m_aName, "eternal-gores") ||
 		str_find_nocase(ServerInfo.m_aName, "eternal gores"))
@@ -128,9 +150,34 @@ CShowPoints::EProvider CShowPoints::CurrentProvider() const
 		return EProvider::Ego;
 	}
 
-	if(str_find_nocase(ServerInfo.m_aName, "Legit Network"))
+	const bool IsLegit = str_comp_nocase(pCommunityId, "legit") == 0 ||
+		str_find_nocase(ServerInfo.m_aName, "Legit Network") != nullptr;
+	if(IsLegit)
 	{
-		return EProvider::Legit;
+		EProvider Provider = LegitProviderFromGameType(ServerInfo.m_aGameType);
+		if(Provider != EProvider::None)
+			return Provider;
+
+		if(GameClient()->m_ConnectServerInfo.has_value())
+		{
+			Provider = LegitProviderFromGameType(GameClient()->m_ConnectServerInfo->m_aGameType);
+			if(Provider != EProvider::None)
+				return Provider;
+		}
+
+		if(pEntry)
+		{
+			Provider = LegitProviderFromGameType(pEntry->m_Info.m_aGameType);
+			if(Provider != EProvider::None)
+				return Provider;
+		}
+
+		Provider = LegitProviderFromGameType(GameClient()->m_GameInfo.m_aGameType);
+		if(Provider != EProvider::None)
+			return Provider;
+
+		if(str_find_nocase(ServerInfo.m_aName, "Gores") != nullptr)
+			return EProvider::LegitGores;
 	}
 
 	return EProvider::None;
@@ -242,14 +289,11 @@ void CShowPoints::StartRequest(const std::string &Name, EProvider Provider)
 		EscapeUrl(aEscaped, sizeof(aEscaped), Name.c_str());
 		str_format(aUrl, sizeof(aUrl), "https://eternal-gores.com/api/profiles/by-nick/%s", aEscaped);
 	}
-	else if(Provider == EProvider::Legit)
+	else if(Provider == EProvider::LegitGores || Provider == EProvider::LegitDdrace)
 	{
-		const CServerInfo &ServerInfo = Client()->ServerInfo();
-		const bool IsDDraceMode = str_find_nocase(ServerInfo.m_aGameType, "DDraceNetwork") != nullptr;
-
 		char aEscaped[256];
 		EscapeUrl(aEscaped, sizeof(aEscaped), Name.c_str());
-		str_format(aUrl, sizeof(aUrl), "https://legit.tw/api_points.php?name=%s&mode=%s", aEscaped, IsDDraceMode ? "ddrace" : "gores");
+		str_format(aUrl, sizeof(aUrl), "https://legit.tw/api_points.php?name=%s&mode=%s", aEscaped, Provider == EProvider::LegitDdrace ? "ddrace" : "gores");
 	}
 	else
 	{
