@@ -6,6 +6,7 @@
 #include <engine/input.h>
 #include <engine/keys.h>
 #include <engine/shared/config.h>
+#include <engine/shared/video.h>
 
 #include <game/client/gameclient.h>
 
@@ -136,6 +137,11 @@ void CCameraDemos::ApplyFreeviewNumpad(IInput *pInput, float FrameTime, bool &Fo
 		s_FreeviewVelocity = vec2(0.0f, 0.0f);
 		return;
 	}
+
+#if defined(CONF_VIDEORECORDER)
+	if(IVideo::Current() && IVideo::Current()->IsRecording())
+		FrameTime = 1.0f / (float)std::max(g_Config.m_ClVideoRecorderFPS, 1);
+#endif
 
 	const float SmoothFreeviewSpeed = (float)g_Config.m_BcFreeviewSpeed;
 	const float SmoothFreeviewAcceleration = g_Config.m_BcFreeviewSmoothness / 10.0f;
