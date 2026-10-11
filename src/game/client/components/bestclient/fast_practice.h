@@ -10,6 +10,7 @@
 #include <game/client/component.h>
 #include <game/client/prediction/gameworld.h>
 #include <game/gamecore.h>
+#include <game/mapitems.h>
 
 #include <array>
 #include <deque>
@@ -46,6 +47,9 @@ public:
 	bool ForcePredictGrenade() const;
 	bool ForcePredictGunfire() const;
 	bool ForcePredictPlayers() const;
+	bool HasPracticePickup(vec2 Pos, int Type, int Subtype);
+	bool UsingMapDoors() const { return m_MapEntitiesReady; }
+	void RenderMapDoors();
 	void InvalidateBufferedInputState();
 	bool IsPracticeParticipant(int ClientId) const;
 	bool ShouldShowPracticeFrozenSkin(int ClientId) const;
@@ -125,6 +129,22 @@ private:
 		bool m_Finished = false;
 	};
 
+	struct SMapPickup
+	{
+		vec2 m_Pos = vec2(0.0f, 0.0f);
+		int m_Type = 0;
+		int m_Subtype = 0;
+		int m_Number = 0;
+		int m_Flags = 0;
+	};
+
+	struct SMapDoor
+	{
+		vec2 m_From = vec2(0.0f, 0.0f);
+		vec2 m_To = vec2(0.0f, 0.0f);
+		int m_Number = 0;
+	};
+
 	bool m_Enabled = false;
 	bool m_Ready = false;
 	bool m_NeedsRebuild = false;
@@ -171,12 +191,19 @@ private:
 
 	CGameWorld m_PracticeWorld;
 	CGameWorld m_PracticePrevWorld;
+	bool m_MapEntitiesReady = false;
+	std::vector<SMapPickup> m_vMapPickups;
+	std::vector<SMapDoor> m_vMapDoors;
+	std::vector<CDoorTile> m_vExtraDoorTiles;
 
 	static constexpr int FREEZE_SKIN_DEBOUNCE_TICKS = 3;
 
 	static void ConFastPracticeToggle(IConsole::IResult *pResult, void *pUserData);
 
 	void ResetPracticeState();
+	void ClearMapEntities();
+	void BuildMapEntities();
+	void SpawnMapPickups(CGameWorld &World) const;
 	void ResetCommandState();
 	void ResetPracticeRaceStates();
 	void UpdatePracticeRaceState(int ClientId, const CCharacter *pChar, int Tick);

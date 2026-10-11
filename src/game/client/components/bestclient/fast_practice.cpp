@@ -11,9 +11,13 @@
 #include <game/client/animstate.h>
 #include <game/client/components/bestclient/bestclient.h>
 #include <game/client/components/bestclient/inputs.h>
+#include <game/client/components/items.h>
 #include <game/client/gameclient.h>
+#include <game/client/laser_data.h>
+#include <game/client/pickup_data.h>
 #include <game/client/prediction/entities/character.h>
 #include <game/client/prediction/entities/laser.h>
+#include <game/client/prediction/entities/pickup.h>
 #include <game/client/prediction/entities/projectile.h>
 #include <game/client/projectile_data.h>
 #include <game/gamecore.h>
@@ -181,6 +185,7 @@ void CFastPractice::ResetPracticeState()
 	m_DummyAnchor = {};
 	m_PracticeWorld.Clear();
 	m_PracticePrevWorld.Clear();
+	ClearMapEntities();
 	ResetStoredInputs();
 	ResetAttackTickHistory();
 	ResetCommandState();
@@ -483,6 +488,232 @@ bool CFastPractice::ForcePredictPlayers() const
 	return Active() && !Spectating;
 }
 
+bool CFastPractice::HasPracticePickup(vec2 Pos, int Type, int Subtype)
+{
+	if(!Active())
+		return false;
+	for(auto *pPickup = (CPickup *)m_PracticePrevWorld.FindFirst(CGameWorld::ENTTYPE_PICKUP); pPickup; pPickup = (CPickup *)pPickup->NextEntity())
+	{
+		if(pPickup->Type() == Type && pPickup->Subtype() == Subtype && distance(pPickup->GetPos(), Pos) < 17.0f)
+			return true;
+	}
+	return false;
+}
+
+void CFastPractice::ClearMapEntities()
+{
+	if(Collision())
+		Collision()->SetExtraDoorTiles(nullptr);
+	m_MapEntitiesReady = false;
+	m_vMapPickups.clear();
+	m_vMapDoors.clear();
+	m_vExtraDoorTiles.clear();
+}
+
+void CFastPractice::BuildMapEntities()
+{
+	if(m_MapEntitiesReady || !Collision() || Collision()->GetWidth() <= 0 || Collision()->GetHeight() <= 0)
+		return;
+
+	m_vMapPickups.clear();
+	m_vMapDoors.clear();
+	m_vExtraDoorTiles.assign((size_t)Collision()->GetWidth() * Collision()->GetHeight(), CDoorTile{});
+
+	static const int s_aSideX[8] = {0, 1, 1, 1, 0, -1, -1, -1};
+	static const int s_aSideY[8] = {1, 1, 0, -1, -1, -1, 0, 1};
+
+	auto AddPickup = [&](int Index, int x, int y, int Number, int TileFlags) {
+		int Type = -1;
+		int Subtype = 0;
+		if(Index == ENTITY_ARMOR_1)
+			Type = POWERUP_ARMOR;
+		else if(Index == ENTITY_ARMOR_SHOTGUN)
+			Type = POWERUP_ARMOR_SHOTGUN;
+		else if(Index == ENTITY_ARMOR_GRENADE)
+			Type = POWERUP_ARMOR_GRENADE;
+		else if(Index == ENTITY_ARMOR_NINJA)
+			Type = POWERUP_ARMOR_NINJA;
+		else if(Index == ENTITY_ARMOR_LASER)
+			Type = POWERUP_ARMOR_LASER;
+		else if(Index == ENTITY_HEALTH_1)
+			Type = POWERUP_FREEZE;
+		else if(Index == ENTITY_WEAPON_SHOTGUN)
+		{
+			Type = POWERUP_WEAPON;
+			Subtype = WEAPON_SHOTGUN;
+		}
+		else if(Index == ENTITY_WEAPON_GRENADE)
+		{
+			Type = POWERUP_WEAPON;
+			Subtype = WEAPON_GRENADE;
+		}
+		else if(Index == ENTITY_WEAPON_LASER)
+		{
+			Type = POWERUP_WEAPON;
+			Subtype = WEAPON_LASER;
+		}
+		else if(Index == ENTITY_POWERUP_NINJA)
+		{
+			Type = POWERUP_NINJA;
+			Subtype = WEAPON_NINJA;
+		}
+		else
+			return;
+
+		int Flags = 0;
+		if(TileFlags & TILEFLAG_XFLIP)
+			Flags |= PICKUPFLAG_XFLIP;
+		if(TileFlags & TILEFLAG_YFLIP)
+			Flags |= PICKUPFLAG_YFLIP;
+		if(TileFlags & TILEFLAG_ROTATE)
+			Flags |= PICKUPFLAG_ROTATE;
+
+		SMapPickup Pickup;
+		Pickup.m_Pos = vec2(x * 32.0f + 16.0f, y * 32.0f + 16.0f);
+		Pickup.m_Type = Type;
+		Pickup.m_Subtype = Subtype;
+		Pickup.m_Number = Number;
+		Pickup.m_Flags = Flags;
+		m_vMapPickups.push_back(Pickup);
+	};
+
+	auto AddDoor = [&](int x, int y, int Layer, int Number) {
+		const vec2 Pos(x * 32.0f + 16.0f, y * 32.0f + 16.0f);
+		const bool SolidOrigin = Collision()->GetTile(Pos.x, Pos.y) || Collision()->GetFrontTile(Pos.x, Pos.y);
+		for(int Side = 0; Side < 8; Side++)
+		{
+			const int Neighbor = Collision()->Entity(x + s_aSideX[Side], y + s_aSideY[Side], Layer);
+			if(Neighbor < ENTITY_LASER_SHORT || Neighbor > ENTITY_LASER_LONG)
+				continue;
+			const int Length = 32 * 3 + 32 * (Neighbor - ENTITY_LASER_SHORT) * 3;
+			const vec2 Dir(std::sin(pi / 4 * Side), std::cos(pi / 4 * Side));
+			vec2 To = Pos + Dir * Length;
+			Collision()->IntersectNoLaser(Pos, To, &To, nullptr);
+
+			SMapDoor Door;
+			Door.m_From = Pos;
+			Door.m_To = To;
+			Door.m_Number = Number;
+			m_vMapDoors.push_back(Door);
+			if(SolidOrigin)
+				continue;
+
+			for(int i = 0; i < Length - 1; i++)
+			{
+				const vec2 CurrentPos = Pos + Dir * i;
+				if(Collision()->CheckPoint(CurrentPos))
+					break;
+				const int Nx = std::clamp(round_to_int(CurrentPos.x) / 32, 0, Collision()->GetWidth() - 1);
+				const int Ny = std::clamp(round_to_int(CurrentPos.y) / 32, 0, Collision()->GetHeight() - 1);
+				CDoorTile &Tile = m_vExtraDoorTiles[(size_t)Ny * Collision()->GetWidth() + Nx];
+				Tile.m_Index = TILE_STOPA;
+				Tile.m_Flags = 0;
+				Tile.m_Number = (unsigned char)Number;
+			}
+		}
+	};
+
+	const int Width = Collision()->GetWidth();
+	const int Height = Collision()->GetHeight();
+	for(int y = 0; y < Height; y++)
+	{
+		for(int x = 0; x < Width; x++)
+		{
+			const int GameIndex = Collision()->Entity(x, y, LAYER_GAME);
+			if(GameIndex > 0)
+			{
+				AddPickup(GameIndex, x, y, 0, Collision()->GetTileFlags(y * Width + x));
+				if(GameIndex == ENTITY_DOOR)
+					AddDoor(x, y, LAYER_GAME, 0);
+			}
+			if(Collision()->FrontLayer())
+			{
+				const int FrontIndex = Collision()->Entity(x, y, LAYER_FRONT);
+				if(FrontIndex > 0)
+				{
+					AddPickup(FrontIndex, x, y, 0, Collision()->GetFrontTileFlags(y * Width + x));
+					if(FrontIndex == ENTITY_DOOR)
+						AddDoor(x, y, LAYER_FRONT, 0);
+				}
+			}
+			if(Collision()->SwitchLayer())
+			{
+				const int SwitchIndex = Collision()->Entity(x, y, LAYER_SWITCH);
+				if(SwitchIndex > 0)
+				{
+					const CSwitchTile &Switch = Collision()->SwitchLayer()[y * Width + x];
+					AddPickup(SwitchIndex, x, y, Switch.m_Number, Switch.m_Flags);
+					if(SwitchIndex == ENTITY_DOOR)
+						AddDoor(x, y, LAYER_SWITCH, Switch.m_Number);
+				}
+			}
+		}
+	}
+
+	Collision()->SetExtraDoorTiles(m_vExtraDoorTiles.data());
+	m_MapEntitiesReady = true;
+}
+
+void CFastPractice::SpawnMapPickups(CGameWorld &World) const
+{
+	int NextId = -2;
+	for(const SMapPickup &Pickup : m_vMapPickups)
+	{
+		bool Exists = false;
+		for(auto *pPickup = (CPickup *)World.FindFirst(CGameWorld::ENTTYPE_PICKUP); pPickup; pPickup = (CPickup *)pPickup->NextEntity())
+		{
+			if(pPickup->Type() == Pickup.m_Type && pPickup->Subtype() == Pickup.m_Subtype && distance(pPickup->GetPos(), Pickup.m_Pos) < 17.0f)
+			{
+				Exists = true;
+				break;
+			}
+		}
+		if(Exists)
+			continue;
+
+		CPickupData Data;
+		Data.m_Pos = Pickup.m_Pos;
+		Data.m_Type = Pickup.m_Type;
+		Data.m_Subtype = Pickup.m_Subtype;
+		Data.m_SwitchNumber = Pickup.m_Number;
+		Data.m_Flags = Pickup.m_Flags;
+		World.InsertEntity(new CPickup(&World, NextId, &Data));
+		NextId--;
+	}
+}
+
+void CFastPractice::RenderMapDoors()
+{
+	if(!Active())
+		return;
+	const int ClientId = CurrentLocalPracticeId();
+	CCharacter *pChar = m_PracticeWorld.GetCharacterById(ClientId);
+	if(!pChar)
+		return;
+
+	const bool Super = pChar->IsSuper();
+	const int Team = pChar->Team();
+	if(!Super && (Team < 0 || Team >= NUM_DDRACE_TEAMS))
+		return;
+
+	const std::vector<SSwitchers> &vSwitchers = m_PracticeWorld.Switchers();
+	for(const SMapDoor &Door : m_vMapDoors)
+	{
+		const bool Inactive = !Super && Door.m_Number > 0 && Door.m_Number < (int)vSwitchers.size() && !vSwitchers[Door.m_Number].m_aStatus[Team];
+		CLaserData Data{};
+		Data.m_To = Door.m_From;
+		Data.m_From = (Inactive || Super) ? Door.m_From : Door.m_To;
+		Data.m_StartTick = -1;
+		Data.m_ExtraInfo = true;
+		Data.m_Owner = -1;
+		Data.m_Type = LASERTYPE_DOOR;
+		Data.m_SwitchNumber = Door.m_Number;
+		Data.m_Subtype = 0;
+		Data.m_Predict = true;
+		GameClient()->m_Items.RenderLaserData(&Data);
+	}
+}
+
 void CFastPractice::PrunePracticeWorld(CGameWorld &World) const
 {
 	for(CCharacter *pChar = (CCharacter *)World.FindFirst(CGameWorld::ENTTYPE_CHARACTER), *pCharNext = nullptr; pChar; pChar = pCharNext)
@@ -544,6 +775,8 @@ bool CFastPractice::Rebuild()
 
 	m_PracticeWorld.CopyWorldClean(&GameClient()->m_GameWorld);
 	PrunePracticeWorld(m_PracticeWorld);
+	BuildMapEntities();
+	SpawnMapPickups(m_PracticeWorld);
 	SyncPracticeWorldConfig(m_PracticeWorld);
 	m_PracticeWorld.m_PredictedEvents.clear();
 	ResetPracticeRaceStates();
