@@ -18,6 +18,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 class IHttpRequest;
 
@@ -72,6 +73,7 @@ public:
 			 * Skin should be downloaded (or loaded from downloadedskins).
 			 */
 			DOWNLOAD,
+			CACHED,
 		};
 
 		enum class EState
@@ -132,6 +134,8 @@ public:
 		bool m_Vanilla;
 		bool m_Special;
 		bool m_AlwaysLoaded;
+		bool m_CacheAvailable;
+		bool m_CacheOnly;
 
 		EState m_State = EState::UNLOADED;
 		std::unique_ptr<CSkin> m_pSkin = nullptr;
@@ -238,6 +242,8 @@ public:
 	void Refresh(TSkinLoadedCallback &&SkinLoadedCallback);
 	CSkinLoadingStats LoadingStats() const;
 	CSkinList &SkinList();
+	const std::vector<CSkinContainer *> &LocalSkinList();
+	const CSkin *FindLocalSkin(const char *pName);
 
 	const CSkinContainer *FindContainerOrNullptr(const char *pName);
 	const CSkin *FindOrNullptr(const char *pName);
@@ -269,13 +275,14 @@ private:
 	class CSkinLoadJob : public CAbstractSkinLoadJob
 	{
 	public:
-		CSkinLoadJob(CSkins *pSkins, const char *pName, int StorageType);
+		CSkinLoadJob(CSkins *pSkins, const char *pName, int StorageType, bool Cached);
 
 	protected:
 		void Run() override;
 
 	private:
 		int m_StorageType;
+		bool m_Cached;
 	};
 
 	class CSkinDownloadJob : public CAbstractSkinLoadJob
@@ -302,6 +309,8 @@ private:
 	std::list<std::string_view> m_SkinsUsageList;
 
 	CSkinList m_SkinList;
+	std::vector<CSkinContainer *> m_vLocalSkins;
+	bool m_LocalSkinListNeedsUpdate = true;
 	std::set<std::string> m_Favorites;
 
 	CSkin m_PlaceholderSkin;

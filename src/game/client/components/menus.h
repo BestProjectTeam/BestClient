@@ -38,8 +38,11 @@
 #include <set>
 #include <string>
 
+class CDemoTeeEditor; // bestclient
+
 class CMenus : public CComponent
 {
+	friend class CDemoTeeEditor; // bestclient
 	static ColorRGBA ms_GuiColor;
 	static ColorRGBA ms_ColorTabbarInactiveOutgame;
 	static ColorRGBA ms_ColorTabbarActiveOutgame;

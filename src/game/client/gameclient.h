@@ -48,6 +48,7 @@
 #include "components/bestclient/ego_tiles_prediction.h" // bestclient
 #include "components/bestclient/edgehelper.h" // bestclient
 #include "components/bestclient/fast_practice.h" // bestclient
+#include "components/bestclient/demo_tee_editor.h" // bestclient
 #include "components/bestclient/finish_prediction.h" // bestclient
 #include "components/bestclient/keystrokes.h" // bestclient
 // bestclient
@@ -213,6 +214,7 @@ class CGameClient : public IGameClient
 public:
 	friend class CTClient;
 	friend class CFastPractice; // bestclient
+	friend class CDemoTeeEditor; // bestclient
 
 	// all components
 	CInfoMessages m_InfoMessages;
@@ -249,6 +251,7 @@ public:
 	CSnapTap m_SnapTap; // bestclient
 	CCloudInput m_CloudInput; // bestclient
 	CFastPractice m_FastPractice; // bestclient
+	CDemoTeeEditor m_DemoTeeEditor; // bestclient
 	CBcAutoMargin m_BcAutoMargin; // bestclient
 	COptimizer m_Optimizer; // bestclient
 	CProcessPriority m_ProcessPriority; // bestclient

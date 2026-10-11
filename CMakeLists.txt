@@ -2960,6 +2960,8 @@ if(CLIENT)
     components/bestclient/camera_extras.h
     components/bestclient/camera_demos.cpp
     components/bestclient/camera_demos.h
+    components/bestclient/demo_tee_editor.cpp
+    components/bestclient/demo_tee_editor.h
     components/bestclient/hud_extras.cpp
     components/bestclient/hud_extras.h
     components/bestclient/corner_indicator.cpp
@@ -3231,6 +3233,9 @@ if(CLIENT)
     components/touch_controls.h
     components/voting.cpp
     components/voting.h
+    demo_tee_edit.cpp
+    demo_tee_edit.h
+    demo_tee_selection.h
     gameclient.cpp
     gameclient.h
     laser_data.cpp
@@ -4006,6 +4011,8 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     csv_test.cpp
     datafile_test.cpp
     dbg_test.cpp
+    demo_tee_edit_test.cpp
+    demo_tee_selection_test.cpp
     editor_test.cpp
     fs_test.cpp
     gameworld_test.cpp
@@ -4063,6 +4070,8 @@ if((GTEST_FOUND OR DOWNLOAD_GTEST) AND SERVER)
     src/engine/client/sqlite.cpp
     src/game/client/components/censor.cpp
     src/game/client/components/censor.h
+    src/game/client/demo_tee_edit.cpp
+    src/game/client/demo_tee_edit.h
     # tidy-alphabetical-end
   )
 

@@ -25,6 +25,7 @@ static constexpr int DEMO_SPEED_INDEX_DEFAULT = 4;
 static_assert(DEMO_SPEEDS[DEMO_SPEED_INDEX_DEFAULT] == 1.0);
 
 typedef bool (*DEMOFUNC_FILTER)(const void *pData, int DataSize, void *pUser);
+typedef void (*DEMOFUNC_SNAPSHOT)(void *pData, int DataSize, bool Sixup, void *pUser);
 
 // TODO: Properly extend demo format using uuids
 // "6be6da4a-cebd-380c-9b5b-1289c842d780"
@@ -123,7 +124,7 @@ class IDemoEditor : public IInterface
 {
 	MACRO_INTERFACE("demoeditor")
 public:
-	virtual bool Slice(const char *pDemo, const char *pDst, int StartTick, int EndTick, DEMOFUNC_FILTER pfnFilter, void *pUser) = 0;
+	virtual bool Slice(const char *pDemo, const char *pDst, int StartTick, int EndTick, DEMOFUNC_FILTER pfnFilter, void *pUser, DEMOFUNC_SNAPSHOT pfnSnapshot = nullptr, void *pSnapshotUser = nullptr) = 0;
 };
 
 #endif

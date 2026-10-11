@@ -21,14 +21,18 @@
 #include <engine/textrender.h>
 
 #include <generated/client_data.h>
+#include <generated/protocol.h>
 
+#include <game/client/components/bestclient/demo_tee_editor.h> // bestclient
 #include <game/client/components/console.h>
 #include <game/client/gameclient.h>
 #include <game/client/ui.h>
 #include <game/client/ui_listbox.h>
 #include <game/localization.h>
 
+#include <algorithm>
 #include <chrono>
+#include <vector>
 
 using namespace std::chrono_literals;
 
@@ -310,11 +314,26 @@ void CMenus::RenderDemoPlayer(CUIRect MainView)
 		UpdateLastPauseChange();
 	}
 
+	CUIRect DemoControlsProbe;
+	MainView.HSplitBottom(TotalHeight, nullptr, &DemoControlsProbe);
+	DemoControlsProbe.VSplitLeft(50.0f, nullptr, &DemoControlsProbe);
+	// bestclient
+	DemoControlsProbe.VSplitLeft(635.0f, &DemoControlsProbe, nullptr);
+	// bestclient
+	DemoControlsProbe.x += m_DemoControlsPositionOffset.x;
+	DemoControlsProbe.y += m_DemoControlsPositionOffset.y;
+
+	// bestclient
+	if(Client()->State() == IClient::STATE_DEMOPLAYBACK)
+		GameClient()->m_DemoTeeEditor.UpdateSelection(GameClient(), DemoControlsProbe);
+	// bestclient
+
 	if(!m_MenuActive)
 	{
 		// bestclient
 		if(Ui()->IsPopupOpen(&m_DemoCameraEffectsPopupId))
 			Ui()->ClosePopupMenu(&m_DemoCameraEffectsPopupId);
+		GameClient()->m_DemoTeeEditor.CloseIfMenuInactive(GameClient(), m_MenuActive);
 		// bestclient
 		HandleDemoSeeking(PositionToSeek, TimeToSeek);
 		return;
@@ -1024,13 +1043,35 @@ void CMenus::RenderDemoPlayerSliceSavePopup(CUIRect MainView)
 		if(str_endswith(m_aCurrentDemoSelectionName, ".demo"))
 			m_aCurrentDemoSelectionName[str_length(m_aCurrentDemoSelectionName) - str_length(".demo")] = '\0';
 
-		Client()->DemoSlice(aPath, CMenus::DemoFilterChat, &s_RemoveChat);
+		// bestclient
+		if(GameClient()->m_DemoTeeEditor.SliceHasUnsupportedEdits(Client()->IsSixup()))
+		{
+			static CUi::SMessagePopupContext s_UnsupportedPopupContext;
+			s_UnsupportedPopupContext.ErrorColor();
+			str_copy(s_UnsupportedPopupContext.m_aMessage, Localize("Exporting tee edits from 0.7 demos is not supported"));
+			Ui()->ShowPopupMessage(Ui()->MouseX(), Ui()->MouseY(), &s_UnsupportedPopupContext);
+			s_ConfirmPopupContext.Reset();
+			return;
+		}
+		// bestclient
+		if(!Client()->DemoSlice(aPath, CMenus::DemoFilterChat, &s_RemoveChat, CDemoTeeEditor::ApplyToSliceCallback, &GameClient()->m_DemoTeeEditor))
+		{
+			static CUi::SMessagePopupContext s_ErrorPopupContext;
+			s_ErrorPopupContext.ErrorColor();
+			str_copy(s_ErrorPopupContext.m_aMessage, Localize("Unable to save demo"));
+			Ui()->ShowPopupMessage(Ui()->MouseX(), Ui()->MouseY(), &s_ErrorPopupContext);
+			s_ConfirmPopupContext.Reset();
+			return;
+		}
 		DemolistPopulate();
 		DemolistOnUpdate(false);
 		m_DemoPlayerState = DEMOPLAYER_NONE;
 #if defined(CONF_VIDEORECORDER)
 		if(s_RenderCut)
 		{
+			// bestclient
+			GameClient()->m_DemoTeeEditor.PrepareCutRender(aPath);
+			// bestclient
 			m_Popup = POPUP_RENDER_DEMO;
 			m_StartPaused = false;
 			m_DemoRenderInput.Set(m_aCurrentDemoSelectionName);

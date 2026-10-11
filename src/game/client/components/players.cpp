@@ -6,6 +6,7 @@
 #include <base/color.h>
 #include <base/dbg.h>
 #include <base/math.h>
+#include <base/str.h>
 
 #include <engine/client/enums.h>
 #include <engine/demo.h>
@@ -23,6 +24,7 @@
 #include <game/client/components/skins.h>
 #include <game/client/components/sounds.h>
 #include <game/client/components/bestclient/bestclient.h> // bestclient
+#include <game/client/components/bestclient/demo_tee_editor.h> // bestclient
 #include <game/client/components/bestclient/jelly_tee.h> // bestclient
 #include <game/client/gameclient.h>
 #include <game/collision.h>
@@ -696,6 +698,18 @@ void CPlayers::RenderPlayer(
 		return;
 
 	CTeeRenderInfo RenderInfo = *pRenderInfo;
+	// bestclient
+	const SDemoTeeOverride *pDemoTeeOverride = ClientId >= 0 ? GameClient()->m_DemoTeeEditor.Override(ClientId) : nullptr;
+	if(ClientId >= 0 && Client()->State() == IClient::STATE_DEMOPLAYBACK && pDemoTeeOverride != nullptr &&
+		pDemoTeeOverride->m_OverrideAppearance &&
+		str_comp(pDemoTeeOverride->m_aOriginalName, GameClient()->m_aClients[ClientId].m_aName) == 0)
+	{
+		if(const CSkin *pSkin = GameClient()->m_Skins.FindLocalSkin(pDemoTeeOverride->m_aSkinName))
+			RenderInfo.Apply(pSkin);
+		RenderInfo.m_aSixup[g_Config.m_ClDummy].Reset();
+		RenderInfo.ApplyColors(pDemoTeeOverride->m_UseCustomColors, pDemoTeeOverride->m_BodyColor, pDemoTeeOverride->m_FeetColor);
+	}
+	// bestclient
 
 	const bool Paused = GameClient()->IsWorldPaused() || GameClient()->IsDemoPlaybackPaused();
 	// float Alpha = (OtherTeam || ClientId < 0) ? g_Config.m_ClShowOthersAlpha / 100.0f : 1.0f;
@@ -1148,6 +1162,19 @@ void CPlayers::RenderPlayer(
 	}
 
 	RenderTools()->RenderTee(&State, &RenderInfo, Player.m_Emote, Direction, Position, Alpha, Local, JellyDeform.m_BodyScale, JellyDeform.m_FeetScale, JellyDeform.m_BodyAngle, JellyDeform.m_FeetAngle); // bestclient
+
+	// bestclient
+	if(ClientId >= 0 && Client()->State() == IClient::STATE_DEMOPLAYBACK && ClientId == GameClient()->m_DemoTeeEditor.SelectedClientId() &&
+		pDemoTeeOverride != nullptr && str_comp(pDemoTeeOverride->m_aOriginalName, GameClient()->m_aClients[ClientId].m_aName) == 0)
+	{
+		Graphics()->TextureClear();
+		Graphics()->QuadsBegin();
+		Graphics()->SetColor(0.42f, 0.64f, 1.0f, 0.32f);
+		Graphics()->DrawCircle(Position.x, Position.y, 43.0f, 32);
+		Graphics()->QuadsEnd();
+		Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
+	}
+	// bestclient
 
 	// bestclient
 	BestClientRenderRealHitbox(Graphics(), GameClient(), ClientId, Position);

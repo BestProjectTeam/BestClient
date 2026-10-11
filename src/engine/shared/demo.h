@@ -213,7 +213,7 @@ class CDemoEditor : public IDemoEditor
 
 public:
 	virtual void Init(CSnapshotDelta *pSnapshotDelta, CSnapshotDelta *pSnapshotDeltaSixup, IConsole *pConsole, IStorage *pStorage);
-	bool Slice(const char *pDemo, const char *pDst, int StartTick, int EndTick, DEMOFUNC_FILTER pfnFilter, void *pUser) override;
+	bool Slice(const char *pDemo, const char *pDst, int StartTick, int EndTick, DEMOFUNC_FILTER pfnFilter, void *pUser, DEMOFUNC_SNAPSHOT pfnSnapshot = nullptr, void *pSnapshotUser = nullptr) override;
 };
 
 #endif
