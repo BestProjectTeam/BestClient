@@ -43,6 +43,13 @@
 #include <utility>
 #include <vector>
 
+// bestclient
+static void LogVulkanFailure(const char *pOp, int Result, uint32_t CanvasWidth, uint32_t CanvasHeight, bool Paused, uint32_t SwapWidth, uint32_t SwapHeight)
+{
+	log_error("bestclient", "vulkan %s result=%d fullscreen=%d borderless=%d canvas=%ux%u paused=%d swap=%ux%u", pOp, Result, g_Config.m_GfxFullscreen, g_Config.m_GfxBorderless, CanvasWidth, CanvasHeight, Paused ? 1 : 0, SwapWidth, SwapHeight);
+}
+// bestclient
+
 // Set on render worker threads so that memory-allocation recovery (which drives
 // the frame loop and issues queue submit/present) is only ever attempted on the
 // main render thread. See AllocateVulkanMemory().
@@ -2390,6 +2397,9 @@ protected:
 		VkResult QueueSubmitRes = vkQueueSubmit(m_VKGraphicsQueue, 1, &SubmitInfo, m_vQueueSubmitFences[m_CurImageIndex]);
 		if(QueueSubmitRes != VK_SUCCESS)
 		{
+			// bestclient
+			LogVulkanFailure("submit", (int)QueueSubmitRes, m_CanvasWidth, m_CanvasHeight, m_RenderingPaused, m_VKSwapImgAndViewportExtent.m_SwapImageViewport.width, m_VKSwapImgAndViewportExtent.m_SwapImageViewport.height);
+			// bestclient
 			const char *pCritErrorMsg = CheckVulkanCriticalError(QueueSubmitRes);
 			if(pCritErrorMsg != nullptr)
 			{
@@ -2417,6 +2427,9 @@ protected:
 		VkResult QueuePresentRes = vkQueuePresentKHR(m_VKPresentQueue, &PresentInfo);
 		if(QueuePresentRes != VK_SUCCESS && QueuePresentRes != VK_SUBOPTIMAL_KHR)
 		{
+			// bestclient
+			LogVulkanFailure("present", (int)QueuePresentRes, m_CanvasWidth, m_CanvasHeight, m_RenderingPaused, m_VKSwapImgAndViewportExtent.m_SwapImageViewport.width, m_VKSwapImgAndViewportExtent.m_SwapImageViewport.height);
+			// bestclient
 			const char *pCritErrorMsg = CheckVulkanCriticalError(QueuePresentRes);
 			if(pCritErrorMsg != nullptr)
 			{
@@ -2443,6 +2456,9 @@ protected:
 		auto AcqResult = vkAcquireNextImageKHR(m_VKDevice, m_VKSwapChain, std::numeric_limits<uint64_t>::max(), m_AcquireImageSemaphore, VK_NULL_HANDLE, &m_CurImageIndex);
 		if(AcqResult != VK_SUCCESS)
 		{
+			// bestclient
+			LogVulkanFailure("acquire", (int)AcqResult, m_CanvasWidth, m_CanvasHeight, m_RenderingPaused, m_VKSwapImgAndViewportExtent.m_SwapImageViewport.width, m_VKSwapImgAndViewportExtent.m_SwapImageViewport.height);
+			// bestclient
 			if(AcqResult == VK_ERROR_OUT_OF_DATE_KHR || m_RecreateSwapChain)
 			{
 				m_RecreateSwapChain = false;
