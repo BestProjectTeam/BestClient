@@ -48,6 +48,50 @@ static void LogVulkanFailure(const char *pOp, int Result, uint32_t CanvasWidth, 
 {
 	log_error("bestclient", "vulkan %s result=%d fullscreen=%d borderless=%d canvas=%ux%u paused=%d swap=%ux%u", pOp, Result, g_Config.m_GfxFullscreen, g_Config.m_GfxBorderless, CanvasWidth, CanvasHeight, Paused ? 1 : 0, SwapWidth, SwapHeight);
 }
+
+static const char *VulkanPresentModeName(VkPresentModeKHR Mode)
+{
+	switch(Mode)
+	{
+	case VK_PRESENT_MODE_IMMEDIATE_KHR: return "immediate";
+	case VK_PRESENT_MODE_MAILBOX_KHR: return "mailbox";
+	case VK_PRESENT_MODE_FIFO_KHR: return "fifo";
+	case VK_PRESENT_MODE_FIFO_RELAXED_KHR: return "fifo_relaxed";
+	default: return "other";
+	}
+}
+
+static const char *VulkanCompositeAlphaName(VkCompositeAlphaFlagBitsKHR Alpha)
+{
+	switch(Alpha)
+	{
+	case VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR: return "opaque";
+	case VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR: return "pre_multiplied";
+	case VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR: return "post_multiplied";
+	case VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR: return "inherit";
+	default: return "other";
+	}
+}
+
+static void LogVulkanSwapChain(VkPresentModeKHR PresentMode, VkCompositeAlphaFlagBitsKHR Alpha, uint32_t SwapWidth, uint32_t SwapHeight, SDL_Window *pWindow)
+{
+	int WindowWidth = 0;
+	int WindowHeight = 0;
+	int DesktopWidth = 0;
+	int DesktopHeight = 0;
+	if(pWindow != nullptr)
+	{
+		SDL_GetWindowSize(pWindow, &WindowWidth, &WindowHeight);
+		const int DisplayIndex = SDL_GetWindowDisplayIndex(pWindow);
+		SDL_DisplayMode DesktopMode;
+		if(DisplayIndex >= 0 && SDL_GetDesktopDisplayMode(DisplayIndex, &DesktopMode) == 0)
+		{
+			DesktopWidth = DesktopMode.w;
+			DesktopHeight = DesktopMode.h;
+		}
+	}
+	log_info("bestclient", "vulkan swapchain backend=%s present=%s alpha=%s window=%dx%d desktop=%dx%d swap=%ux%u fullscreen=%d borderless=%d vsync=%d", g_Config.m_GfxBackend, VulkanPresentModeName(PresentMode), VulkanCompositeAlphaName(Alpha), WindowWidth, WindowHeight, DesktopWidth, DesktopHeight, SwapWidth, SwapHeight, g_Config.m_GfxFullscreen, g_Config.m_GfxBorderless, g_Config.m_GfxVsync);
+}
 // bestclient
 
 // Set on render worker threads so that memory-allocation recovery (which drives
@@ -4384,6 +4428,10 @@ public:
 		{
 			return false;
 		}
+
+		// bestclient
+		LogVulkanSwapChain(PresentMode, SwapInfo.compositeAlpha, SwapInfo.imageExtent.width, SwapInfo.imageExtent.height, m_pWindow);
+		// bestclient
 
 		return true;
 	}
