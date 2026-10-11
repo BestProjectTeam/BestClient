@@ -1387,6 +1387,16 @@ namespace
 		return InnerPadX * 2.0f + NumBars * BarW + std::max(0, NumBars - 1) * Gap;
 	}
 
+	static float MusicPlayerTextColumnCenterX(const CUIRect &View, float CompactH, float Scale, float WidthScale)
+	{
+		const float VisualW = MusicPlayerVisualizerWidth(true, Scale, WidthScale, 0.0f);
+		const float ArtSize = std::max(0.0f, CompactH - 1.7f * Scale);
+		const float SideGap = 1.05f * Scale * WidthScale;
+		const float TextLeft = View.x + 1.70f * Scale + 0.1f * Scale * WidthScale + ArtSize + SideGap;
+		const float TextRight = View.x + View.w - 1.70f * Scale * WidthScale - VisualW - SideGap;
+		return (TextLeft + TextRight) * 0.5f;
+	}
+
 	static std::string MusicPlayerPrimaryText(const SNowPlayingSnapshot &Snapshot)
 	{
 		return Snapshot.m_Title.empty() ? Localize("No media") : Snapshot.m_Title;
@@ -3727,6 +3737,12 @@ public:
 		m_LyricsTimerWidthAnim = ApproachAnim(m_LyricsTimerWidthAnim, WantLyricsTimer ? TimerWidthTarget : (m_LyricsTimerHeightAnim > 0.01f ? TimerWidthTarget : 0.0f), Delta, TimerWidthSpeed);
 
 		CUIRect ReservationRect = Metrics.m_ViewRect;
+		if(WantLyricsTimer)
+		{
+			const float ColumnCenter = MusicPlayerTextColumnCenterX(ReservationRect, Metrics.m_CompactH, Metrics.m_Scale, Metrics.m_WidthScale);
+			const float Shift = (ReservationRect.x + ReservationRect.w * 0.5f) - ColumnCenter;
+			ReservationRect.x = std::clamp(ReservationRect.x - Shift, 0.0f, std::max(0.0f, Width - ReservationRect.w));
+		}
 		if(m_LyricsTimerHeightAnim > 0.01f && LyricsWidthPushT > 0.001f)
 			ReservationRect.h += m_LyricsTimerHeightAnim * LyricsWidthPushT;
 
@@ -4068,6 +4084,17 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	const float LyricsTimerFooterH = (!ForcePreview && LyricsEnabled) ? m_pImpl->m_LyricsTimerHeightAnim : ((LyricsEnabled && g_Config.m_BcMusicPlayerShowCurrentTime != 0) ? LyricsBelowTimerBlockHeight(Scale, TextScale) : 0.0f);
 	const float LyricsTimerTabW = (!ForcePreview && LyricsEnabled) ? m_pImpl->m_LyricsTimerWidthAnim : 0.0f;
 	const bool DrawLyricsTimerTab = LyricsTimerFooterH > 0.05f && (ForcePreview || LyricsTimerTabW > 0.05f);
+	bool LockLyricsTimerAnchor = false;
+	float LyricsTimerAnchorX = 0.0f;
+	if(LyricsEnabled && g_Config.m_BcMusicPlayerShowCurrentTime != 0)
+	{
+		LockLyricsTimerAnchor = true;
+		LyricsTimerAnchorX = MusicPlayerTextColumnCenterX(View, Metrics.m_CompactH, Scale, WidthScale);
+		float Shift = (View.x + View.w * 0.5f) - LyricsTimerAnchorX;
+		if(PixelWidth > 0.0f)
+			Shift = roundf(Shift / PixelWidth) * PixelWidth;
+		View.x = std::clamp(View.x - Shift, 0.0f, std::max(0.0f, Width - View.w));
+	}
 
 	if(GlowColor.a > 0.001f)
 	{
@@ -4110,10 +4137,11 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	}
 	const float LyricsColumnCenterX = TextArea.x + TextArea.w * 0.5f;
 
+	const float LyricsTimerCenterX = LockLyricsTimerAnchor ? LyricsTimerAnchorX : LyricsColumnCenterX;
 	if(DrawLyricsTimerTab)
 	{
 		const float TabW = ForcePreview ? std::min(View.w * 0.45f, LyricsBelowTimerFont(Scale, TextScale) * 6.5f) : LyricsTimerTabW;
-		const float TabX = LyricsColumnCenterX - TabW * 0.5f;
+		const float TabX = LyricsTimerCenterX - TabW * 0.5f;
 		DrawMusicPlayerPanelWithTimerTab(Graphics(), View, TabX, TabW, LyricsTimerFooterH, LyricsBelowTimerFillet(Scale), Metrics.m_Rounding, PanelColor, Width, Height);
 	}
 	else
@@ -4306,7 +4334,7 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 		ShowBelowGameTimer = GameTimer.m_Valid;
 		BelowTimerText = ShowBelowGameTimer ? GameTimer.m_Text : FormatMusicPositionMs((int64_t)PositionMs);
 		const float TabW = ForcePreview ? std::min(View.w * 0.45f, LyricsBelowTimerFont(Scale, TextScale) * 6.5f) : std::max(LyricsTimerTabW, 1.0f);
-		BelowTimerHud = MakeLyricsTimerTabRect(LyricsColumnCenterX - TabW * 0.5f, View.y + View.h, TabW, LyricsTimerFooterH);
+		BelowTimerHud = MakeLyricsTimerTabRect(LyricsTimerCenterX - TabW * 0.5f, View.y + View.h, TabW, LyricsTimerFooterH);
 	}
 
 	Ui()->MapScreen();
