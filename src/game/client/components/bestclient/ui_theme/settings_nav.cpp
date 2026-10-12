@@ -29,7 +29,8 @@ static constexpr int TC_TAB_INFO = 5;
 static constexpr int BC_TAB_VISUALS = 0;
 static constexpr int BC_TAB_GAMEPLAY = 1;
 static constexpr int BC_TAB_OTHERS = 2;
-static constexpr int BC_TAB_INFO = 3;
+static constexpr int BC_TAB_CONFIGS = 3;
+static constexpr int BC_TAB_INFO = 4;
 
 static const int s_aDdnetLeaves[] = {
 	SETTINGS_NAV_LEAF_GENERAL,
@@ -56,6 +57,7 @@ static const int s_aBestclientLeaves[] = {
 	SETTINGS_NAV_LEAF_BC_VISUALS,
 	SETTINGS_NAV_LEAF_BC_GAMEPLAY,
 	SETTINGS_NAV_LEAF_BC_OTHERS,
+	SETTINGS_NAV_LEAF_BC_CONFIGS,
 	SETTINGS_NAV_LEAF_BC_INFO,
 };
 
@@ -158,6 +160,10 @@ SSettingsLeafTarget LeafTarget(int Leaf)
 		Target.m_SettingsPage = CMenus::SETTINGS_BESTCLIENT;
 		Target.m_BestClientTab = BC_TAB_OTHERS;
 		break;
+	case SETTINGS_NAV_LEAF_BC_CONFIGS:
+		Target.m_SettingsPage = CMenus::SETTINGS_BESTCLIENT;
+		Target.m_BestClientTab = BC_TAB_CONFIGS;
+		break;
 	case SETTINGS_NAV_LEAF_BC_INFO:
 		Target.m_SettingsPage = CMenus::SETTINGS_BESTCLIENT;
 		Target.m_BestClientTab = BC_TAB_INFO;
@@ -190,6 +196,8 @@ bool IsLeafVisible(int Leaf, int TcTabFlags, int BcTabFlags)
 		const int Tab = Leaf - SETTINGS_NAV_LEAF_BC_VISUALS;
 		return !IsFlagSet(BcTabFlags, Tab);
 	}
+	if(Leaf == SETTINGS_NAV_LEAF_BC_CONFIGS)
+		return !IsFlagSet(BcTabFlags, BC_TAB_CONFIGS);
 	return true;
 }
 
@@ -223,6 +231,7 @@ int LeafFromState(int SettingsPage, int TClientTab, int BestClientTab)
 		{
 		case BC_TAB_GAMEPLAY: return SETTINGS_NAV_LEAF_BC_GAMEPLAY;
 		case BC_TAB_OTHERS: return SETTINGS_NAV_LEAF_BC_OTHERS;
+		case BC_TAB_CONFIGS: return SETTINGS_NAV_LEAF_BC_CONFIGS;
 		case BC_TAB_INFO: return SETTINGS_NAV_LEAF_BC_INFO;
 		default: return SETTINGS_NAV_LEAF_BC_VISUALS;
 		}
@@ -394,6 +403,7 @@ void CMenus::RenderSettingsNavNewStyle(CUIRect &TabBar)
 		case SETTINGS_NAV_LEAF_BC_VISUALS: return BcLocalize("Visuals");
 		case SETTINGS_NAV_LEAF_BC_GAMEPLAY: return BcLocalize("Gameplay");
 		case SETTINGS_NAV_LEAF_BC_OTHERS: return BcLocalize("Others");
+		case SETTINGS_NAV_LEAF_BC_CONFIGS: return BcLocalize("Configs");
 		case SETTINGS_NAV_LEAF_BC_INFO: return BcLocalize("Info");
 		default: return "";
 		}

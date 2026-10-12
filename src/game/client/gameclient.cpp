@@ -203,7 +203,7 @@ void CGameClient::OnConsoleInit()
 					      &m_VoiceChat, // bestclient
 					      &m_Hud,
 					      &m_BestClient, // bestclient
-					      // bestclient
+					      &m_BcConfigPresets, // bestclient
 					      &m_Translate, // bestclient
 					      // bestclient
 					      &m_EgoTilesPrediction, // bestclient

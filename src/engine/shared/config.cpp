@@ -505,6 +505,14 @@ void CConfigManager::StoreUnknownCommand(const char *pCommand)
 	m_vpUnknownCommands.push_back(m_ConfigHeap.StoreString(pCommand));
 }
 
+// bestclient
+void CConfigManager::VisitVariables(void (*pfnCallback)(SConfigVariable *pVariable, void *pUserData), void *pUserData)
+{
+	for(SConfigVariable *pVariable : m_vpAllVariables)
+		pfnCallback(pVariable, pUserData);
+}
+// bestclient
+
 void CConfigManager::PossibleConfigVariables(const char *pStr, int FlagMask, POSSIBLECFGFUNC pfnCallback, void *pUserData)
 {
 	for(const SConfigVariable *pVariable : m_vpAllVariables)

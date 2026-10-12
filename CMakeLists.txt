@@ -2899,6 +2899,8 @@ if(CLIENT)
     components/background.h
     components/bestclient/bestclient.cpp
     components/bestclient/bestclient.h
+    components/bestclient/config_presets.cpp
+    components/bestclient/config_presets.h
     components/bestclient/profile_assets.cpp
     components/bestclient/profile_assets.h
     components/bestclient/admin_panel.cpp

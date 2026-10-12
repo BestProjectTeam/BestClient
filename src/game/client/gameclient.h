@@ -30,6 +30,7 @@
 // components
 #include "components/background.h"
 #include "components/bestclient/bestclient.h" // bestclient
+#include "components/bestclient/config_presets.h" // bestclient
 #include "components/bestclient/admin_panel.h" // bestclient
 #include "components/bestclient/aspect_ratio.h" // bestclient
 #include "components/bestclient/3d_particles.h" // bestclient
@@ -234,6 +235,7 @@ public:
 	CFlow m_Flow;
 	CHud m_Hud;
 	CBestClient m_BestClient; // bestclient
+	CBcConfigPresets m_BcConfigPresets; // bestclient
 	CEgoTilesPrediction m_EgoTilesPrediction; // bestclient
 	CSpecPauseRadio m_SpecPauseRadio; // bestclient
 	CShowPoints m_ShowPoints; // bestclient

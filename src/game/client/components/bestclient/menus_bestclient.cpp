@@ -32,6 +32,7 @@
 #include <game/client/gameclient.h>
 #include <game/client/lineinput.h>
 #include <game/client/ui.h>
+#include <game/client/ui_listbox.h>
 #include <game/client/ui_scrollregion.h>
 #include <game/localization.h>
 
@@ -49,6 +50,7 @@ enum
 	BESTCLIENT_TAB_VISUALS = 0,
 	BESTCLIENT_TAB_GAMEPLAY,
 	BESTCLIENT_TAB_OTHERS,
+	BESTCLIENT_TAB_CONFIGS,
 	BESTCLIENT_TAB_INFO,
 	NUM_BESTCLIENT_TABS,
 };
@@ -607,6 +609,127 @@ static bool IsBestClientTabFlagSet(int32_t Flags, int Tab)
 }
 // bestclient
 
+void CMenus::RenderSettingsBestClientConfigPresets(CUIRect MainView)
+{
+	const float FontSize = 14.0f;
+	const float EditBoxFontSize = 12.0f;
+	const float LineSize = 20.0f;
+	const float MarginSmall = 5.0f;
+
+	CBcConfigPresets &Presets = GameClient()->m_BcConfigPresets;
+	static int s_Selected = -1;
+	static CLineInputBuffered<CBcConfigPresets::MAX_NAME_LENGTH> s_NameInput;
+	if(s_Selected >= (int)Presets.m_vPresets.size())
+		s_Selected = (int)Presets.m_vPresets.size() - 1;
+
+	CUIRect Label, Button;
+	const bool HasSelection = s_Selected >= 0 && s_Selected < (int)Presets.m_vPresets.size();
+	{
+		CUIRect Top, NameColumn, Actions;
+		MainView.HSplitTop(30.0f + MarginSmall + 30.0f, &Top, &MainView);
+		Top.VSplitLeft(300.0f, &NameColumn, &Actions);
+		CUIRect NameCard;
+		NameColumn.HSplitTop(60.0f, &NameCard, &NameColumn);
+		NameCard.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f), IGraphics::CORNER_ALL, 5.0f);
+		NameCard.Margin(5.0f, &NameCard);
+		{
+			CUIRect Icon, Text, NameRow;
+			NameCard.VSplitLeft(50.0f, &Icon, &Text);
+			RenderFontIcon(Icon, FontIcon::FILE, 28.0f, TEXTALIGN_MC);
+			Text.VSplitLeft(5.0f, nullptr, &Text);
+			const float RowHeight = Text.h / 2.0f;
+			Text.HSplitTop(RowHeight, &NameRow, &Text);
+			NameRow.VMargin(2.0f, &NameRow);
+			Ui()->DoEditBox(&s_NameInput, &NameRow, EditBoxFontSize);
+			s_NameInput.SetEmptyText(BcLocalize("Name"));
+			char aTime[64];
+			str_timestamp_ex(time_timestamp(), aTime, sizeof(aTime), "%d.%m.%Y %H:%M");
+			Ui()->DoLabel(&Text, aTime, RowHeight * 0.55f, TEXTALIGN_ML);
+		}
+
+		Actions.VSplitLeft(20.0f, nullptr, &Actions);
+		CUIRect Row, LeftButton, RightButton;
+		Actions.HSplitTop(30.0f, &Row, &Actions);
+		Row.VSplitMid(&LeftButton, &RightButton, MarginSmall);
+		static CButtonContainer s_LoadButton;
+		if(DoButton_Menu(&s_LoadButton, BcLocalize("Load"), 0, &LeftButton) && HasSelection)
+			Presets.Load(Presets.m_vPresets[s_Selected].m_aName);
+		static CButtonContainer s_SaveButton;
+		if(DoButton_Menu(&s_SaveButton, BcLocalize("Save"), 0, &RightButton))
+		{
+			const char *pName = s_NameInput.GetString();
+			if(Presets.SaveNew(pName))
+			{
+				for(int i = 0; i < (int)Presets.m_vPresets.size(); ++i)
+				{
+					if(str_comp(Presets.m_vPresets[i].m_aName, pName) == 0)
+						s_Selected = i;
+				}
+				s_NameInput.Clear();
+			}
+		}
+		Actions.HSplitTop(MarginSmall, nullptr, &Actions);
+		Actions.HSplitTop(30.0f, &Row, &Actions);
+		Row.VSplitMid(&LeftButton, &RightButton, MarginSmall);
+		static CButtonContainer s_DeleteButton;
+		if(DoButton_Menu(&s_DeleteButton, BcLocalize("Delete"), 0, &LeftButton) && HasSelection)
+		{
+			Presets.Delete(Presets.m_vPresets[s_Selected].m_aName);
+			if(s_Selected >= (int)Presets.m_vPresets.size())
+				s_Selected = (int)Presets.m_vPresets.size() - 1;
+		}
+		static CButtonContainer s_OverrideButton;
+		if(DoButton_Menu(&s_OverrideButton, BcLocalize("Override"), 0, &RightButton) && HasSelection)
+			Presets.Override(Presets.m_vPresets[s_Selected].m_aName);
+	}
+
+	{
+		CUIRect Bottom, Saved;
+		MainView.HSplitBottom(LineSize + MarginSmall, &MainView, &Bottom);
+		Bottom.HSplitTop(MarginSmall, nullptr, &Bottom);
+		Bottom.VSplitLeft(170.0f, &Button, &Bottom);
+		static CButtonContainer s_FolderButton;
+		char aFolder[64];
+		str_format(aFolder, sizeof(aFolder), "%s %s", BcLocalize("Configs"), BcLocalize("Folder"));
+		if(DoButton_Menu(&s_FolderButton, aFolder, 0, &Button))
+			Presets.OpenFolder();
+		Bottom.VSplitRight(120.0f, nullptr, &Saved);
+		char aBuf[64];
+		str_format(aBuf, sizeof(aBuf), BcLocalize("Saved: %d"), (int)Presets.m_vPresets.size());
+		Ui()->DoLabel(&Saved, aBuf, FontSize, TEXTALIGN_MR);
+	}
+
+	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+	static CListBox s_ListBox;
+	s_ListBox.DoStart(64.0f, Presets.m_vPresets.size(), MainView.w / 220.0f, 3, s_Selected, &MainView, true, IGraphics::CORNER_ALL, true);
+	static std::vector<int> s_Ids;
+	if(s_Ids.size() < Presets.m_vPresets.size())
+		s_Ids.resize(Presets.m_vPresets.size());
+	for(int i = 0; i < (int)Presets.m_vPresets.size(); ++i)
+	{
+		const CListboxItem Item = s_ListBox.DoNextItem(&s_Ids[i], s_Selected == i);
+		if(!Item.m_Visible)
+			continue;
+
+		CUIRect Icon, Text;
+		Item.m_Rect.VSplitLeft(50.0f, &Icon, &Text);
+		Text.VSplitLeft(5.0f, nullptr, &Text);
+		RenderFontIcon(Icon, FontIcon::FILE, 28.0f, TEXTALIGN_MC);
+
+		char aTime[64];
+		str_timestamp_ex(Presets.m_vPresets[i].m_Time, aTime, sizeof(aTime), "%d.%m.%Y %H:%M");
+		char aChanges[64];
+		str_format(aChanges, sizeof(aChanges), BcLocalize("Changes: %d"), Presets.m_vPresets[i].m_Changes);
+		const float RowHeight = Text.h / 3.0f;
+		Text.HSplitTop(RowHeight, &Label, &Text);
+		Ui()->DoLabel(&Label, Presets.m_vPresets[i].m_aName, RowHeight * 0.8f, TEXTALIGN_ML);
+		Text.HSplitTop(RowHeight, &Label, &Text);
+		Ui()->DoLabel(&Label, aTime, RowHeight * 0.7f, TEXTALIGN_ML);
+		Ui()->DoLabel(&Text, aChanges, RowHeight * 0.7f, TEXTALIGN_ML);
+	}
+	s_Selected = s_ListBox.DoEnd();
+}
+
 void CMenus::RenderSettingsBestClient(CUIRect MainView)
 {
 	// bestclient
@@ -627,12 +750,14 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 		BcLocalize("Visuals"),
 		BcLocalize("Gameplay"),
 		BcLocalize("Others"),
+		BcLocalize("Configs"),
 		BcLocalize("Info"),
 	};
 	const int aTabOrder[NUM_BESTCLIENT_TABS] = {
 		BESTCLIENT_TAB_VISUALS,
 		BESTCLIENT_TAB_GAMEPLAY,
 		BESTCLIENT_TAB_OTHERS,
+		BESTCLIENT_TAB_CONFIGS,
 		BESTCLIENT_TAB_INFO,
 	};
 
@@ -710,6 +835,8 @@ void CMenus::RenderSettingsBestClient(CUIRect MainView)
 			RenderSettingsBestClientGameplay(Content);
 		else if(Tab == BESTCLIENT_TAB_OTHERS)
 			RenderSettingsBestClientOthers(Content);
+		else if(Tab == BESTCLIENT_TAB_CONFIGS)
+			RenderSettingsBestClientConfigPresets(Content);
 		else if(Tab == BESTCLIENT_TAB_INFO)
 			RenderSettingsBestClientInfo(Content);
 	};
@@ -4606,12 +4733,14 @@ void CMenus::RenderSettingsBestClientInfo(CUIRect MainView)
 		BcLocalize("Visuals"),
 		BcLocalize("Gameplay"),
 		BcLocalize("Others"),
+		BcLocalize("Configs"),
 		BcLocalize("Info"),
 	};
 	const int aTabOrder[NUM_BESTCLIENT_TABS] = {
 		BESTCLIENT_TAB_VISUALS,
 		BESTCLIENT_TAB_GAMEPLAY,
 		BESTCLIENT_TAB_OTHERS,
+		BESTCLIENT_TAB_CONFIGS,
 		BESTCLIENT_TAB_INFO,
 	};
 

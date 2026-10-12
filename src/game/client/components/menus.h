@@ -1015,6 +1015,7 @@ private:
 	void RenderSettingsBestClientFun(CUIRect MainView);
 	// bestclient
 	void RenderSettingsBestClientInfo(CUIRect MainView); // bestclient
+	void RenderSettingsBestClientConfigPresets(CUIRect MainView); // bestclient
 	void RenderSettingsBestClientChatMediaBlock(CUIRect &Column); // bestclient
 	void RenderPopupStylePicker(CUIRect Box); // bestclient
 	void FinishWelcomeToStylePicker(); // bestclient

@@ -306,6 +306,10 @@ public:
 	void StoreUnknownCommand(const char *pCommand) override;
 
 	void PossibleConfigVariables(const char *pStr, int FlagMask, POSSIBLECFGFUNC pfnCallback, void *pUserData) override;
+
+	// bestclient
+	void VisitVariables(void (*pfnCallback)(SConfigVariable *pVariable, void *pUserData), void *pUserData) override;
+	// bestclient
 };
 
 #endif

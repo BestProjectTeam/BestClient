@@ -53,6 +53,10 @@ public:
 	virtual void StoreUnknownCommand(const char *pCommand) = 0;
 
 	virtual void PossibleConfigVariables(const char *pStr, int FlagMask, POSSIBLECFGFUNC pfnCallback, void *pUserData) = 0;
+
+	// bestclient
+	virtual void VisitVariables(void (*pfnCallback)(struct SConfigVariable *pVariable, void *pUserData), void *pUserData) = 0;
+	// bestclient
 };
 
 extern IConfigManager *CreateConfigManager();
