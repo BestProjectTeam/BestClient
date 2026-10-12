@@ -378,6 +378,11 @@ void CCamera::OnRender()
 		// bestclient
 	}
 
+	// bestclient
+	if(m_CamType == CAMTYPE_SPEC)
+		CCameraDemos::ApplyFreeviewNumpad(Input(), Client()->RenderFrameTime(), m_ForceFreeview, m_ForceFreeviewPos, m_Center);
+	// bestclient
+
 	if(m_ForceFreeview && m_CamType == CAMTYPE_SPEC)
 	{
 		GameClient()->m_Controls.m_aMouseInputType[g_Config.m_ClDummy] = CControls::EMouseInputType::AUTOMATED;
@@ -388,11 +393,6 @@ void CCamera::OnRender()
 	{
 		m_ForceFreeviewPos = m_Center;
 	}
-
-	// bestclient
-	if(m_CamType == CAMTYPE_SPEC)
-		CCameraDemos::ApplyFreeviewNumpad(Input(), Client()->RenderFrameTime(), m_ForceFreeview, m_ForceFreeviewPos, m_Center);
-	// bestclient
 
 	const int SpecId = GameClient()->m_Snap.m_SpecInfo.m_SpectatorId;
 
