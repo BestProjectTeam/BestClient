@@ -2530,7 +2530,7 @@ void CMenus::OnShutdown()
 bool CMenus::OnCursorMove(float x, float y, IInput::ECursorType CursorType)
 {
 	// bestclient
-	if(!m_MenuActive && !Ui()->IsPopupOpen() && !GameClient()->m_AspectRatio.ConfirmWantsInput() && Client()->State() != IClient::STATE_DEMOPLAYBACK)
+	if(!m_MenuActive && !Ui()->IsPopupOpen() && !GameClient()->m_AspectRatio.ConfirmWantsInput())
 		return false;
 	// bestclient
 

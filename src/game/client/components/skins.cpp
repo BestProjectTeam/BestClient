@@ -932,9 +932,6 @@ const CSkins::CSkinContainer *CSkins::FindContainerImpl(const char *pName)
 		pSkinContainer->SetState(pSkinContainer->DetermineInitialState());
 		ExistingSkin = m_Skins.insert({pSkinContainer->Name(), std::move(pSkinContainer)}).first;
 	}
-	if((g_Config.m_ClVanillaSkinsOnly && !ExistingSkin->second->m_Vanilla) ||
-		(ExistingSkin->second->Type() == CSkinContainer::EType::CACHED && !g_Config.m_ClDownloadSkins))
-		return nullptr;
 	if(ExistingSkin->second->m_CacheOnly)
 	{
 		ExistingSkin->second->m_CacheOnly = false;
