@@ -73,12 +73,6 @@ bool CHttpRequestCurl::ConfigureHandle(CURL *pHandle)
 		curl_easy_setopt(pHandle, CURLOPT_VERBOSE, 1L);
 		curl_easy_setopt(pHandle, CURLOPT_DEBUGFUNCTION, CurlDebug);
 	}
-	long Protocols = CURLPROTO_HTTPS;
-	if(g_Config.m_HttpAllowInsecure)
-	{
-		Protocols |= CURLPROTO_HTTP;
-	}
-
 	curl_easy_setopt(pHandle, CURLOPT_ERRORBUFFER, m_aErr);
 
 	curl_easy_setopt(pHandle, CURLOPT_CONNECTTIMEOUT_MS, m_Timeout.m_ConnectTimeoutMs);
@@ -95,6 +89,16 @@ bool CHttpRequestCurl::ConfigureHandle(CURL *pHandle)
 		curl_easy_setopt(pHandle, CURLOPT_TIMECONDITION, CURL_TIMECOND_IFMODSINCE);
 	}
 
+	// bestclient
+	const bool AllowHttp = g_Config.m_HttpAllowInsecure || m_AllowHttp;
+#if LIBCURL_VERSION_NUM >= 0x075500
+	const char *pProtocols = AllowHttp ? "https,http" : "https";
+	curl_easy_setopt(pHandle, CURLOPT_PROTOCOLS_STR, pProtocols);
+	curl_easy_setopt(pHandle, CURLOPT_REDIR_PROTOCOLS_STR, pProtocols);
+#else
+	long Protocols = CURLPROTO_HTTPS;
+	if(AllowHttp)
+		Protocols |= CURLPROTO_HTTP;
 	// ‘CURLOPT_PROTOCOLS’ is deprecated: since 7.85.0. Use CURLOPT_PROTOCOLS_STR
 	// Wait until all platforms have 7.85.0
 #ifdef __GNUC__
@@ -102,9 +106,12 @@ bool CHttpRequestCurl::ConfigureHandle(CURL *pHandle)
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
 	curl_easy_setopt(pHandle, CURLOPT_PROTOCOLS, Protocols);
+	curl_easy_setopt(pHandle, CURLOPT_REDIR_PROTOCOLS, Protocols);
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif
+#endif
+	// bestclient
 	curl_easy_setopt(pHandle, CURLOPT_FOLLOWLOCATION, 1L);
 	curl_easy_setopt(pHandle, CURLOPT_MAXREDIRS, 4L);
 	if(m_FailOnErrorStatus)

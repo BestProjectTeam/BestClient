@@ -247,22 +247,43 @@ protected:
 	virtual bool ParseResponse(CTranslateResponse &Out) = 0;
 	virtual bool ParseHttpError() const { return false; }
 
+	static void NormalizeEndpointUrl(const char *pUrl, char *pOut, size_t OutSize)
+	{
+		if(!pUrl || !pUrl[0])
+		{
+			str_copy(pOut, "", OutSize);
+			return;
+		}
+		while(*pUrl && isspace((unsigned char)*pUrl))
+			++pUrl;
+		if(str_startswith(pUrl, "http://") || str_startswith(pUrl, "https://"))
+			str_copy(pOut, pUrl, OutSize);
+		else
+			str_format(pOut, OutSize, "http://%s", pUrl);
+	}
+
 	void CreateHttpRequest(IHttp &Http, const char *pUrl)
 	{
-		auto pRequest = HttpGet(pUrl);
+		char aUrl[256];
+		NormalizeEndpointUrl(pUrl, aUrl, sizeof(aUrl));
+		auto pRequest = HttpGet(aUrl);
 		pRequest->LogProgress(HTTPLOG::FAILURE);
 		pRequest->FailOnErrorStatus(false);
 		pRequest->Timeout(CTimeout{20000, 0, 500, 10});
+		pRequest->AllowHttp(true);
 		m_pHttpRequest = std::move(pRequest);
 		Http.Run(m_pHttpRequest);
 	}
 
 	void CreateHttpRequestPost(IHttp &Http, const char *pUrl, const char *pBody)
 	{
-		auto pRequest = HttpGet(pUrl);
+		char aUrl[256];
+		NormalizeEndpointUrl(pUrl, aUrl, sizeof(aUrl));
+		auto pRequest = HttpGet(aUrl);
 		pRequest->LogProgress(HTTPLOG::FAILURE);
 		pRequest->FailOnErrorStatus(false);
 		pRequest->Timeout(CTimeout{20000, 0, 500, 10});
+		pRequest->AllowHttp(true);
 		pRequest->HeaderString("Content-Type", "application/x-www-form-urlencoded");
 		pRequest->Post((const unsigned char *)pBody, str_length(pBody));
 		m_pHttpRequest = std::move(pRequest);
@@ -366,7 +387,7 @@ public:
 			Json.WriteStrValue(g_Config.m_TcTranslateKey);
 		}
 		Json.EndObject();
-		CreateHttpRequest(Http, g_Config.m_TcTranslateEndpoint[0] ? g_Config.m_TcTranslateEndpoint : "localhost:5000/translate");
+		CreateHttpRequest(Http, g_Config.m_TcTranslateEndpoint[0] ? g_Config.m_TcTranslateEndpoint : "http://localhost:5000/translate");
 		m_pHttpRequest->PostJson(Json.GetOutputString().c_str());
 	}
 };
@@ -538,9 +559,7 @@ public:
 		char aBody[4096];
 		str_format(aBody, sizeof(aBody), "client=gtx&sl=%s&dt=t&tl=%s&q=", IsAutoLanguage(pSource) ? "auto" : pSource, EncodeTarget(pTarget));
 		UrlEncode(pText, aBody + str_length(aBody), sizeof(aBody) - str_length(aBody));
-		CreateHttpRequestPost(Http,
-			g_Config.m_TcTranslateEndpoint[0] ? g_Config.m_TcTranslateEndpoint : "https://translate.googleapis.com/translate_a/single",
-			aBody);
+		CreateHttpRequestPost(Http, "https://translate.googleapis.com/translate_a/single", aBody);
 	}
 };
 
@@ -700,11 +719,24 @@ void CTranslate::OnConsoleInit()
 
 void CTranslate::AutoTranslate(CChat::CLine &Line)
 {
-	if(!g_Config.m_TcTranslateAutoIncoming || Line.m_ClientId < 0 || Line.m_aName[0] == '\0')
+	(void)Line;
+}
+
+void CTranslate::TranslateMessage(CChat::CLine &Line)
+{
+	if(Line.m_ClientId < 0 || Line.m_aName[0] == '\0' || Line.m_aText[0] == '\0')
 		return;
 	for(const int LocalId : GameClient()->m_aLocalIds)
 		if(LocalId >= 0 && LocalId == Line.m_ClientId)
 			return;
+	if(Line.m_pTranslateResponse && Line.m_pTranslateResponse->m_Text[0])
+	{
+		Line.m_pTranslateResponse->m_Shown = !Line.m_pTranslateResponse->m_Shown;
+		Line.m_aYOffset[0] = -1.0f;
+		Line.m_aYOffset[1] = -1.0f;
+		GameClient()->m_Chat.RebuildChat();
+		return;
+	}
 	if(LanguagesEqual(IncomingSourceLanguage(), IncomingTargetLanguage()))
 		return;
 	TranslateLine(Line, true);
@@ -752,21 +784,7 @@ bool CTranslate::ChatDoTranslateOutgoing(int Team, const char *pText)
 
 void CTranslate::ToggleShiftClick()
 {
-	const int Target = std::clamp(g_Config.m_BcTranslateShiftClickTarget, 0, 2);
-	if(Target == 0)
-		g_Config.m_TcTranslateAutoIncoming ^= 1;
-	else if(Target == 1)
-		g_Config.m_TcTranslateAutoOutgoing ^= 1;
-	else if(g_Config.m_TcTranslateAutoIncoming && g_Config.m_TcTranslateAutoOutgoing)
-	{
-		g_Config.m_TcTranslateAutoIncoming = 0;
-		g_Config.m_TcTranslateAutoOutgoing = 0;
-	}
-	else
-	{
-		g_Config.m_TcTranslateAutoIncoming = 1;
-		g_Config.m_TcTranslateAutoOutgoing = 1;
-	}
+	g_Config.m_TcTranslateAutoOutgoing ^= 1;
 }
 
 void CTranslate::OnRender()

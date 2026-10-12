@@ -206,19 +206,14 @@ std::string CChatScroll::BuildPlainTextLine(CChat &Chat, int LineIndex)
 
 	const char *pTranslatedError = nullptr;
 	const char *pTranslatedText = nullptr;
-	const char *pTranslatedLanguage = nullptr;
-	if(Line.m_pTranslateResponse != nullptr && Line.m_pTranslateResponse->m_Text[0])
+	if(Line.m_pTranslateResponse != nullptr && Line.m_pTranslateResponse->m_Shown && Line.m_pTranslateResponse->m_Text[0])
 	{
 		if(TextHiddenByStreamer)
 			pTranslatedError = TCLocalize("Translated text hidden due to streamer mode");
 		else if(Line.m_pTranslateResponse->m_Error)
 			pTranslatedError = Line.m_pTranslateResponse->m_Text;
 		else
-		{
 			pTranslatedText = Line.m_pTranslateResponse->m_Text;
-			if(Line.m_pTranslateResponse->m_Language[0] != '\0')
-				pTranslatedLanguage = Line.m_pTranslateResponse->m_Language;
-		}
 	}
 
 	std::string Result;
@@ -233,14 +228,6 @@ std::string CChatScroll::BuildPlainTextLine(CChat &Chat, int LineIndex)
 	if(pTranslatedText)
 	{
 		Result += pTranslatedText;
-		if(pTranslatedLanguage)
-		{
-			Result += " [";
-			Result += pTranslatedLanguage;
-			Result += "]";
-		}
-		Result += "\n";
-		Result += pText;
 	}
 	else if(pTranslatedError)
 	{
@@ -308,19 +295,14 @@ void CChatScroll::MeasureHeights(CChat &Chat, float TextBegin, float FontSize, f
 
 		const char *pTranslatedError = nullptr;
 		const char *pTranslatedText = nullptr;
-		const char *pTranslatedLanguage = nullptr;
-		if(Line.m_pTranslateResponse != nullptr && Line.m_pTranslateResponse->m_Text[0])
+		if(Line.m_pTranslateResponse != nullptr && Line.m_pTranslateResponse->m_Shown && Line.m_pTranslateResponse->m_Text[0])
 		{
 			if(pText != Line.m_aText)
 				pTranslatedError = TCLocalize("Translated text hidden due to streamer mode");
 			else if(Line.m_pTranslateResponse->m_Error)
 				pTranslatedError = Line.m_pTranslateResponse->m_Text;
 			else
-			{
 				pTranslatedText = Line.m_pTranslateResponse->m_Text;
-				if(Line.m_pTranslateResponse->m_Language[0] != '\0')
-					pTranslatedLanguage = Line.m_pTranslateResponse->m_Language;
-			}
 		}
 
 		CTextCursor MeasureCursor;
@@ -350,17 +332,9 @@ void CChatScroll::MeasureHeights(CChat &Chat, float TextBegin, float FontSize, f
 		}
 		if(pTranslatedText)
 		{
+			AppendCursor.m_LineCount = 1;
+			AppendCursor.m_Y = AppendCursor.m_StartY;
 			pTextRender->TextEx(&AppendCursor, pTranslatedText);
-			if(pTranslatedLanguage)
-			{
-				pTextRender->TextEx(&AppendCursor, " [");
-				pTextRender->TextEx(&AppendCursor, pTranslatedLanguage);
-				pTextRender->TextEx(&AppendCursor, "]");
-			}
-			pTextRender->TextEx(&AppendCursor, "\n");
-			AppendCursor.m_FontSize *= 0.8f;
-			pTextRender->TextEx(&AppendCursor, pText);
-			AppendCursor.m_FontSize /= 0.8f;
 		}
 		else if(pTranslatedError)
 		{
@@ -439,7 +413,7 @@ CChatScroll::SActionFrame CChatScroll::BeginActions(CChat &Chat)
 		return Frame;
 	}
 	Frame.m_MousePos = MousePos(Chat);
-	Frame.m_LeftClicked = !Chat.m_ScrollbarDragging && pClient->Input()->KeyPress(KEY_MOUSE_1);
+	Frame.m_LeftClicked = !Chat.m_ScrollbarDragging && Chat.m_TranslateMessageHoverLine < 0 && pClient->Input()->KeyPress(KEY_MOUSE_1);
 	Frame.m_RightClicked = !Chat.m_ScrollbarDragging && pClient->Input()->KeyPress(KEY_MOUSE_2);
 	if(Chat.m_Mode != CChat::MODE_NONE && Chat.m_ActionLineIndex >= 0)
 	{

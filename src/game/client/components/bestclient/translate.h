@@ -86,6 +86,7 @@ public:
 	void OnRender() override;
 
 	void AutoTranslate(CChat::CLine &Line);
+	void TranslateMessage(CChat::CLine &Line);
 	bool ChatDoTranslateOutgoing(int Team, const char *pText);
 	void ToggleShiftClick();
 };

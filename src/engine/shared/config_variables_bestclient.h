@@ -30,6 +30,7 @@ MACRO_CONFIG_STR(BcTranslateOutgoingSource, bc_translate_outgoing_source, 16, "a
 MACRO_CONFIG_STR(BcTranslateOutgoingTarget, bc_translate_outgoing_target, 16, "en", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Target language for outgoing chat translation")
 MACRO_CONFIG_INT(BcTranslateOutgoingStripPunctuation, bc_translate_outgoing_strip_punctuation, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Remove apostrophes from translated outgoing chat messages")
 MACRO_CONFIG_INT(BcTranslateShiftClickTarget, bc_translate_shift_click_target, 2, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Shift+click translate icon toggles: 0 others, 1 yours, 2 both")
+MACRO_CONFIG_INT(BcTranslateMessageButton, bc_translate_message_button, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show a translate button to the right of other players' chat messages")
 
 // Casino
 MACRO_CONFIG_INT(BcCasinoBalance, bc_casino_balance, 500, 0, 9999999, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Casino game balance in dollars")

@@ -28,6 +28,7 @@ class CTranslateResponse
 {
 public:
 	bool m_Error = false;
+	bool m_Shown = true;
 	char m_Text[1024] = "";
 	char m_Language[16] = "";
 };
@@ -198,6 +199,9 @@ class CChat : public CComponent
 	bool m_TranslateButtonRectValid = false;
 	CUIRect m_TranslateButtonRect;
 	CUIRect m_TranslateButtonUiRect;
+	CButtonContainer m_TranslateMessageButtonToggle;
+	int m_TranslateMessageHoverLine = -1;
+	int m_TranslateMessagePressedLine = -1;
 	// bestclient
 
 	static void ConSay(IConsole::IResult *pResult, void *pUserData);

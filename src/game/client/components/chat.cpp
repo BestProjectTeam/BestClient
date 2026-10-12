@@ -342,7 +342,7 @@ static float TranslateSettingsPopupHeight(bool NeedsEndpointConfig)
 	constexpr float Gap = 3.0f;
 	constexpr float BottomPadding = 12.0f;
 	constexpr float RowsWithGap = RowHeight + Gap;
-	float Height = RowsWithGap * 7 + Gap + RowHeight;
+	float Height = RowsWithGap * 6 + Gap + RowHeight;
 	if(NeedsEndpointConfig)
 		Height += RowHeight + Gap + RowHeight;
 	return Height + BottomPadding;
@@ -372,19 +372,16 @@ CUi::EPopupMenuFunctionResult CChat::PopupTranslateSettings(void *pContext, CUIR
 	static CUi::SDropDownState s_OutgoingSourceState;
 	static CUi::SDropDownState s_OutgoingTargetState;
 	static CUi::SDropDownState s_BackendState;
-	static CUi::SDropDownState s_ShiftClickTargetState;
 	static CScrollRegion s_IncomingSourceScroll;
 	static CScrollRegion s_IncomingTargetScroll;
 	static CScrollRegion s_OutgoingSourceScroll;
 	static CScrollRegion s_OutgoingTargetScroll;
 	static CScrollRegion s_BackendScroll;
-	static CScrollRegion s_ShiftClickTargetScroll;
 	s_IncomingSourceState.m_SelectionPopupContext.m_pScrollRegion = &s_IncomingSourceScroll;
 	s_IncomingTargetState.m_SelectionPopupContext.m_pScrollRegion = &s_IncomingTargetScroll;
 	s_OutgoingSourceState.m_SelectionPopupContext.m_pScrollRegion = &s_OutgoingSourceScroll;
 	s_OutgoingTargetState.m_SelectionPopupContext.m_pScrollRegion = &s_OutgoingTargetScroll;
 	s_BackendState.m_SelectionPopupContext.m_pScrollRegion = &s_BackendScroll;
-	s_ShiftClickTargetState.m_SelectionPopupContext.m_pScrollRegion = &s_ShiftClickTargetScroll;
 
 	std::vector<const char *> BackendNames;
 	for(const STranslateBackendInfo &Backend : g_aTranslateBackends)
@@ -408,21 +405,8 @@ CUi::EPopupMenuFunctionResult CChat::PopupTranslateSettings(void *pContext, CUIR
 	const float FontSize = 11.0f;
 	CUIRect Row;
 	View.HSplitTop(RowHeight, &Row, &View);
-	{
-		CUIRect Label;
-		Row.VSplitLeft(90.0f, &Label, &Row);
-		pChat->Ui()->DoLabel(&Label, Localize("Shift+click"), FontSize, TEXTALIGN_ML);
-		const int ShiftClickTarget = std::clamp(g_Config.m_BcTranslateShiftClickTarget, 0, 2);
-		const char *apShiftClickTargets[] = {Localize("Others"), Localize("Yours"), Localize("Both")};
-		const int NewShiftClickTarget = pChat->Ui()->DoDropDown(&Row, ShiftClickTarget, apShiftClickTargets, std::size(apShiftClickTargets), s_ShiftClickTargetState);
-		if(NewShiftClickTarget != ShiftClickTarget)
-			g_Config.m_BcTranslateShiftClickTarget = NewShiftClickTarget;
-	}
-	View.HSplitTop(Gap, nullptr, &View);
-
-	View.HSplitTop(RowHeight, &Row, &View);
-	if(pChat->GameClient()->m_Menus.DoButton_CheckBox(&pChat->m_TranslateSettingsIncomingButton, Localize("Others"), g_Config.m_TcTranslateAutoIncoming, &Row))
-		g_Config.m_TcTranslateAutoIncoming ^= 1;
+	if(pChat->GameClient()->m_Menus.DoButton_CheckBox(&pChat->m_TranslateMessageButtonToggle, Localize("Message button"), g_Config.m_BcTranslateMessageButton, &Row))
+		g_Config.m_BcTranslateMessageButton ^= 1;
 	View.HSplitTop(Gap, nullptr, &View);
 
 	auto RenderLanguagePair = [&](char *pSource, size_t SourceSize, char *pTarget, size_t TargetSize, CUi::SDropDownState &SourceState, CUi::SDropDownState &TargetState) {
@@ -494,7 +478,7 @@ CUi::EPopupMenuFunctionResult CChat::PopupTranslateSettings(void *pContext, CUIR
 void CChat::RenderTranslateSettingsButton(const CUIRect &ButtonRect)
 {
 	const bool Hovered = Ui()->MouseHovered(&ButtonRect);
-	const bool Active = g_Config.m_TcTranslateAutoIncoming || g_Config.m_TcTranslateAutoOutgoing;
+	const bool Active = g_Config.m_TcTranslateAutoOutgoing;
 	const bool Open = Ui()->IsPopupOpen(&m_TranslateSettingsPopupId);
 	const ColorRGBA IconColor = Open ? ColorRGBA(0.5f, 0.65f, 1.0f, 1.0f) :
 		(Active ? ColorRGBA(0.35f, 0.85f, 0.45f, 1.0f) : ColorRGBA(1.0f, 1.0f, 1.0f, Hovered ? 1.0f : 0.8f));
@@ -536,6 +520,22 @@ bool CChat::OnInput(const IInput::CEvent &Event)
 	}
 	if(Ui()->IsPopupOpen(&m_TranslateSettingsPopupId) && Ui()->OnInput(Event))
 		return true;
+	if(Event.m_Key == KEY_MOUSE_1 && m_TranslateMessageHoverLine >= 0)
+	{
+		if(Event.m_Flags & IInput::FLAG_PRESS)
+		{
+			m_TranslateMessagePressedLine = m_TranslateMessageHoverLine;
+			return true;
+		}
+		if(Event.m_Flags & IInput::FLAG_RELEASE)
+		{
+			const int LineIndex = m_TranslateMessagePressedLine;
+			m_TranslateMessagePressedLine = -1;
+			if(LineIndex == m_TranslateMessageHoverLine && LineIndex >= 0 && LineIndex < MAX_LINES)
+				GameClient()->m_Translate.TranslateMessage(m_aLines[LineIndex]);
+			return true;
+		}
+	}
 	if(Event.m_Key == KEY_MOUSE_1 && m_TranslateButtonRectValid)
 	{
 		const vec2 MousePos = ChatMousePos();
@@ -896,6 +896,8 @@ void CChat::DisableMode()
 		// bestclient
 		Ui()->ClosePopupMenu(&m_TranslateSettingsPopupId, true);
 		m_TranslateButtonPressed = false;
+		m_TranslateMessageHoverLine = -1;
+		m_TranslateMessagePressedLine = -1;
 		// bestclient
 		m_Mode = MODE_NONE;
 		// bestclient
@@ -1476,8 +1478,7 @@ void CChat::OnPrepareLines(float y)
 
 		const char *pTranslatedError = nullptr;
 		const char *pTranslatedText = nullptr;
-		const char *pTranslatedLanguage = nullptr;
-		if(Line.m_pTranslateResponse != nullptr && Line.m_pTranslateResponse->m_Text[0])
+		if(Line.m_pTranslateResponse != nullptr && Line.m_pTranslateResponse->m_Shown && Line.m_pTranslateResponse->m_Text[0])
 		{
 			// bestclient
 			if(TextHiddenByStreamer)
@@ -1491,8 +1492,6 @@ void CChat::OnPrepareLines(float y)
 			else
 			{
 				pTranslatedText = Line.m_pTranslateResponse->m_Text;
-				if(Line.m_pTranslateResponse->m_Language[0] != '\0')
-					pTranslatedLanguage = Line.m_pTranslateResponse->m_Language;
 			}
 		}
 		// bestclient
@@ -1585,28 +1584,11 @@ void CChat::OnPrepareLines(float y)
 
 		if(pTranslatedText)
 		{
+			// bestclient
+			AppendCursor.m_LineCount = 1;
+			AppendCursor.m_Y = AppendCursor.m_StartY;
+			// bestclient
 			TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &AppendCursor, pTranslatedText);
-			if(pTranslatedLanguage)
-			{
-				ColorRGBA ColorLang = Color;
-				ColorLang.r *= 0.8f;
-				ColorLang.g *= 0.8f;
-				ColorLang.b *= 0.8f;
-				TextRender()->TextColor(ColorLang);
-				TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &AppendCursor, " [");
-				TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &AppendCursor, pTranslatedLanguage);
-				TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &AppendCursor, "]");
-			}
-			ColorRGBA ColorSub = Color;
-			ColorSub.r *= 0.7f;
-			ColorSub.g *= 0.7f;
-			ColorSub.b *= 0.7f;
-			TextRender()->TextColor(ColorSub);
-			TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &AppendCursor, "\n");
-			AppendCursor.m_FontSize *= 0.8f;
-			TextRender()->CreateOrAppendTextContainer(Line.m_TextContainerIndex, &AppendCursor, pText);
-			AppendCursor.m_FontSize /= 0.8f;
-			TextRender()->TextColor(Color);
 		}
 		else if(pTranslatedError)
 		{
@@ -1865,6 +1847,7 @@ void CChat::OnRender()
 
 	// bestclient
 	CChatScroll::SActionFrame ActionFrame = CChatScroll::BeginActions(*this);
+	m_TranslateMessageHoverLine = -1;
 	float RenderY = y + m_BacklogScrollOffset;
 	bool AllowTopClip = true;
 	// bestclient
@@ -1891,6 +1874,43 @@ void CChat::OnRender()
 		const float LineW = ChatWidth();
 		const int ArrayIndex = ((m_CurrentLine - i) + MAX_LINES) % MAX_LINES;
 		CChatScroll::NoteLineHover(ActionFrame, *this, ArrayIndex, x, LineW, LineRenderY, LineH, ChatInteractionActive);
+		if(g_Config.m_BcTranslateMessageButton && ChatInteractionActive && Line.m_ClientId >= 0 && Line.m_aName[0] != '\0' && Line.m_aText[0] != '\0')
+		{
+			bool OwnMessage = false;
+			for(const int LocalId : GameClient()->m_aLocalIds)
+			{
+				if(LocalId >= 0 && LocalId == Line.m_ClientId)
+					OwnMessage = true;
+			}
+			if(!OwnMessage)
+			{
+				const float ButtonSize = MeasureFontSize * 1.6f;
+				CUIRect ButtonRect = {x + LineW + 2.0f, LineRenderY - ButtonSize * 0.15f, ButtonSize, ButtonSize};
+				const vec2 MousePos = ChatMousePos();
+				const bool Hovered = MousePos.x >= ButtonRect.x && MousePos.x <= ButtonRect.x + ButtonRect.w &&
+					MousePos.y >= ButtonRect.y && MousePos.y <= ButtonRect.y + ButtonRect.h;
+				if(Hovered)
+					m_TranslateMessageHoverLine = ArrayIndex;
+				const bool HasTranslation = Line.m_pTranslateResponse && Line.m_pTranslateResponse->m_Shown && Line.m_pTranslateResponse->m_Text[0] && !Line.m_pTranslateResponse->m_Error;
+				const ColorRGBA IconColor = HasTranslation ? ColorRGBA(0.35f, 0.85f, 0.45f, Blend) :
+					(Hovered ? ColorRGBA(1.0f, 1.0f, 1.0f, Blend) : ColorRGBA(1.0f, 1.0f, 1.0f, 0.55f * Blend));
+				const float UiScale = Ui()->Screen()->h / Height;
+				const CUIRect UiButtonRect = {ButtonRect.x * UiScale, ButtonRect.y * UiScale, ButtonRect.w * UiScale, ButtonRect.h * UiScale};
+				Ui()->MapScreen();
+				TextRender()->SetFontPreset(EFontPreset::ICON_FONT);
+				TextRender()->SetRenderFlags(ETextRenderFlags::TEXT_RENDER_FLAG_ONLY_ADVANCE_WIDTH |
+					ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING |
+					ETextRenderFlags::TEXT_RENDER_FLAG_NO_Y_BEARING |
+					ETextRenderFlags::TEXT_RENDER_FLAG_NO_PIXEL_ALIGNMENT |
+					ETextRenderFlags::TEXT_RENDER_FLAG_NO_OVERSIZE);
+				TextRender()->TextColor(IconColor);
+				TextRender()->Text(UiButtonRect.x, UiButtonRect.y, UiButtonRect.h * 0.85f, FontIcon::EARTH_AMERICAS);
+				TextRender()->SetRenderFlags(0);
+				TextRender()->SetFontPreset(EFontPreset::DEFAULT_FONT);
+				TextRender()->TextColor(TextRender()->DefaultTextColor());
+				Graphics()->MapScreenToSize(Width, Height);
+			}
+		}
 		// bestclient
 
 		if(!g_Config.m_ClChatOld)
