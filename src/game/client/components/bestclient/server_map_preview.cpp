@@ -30,7 +30,7 @@
 
 namespace
 {
-constexpr float ZOOM_MIN = 0.5f;
+constexpr float ZOOM_MIN = 0.08f;
 constexpr float ZOOM_MAX = 2.0f;
 constexpr float ZOOM_STEP = 1.15f;
 constexpr float CORNER_RADIUS = 12.0f;
@@ -959,11 +959,13 @@ void CServerMapPreview::Render(CUIRect Rect, ColorRGBA FrameColor)
 		ZoomHit.HMargin(SliderGap, &ZoomHit);
 
 	static CButtonContainer s_Zoom;
-	const float ZoomSpan = ZOOM_MAX - ZOOM_MIN;
-	float ZoomT = ZoomSpan > 0.0f ? (m_Zoom - ZOOM_MIN) / ZoomSpan : 0.0f;
+	const float LogMin = std::log(ZOOM_MIN);
+	const float LogMax = std::log(ZOOM_MAX);
+	const float LogSpan = LogMax - LogMin;
+	float ZoomT = LogSpan > 0.0f ? (std::log(std::clamp(m_Zoom, ZOOM_MIN, ZOOM_MAX)) - LogMin) / LogSpan : 0.0f;
 	CUIRect Handle;
 	ZoomT = DoZoomHandle(Ui(), &s_Zoom, ZoomHit, ZoomT, &Handle);
-	m_Zoom = std::clamp(ZOOM_MIN + ZoomT * ZoomSpan, ZOOM_MIN, ZOOM_MAX);
+	m_Zoom = std::clamp(std::exp(LogMin + ZoomT * LogSpan), ZOOM_MIN, ZOOM_MAX);
 
 	CUIRect Grip;
 	Grip.w = RESIZE_GRIP;
