@@ -123,6 +123,10 @@ Show vote percentage
 == Показывать процент голосов
 
 [BestClient]
+Display max FPS
+== Показывать максимальный FPS
+
+[BestClient]
 Bestclient discord rpc (restart requires)
 == Discord RPC бестклиента (нужен перезапуск)
 

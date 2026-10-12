@@ -156,6 +156,7 @@
 	{"Show points in tab", SETTINGS_NAV_LEAF_BC_VISUALS, "Visuals QoL", &g_Config.m_BcShowPointsInTab, nullptr},
 	{"Show spectator nicknames", SETTINGS_NAV_LEAF_BC_VISUALS, "Visuals QoL", &g_Config.m_BcShowSpectatorNames, nullptr},
 	{"Show vote percentage", SETTINGS_NAV_LEAF_BC_VISUALS, "Visuals QoL", &g_Config.m_BcShowVotePercentage, nullptr},
+	{"Display max FPS", SETTINGS_NAV_LEAF_BC_VISUALS, "Visuals QoL", &g_Config.m_BcDisplayMaxFps, nullptr},
 	{"Bestclient discord rpc (restart requires)", SETTINGS_NAV_LEAF_BC_VISUALS, "Visuals QoL", &g_Config.m_BcDiscordRPC, nullptr},
 	{"Bind/Emote wheel scale", SETTINGS_NAV_LEAF_BC_VISUALS, "Visuals QoL", &g_Config.m_BcWheelScale, nullptr},
 	{"Scoreboard scale", SETTINGS_NAV_LEAF_BC_VISUALS, "Visuals QoL", &g_Config.m_BcScoreboardScale, nullptr},

@@ -798,7 +798,7 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 	const float RealHitboxColorHeight = g_Config.m_BcShowRealHitbox ? RealHitboxColorLineSize + RealHitboxColorLineSpacing : 0.0f;
 	const float VisualsQoLBlockHeight =
 		LineSize + MarginSmall +
-		8.0f * LineSize +
+		9.0f * LineSize +
 		RealHitboxColorHeight +
 		3.0f * LineSize;
 	CUIRect VisualsQoLBlock;
@@ -837,6 +837,12 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowSpectatorNames, BcLocalize("Show spectator nicknames"), &g_Config.m_BcShowSpectatorNames, &SpectatorNamesRow, LineSize);
 	}
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowVotePercentage, BcLocalize("Show vote percentage"), &g_Config.m_BcShowVotePercentage, &VisualsQoLBlock, LineSize);
+	{
+		CUIRect MaxFpsRow;
+		VisualsQoLBlock.HSplitTop(LineSize, &MaxFpsRow, &VisualsQoLBlock);
+		BcMenuBadges::DrawNew(Graphics(), Ui(), TextRender(), &MaxFpsRow, MarginSmall);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcDisplayMaxFps, BcLocalize("Display max FPS"), &g_Config.m_BcDisplayMaxFps, &MaxFpsRow, LineSize);
+	}
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcDiscordRPC, BcLocalize("Bestclient discord rpc (restart requires)"), &g_Config.m_BcDiscordRPC, &VisualsQoLBlock, LineSize);
 	VisualsQoLBlock.HSplitTop(LineSize, &Button, &VisualsQoLBlock);
 	Ui()->DoScrollbarOption(&g_Config.m_BcWheelScale, &g_Config.m_BcWheelScale, &Button, BcLocalize("Bind/Emote wheel scale"), 50, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_DELAYUPDATE, "%");
@@ -3246,6 +3252,7 @@ void CMenus::RenderSettingsBestClientGameplay(CUIRect MainView)
 
 	InputsBlock.HSplitTop(MarginSmall, nullptr, &InputsBlock);
 	InputsBlock.HSplitTop(LineSize, &Content, &InputsBlock);
+	BcMenuBadges::DrawNew(Graphics(), Ui(), TextRender(), &Content, MarginSmall);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcInputDebounce, BcLocalize("Input Debounce"), &g_Config.m_BcInputDebounce, &Content, LineSize);
 
 	LeftColumn.HSplitTop(MarginBetweenViews, nullptr, &LeftColumn);

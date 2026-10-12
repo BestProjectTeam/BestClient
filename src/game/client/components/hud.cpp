@@ -546,7 +546,9 @@ void CHud::RenderTextInfo()
 	if(Showfps)
 	{
 		char aBuf[16];
-		const int FramesPerSecond = round_to_int(1.0f / Client()->FrameTimeAverage());
+		// bestclient
+		const int FramesPerSecond = GameClient()->m_BestClient.HudFramesPerSecond(Client()->FrameTimeAverage());
+		// bestclient
 		str_format(aBuf, sizeof(aBuf), "%d", FramesPerSecond);
 
 		static float s_TextWidth0 = TextRender()->TextWidth(12.f, "0", -1, -1.0f);

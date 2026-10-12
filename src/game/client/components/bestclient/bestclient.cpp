@@ -34,6 +34,24 @@
 
 static const int FROZEN_SKIN_MAX_DARKEN = 70;
 
+int CBestClient::HudFramesPerSecond(float FrameTimeAverage)
+{
+	if(!g_Config.m_BcDisplayMaxFps)
+		return round_to_int(1.0f / FrameTimeAverage);
+
+	constexpr float Window = 0.5f;
+	const float FrameTime = std::max(Client()->RenderFrameTime(), 0.000001f);
+	m_HudMaxFpsShortest = std::min(m_HudMaxFpsShortest, FrameTime);
+	m_HudMaxFpsWindow += FrameTime;
+	if(m_HudMaxFpsWindow >= Window)
+	{
+		m_HudMaxFps = std::clamp(round_to_int(1.0f / m_HudMaxFpsShortest), 1, 99999);
+		m_HudMaxFpsWindow = 0.0f;
+		m_HudMaxFpsShortest = 1.0f;
+	}
+	return m_HudMaxFps;
+}
+
 void CBestClient::UpdateGoresMode()
 {
 	if(!g_Config.m_BcGoresMode || !GameClient()->m_Snap.m_pLocalCharacter)

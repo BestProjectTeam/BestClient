@@ -57,6 +57,7 @@ MACRO_CONFIG_INT(BcShowCorrectCheckpoint, bc_show_correct_checkpoint, 0, 0, 1, C
 MACRO_CONFIG_INT(BcShowPointsInTab, bc_show_points_in_tab, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show player points in the scoreboard on DDNet, EGO and Legit Network servers")
 MACRO_CONFIG_INT(BcShowSpectatorNames, bc_show_spectator_names, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show spectator nicknames in the spectator count HUD")
 MACRO_CONFIG_INT(BcShowVotePercentage, bc_show_vote_percentage, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show yes/no vote percentages on the vote HUD")
+MACRO_CONFIG_INT(BcDisplayMaxFps, bc_display_max_fps, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show the maximum FPS in the HUD counter instead of the average")
 MACRO_CONFIG_INT(BcScoreboardScale, bc_scoreboard_scale, 100, 50, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Scoreboard scale in percent, independent of UI scale")
 MACRO_CONFIG_INT(BcWheelScale, bc_wheel_scale, 100, 50, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Bind/emote wheel scale in percent, independent of UI scale")
 MACRO_CONFIG_INT(UiScale, ui_scale, 100, 50, 110, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Global UI scale in percent")

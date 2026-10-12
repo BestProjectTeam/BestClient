@@ -123,6 +123,10 @@ Show vote percentage
 == 显示投票百分比
 
 [BestClient]
+Display max FPS
+== 显示最高 FPS
+
+[BestClient]
 Bestclient discord rpc (restart requires)
 == BestClient Discord RPC（需要重启）
 

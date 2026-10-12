@@ -48,6 +48,10 @@ class CBestClient : public CComponent
 	std::shared_ptr<IHttpRequest> m_pFindHoursTask;
 	char m_aFindHoursPlayer[MAX_NAME_LENGTH]{};
 
+	float m_HudMaxFpsWindow = 0.0f;
+	float m_HudMaxFpsShortest = 1.0f;
+	int m_HudMaxFps = 1;
+
 	void UpdateFindHours();
 	void ResetFindHours();
 	static void SaveUiThemeFileCallback(IConfigManager *pConfigManager, void *pUserData);
@@ -77,6 +81,8 @@ public:
 	void RenderSpecMovedNotify();
 
 	void OnClientNameChanged(int ClientId, const char *pNewName, const char *pNewClan);
+
+	int HudFramesPerSecond(float FrameTimeAverage);
 
 	void CopyPlayerSkin(int ClientId);
 	void FetchFindHours(const char *pName);
