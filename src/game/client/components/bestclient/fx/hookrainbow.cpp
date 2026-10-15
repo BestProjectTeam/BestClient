@@ -1,13 +1,13 @@
 /* Copyright © 2026 BestProject Team */
 #include "hookrainbow.h"
 
+#include "own_tee.h"
+
 #include <base/math.h>
 
 #include <engine/shared/config.h>
 
 #include <game/client/gameclient.h>
-
-#include "own_tee.h"
 
 #include <algorithm>
 #include <cmath>
@@ -26,6 +26,7 @@ void CHookRainbow::OnInit()
 
 void CHookRainbow::OnReset()
 {
+	m_WasActive = false;
 	m_Tracker.Reset();
 	for(CBloomState &State : m_aStates)
 		State = CBloomState();
@@ -253,9 +254,11 @@ void CHookRainbow::OnRender()
 
 	if(g_Config.m_BcHookStyle != FGF_HOOK_STYLE_RAINBOW || !g_Config.m_BcHookTip)
 	{
-		OnReset();
+		if(m_WasActive)
+			OnReset();
 		return;
 	}
+	m_WasActive = true;
 
 	const float Scale = g_Config.m_BcHookSize / 100.0f;
 	m_Tracker.Update(GameClient(), Passed, g_Config.m_BcHookChargeTime / 1000.0f, FADE_TIME,

@@ -1,15 +1,15 @@
 /* Copyright © 2026 BestProject Team */
 #include "hooktroll.h"
 
+#include "fgf_glow.h"
+#include "own_tee.h"
+
 #include <base/math.h>
 
 #include <engine/shared/config.h>
 #include <engine/storage.h>
 
-#include "fgf_glow.h"
 #include <game/client/gameclient.h>
-
-#include "own_tee.h"
 
 #include <algorithm>
 #include <cmath>
@@ -34,6 +34,7 @@ void CHookTroll::OnInit()
 
 void CHookTroll::OnReset()
 {
+	m_WasActive = false;
 	m_Tracker.Reset();
 	for(CTrollState &State : m_aStates)
 		State = CTrollState();
@@ -157,9 +158,11 @@ void CHookTroll::OnRender()
 
 	if(g_Config.m_BcHookStyle != FGF_HOOK_STYLE_TROLL)
 	{
-		OnReset();
+		if(m_WasActive)
+			OnReset();
 		return;
 	}
+	m_WasActive = true;
 	const float Scale = g_Config.m_BcHookSize / 100.0f;
 	const bool Tip = g_Config.m_BcHookTip != 0;
 

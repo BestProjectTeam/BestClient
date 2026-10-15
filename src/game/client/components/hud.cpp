@@ -20,10 +20,10 @@
 #include <generated/protocol.h>
 
 #include <game/client/animstate.h>
-#include <game/client/components/bestclient/gradient.h> // bestclient
-#include <game/client/components/bestclient/hud_extras.h> // bestclient
 #include <game/client/components/bestclient/corner_indicator.h> // bestclient
 #include <game/client/components/bestclient/cursor_trail.h> // bestclient
+#include <game/client/components/bestclient/gradient.h> // bestclient
+#include <game/client/components/bestclient/hud_extras.h> // bestclient
 #include <game/client/components/scoreboard.h>
 #include <game/client/components/skins.h>
 #include <game/client/gameclient.h>
@@ -112,6 +112,9 @@ void CHud::ResetHudContainers()
 void CHud::OnWindowResize()
 {
 	ResetHudContainers();
+	m_LastFpsWidth = -1.0f;
+	m_PracticeLine1Width = -1.0f;
+	m_PracticeLine2Width = -1.0f;
 }
 
 void CHud::OnReset()
@@ -128,6 +131,13 @@ void CHud::OnReset()
 	m_aLastPlayerSpeedChange[0] = ESpeedChange::NONE;
 	m_aLastPlayerSpeedChange[1] = ESpeedChange::NONE;
 	m_LastSpectatorCountTick = 0;
+	m_FreezeInfoInitialized = false;
+	m_CachedFreezeSkinRevision = 0;
+	m_LastFps = -1;
+	m_LastFpsWidth = -1.0f;
+	m_PracticeLine1Width = -1.0f;
+	m_PracticeLine2Width = -1.0f;
+	m_LastMovementInfoTick = -1;
 
 	ResetHudContainers();
 }
@@ -551,25 +561,23 @@ void CHud::RenderTextInfo()
 		// bestclient
 		str_format(aBuf, sizeof(aBuf), "%d", FramesPerSecond);
 
-		static float s_TextWidth0 = TextRender()->TextWidth(12.f, "0", -1, -1.0f);
-		static float s_TextWidth00 = TextRender()->TextWidth(12.f, "00", -1, -1.0f);
-		static float s_TextWidth000 = TextRender()->TextWidth(12.f, "000", -1, -1.0f);
-		static float s_TextWidth0000 = TextRender()->TextWidth(12.f, "0000", -1, -1.0f);
-		static float s_TextWidth00000 = TextRender()->TextWidth(12.f, "00000", -1, -1.0f);
-		static const float s_aTextWidth[5] = {s_TextWidth0, s_TextWidth00, s_TextWidth000, s_TextWidth0000, s_TextWidth00000};
+		if(FramesPerSecond != m_LastFps || m_Width != m_LastFpsWidth || !m_FPSTextContainerIndex.Valid())
+		{
+			m_LastFps = FramesPerSecond;
+			m_LastFpsWidth = m_Width;
+			const float TextW = TextRender()->TextWidth(12.0f, aBuf, -1, -1.0f);
 
-		int DigitIndex = GetDigitsIndex(FramesPerSecond, 4);
-
-		CTextCursor Cursor;
-		Cursor.SetPosition(vec2(m_Width - 10 - s_aTextWidth[DigitIndex], 5));
-		Cursor.m_FontSize = 12.0f;
-		auto OldFlags = TextRender()->GetRenderFlags();
-		TextRender()->SetRenderFlags(OldFlags | TEXT_RENDER_FLAG_ONE_TIME_USE);
-		if(m_FPSTextContainerIndex.Valid())
-			TextRender()->RecreateTextContainerSoft(m_FPSTextContainerIndex, &Cursor, aBuf);
-		else
-			TextRender()->CreateTextContainer(m_FPSTextContainerIndex, &Cursor, "0");
-		TextRender()->SetRenderFlags(OldFlags);
+			CTextCursor Cursor;
+			Cursor.SetPosition(vec2(m_Width - 10 - TextW, 5));
+			Cursor.m_FontSize = 12.0f;
+			auto OldFlags = TextRender()->GetRenderFlags();
+			TextRender()->SetRenderFlags(OldFlags | TEXT_RENDER_FLAG_ONE_TIME_USE);
+			if(m_FPSTextContainerIndex.Valid())
+				TextRender()->RecreateTextContainerSoft(m_FPSTextContainerIndex, &Cursor, aBuf);
+			else
+				TextRender()->CreateTextContainer(m_FPSTextContainerIndex, &Cursor, aBuf);
+			TextRender()->SetRenderFlags(OldFlags);
+		}
 		if(m_FPSTextContainerIndex.Valid())
 		{
 			TextRender()->RenderTextContainer(m_FPSTextContainerIndex, TextRender()->DefaultTextColor(), TextRender()->DefaultTextOutlineColor());
@@ -589,8 +597,12 @@ void CHud::RenderTextInfo()
 		constexpr const char *pLine2 = "(you can use practice commands /tc /invincible)";
 		const float Line1Size = 10.0f;
 		const float Line2Size = 8.0f;
-		const float Line1X = m_Width / 2.0f - TextRender()->TextWidth(Line1Size, pLine1, -1, -1.0f) / 2.0f;
-		const float Line2X = m_Width / 2.0f - TextRender()->TextWidth(Line2Size, pLine2, -1, -1.0f) / 2.0f;
+		if(m_PracticeLine1Width < 0.0f)
+			m_PracticeLine1Width = TextRender()->TextWidth(Line1Size, pLine1, -1, -1.0f);
+		if(m_PracticeLine2Width < 0.0f)
+			m_PracticeLine2Width = TextRender()->TextWidth(Line2Size, pLine2, -1, -1.0f);
+		const float Line1X = m_Width / 2.0f - m_PracticeLine1Width / 2.0f;
+		const float Line2X = m_Width / 2.0f - m_PracticeLine2Width / 2.0f;
 		TextRender()->Text(Line1X, 34.0f, Line1Size, pLine1, -1.0f);
 		TextRender()->Text(Line2X, 45.0f, Line2Size, pLine2, -1.0f);
 	}
@@ -1605,8 +1617,11 @@ inline float CHud::GetMovementInformationBoxHeight() const
 	return BoxHeight;
 }
 
-void CHud::UpdateMovementInformationTextContainer(STextContainerIndex &TextContainer, float FontSize, float Value, float &PrevValue)
+void CHud::UpdateMovementInformationTextContainer(STextContainerIndex &TextContainer, float FontSize, float Value, float &PrevValue, bool AllowUpdate)
 {
+	if(!AllowUpdate && TextContainer.Valid())
+		return;
+
 	Value = std::round(Value * 100.0f) / 100.0f; // Round to 2dp
 	if(TextContainer.Valid() && PrevValue == Value)
 		return;
@@ -1617,7 +1632,10 @@ void CHud::UpdateMovementInformationTextContainer(STextContainerIndex &TextConta
 
 	CTextCursor Cursor;
 	Cursor.m_FontSize = FontSize;
-	TextRender()->RecreateTextContainer(TextContainer, &Cursor, aBuf);
+	if(TextContainer.Valid())
+		TextRender()->RecreateTextContainerSoft(TextContainer, &Cursor, aBuf);
+	else
+		TextRender()->CreateTextContainer(TextContainer, &Cursor, aBuf);
 }
 
 void CHud::RenderMovementInformationTextContainer(STextContainerIndex &TextContainer, const ColorRGBA &Color, float X, float Y)
@@ -1774,13 +1792,19 @@ void CHud::RenderMovementInformation(bool ForcePreview)
 
 	const float LeftX = Rect.x + 2.0f * Scale;
 
+	const int CurTick = Client()->GameTick(g_Config.m_ClDummy);
+	// Update movement info numbers every 2 ticks (~25 Hz) to reduce FreeType recreation overhead
+	const bool UpdateMoveContainers = (m_LastMovementInfoTick == -1 || CurTick - m_LastMovementInfoTick >= 2 || CurTick < m_LastMovementInfoTick);
+	if(UpdateMoveContainers)
+		m_LastMovementInfoTick = CurTick;
+
 	if(g_Config.m_ClShowhudPlayerPosition)
 	{
 		TextRender()->Text(LeftX, y, Fontsize, Localize("Position:"), -1.0f);
 		y += LineHeight;
 
 		TextRender()->Text(LeftX, y, Fontsize, "X:", -1.0f);
-		UpdateMovementInformationTextContainer(m_aPlayerPositionContainers[0], Fontsize, Info.m_Pos.x, m_aPlayerPrevPosition[0]);
+		UpdateMovementInformationTextContainer(m_aPlayerPositionContainers[0], Fontsize, Info.m_Pos.x, m_aPlayerPrevPosition[0], UpdateMoveContainers);
 
 		ColorRGBA TextColor = TextRender()->DefaultTextColor();
 		if(ShowDummyPos && fabsf(Info.m_Pos.x - DummyInfo.m_Pos.x) < 0.01f)
@@ -1790,7 +1814,7 @@ void CHud::RenderMovementInformation(bool ForcePreview)
 		y += LineHeight;
 
 		TextRender()->Text(LeftX, y, Fontsize, "Y:", -1.0f);
-		UpdateMovementInformationTextContainer(m_aPlayerPositionContainers[1], Fontsize, Info.m_Pos.y, m_aPlayerPrevPosition[1]);
+		UpdateMovementInformationTextContainer(m_aPlayerPositionContainers[1], Fontsize, Info.m_Pos.y, m_aPlayerPrevPosition[1], UpdateMoveContainers);
 		RenderMovementInformationTextContainer(m_aPlayerPositionContainers[1], TextRender()->DefaultTextColor(), RightX, y);
 		y += LineHeight;
 
@@ -1860,7 +1884,7 @@ void CHud::RenderMovementInformation(bool ForcePreview)
 			if(m_aLastPlayerSpeedChange[i] == ESpeedChange::DECREASE)
 				Color = ColorRGBA(1.0f, 0.5f, 0.5f, 1.0f);
 			TextRender()->Text(LeftX, y, Fontsize, aaCoordinates[i], -1.0f);
-			UpdateMovementInformationTextContainer(m_aPlayerSpeedTextContainers[i], Fontsize, i == 0 ? Info.m_Speed.x : Info.m_Speed.y, m_aPlayerPrevSpeed[i]);
+			UpdateMovementInformationTextContainer(m_aPlayerSpeedTextContainers[i], Fontsize, i == 0 ? Info.m_Speed.x : Info.m_Speed.y, m_aPlayerPrevSpeed[i], UpdateMoveContainers);
 			RenderMovementInformationTextContainer(m_aPlayerSpeedTextContainers[i], Color, RightX, y);
 			y += LineHeight;
 		}
@@ -1888,7 +1912,7 @@ void CHud::RenderMovementInformation(bool ForcePreview)
 		TextRender()->Text(LeftX, y, Fontsize, Localize("Angle:"), -1.0f);
 		y += LineHeight;
 
-		UpdateMovementInformationTextContainer(m_PlayerAngleTextContainerIndex, Fontsize, Info.m_Angle, m_PlayerPrevAngle);
+		UpdateMovementInformationTextContainer(m_PlayerAngleTextContainerIndex, Fontsize, Info.m_Angle, m_PlayerPrevAngle, UpdateMoveContainers);
 		RenderMovementInformationTextContainer(m_PlayerAngleTextContainerIndex, TextRender()->DefaultTextColor(), RightX, y);
 		y += LineHeight;
 
@@ -2150,7 +2174,7 @@ CUIRect CHud::GetFrozenHudRect(bool ForcePreview) const
 	if(ForcePreview && NumInTeam <= 0)
 		NumInTeam = 3;
 	if(!ForcePreview && (NumInTeam <= 0 || !GameClient()->m_GameInfo.m_EntitiesDDRace || g_Config.m_TcShowFrozenHud <= 0 ||
-				 GameClient()->m_Scoreboard.IsShown() || (LocalTeamId == 0 && g_Config.m_TcFrozenHudTeamOnly)))
+				    GameClient()->m_Scoreboard.IsShown() || (LocalTeamId == 0 && g_Config.m_TcFrozenHudTeamOnly)))
 		return {0.0f, 0.0f, 0.0f, 0.0f};
 
 	const auto Layout = HudLayout::Get(HudLayout::MODULE_FROZEN_HUD, m_Width, m_Height);
@@ -2192,7 +2216,7 @@ void CHud::RenderFrozenHud(bool ForcePreview)
 		NumFrozen = 1;
 	}
 	if(!ForcePreview && (NumInTeam <= 0 || !GameClient()->m_GameInfo.m_EntitiesDDRace || g_Config.m_TcShowFrozenHud <= 0 ||
-				 GameClient()->m_Scoreboard.IsShown() || (LocalTeamId == 0 && g_Config.m_TcFrozenHudTeamOnly)))
+				    GameClient()->m_Scoreboard.IsShown() || (LocalTeamId == 0 && g_Config.m_TcFrozenHudTeamOnly)))
 		return;
 
 	const CUIRect Rect = GetFrozenHudRect(ForcePreview);
@@ -2202,15 +2226,23 @@ void CHud::RenderFrozenHud(bool ForcePreview)
 	const auto Layout = HudLayout::Get(HudLayout::MODULE_FROZEN_HUD, m_Width, m_Height);
 	const float Scale = GetFrozenHudScale(Layout);
 	const float ModuleAlpha = HudLayout::AlphaFactor(HudLayout::MODULE_FROZEN_HUD);
-	CTeeRenderInfo FreezeInfo;
-	const CSkin *pSkin = GameClient()->m_Skins.Find("x_ninja");
-	FreezeInfo.m_OriginalRenderSkin = pSkin->m_OriginalSkin;
-	FreezeInfo.m_ColorableRenderSkin = pSkin->m_ColorableSkin;
-	FreezeInfo.m_BloodColor = pSkin->m_BloodColor;
-	FreezeInfo.m_SkinMetrics = pSkin->m_Metrics;
-	FreezeInfo.m_ColorBody = ColorRGBA(1.0f, 1.0f, 1.0f);
-	FreezeInfo.m_ColorFeet = ColorRGBA(1.0f, 1.0f, 1.0f);
-	FreezeInfo.m_CustomColoredSkin = false;
+	if(!m_FreezeInfoInitialized || m_CachedFreezeSkinRevision != GameClient()->m_Skins.Revision())
+	{
+		const CSkin *pSkin = GameClient()->m_Skins.Find("x_ninja");
+		if(pSkin)
+		{
+			m_CachedFreezeInfo.m_OriginalRenderSkin = pSkin->m_OriginalSkin;
+			m_CachedFreezeInfo.m_ColorableRenderSkin = pSkin->m_ColorableSkin;
+			m_CachedFreezeInfo.m_BloodColor = pSkin->m_BloodColor;
+			m_CachedFreezeInfo.m_SkinMetrics = pSkin->m_Metrics;
+			m_CachedFreezeInfo.m_ColorBody = ColorRGBA(1.0f, 1.0f, 1.0f);
+			m_CachedFreezeInfo.m_ColorFeet = ColorRGBA(1.0f, 1.0f, 1.0f);
+			m_CachedFreezeInfo.m_CustomColoredSkin = false;
+			m_CachedFreezeSkinRevision = GameClient()->m_Skins.Revision();
+			m_FreezeInfoInitialized = true;
+		}
+	}
+	const CTeeRenderInfo &FreezeInfo = m_CachedFreezeInfo;
 
 	const float TeeSize = g_Config.m_TcFrozenHudTeeSize * Scale;
 	int MaxTees = (int)(8.3f * (m_Width / m_Height) * 13.0f / TeeSize);
@@ -2511,7 +2543,10 @@ void CHud::RenderDDRaceEffects()
 			CTextCursor Cursor;
 			Cursor.SetPosition(vec2(150 * Graphics()->ScreenAspect() - TextRender()->TextWidth(12, aBuf) / 2, 20));
 			Cursor.m_FontSize = 12.0f;
-			TextRender()->RecreateTextContainer(m_DDRaceEffectsTextContainerIndex, &Cursor, aBuf);
+			if(m_DDRaceEffectsTextContainerIndex.Valid())
+				TextRender()->RecreateTextContainerSoft(m_DDRaceEffectsTextContainerIndex, &Cursor, aBuf);
+			else
+				TextRender()->CreateTextContainer(m_DDRaceEffectsTextContainerIndex, &Cursor, aBuf);
 			if(m_FinishTimeDiff != 0.0f && m_DDRaceEffectsTextContainerIndex.Valid())
 			{
 				if(m_FinishTimeDiff < 0)
@@ -2570,7 +2605,10 @@ void CHud::RenderDDRaceEffects()
 			CTextCursor Cursor;
 			Cursor.SetPosition(vec2(150 * Graphics()->ScreenAspect() - TextRender()->TextWidth(10, aBuf) / 2, 20));
 			Cursor.m_FontSize = 10.0f;
-			TextRender()->RecreateTextContainer(m_DDRaceEffectsTextContainerIndex, &Cursor, aBuf);
+			if(m_DDRaceEffectsTextContainerIndex.Valid())
+				TextRender()->RecreateTextContainerSoft(m_DDRaceEffectsTextContainerIndex, &Cursor, aBuf);
+			else
+				TextRender()->CreateTextContainer(m_DDRaceEffectsTextContainerIndex, &Cursor, aBuf);
 
 			if(m_DDRaceEffectsTextContainerIndex.Valid())
 			{

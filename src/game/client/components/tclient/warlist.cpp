@@ -1,11 +1,145 @@
 #include "warlist.h"
 
+#include <engine/engine.h>
 #include <engine/graphics.h>
 #include <engine/shared/config.h>
+#include <engine/shared/jobs.h>
 
 #include <game/client/animstate.h>
 #include <game/client/gameclient.h>
 #include <game/client/render.h>
+
+class CWarListJob : public IJob
+{
+public:
+	CWarListJob()
+	{
+		Abortable(true);
+	}
+
+	class CClientQuery
+	{
+	public:
+		bool m_Active = false;
+		char m_aName[MAX_NAME_LENGTH] = "";
+		char m_aClan[MAX_CLAN_LENGTH] = "";
+	};
+
+	class CWarEntryData
+	{
+	public:
+		char m_aName[MAX_NAME_LENGTH] = "";
+		char m_aClan[MAX_CLAN_LENGTH] = "";
+		char m_aReason[MAX_WARLIST_REASON_LENGTH] = "";
+		ColorRGBA m_Color = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
+		int m_WarTypeIndex = 0;
+	};
+
+	uint64_t m_JobRevision = 0;
+	CClientQuery m_aClients[MAX_CLIENTS];
+	std::vector<CWarEntryData> m_vEntries;
+	int m_NumWarTypes = 0;
+
+	CWarDataCache m_aResult[MAX_CLIENTS];
+
+	void Run() override
+	{
+		for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
+		{
+			if(State() == STATE_ABORTED)
+				return;
+
+			if(!m_aClients[ClientId].m_Active)
+				continue;
+
+			m_aResult[ClientId].m_WarName = false;
+			m_aResult[ClientId].m_WarClan = false;
+			memset(m_aResult[ClientId].m_aReason, 0, sizeof(m_aResult[ClientId].m_aReason));
+			m_aResult[ClientId].m_NameColor = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
+			m_aResult[ClientId].m_ClanColor = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
+			m_aResult[ClientId].m_WarGroupMatches.clear();
+			m_aResult[ClientId].m_WarGroupMatches.resize(m_NumWarTypes, false);
+
+			for(const CWarEntryData &Entry : m_vEntries)
+			{
+				if(Entry.m_aName[0] != '\0' && str_comp(m_aClients[ClientId].m_aName, Entry.m_aName) == 0)
+				{
+					str_copy(m_aResult[ClientId].m_aReason, Entry.m_aReason);
+					m_aResult[ClientId].m_WarName = true;
+					m_aResult[ClientId].m_NameColor = Entry.m_Color;
+					if(Entry.m_WarTypeIndex >= 0 && Entry.m_WarTypeIndex < m_NumWarTypes)
+						m_aResult[ClientId].m_WarGroupMatches[Entry.m_WarTypeIndex] = true;
+				}
+				else if(Entry.m_aClan[0] != '\0' && str_comp(m_aClients[ClientId].m_aClan, Entry.m_aClan) == 0)
+				{
+					// Name war reason has priority over clan war reason
+					if(!m_aResult[ClientId].m_WarName)
+						str_copy(m_aResult[ClientId].m_aReason, Entry.m_aReason);
+
+					m_aResult[ClientId].m_WarClan = true;
+					m_aResult[ClientId].m_ClanColor = Entry.m_Color;
+					if(Entry.m_WarTypeIndex >= 0 && Entry.m_WarTypeIndex < m_NumWarTypes)
+						m_aResult[ClientId].m_WarGroupMatches[Entry.m_WarTypeIndex] = true;
+				}
+			}
+		}
+	}
+};
+
+void CWarList::CheckHarvestJob()
+{
+	if(m_pWarJob && m_pWarJob->Done())
+	{
+		if(m_pWarJob->State() == IJob::STATE_DONE)
+		{
+			if(g_Config.m_TcWarList)
+			{
+				for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
+					m_WarPlayers[ClientId] = std::move(m_pWarJob->m_aResult[ClientId]);
+				m_LastProcessedRevision = m_pWarJob->m_JobRevision;
+				for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
+				{
+					m_aLastClients[ClientId].m_Active = m_pWarJob->m_aClients[ClientId].m_Active;
+					str_copy(m_aLastClients[ClientId].m_aName, m_pWarJob->m_aClients[ClientId].m_aName);
+					str_copy(m_aLastClients[ClientId].m_aClan, m_pWarJob->m_aClients[ClientId].m_aClan);
+				}
+			}
+		}
+		m_pWarJob = nullptr;
+	}
+}
+
+void CWarList::OnRender()
+{
+	CheckHarvestJob();
+}
+
+void CWarList::OnShutdown()
+{
+	if(m_pWarJob)
+	{
+		m_pWarJob->Abort();
+		m_pWarJob = nullptr;
+	}
+}
+
+void CWarList::OnReset()
+{
+	if(m_pWarJob)
+	{
+		m_pWarJob->Abort();
+		m_pWarJob = nullptr;
+	}
+	m_ClearedWhenDisabled = false;
+	m_LastProcessedRevision = 0;
+	for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
+	{
+		m_aLastClients[ClientId].m_Active = false;
+		m_aLastClients[ClientId].m_aName[0] = '\0';
+		m_aLastClients[ClientId].m_aClan[0] = '\0';
+		m_WarPlayers[ClientId] = CWarDataCache();
+	}
+}
 
 void CWarList::OnNewSnapshot()
 {
@@ -215,6 +349,8 @@ void CWarList::UpdateWarEntry(int Index, const char *pName, const char *pClan, c
 		str_copy(m_vWarEntries[Index].m_aClan, pClan);
 		str_copy(m_vWarEntries[Index].m_aReason, pReason);
 		m_vWarEntries[Index].m_pWarType = pType;
+		m_WarListRevision++;
+		UpdateWarPlayers();
 	}
 }
 
@@ -227,6 +363,8 @@ void CWarList::UpsertWarType(int Index, const char *pType, ColorRGBA Color)
 	{
 		str_copy(m_WarTypes[Index]->m_aWarName, pType);
 		m_WarTypes[Index]->m_Color = Color;
+		m_WarListRevision++;
+		UpdateWarPlayers();
 	}
 	else
 	{
@@ -257,6 +395,8 @@ void CWarList::AddWarEntry(const char *pName, const char *pClan, const char *pRe
 	if(!g_Config.m_TcWarListAllowDuplicates)
 		RemoveWarEntryDuplicates(pName, pClan);
 	m_vWarEntries.push_back(Entry);
+	m_WarListRevision++;
+	UpdateWarPlayers();
 }
 
 void CWarList::RemoveWarEntryDuplicates(const char *pName, const char *pClan)
@@ -264,6 +404,7 @@ void CWarList::RemoveWarEntryDuplicates(const char *pName, const char *pClan)
 	if(str_comp(pName, "") == 0 && str_comp(pClan, "") == 0)
 		return;
 
+	bool Removed = false;
 	for(auto It = m_vWarEntries.begin(); It != m_vWarEntries.end();)
 	{
 		bool IsDuplicate =
@@ -271,9 +412,17 @@ void CWarList::RemoveWarEntryDuplicates(const char *pName, const char *pClan)
 			(str_comp(It->m_aClan, pClan) == 0);
 
 		if(IsDuplicate)
+		{
 			It = m_vWarEntries.erase(It);
+			Removed = true;
+		}
 		else
 			++It;
+	}
+	if(Removed)
+	{
+		m_WarListRevision++;
+		UpdateWarPlayers();
 	}
 }
 
@@ -292,6 +441,8 @@ void CWarList::AddWarType(const char *pType, ColorRGBA Color)
 	{
 		Type->m_Color = Color;
 	}
+	m_WarListRevision++;
+	UpdateWarPlayers();
 }
 
 void CWarList::RemoveWarEntry(const char *pName, const char *pClan, const char *pType)
@@ -300,7 +451,11 @@ void CWarList::RemoveWarEntry(const char *pName, const char *pClan, const char *
 	CWarEntry Entry(pWarType, pName, pClan, "");
 	auto It = std::find(m_vWarEntries.begin(), m_vWarEntries.end(), Entry);
 	if(It != m_vWarEntries.end())
+	{
 		m_vWarEntries.erase(It);
+		m_WarListRevision++;
+		UpdateWarPlayers();
+	}
 }
 
 void CWarList::RemoveWarEntry(CWarEntry *Entry)
@@ -308,7 +463,21 @@ void CWarList::RemoveWarEntry(CWarEntry *Entry)
 	auto It = std::find_if(m_vWarEntries.begin(), m_vWarEntries.end(),
 		[Entry](const CWarEntry &WarEntry) { return &WarEntry == Entry; });
 	if(It != m_vWarEntries.end())
+	{
 		m_vWarEntries.erase(It);
+		m_WarListRevision++;
+		UpdateWarPlayers();
+	}
+}
+
+void CWarList::RemoveWarEntry(int Index)
+{
+	if(Index >= 0 && Index < static_cast<int>(m_vWarEntries.size()))
+	{
+		m_vWarEntries.erase(m_vWarEntries.begin() + Index);
+		m_WarListRevision++;
+		UpdateWarPlayers();
+	}
 }
 
 void CWarList::RemoveWarType(const char *pType)
@@ -332,6 +501,18 @@ void CWarList::RemoveWarType(const char *pType)
 			}
 		}
 		m_WarTypes.erase(It);
+		m_WarListRevision++;
+		UpdateWarPlayers();
+	}
+}
+
+void CWarList::RemoveWarType(int Index)
+{
+	if(Index >= 0 && Index < static_cast<int>(m_WarTypes.size()))
+	{
+		if(!m_WarTypes[Index]->m_Removable)
+			return;
+		RemoveWarType(m_WarTypes[Index]->m_aWarName);
 	}
 }
 
@@ -413,47 +594,108 @@ void CWarList::SortWarEntries()
 
 void CWarList::UpdateWarPlayers()
 {
-	for(int i = 0; i < (int)m_WarTypes.size(); ++i)
-		m_WarTypes[i]->m_Index = i;
+	CheckHarvestJob();
 
-	for(int i = 0; i < MAX_CLIENTS; ++i)
+	if(!g_Config.m_TcWarList)
 	{
-		if(!GameClient()->m_aClients[i].m_Active)
-			continue;
-
-		m_WarPlayers[i].m_WarName = false;
-		m_WarPlayers[i].m_WarClan = false;
-		memset(m_WarPlayers[i].m_aReason, 0, sizeof(m_WarPlayers[i].m_aReason));
-		m_WarPlayers[i].m_NameColor = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
-		m_WarPlayers[i].m_ClanColor = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
-		m_WarPlayers[i].m_WarGroupMatches.clear();
-		m_WarPlayers[i].m_WarGroupMatches.resize((int)m_WarTypes.size(), false);
-
-		for(CWarEntry &Entry : m_vWarEntries)
+		if(!m_ClearedWhenDisabled)
 		{
-			if(str_comp(GameClient()->m_aClients[i].m_aName, Entry.m_aName) == 0 && str_comp(Entry.m_aName, "") != 0)
+			if(m_pWarJob)
 			{
-				str_copy(m_WarPlayers[i].m_aReason, Entry.m_aReason);
-				m_WarPlayers[i].m_WarName = true;
-				m_WarPlayers[i].m_NameColor = Entry.m_pWarType->m_Color;
-				m_WarPlayers[i].m_WarGroupMatches[Entry.m_pWarType->m_Index] = true;
+				m_pWarJob->Abort();
+				m_pWarJob = nullptr;
 			}
-			else if(str_comp(GameClient()->m_aClients[i].m_aClan, Entry.m_aClan) == 0 && str_comp(Entry.m_aClan, "") != 0)
+			for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
 			{
-				// Name war reason has priority over clan war reason
-				if(!m_WarPlayers[i].m_WarName)
-					str_copy(m_WarPlayers[i].m_aReason, Entry.m_aReason);
+				m_WarPlayers[ClientId] = CWarDataCache();
+				m_aLastClients[ClientId].m_Active = false;
+				m_aLastClients[ClientId].m_aName[0] = '\0';
+				m_aLastClients[ClientId].m_aClan[0] = '\0';
+			}
+			m_LastProcessedRevision = 0;
+			m_ClearedWhenDisabled = true;
+		}
+		return;
+	}
+	m_ClearedWhenDisabled = false;
 
-				m_WarPlayers[i].m_WarClan = true;
-				m_WarPlayers[i].m_ClanColor = Entry.m_pWarType->m_Color;
-				m_WarPlayers[i].m_WarGroupMatches[Entry.m_pWarType->m_Index] = true;
+	if(m_pWarJob)
+		return;
+
+	bool Changed = (m_WarListRevision != m_LastProcessedRevision);
+	if(!Changed)
+	{
+		for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
+		{
+			const auto &Client = GameClient()->m_aClients[ClientId];
+			if(Client.m_Active != m_aLastClients[ClientId].m_Active ||
+				(Client.m_Active && (str_comp(Client.m_aName, m_aLastClients[ClientId].m_aName) != 0 ||
+							    str_comp(Client.m_aClan, m_aLastClients[ClientId].m_aClan) != 0)))
+			{
+				Changed = true;
+				break;
 			}
 		}
+	}
+
+	if(!Changed)
+		return;
+
+	for(size_t Index = 0; Index < m_WarTypes.size(); ++Index)
+		m_WarTypes[Index]->m_Index = Index;
+
+	auto pJob = std::make_shared<CWarListJob>();
+	pJob->m_JobRevision = m_WarListRevision;
+	pJob->m_NumWarTypes = (int)m_WarTypes.size();
+
+	for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
+	{
+		const auto &Client = GameClient()->m_aClients[ClientId];
+		pJob->m_aClients[ClientId].m_Active = Client.m_Active;
+		if(Client.m_Active)
+		{
+			str_copy(pJob->m_aClients[ClientId].m_aName, Client.m_aName);
+			str_copy(pJob->m_aClients[ClientId].m_aClan, Client.m_aClan);
+		}
+		else
+		{
+			pJob->m_aClients[ClientId].m_aName[0] = '\0';
+			pJob->m_aClients[ClientId].m_aClan[0] = '\0';
+		}
+	}
+
+	pJob->m_vEntries.reserve(m_vWarEntries.size());
+	for(const auto &Entry : m_vWarEntries)
+	{
+		CWarListJob::CWarEntryData Data;
+		str_copy(Data.m_aName, Entry.m_aName);
+		str_copy(Data.m_aClan, Entry.m_aClan);
+		str_copy(Data.m_aReason, Entry.m_aReason);
+		if(Entry.m_pWarType)
+		{
+			Data.m_Color = Entry.m_pWarType->m_Color;
+			Data.m_WarTypeIndex = Entry.m_pWarType->m_Index;
+		}
+		pJob->m_vEntries.push_back(Data);
+	}
+
+	m_pWarJob = pJob;
+	if(Engine())
+		Engine()->AddJob(pJob);
+	else
+	{
+		pJob->Run();
+		CheckHarvestJob();
 	}
 }
 
 CWarList::~CWarList()
 {
+	if(m_pWarJob)
+	{
+		m_pWarJob->Abort();
+		m_pWarJob = nullptr;
+	}
 	for(CWarType *WarType : m_WarTypes)
 		delete WarType;
 	m_WarTypes.clear();

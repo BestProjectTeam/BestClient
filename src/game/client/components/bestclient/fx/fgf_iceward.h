@@ -1,6 +1,8 @@
 /* Copyright © 2026 BestProject Team */
 #ifndef GAME_CLIENT_COMPONENTS_FGF_ICEWARD_H
 #define GAME_CLIENT_COMPONENTS_FGF_ICEWARD_H
+#include "fgf_glow.h"
+
 #include <base/color.h>
 #include <base/vmath.h>
 
@@ -8,7 +10,6 @@
 #include <engine/shared/protocol.h>
 
 #include <game/client/component.h>
-#include "fgf_glow.h"
 
 class CFgfIceWard : public CComponent
 {
@@ -65,6 +66,7 @@ private:
 	CScan m_aScans[MAX_CLIENTS];
 	CGlowParticles m_Frost;
 	float m_LastTime = 0.0f;
+	bool m_WasActive = false;
 
 	bool FreezeAt(vec2 Pos) const;
 	bool UseTileCache(int ClientId, vec2 Pos, float Reach);

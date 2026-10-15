@@ -2,20 +2,20 @@
 #ifndef GAME_CLIENT_COMPONENTS_BESTCLIENT_CLIENTINDICATOR_CLIENT_INDICATOR_H
 #define GAME_CLIENT_COMPONENTS_BESTCLIENT_CLIENTINDICATOR_CLIENT_INDICATOR_H
 
-#include "client_indicator_sync.h"
 #include "browser_cache.h"
+#include "client_indicator_sync.h"
 #include "presence_cache.h"
 
 #include <base/net.h>
 
-#include <game/client/component.h>
-
 #include <engine/http.h>
 #include <engine/shared/uuid_manager.h>
 
+#include <game/client/component.h>
+
 #include <memory>
-#include <unordered_map>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 
 class CClientIndicator : public CComponent
@@ -55,6 +55,7 @@ private:
 	int64_t m_LastBrowserRefreshTick = 0;
 	int64_t m_LastTokenRefreshTick = 0;
 	int64_t m_LastPresencePollTick = 0;
+	int64_t m_LastPollTick = 0;
 	int64_t m_LastRegistrationSyncTick = 0;
 	int64_t m_LastPerfReportTick = 0;
 	int64_t m_LastUpdateCostTick = 0;
@@ -70,6 +71,7 @@ private:
 	CPresenceCache m_PresenceCache;
 
 	std::shared_ptr<IHttpRequest> m_pBrowserTask = nullptr;
+	std::shared_ptr<class CBrowserCacheJob> m_pBrowserJob = nullptr;
 	std::shared_ptr<IHttpRequest> m_pTokenTask = nullptr;
 	CBrowserCache m_BrowserCache;
 	char m_aWebSharedToken[256] = "";

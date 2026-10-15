@@ -1,13 +1,13 @@
 /* Copyright © 2026 BestProject Team */
 #include "hookwind.h"
 
+#include "own_tee.h"
+
 #include <base/math.h>
 
 #include <engine/shared/config.h>
 
 #include <game/client/gameclient.h>
-
-#include "own_tee.h"
 #include <game/gamecore.h>
 
 #include <algorithm>
@@ -52,6 +52,7 @@ void CHookWind::OnInit()
 
 void CHookWind::OnReset()
 {
+	m_WasActive = false;
 	m_Tracker.Reset();
 	for(CWindState &State : m_aStates)
 		State = CWindState();
@@ -416,9 +417,11 @@ void CHookWind::OnRender()
 
 	if(g_Config.m_BcHookStyle != FGF_HOOK_STYLE_WHIRLWIND || !g_Config.m_BcHookTip)
 	{
-		OnReset();
+		if(m_WasActive)
+			OnReset();
 		return;
 	}
+	m_WasActive = true;
 
 	const ColorRGBA Tint = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_BcHookWindColor));
 	const float Scale = g_Config.m_BcHookSize / 100.0f;

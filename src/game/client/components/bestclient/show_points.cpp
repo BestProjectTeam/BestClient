@@ -15,32 +15,52 @@
 
 namespace
 {
-bool IsJsonObject(const json_value *pValue)
-{
-	return pValue && pValue != &json_value_none && pValue->type == json_object;
-}
-
-CShowPoints::EProvider LegitProviderFromGameType(const char *pGameType)
-{
-	if(!pGameType || !pGameType[0])
-		return CShowPoints::EProvider::None;
-	if(str_find_nocase(pGameType, "ddrace") != nullptr)
-		return CShowPoints::EProvider::LegitDdrace;
-	if(str_find_nocase(pGameType, "gores") != nullptr)
-		return CShowPoints::EProvider::LegitGores;
-	return CShowPoints::EProvider::None;
-}
-
-bool ParsePoints(CShowPoints::EProvider Provider, const json_value *pRoot, int *pPoints)
-{
-	if(!IsJsonObject(pRoot) || !pPoints)
-		return false;
-
-	if(Provider == CShowPoints::EProvider::Ego ||
-		Provider == CShowPoints::EProvider::LegitGores ||
-		Provider == CShowPoints::EProvider::LegitDdrace)
+	bool IsJsonObject(const json_value *pValue)
 	{
-		const json_value *pPointsVal = json_object_get(pRoot, "points");
+		return pValue && pValue != &json_value_none && pValue->type == json_object;
+	}
+
+	CShowPoints::EProvider LegitProviderFromGameType(const char *pGameType)
+	{
+		if(!pGameType || !pGameType[0])
+			return CShowPoints::EProvider::None;
+		if(str_find_nocase(pGameType, "ddrace") != nullptr)
+			return CShowPoints::EProvider::LegitDdrace;
+		if(str_find_nocase(pGameType, "gores") != nullptr)
+			return CShowPoints::EProvider::LegitGores;
+		return CShowPoints::EProvider::None;
+	}
+
+	bool ParsePoints(CShowPoints::EProvider Provider, const json_value *pRoot, int *pPoints)
+	{
+		if(!IsJsonObject(pRoot) || !pPoints)
+			return false;
+
+		if(Provider == CShowPoints::EProvider::Ego ||
+			Provider == CShowPoints::EProvider::LegitGores ||
+			Provider == CShowPoints::EProvider::LegitDdrace)
+		{
+			const json_value *pPointsVal = json_object_get(pRoot, "points");
+			if(pPointsVal == &json_value_none)
+				return false;
+			if(pPointsVal->type == json_integer)
+			{
+				*pPoints = (int)pPointsVal->u.integer;
+				return true;
+			}
+			if(pPointsVal->type == json_double)
+			{
+				*pPoints = (int)pPointsVal->u.dbl;
+				return true;
+			}
+			return false;
+		}
+
+		const json_value *pPointsObj = json_object_get(pRoot, "points");
+		if(!IsJsonObject(pPointsObj))
+			return false;
+
+		const json_value *pPointsVal = json_object_get(pPointsObj, "points");
 		if(pPointsVal == &json_value_none)
 			return false;
 		if(pPointsVal->type == json_integer)
@@ -55,26 +75,6 @@ bool ParsePoints(CShowPoints::EProvider Provider, const json_value *pRoot, int *
 		}
 		return false;
 	}
-
-	const json_value *pPointsObj = json_object_get(pRoot, "points");
-	if(!IsJsonObject(pPointsObj))
-		return false;
-
-	const json_value *pPointsVal = json_object_get(pPointsObj, "points");
-	if(pPointsVal == &json_value_none)
-		return false;
-	if(pPointsVal->type == json_integer)
-	{
-		*pPoints = (int)pPointsVal->u.integer;
-		return true;
-	}
-	if(pPointsVal->type == json_double)
-	{
-		*pPoints = (int)pPointsVal->u.dbl;
-		return true;
-	}
-	return false;
-}
 }
 
 bool CShowPoints::Enabled() const
@@ -151,7 +151,7 @@ CShowPoints::EProvider CShowPoints::CurrentProvider() const
 	}
 
 	const bool IsLegit = str_comp_nocase(pCommunityId, "legit") == 0 ||
-		str_find_nocase(ServerInfo.m_aName, "Legit Network") != nullptr;
+			     str_find_nocase(ServerInfo.m_aName, "Legit Network") != nullptr;
 	if(IsLegit)
 	{
 		EProvider Provider = LegitProviderFromGameType(ServerInfo.m_aGameType);
@@ -392,6 +392,9 @@ void CShowPoints::OnUpdate()
 		ClearPending();
 		return;
 	}
+
+	if(m_vInFlight.empty() && !GameClient()->m_Scoreboard.IsActive())
+		return;
 
 	if(CurrentProvider() == EProvider::None)
 	{

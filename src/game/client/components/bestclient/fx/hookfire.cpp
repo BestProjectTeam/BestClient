@@ -1,14 +1,14 @@
 /* Copyright © 2026 BestProject Team */
 #include "hookfire.h"
 
+#include "own_tee.h"
+
 #include <base/math.h>
 
 #include <engine/image.h>
 #include <engine/shared/config.h>
 
 #include <game/client/gameclient.h>
-
-#include "own_tee.h"
 
 #include <algorithm>
 #include <cmath>
@@ -106,6 +106,7 @@ void CHookFire::OnInit()
 
 void CHookFire::OnReset()
 {
+	m_WasActive = false;
 	m_Tracker.Reset();
 	for(CFireState &State : m_aStates)
 		State = CFireState();
@@ -444,9 +445,11 @@ void CHookFire::OnRender()
 
 	if(g_Config.m_BcHookStyle != FGF_HOOK_STYLE_FIRE)
 	{
-		OnReset();
+		if(m_WasActive)
+			OnReset();
 		return;
 	}
+	m_WasActive = true;
 
 	const CPalette CurrentPalette = Palette();
 	const float Scale = g_Config.m_BcHookSize / 100.0f;

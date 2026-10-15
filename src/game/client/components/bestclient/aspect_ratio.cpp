@@ -18,7 +18,7 @@
 
 #include <algorithm>
 
-CAspectRatio::SConfig CAspectRatio::ReadConfig()
+CAspectRatio::CAspectConfig CAspectRatio::ReadConfig()
 {
 	return {
 		g_Config.m_BcCustomAspectRatioMode,
@@ -29,7 +29,7 @@ CAspectRatio::SConfig CAspectRatio::ReadConfig()
 	};
 }
 
-bool CAspectRatio::ConfirmNeeded(const SConfig &Cfg)
+bool CAspectRatio::ConfirmNeeded(const CAspectConfig &Cfg)
 {
 	return Cfg.m_ApplyMode == 1 && (Cfg.m_Mode > 0 || (Cfg.m_Mode < 0 && Cfg.m_Ratio > 0));
 }
@@ -108,12 +108,13 @@ void CAspectRatio::BeginFrame()
 	Graphics()->SetScreenAspectOverrideEnabled(true);
 	m_HudAspectDisabled = false;
 	m_MusicPlayerAspectDisabled = false;
+	m_CachedUseGameNoHudAspect = UseGameNoHudAspect();
 	GameClient()->m_TClient.SetForcedAspect();
 }
 
 void CAspectRatio::PrepareComponent(const CComponent *pComponent)
 {
-	if(!UseGameNoHudAspect())
+	if(!m_CachedUseGameNoHudAspect)
 		return;
 
 	if(m_MusicPlayerAspectDisabled && pComponent != &GameClient()->m_MusicPlayer)
@@ -138,32 +139,32 @@ void CAspectRatio::PrepareComponent(const CComponent *pComponent)
 
 void CAspectRatio::BeforeFogRect()
 {
-	if(UseGameNoHudAspect() && m_HudAspectDisabled)
+	if(m_CachedUseGameNoHudAspect && m_HudAspectDisabled)
 		Graphics()->SetScreenAspectOverrideEnabled(true);
 }
 
 void CAspectRatio::AfterFogRect()
 {
-	if(UseGameNoHudAspect() && m_HudAspectDisabled)
+	if(m_CachedUseGameNoHudAspect && m_HudAspectDisabled)
 		Graphics()->SetScreenAspectOverrideEnabled(false);
 }
 
 void CAspectRatio::BeginCursorGameAspect()
 {
-	if(UseGameNoHudAspect())
+	if(m_CachedUseGameNoHudAspect)
 		Graphics()->SetScreenAspectOverrideEnabled(true);
 }
 
 void CAspectRatio::EndCursorGameAspect()
 {
-	if(UseGameNoHudAspect())
+	if(m_CachedUseGameNoHudAspect)
 		Graphics()->SetScreenAspectOverrideEnabled(false);
 }
 
 void CAspectRatio::UpdateConfirm()
 {
 	constexpr int CONFIRM_SECONDS = 10;
-	const SConfig Cur = ReadConfig();
+	const CAspectConfig Cur = ReadConfig();
 
 	if(!m_ConfirmSeeded)
 	{
@@ -258,7 +259,7 @@ void CAspectRatio::RenderConfirmOverlay(bool MenuActive)
 
 		auto RenderOverlayBtn = [&](const CUIRect &Rect, const char *pText, ColorRGBA Normal, ColorRGBA Hovered) -> bool {
 			const bool Hover = RealMouse.x >= Rect.x && RealMouse.x < Rect.x + Rect.w &&
-				RealMouse.y >= Rect.y && RealMouse.y < Rect.y + Rect.h;
+					   RealMouse.y >= Rect.y && RealMouse.y < Rect.y + Rect.h;
 			Graphics()->DrawRect(Rect.x, Rect.y, Rect.w, Rect.h, Hover ? Hovered : Normal, IGraphics::CORNER_ALL, 3.0f);
 			Ui()->DoLabel(&Rect, pText, 10.5f, TEXTALIGN_MC);
 			return Hover && Ui()->MouseButtonClicked(0);

@@ -156,12 +156,15 @@ private:
 
 	CEntity *m_pNextTraverseEntity = nullptr;
 	CEntity *m_apFirstEntityTypes[NUM_ENTTYPES];
+	std::vector<CEntity *> m_apEntityRecycleBin[NUM_ENTTYPES];
 
 	CCharacter *m_apCharacters[MAX_CLIENTS];
 
 	CCollision *m_pCollision;
 	CTuningParams *m_pTuningList;
 	const CMapBugs *m_pMapBugs;
+
+	void RecycleActiveEntities();
 };
 
 class CCharOrder

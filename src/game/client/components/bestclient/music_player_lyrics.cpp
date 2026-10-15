@@ -1,8 +1,8 @@
 /* Copyright © 2026 BestProject Team */
 #include "music_player_lyrics.h"
 
-#include <base/math.h>
 #include <base/dbg.h>
+#include <base/math.h>
 #include <base/str.h>
 #include <base/time.h>
 
@@ -33,6 +33,45 @@ namespace
 			return "";
 		const char *pStr = json_string_get(pValue);
 		return pStr != nullptr ? pStr : "";
+	}
+
+	class CTextWidthCacheEntry
+	{
+	public:
+		std::string m_Text;
+		float m_FontSize = -1.0f;
+		float m_Width = 0.0f;
+	};
+	static constexpr size_t TEXT_CACHE_SIZE = 64;
+	static CTextWidthCacheEntry s_aLyricsTextWidthCache[TEXT_CACHE_SIZE];
+
+	static float CachedTextWidth(ITextRender *pTextRender, const char *pText, float FontSize)
+	{
+		if(pTextRender == nullptr || pText == nullptr || pText[0] == '\0')
+			return 0.0f;
+
+		size_t Hash = std::hash<std::string_view>{}(pText);
+		Hash ^= std::hash<float>{}(FontSize) + 0x9e3779b9 + (Hash << 6) + (Hash >> 2);
+		size_t Index = Hash % TEXT_CACHE_SIZE;
+
+		if(s_aLyricsTextWidthCache[Index].m_FontSize == FontSize && s_aLyricsTextWidthCache[Index].m_Text == pText)
+			return s_aLyricsTextWidthCache[Index].m_Width;
+
+		float Width = pTextRender->TextWidth(FontSize, pText, -1, -1.0f);
+		s_aLyricsTextWidthCache[Index].m_Text = pText;
+		s_aLyricsTextWidthCache[Index].m_FontSize = FontSize;
+		s_aLyricsTextWidthCache[Index].m_Width = Width;
+		return Width;
+	}
+
+	static void InvalidateLyricsTextWidthCache()
+	{
+		for(auto &Entry : s_aLyricsTextWidthCache)
+		{
+			Entry.m_FontSize = -1.0f;
+			Entry.m_Text.clear();
+			Entry.m_Width = 0.0f;
+		}
 	}
 } // namespace
 
@@ -102,7 +141,7 @@ float CMusicPlayerLyrics::PreferredTextSlotWidth(ITextRender *pTextRender, float
 		return ClampedMax;
 
 	const float Pad = 1.2f * Scale * WidthScale;
-	const float TextW = pTextRender->TextWidth(FontSize, pText, -1, -1.0f);
+	const float TextW = CachedTextWidth(pTextRender, pText, FontSize);
 	return std::clamp(TextW + Pad * 2.0f, 0.0f, ClampedMax);
 }
 
@@ -143,6 +182,7 @@ void CMusicPlayerLyrics::ClearLayoutState()
 	m_LayoutText.clear();
 	m_vCharMetrics.clear();
 	m_BaseLineWidth = 0.0f;
+	InvalidateLyricsTextWidthCache();
 }
 
 void CMusicPlayerLyrics::Disable()
@@ -910,15 +950,15 @@ void CMusicPlayerLyrics::Render(ITextRender *pTextRender, CUi *pUi, const CUIRec
 		{
 			char aDigit[4];
 			str_format(aDigit, sizeof(aDigit), "%d", CountdownDigit(m_OutgoingLineIndex));
-			OutWidth = pTextRender->TextWidth(FontSize, aDigit, -1, -1.0f);
+			OutWidth = CachedTextWidth(pTextRender, aDigit, FontSize);
 		}
 		else if(IsFallbackIndex(m_OutgoingLineIndex))
 		{
-			OutWidth = pTextRender->TextWidth(FontSize, FallbackText(m_OutgoingLineIndex), -1, -1.0f);
+			OutWidth = CachedTextWidth(pTextRender, FallbackText(m_OutgoingLineIndex), FontSize);
 		}
 		else
 		{
-			OutWidth = pTextRender->TextWidth(FontSize, m_vLines[m_OutgoingLineIndex].m_Text.c_str(), -1, -1.0f);
+			OutWidth = CachedTextWidth(pTextRender, m_vLines[m_OutgoingLineIndex].m_Text.c_str(), FontSize);
 		}
 		const float OutX = CenterX - OutWidth * 0.5f;
 		const int OutColorMode = IsMutedFallback(m_OutgoingLineIndex) ? 1 : 2;

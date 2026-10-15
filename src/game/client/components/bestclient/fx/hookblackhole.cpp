@@ -1,13 +1,13 @@
 /* Copyright © 2026 BestProject Team */
 #include "hookblackhole.h"
 
+#include "own_tee.h"
+
 #include <base/math.h>
 
 #include <engine/shared/config.h>
 
 #include <game/client/gameclient.h>
-
-#include "own_tee.h"
 
 #include <algorithm>
 #include <cmath>
@@ -31,6 +31,7 @@ void CHookBlackHole::OnInit()
 
 void CHookBlackHole::OnReset()
 {
+	m_WasActive = false;
 	m_Tracker.Reset();
 	for(CHoleState &State : m_aStates)
 		State = CHoleState();
@@ -362,9 +363,11 @@ void CHookBlackHole::OnRender()
 
 	if(g_Config.m_BcHookStyle != FGF_HOOK_STYLE_BLACK_HOLE || !g_Config.m_BcHookTip)
 	{
-		OnReset();
+		if(m_WasActive)
+			OnReset();
 		return;
 	}
+	m_WasActive = true;
 
 	const CPalette CurrentPalette = Palette();
 	const float Scale = g_Config.m_BcHookSize / 100.0f;

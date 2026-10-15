@@ -488,6 +488,12 @@ void CBgDraw::OnRender()
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return;
 
+	const bool HasInput = m_aInputData[0] != InputMode::NONE || m_aInputData[1] != InputMode::NONE ||
+			      m_apActiveItems[0].has_value() || m_apActiveItems[1].has_value();
+
+	if(m_pvItems->empty() && !HasInput)
+		return;
+
 	Graphics()->TextureClear();
 
 	float Delta = Client()->RenderFrameTime();

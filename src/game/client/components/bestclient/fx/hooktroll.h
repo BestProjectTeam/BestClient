@@ -1,6 +1,8 @@
 /* Copyright © 2026 BestProject Team */
 #ifndef GAME_CLIENT_COMPONENTS_HOOKTROLL_H
 #define GAME_CLIENT_COMPONENTS_HOOKTROLL_H
+#include "hookgrip.h"
+
 #include <base/color.h>
 #include <base/vmath.h>
 
@@ -8,7 +10,6 @@
 #include <engine/shared/protocol.h>
 
 #include <game/client/component.h>
-#include "hookgrip.h"
 
 class CHookTroll : public CComponent
 {
@@ -68,6 +69,7 @@ private:
 	CLooseFace m_aFaces[MAX_FACES];
 	int m_NumFaces = 0;
 	float m_LastTime = 0.0f;
+	bool m_WasActive = false;
 
 	void DrawSplat(vec2 Center, vec2 Normal, float Radius, float Seed, float Alpha);
 };

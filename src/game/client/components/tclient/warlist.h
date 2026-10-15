@@ -8,6 +8,8 @@
 
 #include <game/client/component.h>
 
+#include <memory>
+
 enum
 {
 	MAX_WARLIST_TYPE_LENGTH = 16,
@@ -86,8 +88,25 @@ public:
 	char m_aReason[MAX_WARLIST_REASON_LENGTH] = "";
 };
 
+class CWarListJob;
+
 class CWarList : public CComponent
 {
+	class CClientSig
+	{
+	public:
+		bool m_Active = false;
+		char m_aName[MAX_NAME_LENGTH] = "";
+		char m_aClan[MAX_CLAN_LENGTH] = "";
+	};
+
+	CClientSig m_aLastClients[MAX_CLIENTS];
+	uint64_t m_WarListRevision = 1;
+	uint64_t m_LastProcessedRevision = 0;
+	std::shared_ptr<CWarListJob> m_pWarJob;
+	bool m_ClearedWhenDisabled = false;
+
+	void CheckHarvestJob();
 	// The war list will have these commands
 	//
 	// Preset Commands
@@ -158,6 +177,9 @@ public:
 
 	int Sizeof() const override { return sizeof(*this); }
 	void OnNewSnapshot() override;
+	void OnRender() override;
+	void OnShutdown() override;
+	void OnReset() override;
 	void OnConsoleInit() override;
 
 	void UpdateWarPlayers();

@@ -1,6 +1,9 @@
 /* Copyright © 2026 BestProject Team */
 #ifndef GAME_CLIENT_COMPONENTS_HOOKRAINBOW_H
 #define GAME_CLIENT_COMPONENTS_HOOKRAINBOW_H
+#include "fgf_glow.h"
+#include "hookgrip.h"
+
 #include <base/color.h>
 #include <base/vmath.h>
 
@@ -8,8 +11,6 @@
 #include <engine/shared/protocol.h>
 
 #include <game/client/component.h>
-#include "fgf_glow.h"
-#include "hookgrip.h"
 
 class CHookRainbow : public CComponent
 {
@@ -54,6 +55,7 @@ private:
 	CFalling m_aFalling[MAX_FALLING];
 	int m_NumFalling = 0;
 	float m_LastTime = 0.0f;
+	bool m_WasActive = false;
 
 	void Bloom(int Owner, const CHookGripTracker::CGrip &Grip, float Scale);
 	void Charged(int Owner, const CHookGripTracker::CGrip &Grip, float Scale);

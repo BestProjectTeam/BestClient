@@ -17,9 +17,9 @@
 #include <engine/engine.h>
 #include <engine/font_icons.h>
 #include <engine/graphics.h>
+#include <engine/http.h>
 #include <engine/shared/bestclient_indicator_protocol.h>
 #include <engine/shared/config.h>
-#include <engine/http.h>
 #include <engine/shared/json.h>
 #include <engine/storage.h>
 #include <engine/textrender.h>
@@ -99,7 +99,8 @@ namespace
 	void WriteVoiceString(std::vector<uint8_t> &vOut, const char *pStr, int MaxLen = 128)
 	{
 		int Len = (int)str_length(pStr);
-		if(Len > MaxLen) Len = MaxLen;
+		if(Len > MaxLen)
+			Len = MaxLen;
 		BestClientVoice::WriteU16(vOut, (uint16_t)Len);
 		for(int i = 0; i < Len; i++)
 			vOut.push_back((uint8_t)pStr[i]);
@@ -698,6 +699,24 @@ void CVoiceChat::OnStateChange(int NewState, int OldState)
 
 void CVoiceChat::OnUpdate()
 {
+	if(m_pServerListTask && m_pServerListTask->State() == EHttpState::DONE)
+	{
+		FinishServerList();
+		ResetServerListTask();
+	}
+	else if(m_pServerListTask && (m_pServerListTask->State() == EHttpState::ERROR || m_pServerListTask->State() == EHttpState::ABORTED))
+	{
+		ResetServerListTask();
+	}
+
+	const bool Enabled = g_Config.m_BcVoiceChatEnable != 0;
+	if(!Enabled)
+	{
+		if(m_Socket)
+			StopVoice();
+		return;
+	}
+
 	const int64_t PerfStart = time_get();
 	const bool Online = Client()->State() == IClient::STATE_ONLINE;
 	EnsureDefaultVoiceServerAddress();
@@ -768,16 +787,6 @@ void CVoiceChat::OnUpdate()
 	const bool ServerChanged = str_comp(m_aLastServerAddr, EffectiveServerAddr.c_str()) != 0;
 	const bool DeviceChanged = m_LastInputDevice != g_Config.m_BcVoiceChatInputDevice || m_LastOutputDevice != g_Config.m_BcVoiceChatOutputDevice;
 
-	if(m_pServerListTask && m_pServerListTask->State() == EHttpState::DONE)
-	{
-		FinishServerList();
-		ResetServerListTask();
-	}
-	else if(m_pServerListTask && (m_pServerListTask->State() == EHttpState::ERROR || m_pServerListTask->State() == EHttpState::ABORTED))
-	{
-		ResetServerListTask();
-	}
-
 	if(Online && m_vServerEntries.empty() && !m_pServerListTask)
 	{
 		const int64_t Now = time_get();
@@ -789,14 +798,6 @@ void CVoiceChat::OnUpdate()
 	}
 
 	ProcessServerListPing();
-
-	const bool Enabled = g_Config.m_BcVoiceChatEnable != 0;
-	if(!Enabled)
-	{
-		if(m_Socket)
-			StopVoice();
-		return;
-	}
 
 	if(ServerChanged || DeviceChanged)
 	{
@@ -1580,7 +1581,7 @@ bool CVoiceChat::TryHandleChatCommand(const char *pLine)
 		g_Config.m_BcVoiceChatRadiusTiles = Tiles;
 		g_Config.m_BcVoiceChatRadiusEnabled = 1;
 		char aMsg[128];
-	str_format(aMsg, sizeof(aMsg), Localize("Voice radius: %s (%d tiles)"), Localize("On"), Tiles);
+		str_format(aMsg, sizeof(aMsg), Localize("Voice radius: %s (%d tiles)"), Localize("On"), Tiles);
 		GameClient()->m_Chat.Echo(aMsg);
 		return true;
 	}

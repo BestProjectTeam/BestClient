@@ -1,14 +1,14 @@
 /* Copyright © 2026 BestProject Team */
 #include "fgf_ki.h"
 
+#include "hookgrip.h"
+#include "own_tee.h"
+
 #include <base/math.h>
 
 #include <engine/shared/config.h>
 
-#include "hookgrip.h"
 #include <game/client/gameclient.h>
-
-#include "own_tee.h"
 #include <game/gamecore.h>
 
 #include <algorithm>
@@ -25,6 +25,7 @@ void CFgfKi::OnInit()
 
 void CFgfKi::OnReset()
 {
+	m_WasActive = false;
 	for(CCharge &Charge : m_aCharges)
 		Charge = CCharge();
 	m_Burst.Clear();
@@ -201,9 +202,11 @@ void CFgfKi::OnRender()
 
 	if(!g_Config.m_BcGatheredEnergy)
 	{
-		OnReset();
+		if(m_WasActive)
+			OnReset();
 		return;
 	}
+	m_WasActive = true;
 
 	const float Scale = g_Config.m_BcHookSize / 100.0f;
 	const float HookLimit = (float)(SERVER_TICK_SPEED + SERVER_TICK_SPEED / 5);
