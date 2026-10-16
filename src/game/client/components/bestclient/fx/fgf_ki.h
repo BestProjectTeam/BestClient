@@ -1,6 +1,8 @@
 /* Copyright © 2026 BestProject Team */
 #ifndef GAME_CLIENT_COMPONENTS_FGF_KI_H
 #define GAME_CLIENT_COMPONENTS_FGF_KI_H
+#include "fgf_glow.h"
+
 #include <base/color.h>
 #include <base/vmath.h>
 
@@ -8,7 +10,6 @@
 #include <engine/shared/protocol.h>
 
 #include <game/client/component.h>
-#include "fgf_glow.h"
 
 class CFgfKi : public CComponent
 {
@@ -54,6 +55,7 @@ private:
 	CCharge m_aCharges[MAX_CLIENTS];
 	CGlowParticles m_Burst;
 	float m_LastTime = 0.0f;
+	bool m_WasActive = false;
 
 	ColorRGBA Color(const CCharge &Charge, float Offset) const;
 	void Spawn(CCharge &Charge, float Scale);

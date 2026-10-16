@@ -29,47 +29,47 @@
 
 // components
 #include "components/background.h"
-#include "components/bestclient/bestclient.h" // bestclient
-#include "components/bestclient/config_presets.h" // bestclient
+#include "components/bestclient/3d_particles.h" // bestclient
 #include "components/bestclient/admin_panel.h" // bestclient
 #include "components/bestclient/aspect_ratio.h" // bestclient
-#include "components/bestclient/3d_particles.h" // bestclient
-#include "components/bestclient/jelly_tee.h" // bestclient
-#include "components/bestclient/gradient.h" // bestclient
-#include "components/bestclient/flying_name_plates.h" // bestclient
-#include "components/bestclient/quick_binds.h" // bestclient
-#include "components/bestclient/rollback_demo.h" // bestclient
-#include "components/bestclient/fast_actions.h" // bestclient
-#include "components/bestclient/snap_tap.h" // bestclient
-#include "components/bestclient/optimizer.h" // bestclient
-#include "components/bestclient/process_priority.h" // bestclient
-#include "components/bestclient/music_player.h" // bestclient
+#include "components/bestclient/bestclient.h" // bestclient
 #include "components/bestclient/browser_utils.h" // bestclient
+#include "components/bestclient/config_presets.h" // bestclient
+#include "components/bestclient/demo_tee_editor.h" // bestclient
+#include "components/bestclient/edgehelper.h" // bestclient
 #include "components/bestclient/ego_finished_maps.h" // bestclient
 #include "components/bestclient/ego_tiles_prediction.h" // bestclient
-#include "components/bestclient/edgehelper.h" // bestclient
+#include "components/bestclient/fast_actions.h" // bestclient
 #include "components/bestclient/fast_practice.h" // bestclient
-#include "components/bestclient/demo_tee_editor.h" // bestclient
 #include "components/bestclient/finish_prediction.h" // bestclient
+#include "components/bestclient/flying_name_plates.h" // bestclient
+#include "components/bestclient/gradient.h" // bestclient
+#include "components/bestclient/jelly_tee.h" // bestclient
 #include "components/bestclient/keystrokes.h" // bestclient
+#include "components/bestclient/music_player.h" // bestclient
+#include "components/bestclient/optimizer.h" // bestclient
+#include "components/bestclient/process_priority.h" // bestclient
+#include "components/bestclient/quick_binds.h" // bestclient
+#include "components/bestclient/rollback_demo.h" // bestclient
+#include "components/bestclient/snap_tap.h" // bestclient
 // bestclient
-#include "components/bestclient/weapon_vfx.h"
 #include "components/bestclient/fx/components.h"
+#include "components/bestclient/weapon_vfx.h"
 // bestclient
-#include "components/bestclient/hud_editor.h" // bestclient
-#include "components/bestclient/chat_bubbles.h" // bestclient
-#include "components/bestclient/physicball.h" // bestclient
 #include "components/bestclient/automargin.h" // bestclient
-#include "components/bestclient/cloud_input.h" // bestclient
+#include "components/bestclient/chat_bubbles.h" // bestclient
 #include "components/bestclient/chat_media.h" // bestclient
-#include "components/bestclient/cursor_trail.h" // bestclient
-#include "components/bestclient/ui_animations.h" // bestclient
-#include "components/bestclient/gif_bubbles.h" // bestclient
-#include "components/bestclient/spec_pause_radio.h" // bestclient
-#include "components/bestclient/show_points.h" // bestclient
 #include "components/bestclient/clientindicator/client_indicator.h" // bestclient
-#include "components/bestclient/voice/voice.h" // bestclient
+#include "components/bestclient/cloud_input.h" // bestclient
+#include "components/bestclient/cursor_trail.h" // bestclient
+#include "components/bestclient/gif_bubbles.h" // bestclient
+#include "components/bestclient/hud_editor.h" // bestclient
+#include "components/bestclient/physicball.h" // bestclient
+#include "components/bestclient/show_points.h" // bestclient
+#include "components/bestclient/spec_pause_radio.h" // bestclient
 #include "components/bestclient/twitch_chat.h" // bestclient
+#include "components/bestclient/ui_animations.h" // bestclient
+#include "components/bestclient/voice/voice.h" // bestclient
 // bestclient
 #include "components/bestclient/translate.h" // bestclient
 // bestclient
@@ -344,6 +344,17 @@ public:
 	CCustomCommunities m_CustomCommunities;
 	CMovingTiles m_MovingTilesBackground = CMovingTiles{false};
 	CMovingTiles m_MovingTilesForeground = CMovingTiles{true};
+
+	class CCompTiming
+	{
+	public:
+		const char *m_pName = nullptr;
+		int64_t m_UpdateTicks = 0;
+		int64_t m_RenderTicks = 0;
+	};
+
+	std::unordered_map<const class CComponent *, CCompTiming> m_mCompTiming;
+	int m_PerfFrames = 0;
 
 private:
 	std::vector<class CComponent *> m_vpAll;
@@ -1211,6 +1222,7 @@ public:
 	bool CheckNewInput() override;
 	std::optional<CServerInfo> m_ConnectServerInfo = std::nullopt;
 	void SetConnectInfo(const NETADDR *pAddress) override;
+	const char *GetComponentName(const CComponent *pComp) const;
 };
 
 ColorRGBA CalculateNameColor(ColorHSLA TextColorHSL);

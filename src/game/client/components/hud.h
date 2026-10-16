@@ -9,6 +9,7 @@
 #include <generated/protocol.h>
 
 #include <game/client/component.h>
+#include <game/client/render.h>
 #include <game/client/ui_rect.h> // bestclient
 
 struct SScoreInfo
@@ -82,11 +83,19 @@ class CHud : public CComponent
 	void RenderPlayerState(int ClientId);
 
 	int m_LastSpectatorCountTick;
+	bool m_FreezeInfoInitialized = false;
+	uint64_t m_CachedFreezeSkinRevision = 0;
+	CTeeRenderInfo m_CachedFreezeInfo;
+	int m_LastFps = -1;
+	float m_LastFpsWidth = -1.0f;
+	float m_PracticeLine1Width = -1.0f;
+	float m_PracticeLine2Width = -1.0f;
+	int m_LastMovementInfoTick = -1;
 	void RenderSpectatorCount(bool ForcePreview = false); // bestclient
 	void RenderDummyActions(bool ForcePreview = false); // bestclient
 	void RenderMovementInformation(bool ForcePreview = false); // bestclient
 
-	void UpdateMovementInformationTextContainer(STextContainerIndex &TextContainer, float FontSize, float Value, float &PrevValue);
+	void UpdateMovementInformationTextContainer(STextContainerIndex &TextContainer, float FontSize, float Value, float &PrevValue, bool AllowUpdate);
 	void RenderMovementInformationTextContainer(STextContainerIndex &TextContainer, const ColorRGBA &Color, float X, float Y);
 
 	class CMovementInformation

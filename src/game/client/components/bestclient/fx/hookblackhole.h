@@ -1,6 +1,9 @@
 /* Copyright © 2026 BestProject Team */
 #ifndef GAME_CLIENT_COMPONENTS_HOOKBLACKHOLE_H
 #define GAME_CLIENT_COMPONENTS_HOOKBLACKHOLE_H
+#include "fgf_glow.h"
+#include "hookgrip.h"
+
 #include <base/color.h>
 #include <base/vmath.h>
 
@@ -8,8 +11,6 @@
 #include <engine/shared/protocol.h>
 
 #include <game/client/component.h>
-#include "fgf_glow.h"
-#include "hookgrip.h"
 
 class CHookBlackHole : public CComponent
 {
@@ -51,6 +52,7 @@ private:
 	CGlowParticles m_Matter;
 	CGlowParticles m_Light;
 	float m_LastTime = 0.0f;
+	bool m_WasActive = false;
 
 	static CPalette Palette();
 	static float HorizonRadius(const CHookGripTracker::CGrip &Grip, float Scale);

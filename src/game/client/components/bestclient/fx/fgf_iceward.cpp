@@ -1,31 +1,32 @@
 /* Copyright © 2026 BestProject Team */
 #include "fgf_iceward.h"
 
+#include "hookgrip.h"
+#include "own_tee.h"
+
 #include <base/math.h>
 
 #include <engine/shared/config.h>
 
 #include <game/client/gameclient.h>
-
-#include "hookgrip.h"
-#include "own_tee.h"
 #include <game/collision.h>
 #include <game/mapitems.h>
 
 #include <algorithm>
 #include <cmath>
 
-namespace {
-bool IsFreeze(int Tile)
+namespace
 {
-	return Tile == TILE_FREEZE || Tile == TILE_DFREEZE || Tile == TILE_LFREEZE;
-}
+	bool IsFreeze(int Tile)
+	{
+		return Tile == TILE_FREEZE || Tile == TILE_DFREEZE || Tile == TILE_LFREEZE;
+	}
 
-float Noise(float Seed)
-{
-	const float x = std::sin(Seed * 12.9898f + 78.233f) * 43758.5453f;
-	return x - std::floor(x);
-}
+	float Noise(float Seed)
+	{
+		const float x = std::sin(Seed * 12.9898f + 78.233f) * 43758.5453f;
+		return x - std::floor(x);
+	}
 }
 
 static float WardSparks() { return g_Config.m_BcFreezePullSparks / 100.0f; }
@@ -39,6 +40,7 @@ void CFgfIceWard::OnInit()
 
 void CFgfIceWard::OnReset()
 {
+	m_WasActive = false;
 	for(CWard &Ward : m_aWards)
 		Ward = CWard();
 	for(int &Num : m_aNumStrands)
@@ -273,9 +275,11 @@ void CFgfIceWard::OnRender()
 
 	if(!g_Config.m_BcFreezePull)
 	{
-		OnReset();
+		if(m_WasActive)
+			OnReset();
 		return;
 	}
+	m_WasActive = true;
 
 	const float Reach = (float)g_Config.m_BcFreezePullRange;
 	const ColorRGBA Color = g_Config.m_BcFreezePullHookColor ? FgfThemeColor() : color_cast<ColorRGBA>(ColorHSLA(g_Config.m_BcFreezePullColor));

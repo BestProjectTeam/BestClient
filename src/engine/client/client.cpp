@@ -3551,7 +3551,21 @@ void CClient::Run()
 				m_EditorActive = false;
 			}
 
+			if(!g_Config.m_Debug && m_ClientPerfFrames > 0)
+			{
+				m_AccUpdateNs = 0;
+				m_AccRenderNs = 0;
+				m_AccSwapNs = 0;
+				m_ClientPerfFrames = 0;
+			}
+
+			int64_t TimeUp0 = g_Config.m_Debug ? time_get_nanoseconds().count() : 0;
 			Update();
+			if(g_Config.m_Debug)
+			{
+				int64_t TimeUp1 = time_get_nanoseconds().count();
+				m_AccUpdateNs += (TimeUp1 - TimeUp0);
+			}
 			int64_t Now = time_get();
 
 			bool IsRenderActive = (g_Config.m_GfxBackgroundRender || m_pGraphics->WindowOpen());
@@ -3614,8 +3628,30 @@ void CClient::Run()
 					NextRenderTime = std::max(NextRenderTime + time_freq() / GfxRefreshRate, Now);
 				m_LastRenderTime = Now;
 
+				int64_t TimeRender0 = g_Config.m_Debug ? time_get_nanoseconds().count() : 0;
 				Render();
+				int64_t TimeRender1 = g_Config.m_Debug ? time_get_nanoseconds().count() : 0;
 				m_pGraphics->Swap();
+				if(g_Config.m_Debug)
+				{
+					int64_t TimeRender2 = time_get_nanoseconds().count();
+					m_AccRenderNs += (TimeRender1 - TimeRender0);
+					m_AccSwapNs += (TimeRender2 - TimeRender1);
+					m_ClientPerfFrames++;
+					if(m_ClientPerfFrames >= 120)
+					{
+						double AvgUpUs = (m_AccUpdateNs / 1000.0) / m_ClientPerfFrames;
+						double AvgRnUs = (m_AccRenderNs / 1000.0) / m_ClientPerfFrames;
+						double AvgSwUs = (m_AccSwapNs / 1000.0) / m_ClientPerfFrames;
+						double AvgTotUs = AvgUpUs + AvgRnUs + AvgSwUs;
+						log_info("perf", "[FRAME] avg: Update=%6.1f us | Render=%6.1f us | Swap=%6.1f us | Total=%6.1f us (%.1f FPS)",
+							AvgUpUs, AvgRnUs, AvgSwUs, AvgTotUs, AvgTotUs > 0 ? (1000000.0 / AvgTotUs) : 0.0);
+						m_AccUpdateNs = 0;
+						m_AccRenderNs = 0;
+						m_AccSwapNs = 0;
+						m_ClientPerfFrames = 0;
+					}
+				}
 			}
 
 			// Wake up for the next update or frame, whichever comes first. While playing, also wake up for

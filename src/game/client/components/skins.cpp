@@ -543,14 +543,15 @@ void CSkins::OnShutdown()
 		}
 	}
 	m_Skins.clear();
+	m_HasPendingFinishedSkins = false;
 }
 
 void CSkins::OnUpdate()
 {
-	// Only update skins periodically to reduce FPS impact
+	// Only update skins periodically to reduce FPS impact, unless we have finished skins pending GPU upload
 	const std::chrono::nanoseconds StartTime = time_get_nanoseconds();
-	const std::chrono::nanoseconds MaxTime = std::chrono::milliseconds(std::clamp(round_to_int(Client()->RenderFrameTime() * 50000.0f), 25, 500));
-	if(m_ContainerUpdateTime.has_value() && StartTime - m_ContainerUpdateTime.value() < MaxTime)
+	constexpr std::chrono::nanoseconds PeriodicInterval = std::chrono::milliseconds(50);
+	if(!m_HasPendingFinishedSkins && m_ContainerUpdateTime.has_value() && StartTime - m_ContainerUpdateTime.value() < PeriodicInterval)
 	{
 		return;
 	}
@@ -568,7 +569,7 @@ void CSkins::OnUpdate()
 	CSkinLoadingStats Stats = LoadingStats();
 	UpdateUnloadSkins(Stats);
 	UpdateStartLoading(Stats);
-	UpdateFinishLoading(Stats, StartTime, MaxTime);
+	UpdateFinishLoading(Stats, StartTime, std::chrono::microseconds(1500));
 }
 
 void CSkins::UpdateUnloadSkins(CSkinLoadingStats &Stats)
@@ -606,6 +607,7 @@ void CSkins::UpdateUnloadSkins(CSkinLoadingStats &Stats)
 			pSkinContainer->m_pSkin->m_OriginalSkin.Unload(Graphics());
 			pSkinContainer->m_pSkin->m_ColorableSkin.Unload(Graphics());
 			pSkinContainer->m_pSkin = nullptr;
+			m_Revision++;
 			Stats.m_NumLoaded--;
 		}
 		else
@@ -660,6 +662,9 @@ void CSkins::UpdateStartLoading(CSkinLoadingStats &Stats)
 
 void CSkins::UpdateFinishLoading(CSkinLoadingStats &Stats, std::chrono::nanoseconds StartTime, std::chrono::nanoseconds MaxTime)
 {
+	m_HasPendingFinishedSkins = false;
+	size_t LoadedThisFrame = 0;
+
 	for(auto &[_, pSkinContainer] : m_Skins)
 	{
 		if(Stats.m_NumLoading == 0)
@@ -675,6 +680,13 @@ void CSkins::UpdateFinishLoading(CSkinLoadingStats &Stats, std::chrono::nanoseco
 		{
 			continue;
 		}
+
+		if(LoadedThisFrame >= 1 || time_get_nanoseconds() - StartTime >= MaxTime)
+		{
+			m_HasPendingFinishedSkins = true;
+			break;
+		}
+
 		Stats.m_NumLoading--;
 		if(pSkinContainer->m_pLoadJob->State() == IJob::STATE_DONE && pSkinContainer->m_pLoadJob->m_Data.m_Info.m_pData)
 		{
@@ -684,14 +696,11 @@ void CSkins::UpdateFinishLoading(CSkinLoadingStats &Stats, std::chrono::nanoseco
 				m_LocalSkinListNeedsUpdate = true;
 			}
 			LoadSkinFinish(pSkinContainer.get(), pSkinContainer->m_pLoadJob->m_Data);
+			m_Revision++;
 			GameClient()->OnSkinUpdate(pSkinContainer->Name());
 			pSkinContainer->m_pLoadJob = nullptr;
 			Stats.m_NumLoaded++;
-			if(time_get_nanoseconds() - StartTime >= MaxTime)
-			{
-				// Avoid using too much frame time for loading skins
-				break;
-			}
+			LoadedThisFrame++;
 		}
 		else
 		{
@@ -721,10 +730,12 @@ void CSkins::RefreshEventSkins()
 			str_copy(m_aEventSkinPrefix, "santa");
 		}
 	}
+	m_Revision++;
 }
 
 void CSkins::Refresh(TSkinLoadedCallback &&SkinLoadedCallback)
 {
+	m_Revision++;
 	for(auto &[_, pSkinContainer] : m_Skins)
 	{
 		if(pSkinContainer->m_pLoadJob)
@@ -820,7 +831,7 @@ CSkins::CSkinList &CSkins::SkinList()
 		// Don't include skins in the list that couldn't be found in the database except the current player
 		// and dummy skins to avoid showing a lot of not-found entries while the user is typing a skin name.
 		if((pSkinContainer->m_State == CSkinContainer::EState::NOT_FOUND ||
-			(g_Config.m_ClVanillaSkinsOnly && !pSkinContainer->m_Vanilla)) &&
+			   (g_Config.m_ClVanillaSkinsOnly && !pSkinContainer->m_Vanilla)) &&
 			!pSkinContainer->IsSpecial() &&
 			!SelectedMain &&
 			!SelectedDummy &&

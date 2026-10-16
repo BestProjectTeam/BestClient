@@ -1,6 +1,8 @@
 /* Copyright © 2026 BestProject Team */
 #include "lightning.h"
 
+#include "own_tee.h"
+
 #include <base/math.h>
 
 #include <engine/shared/config.h>
@@ -9,8 +11,6 @@
 
 #include <game/client/components/particles.h>
 #include <game/client/gameclient.h>
-
-#include "own_tee.h"
 
 #include <algorithm>
 #include <cmath>
@@ -349,6 +349,9 @@ void CLightning::OnRender()
 	const float Time = LocalTime();
 	const float Passed = std::clamp(Time - m_LastTime, 0.0f, 0.1f) * GameClient()->GetAnimationPlaybackSpeed();
 	m_LastTime = Time;
+
+	if(m_NumBolts == 0 && !m_Glow.HasAny())
+		return;
 
 	const CPalette CurrentPalette = Palette();
 

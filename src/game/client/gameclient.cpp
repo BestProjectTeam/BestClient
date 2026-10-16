@@ -83,9 +83,12 @@
 #include <game/teamscore.h>
 #include <game/version.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <limits>
+#include <unordered_map>
+#include <vector>
 
 using namespace std::chrono_literals;
 
@@ -567,11 +570,14 @@ void CGameClient::OnUpdate()
 
 	// handle touch events
 	std::vector<IInput::CTouchFingerState> vTouchFingerStates = Input()->TouchFingerStates();
-	for(auto &pComponent : m_vpInput)
+	if(!vTouchFingerStates.empty())
 	{
-		if(pComponent->OnTouchState(vTouchFingerStates))
+		for(auto &pComponent : m_vpInput)
 		{
-			Input()->ClearTouchDeltas();
+			if(pComponent->OnTouchState(vTouchFingerStates))
+			{
+				Input()->ClearTouchDeltas();
+			}
 		}
 	}
 
@@ -588,7 +594,14 @@ void CGameClient::OnUpdate()
 
 	for(auto &pComponent : m_vpAll)
 	{
+		int64_t TimeStart = g_Config.m_Debug ? time_get_nanoseconds().count() : 0;
 		pComponent->OnUpdate();
+		if(g_Config.m_Debug)
+		{
+			int64_t TimeDelta = time_get_nanoseconds().count() - TimeStart;
+			m_mCompTiming[pComponent].m_UpdateTicks += TimeDelta;
+			m_mCompTiming[pComponent].m_pName = GetComponentName(pComponent);
+		}
 	}
 
 	m_LocalServer.Update();
@@ -947,10 +960,46 @@ void CGameClient::OnRender()
 	// render all systems
 	for(auto &pComponent : m_vpAll)
 	{
+		int64_t TimeStart = g_Config.m_Debug ? time_get_nanoseconds().count() : 0;
 		// bestclient
 		m_AspectRatio.PrepareComponent(pComponent);
 		// bestclient
 		pComponent->OnRender();
+		if(g_Config.m_Debug)
+		{
+			int64_t TimeDelta = time_get_nanoseconds().count() - TimeStart;
+			m_mCompTiming[pComponent].m_RenderTicks += TimeDelta;
+			m_mCompTiming[pComponent].m_pName = GetComponentName(pComponent);
+		}
+	}
+
+	if(g_Config.m_Debug)
+	{
+		m_PerfFrames++;
+		if(m_PerfFrames >= 120)
+		{
+			std::vector<CCompTiming> vCompTimings;
+			for(const auto &Pair : m_mCompTiming)
+				vCompTimings.push_back(Pair.second);
+			std::sort(vCompTimings.begin(), vCompTimings.end(), [](const CCompTiming &a, const CCompTiming &b) {
+				return (a.m_RenderTicks + a.m_UpdateTicks) > (b.m_RenderTicks + b.m_UpdateTicks);
+			});
+			log_info("perf", "=== COMPONENT BREAKDOWN (avg us/frame over 120 frames) ===");
+			for(size_t Index = 0; Index < std::min((size_t)10, vCompTimings.size()); Index++)
+			{
+				double AvgRenderUs = (vCompTimings[Index].m_RenderTicks / 1000.0) / m_PerfFrames;
+				double AvgUpdateUs = (vCompTimings[Index].m_UpdateTicks / 1000.0) / m_PerfFrames;
+				log_info("perf", "  #%zu: %-25s | Render: %6.1f us | Update: %6.1f us | Total: %6.1f us",
+					Index + 1, vCompTimings[Index].m_pName ? vCompTimings[Index].m_pName : "Unknown", AvgRenderUs, AvgUpdateUs, AvgRenderUs + AvgUpdateUs);
+			}
+			m_mCompTiming.clear();
+			m_PerfFrames = 0;
+		}
+	}
+	else if(m_PerfFrames > 0)
+	{
+		m_mCompTiming.clear();
+		m_PerfFrames = 0;
 	}
 
 	// bestclient
@@ -3008,6 +3057,8 @@ void CGameClient::OnPredict()
 	vec2 aBeforeRender[MAX_CLIENTS];
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
+		if(!m_Snap.m_aCharacters[i].m_Active || i == m_Snap.m_LocalClientId || !m_aLastActive[i])
+			continue;
 		if(CloudInputMode)
 			aBeforeRender[i] = mix(m_aClients[i].m_PrevPredicted.m_Pos, m_aClients[i].m_Predicted.m_Pos, Client()->PredIntraGameTick(g_Config.m_ClDummy));
 		else
@@ -5882,4 +5933,239 @@ void CGameClient::SetConnectInfo(const NETADDR *pAddress)
 	m_ConnectServerInfo = pEntry->m_Info;
 	const CNetObj_GameInfoEx GameInfoEx = {.m_Version = 0};
 	m_GameInfo = GetGameInfo(&GameInfoEx, 0, &*m_ConnectServerInfo);
+}
+
+const char *CGameClient::GetComponentName(const CComponent *pComp) const
+{
+	if(pComp == &m_Skins)
+		return "Skins";
+	if(pComp == &m_Skins7)
+		return "Skins7";
+	if(pComp == &m_CountryFlags)
+		return "CountryFlags";
+	if(pComp == &m_MapImages)
+		return "MapImages";
+	if(pComp == &m_Effects)
+		return "Effects";
+	if(pComp == &m_SkinProfiles)
+		return "SkinProfiles";
+	if(pComp == &m_Binds)
+		return "Binds";
+	if(pComp == &m_Controls)
+		return "Controls";
+	if(pComp == &m_Camera)
+		return "Camera";
+	if(pComp == &m_Sounds)
+		return "Sounds";
+	if(pComp == &m_Voting)
+		return "Voting";
+	if(pComp == &m_Particles)
+		return "Particles";
+	if(pComp == &m_RaceDemo)
+		return "RaceDemo";
+	if(pComp == &m_Rainbow)
+		return "Rainbow";
+	if(pComp == &m_MapSounds)
+		return "MapSounds";
+	if(pComp == &m_Censor)
+		return "Censor";
+	if(pComp == &m_Background)
+		return "Background";
+	if(pComp == &m_MapLayersBackground)
+		return "MapLayersBackground";
+	if(pComp == &m_BgDraw)
+		return "BgDraw";
+	if(pComp == &m_Particles.m_RenderTrail)
+		return "Particles.RenderTrail";
+	if(pComp == &m_Particles.m_RenderTrailExtra)
+		return "Particles.RenderTrailExtra";
+	if(pComp == &m_Items)
+		return "Items";
+	if(pComp == &m_Trails)
+		return "Trails";
+	if(pComp == &m_3DParticles)
+		return "3DParticles";
+	if(pComp == &m_Ghost)
+		return "Ghost";
+	if(pComp == &m_TClient)
+		return "TClient";
+	if(pComp == &m_JellyTee)
+		return "JellyTee";
+	if(pComp == &m_BcGradient)
+		return "BcGradient";
+	if(pComp == &m_FlyingNamePlates)
+		return "FlyingNamePlates";
+	if(pComp == &m_Players)
+		return "Players";
+	if(pComp == &m_MovingTilesBackground)
+		return "MovingTilesBg";
+	if(pComp == &m_CloudInput)
+		return "CloudInput";
+	if(pComp == &m_FastPractice)
+		return "FastPractice";
+	if(pComp == &m_BcAutoMargin)
+		return "BcAutoMargin";
+	if(pComp == &m_MapLayersForeground)
+		return "MapLayersForeground";
+	if(pComp == &m_MovingTilesForeground)
+		return "MovingTilesFg";
+	if(pComp == &m_Outlines)
+		return "Outlines";
+	if(pComp == &m_Mumble)
+		return "Mumble";
+	if(pComp == &m_Pet)
+		return "Pet";
+	if(pComp == &m_FgfWeather)
+		return "FgfWeather";
+	if(pComp == &m_Lightning)
+		return "Lightning";
+	if(pComp == &m_HookWind)
+		return "HookWind";
+	if(pComp == &m_HookBlackHole)
+		return "HookBlackHole";
+	if(pComp == &m_HookMagic)
+		return "HookMagic";
+	if(pComp == &m_HookRainbow)
+		return "HookRainbow";
+	if(pComp == &m_HookLightning)
+		return "HookLightning";
+	if(pComp == &m_HookTentacle)
+		return "HookTentacle";
+	if(pComp == &m_HookFire)
+		return "HookFire";
+	if(pComp == &m_HookTroll)
+		return "HookTroll";
+	if(pComp == &m_HookRope)
+		return "HookRope";
+	if(pComp == &m_FgfActions)
+		return "FgfActions";
+	if(pComp == &m_FgfKi)
+		return "FgfKi";
+	if(pComp == &m_FgfIceWard)
+		return "FgfIceWard";
+	if(pComp == &m_WeaponVfx)
+		return "WeaponVfx";
+	if(pComp == &m_Particles.m_RenderExplosions)
+		return "Particles.RenderExplosions";
+	if(pComp == &m_NamePlates)
+		return "NamePlates";
+	if(pComp == &m_GifBubbles)
+		return "GifBubbles";
+	if(pComp == &m_ChatBubbles)
+		return "ChatBubbles";
+	if(pComp == &m_PhysicBalls)
+		return "PhysicBalls";
+	if(pComp == &m_ChatMedia)
+		return "ChatMedia";
+	if(pComp == &m_CursorTrail)
+		return "CursorTrail";
+	if(pComp == &m_BcUiAnimations)
+		return "BcUiAnimations";
+	if(pComp == &m_Particles.m_RenderExtra)
+		return "Particles.RenderExtra";
+	if(pComp == &m_Particles.m_RenderGeneral)
+		return "Particles.RenderGeneral";
+	if(pComp == &m_FreezeBars)
+		return "FreezeBars";
+	if(pComp == &m_DamageInd)
+		return "DamageInd";
+	if(pComp == &m_PlayerIndicator)
+		return "PlayerIndicator";
+	if(pComp == &m_Mod)
+		return "Mod";
+	if(pComp == &m_CustomCommunities)
+		return "CustomCommunities";
+	if(pComp == &m_MusicPlayer)
+		return "MusicPlayer";
+	if(pComp == &m_BrowserUtils)
+		return "BrowserUtils";
+	if(pComp == &m_TwitchChat)
+		return "TwitchChat";
+	if(pComp == &m_EgoFinishedMaps)
+		return "EgoFinishedMaps";
+	if(pComp == &m_ShowPoints)
+		return "ShowPoints";
+	if(pComp == &m_ClientIndicator)
+		return "ClientIndicator";
+	if(pComp == &m_VoiceChat)
+		return "VoiceChat";
+	if(pComp == &m_Hud)
+		return "Hud";
+	if(pComp == &m_BestClient)
+		return "BestClient";
+	if(pComp == &m_BcConfigPresets)
+		return "BcConfigPresets";
+	if(pComp == &m_Translate)
+		return "Translate";
+	if(pComp == &m_EgoTilesPrediction)
+		return "EgoTilesPrediction";
+	if(pComp == &m_QuickBinds)
+		return "QuickBinds";
+	if(pComp == &m_RollbackDemo)
+		return "RollbackDemo";
+	if(pComp == &m_Spectator)
+		return "Spectator";
+	if(pComp == &m_Emoticon)
+		return "Emoticon";
+	if(pComp == &m_SpecPauseRadio)
+		return "SpecPauseRadio";
+	if(pComp == &m_BindChat)
+		return "BindChat";
+	if(pComp == &m_BindWheel)
+		return "BindWheel";
+	if(pComp == &m_FastActions)
+		return "FastActions";
+	if(pComp == &m_SnapTap)
+		return "SnapTap";
+	if(pComp == &m_Optimizer)
+		return "Optimizer";
+	if(pComp == &m_ProcessPriority)
+		return "ProcessPriority";
+	if(pComp == &m_WarList)
+		return "WarList";
+	if(pComp == &m_StatusBar)
+		return "StatusBar";
+	if(pComp == &m_InfoMessages)
+		return "InfoMessages";
+	if(pComp == &m_Chat)
+		return "Chat";
+	if(pComp == &m_Broadcast)
+		return "Broadcast";
+	if(pComp == &m_ImportantAlert)
+		return "ImportantAlert";
+	if(pComp == &m_DebugHud)
+		return "DebugHud";
+	if(pComp == &m_TouchControls)
+		return "TouchControls";
+	if(pComp == &m_EdgeHelper)
+		return "EdgeHelper";
+	if(pComp == &m_FinishPrediction)
+		return "FinishPrediction";
+	if(pComp == &m_Keystrokes)
+		return "Keystrokes";
+	if(pComp == &m_Scoreboard)
+		return "Scoreboard";
+	if(pComp == &m_Statboard)
+		return "Statboard";
+	if(pComp == &m_Motd)
+		return "Motd";
+	if(pComp == &m_AdminPanel)
+		return "AdminPanel";
+	if(pComp == &m_AspectRatio)
+		return "AspectRatio";
+	if(pComp == &m_Menus)
+		return "Menus";
+	if(pComp == &m_Tooltips)
+		return "Tooltips";
+	if(pComp == &m_Scripting)
+		return "Scripting";
+	if(pComp == &m_KeyBinder)
+		return "KeyBinder";
+	if(pComp == &m_GameConsole)
+		return "GameConsole";
+	if(pComp == &m_MenuBackground)
+		return "MenuBackground";
+	if(pComp == &m_HudEditor)
+		return "HudEditor";
+	return "Unknown";
 }

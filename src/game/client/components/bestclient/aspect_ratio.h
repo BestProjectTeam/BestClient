@@ -8,33 +8,35 @@
 
 class CAspectRatio : public CComponent
 {
-	struct SConfig
+	class CAspectConfig
 	{
+	public:
 		int m_Mode = 0;
 		int m_Ratio = 0;
 		int m_ApplyMode = 1;
 		int m_Num = 0;
 		int m_Den = 0;
 
-		bool operator==(const SConfig &Other) const
+		bool operator==(const CAspectConfig &Other) const
 		{
 			return m_Mode == Other.m_Mode && m_Ratio == Other.m_Ratio && m_ApplyMode == Other.m_ApplyMode &&
-				m_Num == Other.m_Num && m_Den == Other.m_Den;
+			       m_Num == Other.m_Num && m_Den == Other.m_Den;
 		}
-		bool operator!=(const SConfig &Other) const { return !(*this == Other); }
+		bool operator!=(const CAspectConfig &Other) const { return !(*this == Other); }
 	};
 
 	bool m_ConfirmSeeded = false;
 	bool m_ConfirmActive = false;
 	int64_t m_ConfirmDeadline = 0;
-	SConfig m_Prev;
-	SConfig m_Last;
+	CAspectConfig m_Prev;
+	CAspectConfig m_Last;
 	bool m_HudAspectDisabled = false;
 	bool m_MusicPlayerAspectDisabled = false;
+	bool m_CachedUseGameNoHudAspect = false;
 	bool m_MenuRestoreGraphicsAspect = true;
 
-	static SConfig ReadConfig();
-	static bool ConfirmNeeded(const SConfig &Cfg);
+	static CAspectConfig ReadConfig();
+	static bool ConfirmNeeded(const CAspectConfig &Cfg);
 	void ResetToPrevious();
 
 public:

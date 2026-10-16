@@ -1,31 +1,32 @@
 /* Copyright © 2026 BestProject Team */
 #include "music_player.h"
-#include "music_player_lyrics.h"
 
+#include "music_player_lyrics.h"
 #include "visualizer/analyzer.h"
 #include "visualizer/service.h"
 #include "visualizer/source_priority.h"
 
 #include <base/color.h>
-#include <base/math.h>
 #include <base/dbg.h>
+#include <base/math.h>
 #include <base/str.h>
 #include <base/time.h>
 
 #include <engine/engine.h>
+#include <engine/external/readerwriterqueue/ReaderWriterQueue.h>
 #include <engine/font_icons.h>
 #include <engine/graphics.h>
-#include <engine/shared/config.h>
 #include <engine/http.h>
+#include <engine/shared/config.h>
 #include <engine/shared/jobs.h>
 #include <engine/storage.h>
 #include <engine/textrender.h>
 
 #include <generated/client_data.h>
 
+#include <game/client/bc_ui_animations.h>
 #include <game/client/components/bestclient/media_decoder.h>
 #include <game/client/components/hud_layout.h>
-#include <game/client/bc_ui_animations.h>
 #include <game/client/gameclient.h>
 #include <game/client/ui.h>
 #include <game/localization.h>
@@ -1412,11 +1413,45 @@ namespace
 		return Text;
 	}
 
+	class CMusicPlayerTextWidthCacheEntry
+	{
+	public:
+		std::string m_Text;
+		float m_FontSize = -1.0f;
+		float m_Width = 0.0f;
+	};
+	static constexpr size_t MUSIC_PLAYER_TEXT_CACHE_SIZE = 64;
+	static CMusicPlayerTextWidthCacheEntry s_aMusicPlayerTextWidthCache[MUSIC_PLAYER_TEXT_CACHE_SIZE];
+
+	static void InvalidateMusicPlayerTextWidthCache()
+	{
+		for(auto &Entry : s_aMusicPlayerTextWidthCache)
+		{
+			Entry.m_FontSize = -1.0f;
+			Entry.m_Text.clear();
+			Entry.m_Width = 0.0f;
+		}
+	}
+
 	static float ComputeMusicPlayerTextWidth(ITextRender *pTextRender, const std::string &Text, float FontSize)
 	{
 		if(pTextRender == nullptr)
 			return FontSize * 5.0f;
-		return pTextRender->TextWidth(FontSize, Text.c_str(), -1, -1.0f);
+		if(Text.empty())
+			return 0.0f;
+
+		size_t Hash = std::hash<std::string>{}(Text);
+		Hash ^= std::hash<float>{}(FontSize) + 0x9e3779b9 + (Hash << 6) + (Hash >> 2);
+		size_t Index = Hash % MUSIC_PLAYER_TEXT_CACHE_SIZE;
+
+		if(s_aMusicPlayerTextWidthCache[Index].m_FontSize == FontSize && s_aMusicPlayerTextWidthCache[Index].m_Text == Text)
+			return s_aMusicPlayerTextWidthCache[Index].m_Width;
+
+		float Width = pTextRender->TextWidth(FontSize, Text.c_str(), -1, -1.0f);
+		s_aMusicPlayerTextWidthCache[Index].m_Text = Text;
+		s_aMusicPlayerTextWidthCache[Index].m_FontSize = FontSize;
+		s_aMusicPlayerTextWidthCache[Index].m_Width = Width;
+		return Width;
 	}
 
 	static float LyricsBelowTimerFont(float Scale, float TextScale)
@@ -1692,24 +1727,6 @@ namespace
 		StableTimer.m_Valid = true;
 		StableTimer.m_Text = "8:88:88";
 		return ComputeMiniTextSlotWidth(pTextRender, SNowPlayingSnapshot(), StableTimer, TitleFont, Scale, WidthScale, false);
-	}
-
-	static float ComputeCompactTextSlotWidth(ITextRender *pTextRender, const SGameTimerDisplay &GameTimer, float TitleFont, float Scale, float WidthScale, bool LyricsEnabled)
-	{
-		if(LyricsEnabled)
-			return CMusicPlayerLyrics::LyricsTextSlotWidth(Scale, WidthScale);
-
-		if(pTextRender == nullptr)
-			return 28.8f * Scale * WidthScale;
-
-		std::string Reference = "88:88";
-		if(GameTimer.m_Valid && !GameTimer.m_Text.empty())
-			Reference = MusicPlayerReferenceDigits(GameTimer.m_Text);
-
-		const bool WideTimer = Reference.size() > 5;
-		const float TextWidth = pTextRender->TextWidth(TitleFont, Reference.c_str(), -1, -1.0f);
-		const float Padding = (WideTimer ? 4.2f : 5.4f) * Scale * WidthScale;
-		return TextWidth + Padding;
 	}
 
 	static float EaseInOutCubic(float t)
@@ -2579,286 +2596,399 @@ public:
 	SMediaDecodedFrames &DecodedFrames() { return m_DecodedFrames; }
 };
 
-	struct SVisualizerLevelInput
-	{
-		bool m_Valid = false;
-		EMusicPlaybackState m_PlaybackState = EMusicPlaybackState::STOPPED;
-		bool m_HasVisualizer = false;
-		BestClientVisualizer::SVisualizerFrame m_Visualizer;
-		int64_t m_DurationMs = 0;
-		int64_t m_PositionMs = 0;
-		std::string m_ServiceId;
-		std::string m_Title;
-		std::string m_Artist;
-		int m_RequestedBars = 2;
-		float m_TimeSeconds = 0.0f;
-	};
+struct SVisualizerLevelInput
+{
+	bool m_Valid = false;
+	EMusicPlaybackState m_PlaybackState = EMusicPlaybackState::STOPPED;
+	bool m_HasVisualizer = false;
+	BestClientVisualizer::SVisualizerFrame m_Visualizer;
+	int64_t m_DurationMs = 0;
+	int64_t m_PositionMs = 0;
+	std::string m_ServiceId;
+	std::string m_Title;
+	std::string m_Artist;
+	int m_RequestedBars = 2;
+	float m_TimeSeconds = 0.0f;
+};
 
-	void AdvanceVisualizerLevels(std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> &aLevels, const SVisualizerLevelInput &Input, float Delta)
-	{
-		const int RequestedBars = std::clamp(Input.m_RequestedBars, 2, MUSIC_PLAYER_MAX_VISUALIZER_BARS);
-		SNowPlayingSnapshot Snapshot;
-		Snapshot.m_Valid = Input.m_Valid;
-		Snapshot.m_PlaybackState = Input.m_PlaybackState;
-		Snapshot.m_HasVisualizer = Input.m_HasVisualizer;
-		Snapshot.m_Visualizer = Input.m_Visualizer;
-		Snapshot.m_DurationMs = Input.m_DurationMs;
-		Snapshot.m_PositionMs = Input.m_PositionMs;
-		Snapshot.m_ServiceId = Input.m_ServiceId;
-		Snapshot.m_Title = Input.m_Title;
-		Snapshot.m_Artist = Input.m_Artist;
+void AdvanceVisualizerLevels(std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> &aLevels, const SVisualizerLevelInput &Input, float Delta)
+{
+	const int RequestedBars = std::clamp(Input.m_RequestedBars, 2, MUSIC_PLAYER_MAX_VISUALIZER_BARS);
+	SNowPlayingSnapshot Snapshot;
+	Snapshot.m_Valid = Input.m_Valid;
+	Snapshot.m_PlaybackState = Input.m_PlaybackState;
+	Snapshot.m_HasVisualizer = Input.m_HasVisualizer;
+	Snapshot.m_Visualizer = Input.m_Visualizer;
+	Snapshot.m_DurationMs = Input.m_DurationMs;
+	Snapshot.m_PositionMs = Input.m_PositionMs;
+	Snapshot.m_ServiceId = Input.m_ServiceId;
+	Snapshot.m_Title = Input.m_Title;
+	Snapshot.m_Artist = Input.m_Artist;
 
-		const float Smoothing = 0.5f;
-		const float FallbackReleaseSpeed = mix(18.0f, 7.5f, Smoothing);
-		const bool UseRealtimeVisualizer =
-			Snapshot.m_PlaybackState == EMusicPlaybackState::PLAYING &&
-			Snapshot.m_HasVisualizer &&
-			Snapshot.m_Visualizer.m_BackendStatus == BestClientVisualizer::EVisualizerBackendStatus::LIVE;
-		if(UseRealtimeVisualizer)
+	const float Smoothing = 0.5f;
+	const float FallbackReleaseSpeed = mix(18.0f, 7.5f, Smoothing);
+	const bool UseRealtimeVisualizer =
+		Snapshot.m_PlaybackState == EMusicPlaybackState::PLAYING &&
+		Snapshot.m_HasVisualizer &&
+		Snapshot.m_Visualizer.m_BackendStatus == BestClientVisualizer::EVisualizerBackendStatus::LIVE;
+	if(UseRealtimeVisualizer)
+	{
+		std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> aTarget{};
+		BestClientVisualizer::BuildRenderBars(Snapshot.m_Visualizer, aTarget.data(), RequestedBars);
+
+		std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> aShaped{};
+		for(int i = 0; i < RequestedBars; ++i)
 		{
-			std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> aTarget{};
-			BestClientVisualizer::BuildRenderBars(Snapshot.m_Visualizer, aTarget.data(), RequestedBars);
+			const float Prev = i > 0 ? aTarget[i - 1] : aTarget[i];
+			const float Next = i + 1 < RequestedBars ? aTarget[i + 1] : aTarget[i];
+			aShaped[i] = std::clamp(Prev * 0.02f + aTarget[i] * 0.96f + Next * 0.02f, 0.0f, 1.0f);
+		}
 
-			std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> aShaped{};
+		float LevelMin = 1.0f;
+		float LevelMax = 0.0f;
+		for(int i = 0; i < RequestedBars; ++i)
+		{
+			LevelMin = std::min(LevelMin, aShaped[i]);
+			LevelMax = std::max(LevelMax, aShaped[i]);
+		}
+		const float LevelRange = LevelMax - LevelMin;
+		if(LevelRange > 0.02f)
+		{
 			for(int i = 0; i < RequestedBars; ++i)
 			{
-				const float Prev = i > 0 ? aTarget[i - 1] : aTarget[i];
-				const float Next = i + 1 < RequestedBars ? aTarget[i + 1] : aTarget[i];
-				aShaped[i] = std::clamp(Prev * 0.02f + aTarget[i] * 0.96f + Next * 0.02f, 0.0f, 1.0f);
+				const float T = (aShaped[i] - LevelMin) / LevelRange;
+				aShaped[i] = std::clamp(0.18f + T * 0.82f, 0.0f, 1.0f);
 			}
-
-			float LevelMin = 1.0f;
-			float LevelMax = 0.0f;
-			for(int i = 0; i < RequestedBars; ++i)
-			{
-				LevelMin = std::min(LevelMin, aShaped[i]);
-				LevelMax = std::max(LevelMax, aShaped[i]);
-			}
-			const float LevelRange = LevelMax - LevelMin;
-			if(LevelRange > 0.02f)
-			{
-				for(int i = 0; i < RequestedBars; ++i)
-				{
-					const float T = (aShaped[i] - LevelMin) / LevelRange;
-					aShaped[i] = std::clamp(0.18f + T * 0.82f, 0.0f, 1.0f);
-				}
-			}
-
-			const float BarsAttack = 1.0f - std::exp(-Delta * VISUALIZER_ATTACK_RATE);
-			const float BarsRelease = 1.0f - std::exp(-Delta * VISUALIZER_RELEASE_RATE);
-			for(int i = 0; i < MUSIC_PLAYER_MAX_VISUALIZER_BARS; ++i)
-			{
-				const float Target = i < RequestedBars ? aShaped[i] : 0.0f;
-				const float Blend = Target > aLevels[i] ? BarsAttack : BarsRelease;
-				aLevels[i] += (Target - aLevels[i]) * Blend;
-			}
-			return;
 		}
 
-		const bool BackendConnecting = Snapshot.m_HasVisualizer && Snapshot.m_Visualizer.m_BackendStatus == BestClientVisualizer::EVisualizerBackendStatus::CONNECTING;
-		const bool BackendSilent = Snapshot.m_HasVisualizer && Snapshot.m_Visualizer.m_BackendStatus == BestClientVisualizer::EVisualizerBackendStatus::SILENT;
-		if(BackendConnecting || BackendSilent)
+		const float BarsAttack = 1.0f - std::exp(-Delta * VISUALIZER_ATTACK_RATE);
+		const float BarsRelease = 1.0f - std::exp(-Delta * VISUALIZER_RELEASE_RATE);
+		for(int i = 0; i < MUSIC_PLAYER_MAX_VISUALIZER_BARS; ++i)
 		{
-			for(float &Level : aLevels)
-				Level = ApproachAnim(Level, 0.0f, Delta, BackendSilent ? FallbackReleaseSpeed * 0.42f : FallbackReleaseSpeed * 0.70f);
-			return;
+			const float Target = i < RequestedBars ? aShaped[i] : 0.0f;
+			const float Blend = Target > aLevels[i] ? BarsAttack : BarsRelease;
+			aLevels[i] += (Target - aLevels[i]) * Blend;
 		}
-
-		if(Snapshot.m_PlaybackState != EMusicPlaybackState::PLAYING)
-		{
-			for(int i = 0; i < MUSIC_PLAYER_MAX_VISUALIZER_BARS; ++i)
-			{
-				const float Drift = i < RequestedBars ? (0.18f + 0.06f * (0.5f + 0.5f * sinf(Input.m_TimeSeconds * (0.55f + 0.03f * i) * 2.0f * pi + 0.35f * i))) : 0.0f;
-				aLevels[i] = ApproachAnim(aLevels[i], Drift, Delta, 4.0f);
-			}
-			return;
-		}
-
-		const float TrackProgress = Snapshot.m_DurationMs > 0 ? std::clamp(Input.m_PositionMs / (float)Snapshot.m_DurationMs, 0.0f, 1.0f) : 0.0f;
-		for(int i = 0; i < RequestedBars; ++i)
-		{
-			const float Target = VisualizerBarTargetLevel(Snapshot, Input.m_TimeSeconds, TrackProgress, i, RequestedBars);
-			const float Speed = Target > aLevels[i] ? 11.0f : 6.0f;
-			aLevels[i] = ApproachAnim(aLevels[i], Target, Delta, Speed);
-		}
-		for(int i = RequestedBars; i < MUSIC_PLAYER_MAX_VISUALIZER_BARS; ++i)
-			aLevels[i] = ApproachAnim(aLevels[i], 0.0f, Delta, 8.0f);
-
-		std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> aSmoothed = aLevels;
-		for(int i = 0; i < RequestedBars; ++i)
-		{
-			const float Prev = i > 0 ? aLevels[i - 1] : aLevels[i];
-			const float Next = i + 1 < RequestedBars ? aLevels[i + 1] : aLevels[i];
-			aSmoothed[i] = Prev * 0.24f + aLevels[i] * 0.52f + Next * 0.24f;
-		}
-		std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> aFinal = aSmoothed;
-		for(int i = 0; i < RequestedBars; ++i)
-		{
-			const float Prev = i > 0 ? aSmoothed[i - 1] : aSmoothed[i];
-			const float Next = i + 1 < RequestedBars ? aSmoothed[i + 1] : aSmoothed[i];
-			aFinal[i] = Prev * 0.20f + aSmoothed[i] * 0.60f + Next * 0.20f;
-		}
-		for(int i = RequestedBars; i < MUSIC_PLAYER_MAX_VISUALIZER_BARS; ++i)
-			aFinal[i] = aLevels[i];
-		aLevels = aFinal;
+		return;
 	}
 
-	class CVisualizerLevelThread
+	const bool BackendConnecting = Snapshot.m_HasVisualizer && Snapshot.m_Visualizer.m_BackendStatus == BestClientVisualizer::EVisualizerBackendStatus::CONNECTING;
+	const bool BackendSilent = Snapshot.m_HasVisualizer && Snapshot.m_Visualizer.m_BackendStatus == BestClientVisualizer::EVisualizerBackendStatus::SILENT;
+	if(BackendConnecting || BackendSilent)
 	{
-	public:
-		CVisualizerLevelThread()
-		{
-			m_aLevels.fill(0.18f);
-			m_aPublished.fill(0.18f);
-			m_PublishSeq.store(0, std::memory_order_relaxed);
-			m_LastStep = std::chrono::steady_clock::now();
-			m_Thread = std::thread([this]() { ThreadMain(); });
-		}
+		for(float &Level : aLevels)
+			Level = ApproachAnim(Level, 0.0f, Delta, BackendSilent ? FallbackReleaseSpeed * 0.42f : FallbackReleaseSpeed * 0.70f);
+		return;
+	}
 
-		~CVisualizerLevelThread()
+	if(Snapshot.m_PlaybackState != EMusicPlaybackState::PLAYING)
+	{
+		for(int i = 0; i < MUSIC_PLAYER_MAX_VISUALIZER_BARS; ++i)
 		{
-			Stop();
+			const float Drift = i < RequestedBars ? (0.18f + 0.06f * (0.5f + 0.5f * sinf(Input.m_TimeSeconds * (0.55f + 0.03f * i) * 2.0f * pi + 0.35f * i))) : 0.0f;
+			aLevels[i] = ApproachAnim(aLevels[i], Drift, Delta, 4.0f);
 		}
+		return;
+	}
 
-		void Stop()
+	const float TrackProgress = Snapshot.m_DurationMs > 0 ? std::clamp(Input.m_PositionMs / (float)Snapshot.m_DurationMs, 0.0f, 1.0f) : 0.0f;
+	for(int i = 0; i < RequestedBars; ++i)
+	{
+		const float Target = VisualizerBarTargetLevel(Snapshot, Input.m_TimeSeconds, TrackProgress, i, RequestedBars);
+		const float Speed = Target > aLevels[i] ? 11.0f : 6.0f;
+		aLevels[i] = ApproachAnim(aLevels[i], Target, Delta, Speed);
+	}
+	for(int i = RequestedBars; i < MUSIC_PLAYER_MAX_VISUALIZER_BARS; ++i)
+		aLevels[i] = ApproachAnim(aLevels[i], 0.0f, Delta, 8.0f);
+
+	std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> aSmoothed = aLevels;
+	for(int i = 0; i < RequestedBars; ++i)
+	{
+		const float Prev = i > 0 ? aLevels[i - 1] : aLevels[i];
+		const float Next = i + 1 < RequestedBars ? aLevels[i + 1] : aLevels[i];
+		aSmoothed[i] = Prev * 0.24f + aLevels[i] * 0.52f + Next * 0.24f;
+	}
+	std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> aFinal = aSmoothed;
+	for(int i = 0; i < RequestedBars; ++i)
+	{
+		const float Prev = i > 0 ? aSmoothed[i - 1] : aSmoothed[i];
+		const float Next = i + 1 < RequestedBars ? aSmoothed[i + 1] : aSmoothed[i];
+		aFinal[i] = Prev * 0.20f + aSmoothed[i] * 0.60f + Next * 0.20f;
+	}
+	for(int i = RequestedBars; i < MUSIC_PLAYER_MAX_VISUALIZER_BARS; ++i)
+		aFinal[i] = aLevels[i];
+	aLevels = aFinal;
+}
+
+class CVisualizerLevelThread
+{
+public:
+	CVisualizerLevelThread()
+	{
+		m_aLevels.fill(0.18f);
+		m_aPublished.fill(0.18f);
+		m_PublishSeq.store(0, std::memory_order_relaxed);
+		m_LastStep = std::chrono::steady_clock::now();
+		m_Thread = std::thread([this]() { ThreadMain(); });
+	}
+
+	~CVisualizerLevelThread()
+	{
+		Stop();
+	}
+
+	void Stop()
+	{
+		m_Shutdown.store(true, std::memory_order_release);
+		m_Cv.notify_all();
+		if(m_Thread.joinable())
+			m_Thread.join();
+	}
+
+	void Reset()
+	{
+		if(m_Shutdown.load(std::memory_order_relaxed))
+			return;
 		{
+			std::lock_guard<std::mutex> Lock(m_Mutex);
+			m_Reset.store(true, std::memory_order_release);
+		}
+		m_Cv.notify_one();
+	}
+
+	void Submit(SVisualizerLevelInput Input)
+	{
+		if(m_Shutdown.load(std::memory_order_relaxed))
+			return;
+		{
+			std::lock_guard<std::mutex> Lock(m_Mutex);
+			m_InputQueue.try_enqueue(std::move(Input));
+		}
+		m_Cv.notify_one();
+	}
+
+	std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> Levels() const
+	{
+		std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> Result{};
+		uint32_t Seq1 = 0;
+		uint32_t Seq2 = 0;
+		do
+		{
+			Seq1 = m_PublishSeq.load(std::memory_order_acquire);
+			int Spins = 0;
+			while(Seq1 & 1)
 			{
-				std::lock_guard<std::mutex> Lock(m_Mutex);
-				if(m_Shutdown)
-					return;
-				m_Shutdown = true;
-			}
-			m_Cv.notify_one();
-			if(m_Thread.joinable())
-				m_Thread.join();
-		}
-
-		void Reset()
-		{
-			{
-				std::lock_guard<std::mutex> Lock(m_Mutex);
-				if(m_Shutdown)
-					return;
-				PublishDefault();
-				m_Reset = true;
-			}
-			m_Cv.notify_one();
-		}
-
-		void Submit(SVisualizerLevelInput Input)
-		{
-			{
-				std::lock_guard<std::mutex> Lock(m_Mutex);
-				if(m_Shutdown)
-					return;
-				m_Input = std::move(Input);
-				m_HasInput = true;
-			}
-			m_Cv.notify_one();
-		}
-
-		std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> Levels() const
-		{
-			std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> Result{};
-			uint32_t Seq1 = 0;
-			uint32_t Seq2 = 0;
-			do
-			{
-				Seq1 = m_PublishSeq.load(std::memory_order_acquire);
-				int Spins = 0;
-				while(Seq1 & 1)
+				if(++Spins > 32)
 				{
-					if(++Spins > 32)
-					{
-						std::this_thread::yield();
-						break;
-					}
+					std::this_thread::yield();
+					break;
+				}
 #if defined(_MSC_VER)
-					_mm_pause();
+				_mm_pause();
 #elif defined(__x86_64__) || defined(__i386__)
-					__builtin_ia32_pause();
+				__builtin_ia32_pause();
 #else
-					std::atomic_thread_fence(std::memory_order_relaxed);
+				std::atomic_thread_fence(std::memory_order_relaxed);
 #endif
-					Seq1 = m_PublishSeq.load(std::memory_order_acquire);
-				}
-				Result = m_aPublished;
-				std::atomic_thread_fence(std::memory_order_acquire);
-				Seq2 = m_PublishSeq.load(std::memory_order_relaxed);
-			} while(Seq1 != Seq2);
-			return Result;
-		}
+				Seq1 = m_PublishSeq.load(std::memory_order_acquire);
+			}
+			Result = m_aPublished;
+			std::atomic_thread_fence(std::memory_order_acquire);
+			Seq2 = m_PublishSeq.load(std::memory_order_relaxed);
+		} while(Seq1 != Seq2);
+		return Result;
+	}
 
-	private:
-		void PublishLevels(const std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> &Levels)
-		{
-			m_PublishSeq.fetch_add(1, std::memory_order_acq_rel);
-			m_aPublished = Levels;
-			m_PublishSeq.fetch_add(1, std::memory_order_release);
-		}
+private:
+	void PublishLevels(const std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> &Levels)
+	{
+		m_PublishSeq.fetch_add(1, std::memory_order_acq_rel);
+		m_aPublished = Levels;
+		m_PublishSeq.fetch_add(1, std::memory_order_release);
+	}
 
-		void PublishDefault()
+	void ThreadMain()
+	{
+		while(true)
 		{
-			std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> Default{};
-			Default.fill(0.18f);
-			PublishLevels(Default);
-		}
-
-		void ThreadMain()
-		{
-			while(true)
+			SVisualizerLevelInput Input;
+			bool HasInput = false;
+			bool Reset = false;
 			{
-				SVisualizerLevelInput Input;
-				bool HasInput = false;
-				bool Reset = false;
+				std::unique_lock<std::mutex> Lock(m_Mutex);
+				m_Cv.wait(Lock, [&]() {
+					return m_Shutdown.load(std::memory_order_relaxed) ||
+					       m_Reset.load(std::memory_order_relaxed) ||
+					       m_InputQueue.size_approx() > 0;
+				});
+				if(m_Shutdown.load(std::memory_order_relaxed))
+					break;
+				Reset = m_Reset.exchange(false, std::memory_order_acq_rel);
+			}
+
+			SVisualizerLevelInput Dequeued;
+			while(m_InputQueue.try_dequeue(Dequeued))
+			{
+				Input = std::move(Dequeued);
+				HasInput = true;
+			}
+
+			const auto Now = std::chrono::steady_clock::now();
+			float Delta = std::chrono::duration<float>(Now - m_LastStep).count();
+			m_LastStep = Now;
+			Delta = std::clamp(Delta, 0.0f, 0.1f);
+
+			if(Reset)
+			{
+				m_aLevels.fill(0.18f);
+				PublishLevels(m_aLevels);
+			}
+			else if(HasInput)
+			{
+				AdvanceVisualizerLevels(m_aLevels, Input, Delta);
+				PublishLevels(m_aLevels);
+			}
+		}
+	}
+
+	std::thread m_Thread;
+	mutable std::mutex m_Mutex;
+	std::condition_variable m_Cv;
+	std::atomic<bool> m_Shutdown{false};
+	std::atomic<bool> m_Reset{false};
+	moodycamel::ReaderWriterQueue<SVisualizerLevelInput> m_InputQueue{8};
+	std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> m_aLevels{};
+
+	mutable std::atomic<uint32_t> m_PublishSeq{0};
+	std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> m_aPublished{};
+	std::chrono::steady_clock::time_point m_LastStep{};
+};
+
+enum class EProviderCommand
+{
+	PREVIOUS,
+	PLAY_PAUSE,
+	NEXT,
+};
+
+class CNowPlayingProviderThread
+{
+public:
+	CNowPlayingProviderThread()
+	{
+		m_Thread = std::thread([this]() { ThreadMain(); });
+	}
+
+	~CNowPlayingProviderThread()
+	{
+		Stop();
+	}
+
+	void Stop()
+	{
+		{
+			std::lock_guard<std::mutex> Lock(m_Mutex);
+			if(m_Shutdown)
+				return;
+			m_Shutdown = true;
+		}
+		m_Cv.notify_all();
+		if(m_Thread.joinable())
+			m_Thread.join();
+	}
+
+	void SendCommand(EProviderCommand Cmd)
+	{
+		{
+			std::lock_guard<std::mutex> Lock(m_Mutex);
+			if(m_Shutdown)
+				return;
+			m_vCommands.push_back(Cmd);
+		}
+		m_Cv.notify_all();
+	}
+
+	bool TryDequeueSnapshot(SNowPlayingSnapshot &Out)
+	{
+		std::lock_guard<std::mutex> Lock(m_SnapshotMutex);
+		if(!m_HasNewSnapshot)
+			return false;
+		Out = std::move(m_LatestSnapshot);
+		m_HasNewSnapshot = false;
+		return true;
+	}
+
+private:
+	void ThreadMain()
+	{
+		std::unique_ptr<IMusicPlaybackProvider> pProvider;
+#if defined(CONF_PLATFORM_LINUX)
+#if BC_MUSICPLAYER_HAS_DBUS
+		pProvider = std::make_unique<CLinuxNowPlayingProvider>();
+#else
+		pProvider = std::make_unique<CNullNowPlayingProvider>();
+#endif
+#elif defined(CONF_FAMILY_WINDOWS) && BC_MUSICPLAYER_HAS_WINRT
+		pProvider = std::make_unique<CWindowsNowPlayingProvider>();
+#else
+		pProvider = std::make_unique<CNullNowPlayingProvider>();
+#endif
+
+		while(true)
+		{
+			std::vector<EProviderCommand> vCommands;
+			{
+				std::unique_lock<std::mutex> Lock(m_Mutex);
+				m_Cv.wait_for(Lock, std::chrono::milliseconds(125), [&]() {
+					return m_Shutdown || !m_vCommands.empty();
+				});
+				if(m_Shutdown)
+					break;
+				vCommands = std::move(m_vCommands);
+				m_vCommands.clear();
+			}
+
+			if(pProvider)
+			{
+				for(EProviderCommand Cmd : vCommands)
 				{
-					std::unique_lock<std::mutex> Lock(m_Mutex);
-					m_Cv.wait(Lock, [&]() { return m_Shutdown || m_HasInput || m_Reset; });
-					if(m_Shutdown)
-						break;
-					Reset = m_Reset;
-					m_Reset = false;
-					HasInput = m_HasInput;
-					if(HasInput)
-						Input = std::move(m_Input);
-					m_HasInput = false;
+					switch(Cmd)
+					{
+					case EProviderCommand::PREVIOUS: pProvider->Previous(); break;
+					case EProviderCommand::PLAY_PAUSE: pProvider->PlayPause(); break;
+					case EProviderCommand::NEXT: pProvider->Next(); break;
+					}
 				}
 
-				const auto Now = std::chrono::steady_clock::now();
-				float Delta = std::chrono::duration<float>(Now - m_LastStep).count();
-				m_LastStep = Now;
-				Delta = std::clamp(Delta, 0.0f, 0.1f);
-
-				if(Reset)
-					m_aLevels.fill(0.18f);
-				if(HasInput)
-					AdvanceVisualizerLevels(m_aLevels, Input, Delta);
-
-				if(!Reset)
-					PublishLevels(m_aLevels);
+				SNowPlayingSnapshot Snapshot;
+				pProvider->Poll(Snapshot);
+				{
+					std::lock_guard<std::mutex> Lock(m_SnapshotMutex);
+					m_LatestSnapshot = std::move(Snapshot);
+					m_HasNewSnapshot = true;
+				}
 			}
 		}
 
-		std::thread m_Thread;
-		mutable std::mutex m_Mutex;
-		std::condition_variable m_Cv;
-		bool m_Shutdown = false;
-		bool m_HasInput = false;
-		bool m_Reset = false;
-		SVisualizerLevelInput m_Input;
-		std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> m_aLevels{};
+		pProvider.reset();
+	}
 
-		mutable std::atomic<uint32_t> m_PublishSeq{0};
-		std::array<float, MUSIC_PLAYER_MAX_VISUALIZER_BARS> m_aPublished{};
-		std::chrono::steady_clock::time_point m_LastStep{};
-	};
+	std::thread m_Thread;
+	std::mutex m_Mutex;
+	std::condition_variable m_Cv;
+	bool m_Shutdown = false;
+	std::vector<EProviderCommand> m_vCommands;
+	std::mutex m_SnapshotMutex;
+	bool m_HasNewSnapshot = false;
+	SNowPlayingSnapshot m_LatestSnapshot;
+};
 
 class CMusicPlayer::CImpl
 {
 public:
 	static constexpr int VISUALIZER_BARS = MUSIC_PLAYER_MAX_VISUALIZER_BARS;
 
-	std::unique_ptr<IMusicPlaybackProvider> m_pProvider;
+	std::unique_ptr<CNowPlayingProviderThread> m_pProviderThread;
 	std::unique_ptr<BestClientVisualizer::CRealtimeMusicVisualizer> m_pVisualizer;
 	std::unique_ptr<CVisualizerLevelThread> m_pLevelThread;
 	SNowPlayingSnapshot m_Snapshot;
@@ -2913,6 +3043,11 @@ public:
 	CMusicPlayerLyrics m_Lyrics;
 	IGraphics::CTextureHandle m_LogoTexture;
 	bool m_LogoLoadAttempted = false;
+	float m_LastResolvedHudWidth = 0.0f;
+	float m_LastResolvedHudHeight = 0.0f;
+	int m_LastResolvedLayoutScale = -1;
+	int m_LastResolvedTextScale = -1;
+	int m_LastResolvedWindowWidth = -1;
 
 	CImpl()
 	{
@@ -2924,20 +3059,8 @@ public:
 
 	void EnsureBackgroundServices()
 	{
-		if(!m_pProvider)
-		{
-#if defined(CONF_PLATFORM_LINUX)
-#if BC_MUSICPLAYER_HAS_DBUS
-			m_pProvider = std::make_unique<CLinuxNowPlayingProvider>();
-#else
-			m_pProvider = std::make_unique<CNullNowPlayingProvider>();
-#endif
-#elif defined(CONF_FAMILY_WINDOWS) && BC_MUSICPLAYER_HAS_WINRT
-			m_pProvider = std::make_unique<CWindowsNowPlayingProvider>();
-#else
-			m_pProvider = std::make_unique<CNullNowPlayingProvider>();
-#endif
-		}
+		if(!m_pProviderThread)
+			m_pProviderThread = std::make_unique<CNowPlayingProviderThread>();
 		if(!m_pVisualizer)
 			m_pVisualizer = std::make_unique<BestClientVisualizer::CRealtimeMusicVisualizer>();
 		if(!m_pLevelThread)
@@ -2951,7 +3074,11 @@ public:
 			m_pLevelThread->Stop();
 			m_pLevelThread.reset();
 		}
-		m_pProvider.reset();
+		if(m_pProviderThread)
+		{
+			m_pProviderThread->Stop();
+			m_pProviderThread.reset();
+		}
 		m_pVisualizer.reset();
 		m_VisualizerData = BestClientVisualizer::SVisualizerFrame();
 		m_VisualizerData.m_IsPassiveFallback = true;
@@ -3506,9 +3633,9 @@ public:
 		const int64_t SnapshotPosition = std::clamp<int64_t>(Snapshot.m_PositionMs, 0, std::max<int64_t>(Snapshot.m_DurationMs, Snapshot.m_PositionMs));
 		const bool NewTrack = TrackKey != m_PlaybackTrackKey;
 		const bool TrackIdentityChanged = NewTrack &&
-			(Snapshot.m_ServiceId != m_Snapshot.m_ServiceId ||
-				Snapshot.m_Title != m_Snapshot.m_Title ||
-				Snapshot.m_Artist != m_Snapshot.m_Artist);
+						  (Snapshot.m_ServiceId != m_Snapshot.m_ServiceId ||
+							  Snapshot.m_Title != m_Snapshot.m_Title ||
+							  Snapshot.m_Artist != m_Snapshot.m_Artist);
 		const bool StateChanged = Snapshot.m_PlaybackState != m_PlaybackAnchorState;
 		const int64_t PredictedPosition = DisplayPositionMs();
 		const int64_t Drift = SnapshotPosition - PredictedPosition;
@@ -3618,7 +3745,7 @@ public:
 
 	void UpdateHudReservation(CMusicPlayer *pOwner)
 	{
-		if(g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideSongPlayer)
+		if(!HudLayout::IsEnabled(HudLayout::MODULE_MUSIC_PLAYER) || g_Config.m_BcMusicPlayer == 0 || (g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideSongPlayer))
 		{
 			ResetHudState();
 			return;
@@ -3631,14 +3758,10 @@ public:
 		const float TextScale = MusicPlayerTextScale();
 		const float CompactScale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
 		const float CompactWidthScale = Width / std::max(HudLayout::CANVAS_WIDTH, 0.001f);
-		const float CompactTitleFont = 6.6f * CompactScale * TextScale;
 		const float MiniTitleFont = 6.0f * CompactScale * TextScale;
 		const bool LyricsEnabled = g_Config.m_BcMusicPlayerShowLyrics != 0;
-		const float CompactTextSlotWidthBase = ComputeCompactTextSlotWidth(pOwner->TextRender(), GameTimer, CompactTitleFont, CompactScale, CompactWidthScale, false);
 		const float MiniTextSlotWidthBase = ComputeMiniTextSlotWidth(pOwner->TextRender(), m_Snapshot, GameTimer, MiniTitleFont, CompactScale, CompactWidthScale, false);
-		const float CompactTextSlotWidthLyrics = CMusicPlayerLyrics::LyricsTextSlotWidth(CompactScale, CompactWidthScale);
 		const float MiniTextSlotWidthLyrics = CMusicPlayerLyrics::LyricsTextSlotWidth(CompactScale, CompactWidthScale);
-		float CompactTextSlotWidth [[maybe_unused]] = CompactTextSlotWidthBase;
 		float MiniTextSlotWidth = MiniTextSlotWidthBase;
 		const CUIRect UiScreen = *pOwner->Ui()->Screen();
 		if(UiScreen.w <= 0.0f || UiScreen.h <= 0.0f)
@@ -3661,8 +3784,6 @@ public:
 		if(LyricsEnabled)
 		{
 			m_Lyrics.TickDisplay(Delta);
-			const float CompactLyricsMeasureFont = 5.25f * CompactScale * TextScale;
-			CompactTextSlotWidth = m_Lyrics.PreferredTextSlotWidth(pOwner->TextRender(), CompactLyricsMeasureFont, CompactTextSlotWidthLyrics, CompactScale, CompactWidthScale);
 			MiniTextSlotWidth = m_Lyrics.PreferredTextSlotWidth(pOwner->TextRender(), MiniTitleFont, MiniTextSlotWidthLyrics, CompactScale, CompactWidthScale);
 		}
 
@@ -3689,11 +3810,11 @@ public:
 
 		if(m_CompactTextSlotWidthAnim <= 0.0f)
 			m_CompactTextSlotWidthAnim = MiniTextSlotWidth;
-		const float HoverTitleSlotWidth = ComputeTrackTitleTextSlotWidth(pOwner->TextRender(), m_Snapshot, MiniTitleFont, CompactScale, CompactWidthScale);
+
 		if(!FreezeNonChatLayout)
 		{
 			const float TargetExpand = HoverCandidate ? 1.0f : 0.0f;
-			const float WidthTarget = LyricsEnabled ? MiniTextSlotWidth : (HoverCandidate ? HoverTitleSlotWidth : MiniTextSlotWidth);
+			const float WidthTarget = LyricsEnabled ? MiniTextSlotWidth : (HoverCandidate ? ComputeTrackTitleTextSlotWidth(pOwner->TextRender(), m_Snapshot, MiniTitleFont, CompactScale, CompactWidthScale) : MiniTextSlotWidth);
 			const float WidthSpeed = WidthTarget > m_CompactTextSlotWidthAnim ? 10.0f : 8.0f;
 			m_CompactTextSlotWidthAnim = ApproachAnim(m_CompactTextSlotWidthAnim, WidthTarget, Delta, WidthSpeed);
 			const float TargetGlow = HoverCandidate ? 1.0f : 0.0f;
@@ -3726,7 +3847,7 @@ public:
 		{
 			const std::string TimerText = GameTimer.m_Valid ? GameTimer.m_Text : FormatMusicPositionMs(m_Snapshot.m_PositionMs);
 			const float TimerFont = LyricsBelowTimerFont(Metrics.m_Scale, TextScale);
-			const float TimerTextW = pOwner->TextRender() != nullptr ? pOwner->TextRender()->TextWidth(TimerFont, TimerText.c_str(), -1, -1.0f) : TimerFont * 5.0f;
+			const float TimerTextW = ComputeMusicPlayerTextWidth(pOwner->TextRender(), TimerText, TimerFont);
 			TimerWidthTarget = std::min(Metrics.m_ViewRect.w * 0.92f, TimerTextW + LyricsBelowTimerPadX(Metrics.m_Scale, CompactWidthScale) * 2.0f);
 			if(!WantLyricsTimer)
 				TimerWidthTarget = m_LyricsTimerWidthAnim > 0.0f ? m_LyricsTimerWidthAnim : TimerWidthTarget;
@@ -3768,6 +3889,7 @@ void CMusicPlayer::EnsureImpl()
 
 void CMusicPlayer::OnReset()
 {
+	InvalidateMusicPlayerTextWidthCache();
 	EnsureImpl();
 	m_pImpl->Reset(Graphics());
 }
@@ -3783,8 +3905,10 @@ void CMusicPlayer::OnShutdown()
 
 void CMusicPlayer::OnWindowResize()
 {
+	InvalidateMusicPlayerTextWidthCache();
 	if(!m_pImpl)
 		return;
+	m_pImpl->m_Lyrics.ClearLayoutState();
 	m_pImpl->ResetArtwork(Graphics());
 }
 
@@ -3891,7 +4015,7 @@ void CMusicPlayer::OnUpdate()
 	EnsureImpl();
 	if(g_Config.m_BcMusicPlayer == 0)
 	{
-		if(m_pImpl->m_pProvider || m_pImpl->m_pVisualizer || m_pImpl->m_pLevelThread || m_pImpl->m_Snapshot.m_Valid)
+		if(m_pImpl->m_pProviderThread || m_pImpl->m_pVisualizer || m_pImpl->m_pLevelThread || m_pImpl->m_Snapshot.m_Valid)
 		{
 			const bool HadSnapshot = m_pImpl->m_Snapshot.m_Valid;
 			m_pImpl->StopBackgroundServices();
@@ -3906,33 +4030,33 @@ void CMusicPlayer::OnUpdate()
 	m_pImpl->EnsureBackgroundServices();
 	const float HudHeight = HudLayout::CANVAS_HEIGHT;
 	const float HudWidth = HudHeight * Graphics()->ScreenAspect();
-	struct SHudScreenScope
-	{
-		IGraphics *m_pGraphics;
-		CScreenRect m_Previous;
-		SHudScreenScope(IGraphics *pGraphics, float Width, float Height) :
-			m_pGraphics(pGraphics),
-			m_Previous(pGraphics->GetScreen())
-		{
-			pGraphics->MapScreenToSize(Width, Height);
-		}
-		~SHudScreenScope()
-		{
-			m_pGraphics->MapScreen(m_Previous);
-		}
-	} HudScreen(Graphics(), HudWidth, HudHeight);
 	HudLayout::TryApplyMusicPlayerLegacyPositionFix(HudWidth, HudHeight, TextRender());
 	if(!HudLayout::HasPositionOverride(HudLayout::MODULE_MUSIC_PLAYER))
 	{
 		const auto Layout = HudLayout::Get(HudLayout::MODULE_MUSIC_PLAYER, HudWidth, HudHeight);
-		const float TextScale = MusicPlayerTextScale();
-		const float LayoutScale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
-		const float LayoutWidthScale = HudWidth / std::max(HudLayout::CANVAS_WIDTH, 0.001f);
-		const float MiniTitleFont = 6.0f * LayoutScale * TextScale;
-		const float PositionTextSlotWidth = ComputeStableMiniPositionTextSlotWidth(TextRender(), MiniTitleFont, LayoutScale, LayoutWidthScale);
-		const SMusicPlayerMetrics Metrics = ComputeMusicPlayerMetrics(Layout, HudWidth, HudHeight, 0.0f, PositionTextSlotWidth, PositionTextSlotWidth, TextScale);
-		const float Nudge = 2.5f * HudWidth / std::max(1.0f, (float)Graphics()->WindowWidth());
-		HudLayout::SetMusicPlayerResolvedDefaultX((HudWidth - Metrics.m_ExpandedW) * 0.5f + Nudge, HudWidth);
+		const int LayoutScaleInt = (int)Layout.m_Scale;
+		const int TextScaleInt = g_Config.m_BcMusicPlayerTextScale;
+		const int WindowWidth = Graphics()->WindowWidth();
+
+		if(m_pImpl->m_LastResolvedHudWidth != HudWidth || m_pImpl->m_LastResolvedHudHeight != HudHeight ||
+			m_pImpl->m_LastResolvedLayoutScale != LayoutScaleInt || m_pImpl->m_LastResolvedTextScale != TextScaleInt ||
+			m_pImpl->m_LastResolvedWindowWidth != WindowWidth)
+		{
+			m_pImpl->m_LastResolvedHudWidth = HudWidth;
+			m_pImpl->m_LastResolvedHudHeight = HudHeight;
+			m_pImpl->m_LastResolvedLayoutScale = LayoutScaleInt;
+			m_pImpl->m_LastResolvedTextScale = TextScaleInt;
+			m_pImpl->m_LastResolvedWindowWidth = WindowWidth;
+
+			const float TextScale = MusicPlayerTextScale();
+			const float LayoutScale = std::clamp(Layout.m_Scale / 100.0f, 0.25f, 3.0f);
+			const float LayoutWidthScale = HudWidth / std::max(HudLayout::CANVAS_WIDTH, 0.001f);
+			const float MiniTitleFont = 6.0f * LayoutScale * TextScale;
+			const float PositionTextSlotWidth = ComputeStableMiniPositionTextSlotWidth(TextRender(), MiniTitleFont, LayoutScale, LayoutWidthScale);
+			const SMusicPlayerMetrics Metrics = ComputeMusicPlayerMetrics(Layout, HudWidth, HudHeight, 0.0f, PositionTextSlotWidth, PositionTextSlotWidth, TextScale);
+			const float Nudge = 2.5f * HudWidth / std::max(1.0f, (float)WindowWidth);
+			HudLayout::SetMusicPlayerResolvedDefaultX((HudWidth - Metrics.m_ExpandedW) * 0.5f + Nudge, HudWidth);
+		}
 	}
 	g_Config.m_BcMusicPlayerColorMode = std::clamp(g_Config.m_BcMusicPlayerColorMode, 0, 1);
 	if(m_pImpl->m_LastAppliedColorMode != g_Config.m_BcMusicPlayerColorMode ||
@@ -3950,25 +4074,28 @@ void CMusicPlayer::OnUpdate()
 		m_pImpl->RefreshCurrentSnapshotVisualizer();
 		m_pImpl->m_LastVisualizerPollTick = Now;
 	}
-	if(m_pImpl->m_LastPollTick == 0 || Now - m_pImpl->m_LastPollTick >= time_freq() / 8)
+	if(m_pImpl->m_pProviderThread)
 	{
 		SNowPlayingSnapshot Snapshot;
-		if(m_pImpl->m_pProvider && m_pImpl->m_pProvider->Poll(Snapshot))
+		if(m_pImpl->m_pProviderThread->TryDequeueSnapshot(Snapshot))
 		{
-			m_pImpl->AttachVisualizerData(Snapshot);
-			m_pImpl->DebugLogProviderSnapshot(Snapshot);
-			m_pImpl->ApplySnapshot(std::move(Snapshot), Now);
-		}
-		else
-		{
-			const bool UseStaleSnapshotGrace = m_pImpl->m_Snapshot.m_Valid && Now - m_pImpl->m_LastSnapshotTick <= time_freq() * 2;
-			m_pImpl->DebugLogProviderPollFailure(UseStaleSnapshotGrace);
-			if(UseStaleSnapshotGrace)
-				m_pImpl->RefreshCurrentSnapshotVisualizer();
+			m_pImpl->m_LastPollTick = Now;
+			if(Snapshot.m_Valid)
+			{
+				m_pImpl->AttachVisualizerData(Snapshot);
+				m_pImpl->DebugLogProviderSnapshot(Snapshot);
+				m_pImpl->ApplySnapshot(std::move(Snapshot), Now);
+			}
 			else
-				m_pImpl->ApplySnapshot(SNowPlayingSnapshot(), Now);
+			{
+				const bool UseStaleSnapshotGrace = m_pImpl->m_Snapshot.m_Valid && Now - m_pImpl->m_LastSnapshotTick <= time_freq() * 2;
+				m_pImpl->DebugLogProviderPollFailure(UseStaleSnapshotGrace);
+				if(UseStaleSnapshotGrace)
+					m_pImpl->RefreshCurrentSnapshotVisualizer();
+				else
+					m_pImpl->ApplySnapshot(SNowPlayingSnapshot(), Now);
+			}
 		}
-		m_pImpl->m_LastPollTick = Now;
 	}
 
 	m_pImpl->UpdateArtwork(this);
@@ -4056,13 +4183,13 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	const float HoverT = ForcePreview ? 1.0f : BCUiAnimations::EaseOutCubic(m_pImpl->m_HoverAnim);
 	const float Delta = std::clamp(Client()->RenderFrameTime(), 0.0f, 0.1f);
 	const float AnimatedTextSlotWidth = ForcePreview ?
-						MiniTextSlotWidth :
-						(m_pImpl->m_CompactTextSlotWidthAnim > 0.0f ? m_pImpl->m_CompactTextSlotWidthAnim : MiniTextSlotWidth);
+						    MiniTextSlotWidth :
+						    (m_pImpl->m_CompactTextSlotWidthAnim > 0.0f ? m_pImpl->m_CompactTextSlotWidthAnim : MiniTextSlotWidth);
 	const float PositionTextSlotWidth = ComputeStableMiniPositionTextSlotWidth(TextRender(), MiniTitleFont, LayoutScale, LayoutWidthScale);
 	const SMusicPlayerMetrics Metrics = ComputeMusicPlayerMetrics(Layout, Width, Height, ExpandT, PositionTextSlotWidth, AnimatedTextSlotWidth, TextScale);
 	const bool CompactMiniLayout = ExpandT < 0.001f &&
-					       absolute(Metrics.m_ViewRect.w - Metrics.m_CompactRect.w) < 0.001f &&
-					       absolute(Metrics.m_ViewRect.h - Metrics.m_CompactRect.h) < 0.001f;
+				       absolute(Metrics.m_ViewRect.w - Metrics.m_CompactRect.w) < 0.001f &&
+				       absolute(Metrics.m_ViewRect.h - Metrics.m_CompactRect.h) < 0.001f;
 	const float BottomReveal = std::clamp((Metrics.m_ViewRect.h - Metrics.m_CompactH) / std::max(0.001f, Metrics.m_ExpandedH - Metrics.m_CompactH), 0.0f, 1.0f);
 	const float TextT = CompactMiniLayout ? 1.0f : BCUiAnimations::EaseOutCubic(std::clamp((BottomReveal - 0.12f) / 0.88f, 0.0f, 1.0f));
 	const float ControlsT = BCUiAnimations::EaseOutCubic(std::clamp((BottomReveal - 0.18f) / 0.82f, 0.0f, 1.0f));
@@ -4120,8 +4247,8 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	const float VisualRightInset = 1.70f * Scale * WidthScale;
 	CUIRect ArtRect = {Content.x + ArtLeftInset, TopBandY + (TopBandH - ArtSize) * 0.5f, ArtSize, ArtSize};
 	CUIRect VisualRect = RenderVisualizer ?
-		CUIRect{View.x + View.w - VisualRightInset - VisualW, TopBandY + (TopBandH - VisualH) * 0.5f, VisualW, VisualH} :
-		CUIRect{View.x + View.w, TopBandY, 0.0f, 0.0f};
+				     CUIRect{View.x + View.w - VisualRightInset - VisualW, TopBandY + (TopBandH - VisualH) * 0.5f, VisualW, VisualH} :
+				     CUIRect{View.x + View.w, TopBandY, 0.0f, 0.0f};
 	CUIRect TextArea = Content;
 	TextArea.x = ArtRect.x + ArtRect.w + CoverPad;
 	TextArea.w = RenderVisualizer ? std::max(0.0f, VisualRect.x - VisualPad - TextArea.x) : std::max(0.0f, Content.x + Content.w - TextArea.x);
@@ -4307,14 +4434,14 @@ void CMusicPlayer::RenderMusicPlayer(bool ForcePreview)
 	const bool NextHovered = ControlsInteractive && Snapshot.m_CanNext &&
 				 (IsPointInsideRect(NextRect, MousePos, HitMargin) || IsPointInsideRect(UiNextRect, UiMousePos, UiHitMargin));
 
-	if(m_pImpl->m_pProvider)
+	if(m_pImpl->m_pProviderThread)
 	{
 		if(Clicked && PrevHovered)
-			m_pImpl->m_pProvider->Previous();
+			m_pImpl->m_pProviderThread->SendCommand(EProviderCommand::PREVIOUS);
 		if(Clicked && PlayHovered)
-			m_pImpl->m_pProvider->PlayPause();
+			m_pImpl->m_pProviderThread->SendCommand(EProviderCommand::PLAY_PAUSE);
 		if(Clicked && NextHovered)
-			m_pImpl->m_pProvider->Next();
+			m_pImpl->m_pProviderThread->SendCommand(EProviderCommand::NEXT);
 	}
 
 	const CUIRect UiTextArea = HudToUiRect(LayoutTextArea, UiScreen, Width, Height);
@@ -4480,7 +4607,7 @@ float MusicPlayerLegacyHudAnchorOffsetCanvasX(ITextRender *pTextRender, int Layo
 	const float CompactH = std::max(9.0f * Scale, TitleFont + 3.0f * Scale);
 	const float ArtSize = std::max(0.0f, CompactH - 1.7f * Scale);
 	const float CompactW = std::min(Width, std::max(18.0f * Scale * WidthScale,
-		(2.35f * 2.0f + 1.25f + 1.35f) * Scale * WidthScale + PositionTextSlotWidth + MiniVisualW + ArtSize));
+						       (2.35f * 2.0f + 1.25f + 1.35f) * Scale * WidthScale + PositionTextSlotWidth + MiniVisualW + ArtSize));
 	const float ExpandedArtSize = std::min(25.0f * Scale - 1.6f * Scale, 15.4f * Scale);
 	const float ExpandedVisualW = (0.15f * 2.0f + NumBars * 1.55f + BarGaps * 1.10f + 1.6f) * Scale * WidthScale;
 	const float ExpandedTextLeftInset = (1.7f + 1.25f) * Scale * WidthScale + ExpandedArtSize;

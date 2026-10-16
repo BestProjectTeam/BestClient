@@ -1,6 +1,9 @@
 /* Copyright © 2026 BestProject Team */
 #ifndef GAME_CLIENT_COMPONENTS_HOOKWIND_H
 #define GAME_CLIENT_COMPONENTS_HOOKWIND_H
+#include "fgf_glow.h"
+#include "hookgrip.h"
+
 #include <base/color.h>
 #include <base/vmath.h>
 
@@ -8,8 +11,6 @@
 #include <engine/shared/protocol.h>
 
 #include <game/client/component.h>
-#include "fgf_glow.h"
-#include "hookgrip.h"
 
 class CHookWind : public CComponent
 {
@@ -80,6 +81,7 @@ private:
 	int m_NumLeaves = 0;
 	CGlowParticles m_Dust;
 	float m_LastTime = 0.0f;
+	bool m_WasActive = false;
 
 	void AddGust(vec2 Center, float Radius, float RadialSpeed, float AngularSpeed, float Arc, float Width, float LifeSpan, float Alpha, float Angle);
 	CLeaf *AddLeaf(int Owner, vec2 Pos, float Scale);

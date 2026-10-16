@@ -18,14 +18,14 @@
 #include <generated/protocol.h>
 
 #include <game/client/animstate.h>
+#include <game/client/components/bestclient/bestclient.h> // bestclient
+#include <game/client/components/bestclient/demo_tee_editor.h> // bestclient
+#include <game/client/components/bestclient/jelly_tee.h> // bestclient
 #include <game/client/components/controls.h>
 #include <game/client/components/effects.h>
 #include <game/client/components/flow.h>
 #include <game/client/components/skins.h>
 #include <game/client/components/sounds.h>
-#include <game/client/components/bestclient/bestclient.h> // bestclient
-#include <game/client/components/bestclient/demo_tee_editor.h> // bestclient
-#include <game/client/components/bestclient/jelly_tee.h> // bestclient
 #include <game/client/gameclient.h>
 #include <game/collision.h>
 #include <game/gamecore.h>
@@ -567,8 +567,8 @@ void CPlayers::RenderHook(
 	{
 		// bestclient
 		const bool HookTargetOutsidePractice = GameClient()->m_FastPractice.Enabled() &&
-			GameClient()->m_FastPractice.IsPracticeParticipant(ClientId) &&
-			!GameClient()->m_FastPractice.IsPracticeParticipant(pPlayerChar->m_HookedPlayer);
+						       GameClient()->m_FastPractice.IsPracticeParticipant(ClientId) &&
+						       !GameClient()->m_FastPractice.IsPracticeParticipant(pPlayerChar->m_HookedPlayer);
 		if(HookTargetOutsidePractice)
 			HookPos = mix(vec2(Prev.m_HookX, Prev.m_HookY), vec2(Player.m_HookX, Player.m_HookY), Intra);
 		else
@@ -1129,8 +1129,10 @@ void CPlayers::RenderPlayer(
 			// bestclient
 			case WEAPON_GUN: RenderHand(&RenderInfo, WeaponPosition, Direction, -3.0f * pi / 4.0f, vec2(-15.0f, 4.0f) * WeaponScale, Alpha); break;
 			case WEAPON_SHOTGUN: RenderHand(&RenderInfo, WeaponPosition, Direction, -pi / 2.0f, vec2(-5.0f, 4.0f) * WeaponScale, Alpha); break;
-			case WEAPON_GRENADE: RenderHand(&RenderInfo, WeaponPosition, Direction, -pi / 2.0f, vec2(-4.0f, 7.0f) * WeaponScale, Alpha); break;
-			// bestclient
+			case WEAPON_GRENADE:
+				RenderHand(&RenderInfo, WeaponPosition, Direction, -pi / 2.0f, vec2(-4.0f, 7.0f) * WeaponScale, Alpha);
+				break;
+				// bestclient
 			}
 		}
 	}
@@ -1281,6 +1283,9 @@ void CPlayers::OnRender()
 	const bool IsTeamPlay = GameClient()->IsTeamPlay();
 	for(int i = 0; i < MAX_CLIENTS; ++i)
 	{
+		if(!IsPlayerInfoAvailable(i))
+			continue;
+
 		aRenderInfo[i] = GameClient()->m_aClients[i].m_RenderInfo;
 		aRenderInfo[i].m_TeeRenderFlags = 0;
 

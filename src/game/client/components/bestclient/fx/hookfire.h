@@ -1,6 +1,9 @@
 /* Copyright © 2026 BestProject Team */
 #ifndef GAME_CLIENT_COMPONENTS_HOOKFIRE_H
 #define GAME_CLIENT_COMPONENTS_HOOKFIRE_H
+#include "fgf_glow.h"
+#include "hookgrip.h"
+
 #include <base/color.h>
 #include <base/vmath.h>
 
@@ -8,8 +11,6 @@
 #include <engine/shared/protocol.h>
 
 #include <game/client/component.h>
-#include "fgf_glow.h"
-#include "hookgrip.h"
 
 class CHookFire : public CComponent
 {
@@ -94,6 +95,7 @@ private:
 	CGlowParticles m_Smoke;
 	CFlameQuad m_aQuads[MAX_FLAMES];
 	float m_LastTime = 0.0f;
+	bool m_WasActive = false;
 
 	static vec2 FlameDirection(const CHookGripTracker::CGrip &Grip);
 

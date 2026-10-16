@@ -43,52 +43,52 @@ constexpr T maximum(T a, T b, T c)
 namespace BestClientVisualizer
 {
 
-CRealtimeMusicVisualizer::CRealtimeMusicVisualizer()
-{
-#if defined(CONF_PLATFORM_LINUX) && defined(BC_MUSICPLAYER_HAS_PULSE) && BC_MUSICPLAYER_HAS_PULSE
-	m_pSource = CreatePulseVisualizerSource();
-#elif defined(CONF_FAMILY_WINDOWS)
-	m_pSource = CreateWasapiVisualizerSource();
-#else
-	m_pSource = CreatePassiveVisualizerSource();
-#endif
-	RefreshConfig();
-}
-
-CRealtimeMusicVisualizer::~CRealtimeMusicVisualizer() = default;
-
-void CRealtimeMusicVisualizer::RefreshConfig()
-{
-	SVisualizerConfig Config;
-	Config.m_SampleRate = maximum(8000, m_ConfigInitialized ? m_Config.m_SampleRate : 48000);
-	Config.m_BandCount = MAX_VISUALIZER_BANDS;
-	Config.m_LowCutHz = 50;
-	Config.m_HighCutHz = 10000;
-	Config.m_BassSplitHz = 100;
-	Config.m_NoiseReduction = 0.0f;
-	Config.m_Sensitivity = 1.0f;
-	m_Config = Config;
-	m_ConfigInitialized = true;
-	if(m_pSource)
-		m_pSource->SetConfig(m_Config);
-}
-
-void CRealtimeMusicVisualizer::SetPlaybackHint(const SVisualizerPlaybackHint &Hint)
-{
-	RefreshConfig();
-	if(m_pSource)
-		m_pSource->SetPlaybackHint(Hint);
-}
-
-bool CRealtimeMusicVisualizer::PollFrame(SVisualizerFrame &OutFrame)
-{
-	RefreshConfig();
-	if(!m_pSource)
+	CRealtimeMusicVisualizer::CRealtimeMusicVisualizer()
 	{
-		OutFrame = SVisualizerFrame();
-		return false;
+#if defined(CONF_PLATFORM_LINUX) && defined(BC_MUSICPLAYER_HAS_PULSE) && BC_MUSICPLAYER_HAS_PULSE
+		m_pSource = CreatePulseVisualizerSource();
+#elif defined(CONF_FAMILY_WINDOWS)
+		m_pSource = CreateWasapiVisualizerSource();
+#else
+		m_pSource = CreatePassiveVisualizerSource();
+#endif
+		RefreshConfig();
 	}
-	return m_pSource->PollFrame(OutFrame);
-}
+
+	CRealtimeMusicVisualizer::~CRealtimeMusicVisualizer() = default;
+
+	// Visualizer configuration parameters are static after initialization (default 48000 Hz, 50-10000 Hz range).
+	// If adaptive device sample rate negotiation is needed in the future, invoke RefreshConfig() on device format changes.
+	void CRealtimeMusicVisualizer::RefreshConfig()
+	{
+		SVisualizerConfig Config;
+		Config.m_SampleRate = maximum(8000, m_ConfigInitialized ? m_Config.m_SampleRate : 48000);
+		Config.m_BandCount = MAX_VISUALIZER_BANDS;
+		Config.m_LowCutHz = 50;
+		Config.m_HighCutHz = 10000;
+		Config.m_BassSplitHz = 100;
+		Config.m_NoiseReduction = 0.0f;
+		Config.m_Sensitivity = 1.0f;
+		m_Config = Config;
+		m_ConfigInitialized = true;
+		if(m_pSource)
+			m_pSource->SetConfig(m_Config);
+	}
+
+	void CRealtimeMusicVisualizer::SetPlaybackHint(const SVisualizerPlaybackHint &Hint)
+	{
+		if(m_pSource)
+			m_pSource->SetPlaybackHint(Hint);
+	}
+
+	bool CRealtimeMusicVisualizer::PollFrame(SVisualizerFrame &OutFrame)
+	{
+		if(!m_pSource)
+		{
+			OutFrame = SVisualizerFrame();
+			return false;
+		}
+		return m_pSource->PollFrame(OutFrame);
+	}
 
 } // namespace BestClientVisualizer

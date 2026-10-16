@@ -281,6 +281,11 @@ class CClient : public IClient, public CDemoPlayer::IListener
 	// For DummyName function
 	char m_aAutomaticDummyName[MAX_NAME_LENGTH];
 
+	int64_t m_AccUpdateNs = 0;
+	int64_t m_AccRenderNs = 0;
+	int64_t m_AccSwapNs = 0;
+	int m_ClientPerfFrames = 0;
+
 public:
 	IConfigManager *ConfigManager() { return m_pConfigManager; }
 	CConfig *Config() { return m_pConfig; }

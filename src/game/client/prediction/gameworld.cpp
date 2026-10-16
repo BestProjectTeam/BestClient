@@ -664,6 +664,47 @@ void CGameWorld::NetObjEnd()
 	}
 }
 
+void CGameWorld::RecycleActiveEntities()
+{
+	m_pNextTraverseEntity = nullptr;
+	for(int Type = 0; Type < NUM_ENTTYPES; Type++)
+	{
+		CEntity *pEnt = m_apFirstEntityTypes[Type];
+		while(pEnt)
+		{
+			CEntity *pNext = pEnt->m_pNextTypeEntity;
+			if(pEnt->m_pParent)
+			{
+				if(m_IsValidCopy && m_pParent && m_pParent->m_pChild == this)
+					pEnt->m_pParent->m_DestroyTick = GameTick();
+				if(pEnt->m_pParent->m_pChild == pEnt)
+					pEnt->m_pParent->m_pChild = nullptr;
+				pEnt->m_pParent = nullptr;
+			}
+			if(pEnt->m_pChild)
+			{
+				if(pEnt->m_pChild->m_pParent == pEnt)
+					pEnt->m_pChild->m_pParent = nullptr;
+				pEnt->m_pChild = nullptr;
+			}
+			pEnt->m_pPrevTypeEntity = nullptr;
+			pEnt->m_pNextTypeEntity = nullptr;
+			pEnt->m_pGameWorld = nullptr;
+			pEnt->m_MarkedForDestroy = false;
+			pEnt->m_SnapTicks = 0;
+			pEnt->m_DestroyTick = -1;
+			m_apEntityRecycleBin[Type].push_back(pEnt);
+			pEnt = pNext;
+		}
+		m_apFirstEntityTypes[Type] = nullptr;
+	}
+	for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
+	{
+		m_apCharacters[ClientId] = nullptr;
+		m_Core.m_apCharacters[ClientId] = nullptr;
+	}
+}
+
 void CGameWorld::CopyWorldClean(CGameWorld *pFrom)
 {
 	if(pFrom == this || !pFrom)
@@ -678,31 +719,49 @@ void CGameWorld::CopyWorldClean(CGameWorld *pFrom)
 	m_Teams = pFrom->m_Teams;
 	m_Core.m_vSwitchers = pFrom->m_Core.m_vSwitchers;
 	m_PredictedEvents = pFrom->m_PredictedEvents;
-	// delete the previous entities
-	Clear();
-	for(int i = 0; i < MAX_CLIENTS; i++)
-	{
-		m_apCharacters[i] = nullptr;
-		m_Core.m_apCharacters[i] = nullptr;
-	}
+
+	// recycle previous entities instead of allocating from heap
+	RecycleActiveEntities();
+
 	// copy and add the new entities
 	for(int Type = 0; Type < NUM_ENTTYPES; Type++)
 	{
 		for(CEntity *pEnt = pFrom->FindLast(Type); pEnt; pEnt = pEnt->TypePrev())
 		{
 			CEntity *pCopy = nullptr;
-			if(Type == ENTTYPE_PROJECTILE)
-				pCopy = new CProjectile(*((CProjectile *)pEnt));
-			else if(Type == ENTTYPE_LASER)
-				pCopy = new CLaser(*((CLaser *)pEnt));
-			else if(Type == ENTTYPE_DRAGGER)
-				pCopy = new CDragger(*((CDragger *)pEnt));
-			else if(Type == ENTTYPE_CHARACTER)
-				pCopy = new CCharacter(*((CCharacter *)pEnt));
-			else if(Type == ENTTYPE_PICKUP)
-				pCopy = new CPickup(*((CPickup *)pEnt));
-			else if(Type == ENTTYPE_PLASMA)
-				pCopy = new CPlasma(*((CPlasma *)pEnt));
+			if(!m_apEntityRecycleBin[Type].empty())
+			{
+				pCopy = m_apEntityRecycleBin[Type].back();
+				m_apEntityRecycleBin[Type].pop_back();
+
+				if(Type == ENTTYPE_PROJECTILE)
+					*((CProjectile *)pCopy) = *((CProjectile *)pEnt);
+				else if(Type == ENTTYPE_LASER)
+					*((CLaser *)pCopy) = *((CLaser *)pEnt);
+				else if(Type == ENTTYPE_DRAGGER)
+					*((CDragger *)pCopy) = *((CDragger *)pEnt);
+				else if(Type == ENTTYPE_CHARACTER)
+					*((CCharacter *)pCopy) = *((CCharacter *)pEnt);
+				else if(Type == ENTTYPE_PICKUP)
+					*((CPickup *)pCopy) = *((CPickup *)pEnt);
+				else if(Type == ENTTYPE_PLASMA)
+					*((CPlasma *)pCopy) = *((CPlasma *)pEnt);
+			}
+			else
+			{
+				if(Type == ENTTYPE_PROJECTILE)
+					pCopy = new CProjectile(*((CProjectile *)pEnt));
+				else if(Type == ENTTYPE_LASER)
+					pCopy = new CLaser(*((CLaser *)pEnt));
+				else if(Type == ENTTYPE_DRAGGER)
+					pCopy = new CDragger(*((CDragger *)pEnt));
+				else if(Type == ENTTYPE_CHARACTER)
+					pCopy = new CCharacter(*((CCharacter *)pEnt));
+				else if(Type == ENTTYPE_PICKUP)
+					pCopy = new CPickup(*((CPickup *)pEnt));
+				else if(Type == ENTTYPE_PLASMA)
+					pCopy = new CPlasma(*((CPlasma *)pEnt));
+			}
 			if(pCopy)
 			{
 				pCopy->m_pParent = nullptr;
@@ -731,34 +790,53 @@ void CGameWorld::CopyWorld(CGameWorld *pFrom)
 	m_Teams = pFrom->m_Teams;
 	m_Core.m_vSwitchers = pFrom->m_Core.m_vSwitchers;
 	m_PredictedEvents = pFrom->m_PredictedEvents;
-	// delete the previous entities
-	Clear();
-	for(int i = 0; i < MAX_CLIENTS; i++)
-	{
-		m_apCharacters[i] = nullptr;
-		m_Core.m_apCharacters[i] = nullptr;
-	}
+
+	// recycle previous entities instead of allocating from heap
+	RecycleActiveEntities();
+
 	// copy and add the new entities
 	for(int Type = 0; Type < NUM_ENTTYPES; Type++)
 	{
 		for(CEntity *pEnt = pFrom->FindLast(Type); pEnt; pEnt = pEnt->TypePrev())
 		{
 			CEntity *pCopy = nullptr;
-			if(Type == ENTTYPE_PROJECTILE)
-				pCopy = new CProjectile(*((CProjectile *)pEnt));
-			else if(Type == ENTTYPE_LASER)
-				pCopy = new CLaser(*((CLaser *)pEnt));
-			else if(Type == ENTTYPE_DRAGGER)
-				pCopy = new CDragger(*((CDragger *)pEnt));
-			else if(Type == ENTTYPE_CHARACTER)
-				pCopy = new CCharacter(*((CCharacter *)pEnt));
-			else if(Type == ENTTYPE_PICKUP)
-				pCopy = new CPickup(*((CPickup *)pEnt));
-			else if(Type == ENTTYPE_PLASMA)
-				pCopy = new CPlasma(*((CPlasma *)pEnt));
+			if(!m_apEntityRecycleBin[Type].empty())
+			{
+				pCopy = m_apEntityRecycleBin[Type].back();
+				m_apEntityRecycleBin[Type].pop_back();
+
+				if(Type == ENTTYPE_PROJECTILE)
+					*((CProjectile *)pCopy) = *((CProjectile *)pEnt);
+				else if(Type == ENTTYPE_LASER)
+					*((CLaser *)pCopy) = *((CLaser *)pEnt);
+				else if(Type == ENTTYPE_DRAGGER)
+					*((CDragger *)pCopy) = *((CDragger *)pEnt);
+				else if(Type == ENTTYPE_CHARACTER)
+					*((CCharacter *)pCopy) = *((CCharacter *)pEnt);
+				else if(Type == ENTTYPE_PICKUP)
+					*((CPickup *)pCopy) = *((CPickup *)pEnt);
+				else if(Type == ENTTYPE_PLASMA)
+					*((CPlasma *)pCopy) = *((CPlasma *)pEnt);
+			}
+			else
+			{
+				if(Type == ENTTYPE_PROJECTILE)
+					pCopy = new CProjectile(*((CProjectile *)pEnt));
+				else if(Type == ENTTYPE_LASER)
+					pCopy = new CLaser(*((CLaser *)pEnt));
+				else if(Type == ENTTYPE_DRAGGER)
+					pCopy = new CDragger(*((CDragger *)pEnt));
+				else if(Type == ENTTYPE_CHARACTER)
+					pCopy = new CCharacter(*((CCharacter *)pEnt));
+				else if(Type == ENTTYPE_PICKUP)
+					pCopy = new CPickup(*((CPickup *)pEnt));
+				else if(Type == ENTTYPE_PLASMA)
+					pCopy = new CPlasma(*((CPlasma *)pEnt));
+			}
 			if(pCopy)
 			{
 				pCopy->m_pParent = pEnt;
+				pCopy->m_pChild = nullptr;
 				pEnt->m_pChild = pCopy;
 				this->InsertEntity(pCopy);
 			}
@@ -853,10 +931,18 @@ void CGameWorld::OnModified() const
 
 void CGameWorld::Clear()
 {
+	m_pNextTraverseEntity = nullptr;
 	// delete all entities
 	for(auto &pFirstEntityType : m_apFirstEntityTypes)
 		while(pFirstEntityType)
 			delete pFirstEntityType; // NOLINT(clang-analyzer-cplusplus.NewDelete)
+
+	for(auto &vRecycled : m_apEntityRecycleBin)
+	{
+		for(CEntity *pEnt : vRecycled)
+			delete pEnt;
+		vRecycled.clear();
+	}
 }
 
 bool CGameWorld::EmulateBug(int Bug) const

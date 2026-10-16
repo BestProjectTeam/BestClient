@@ -1,6 +1,7 @@
 #include "nameplates.h"
 
 #include <base/str.h>
+#include <base/time.h>
 
 #include <engine/font_icons.h>
 #include <engine/graphics.h>
@@ -366,6 +367,7 @@ private:
 	float m_FontSize = -INFINITY;
 	// bestclient
 	bool m_Gradient = false;
+	float m_LastPhase = -1.0f;
 	// bestclient
 
 protected:
@@ -390,16 +392,36 @@ protected:
 		if(!HasWarColor && g_Config.m_BcNameplateGradient && (!Data.m_InGame || CBcGradient::AppliesTo(Data.m_ClientId, &This)))
 		{
 			UseGradient = true;
-			NeedsUpdate = true;
+			if(g_Config.m_BcNameplateGradientAnimateSpeed != 0)
+			{
+				const float Phase = CBcGradient::AnimatePhase(This.Client()->GlobalTime());
+				float PhaseDiff = absolute(Phase - m_LastPhase);
+				if(PhaseDiff > 0.5f)
+					PhaseDiff = 1.0f - PhaseDiff;
+				if(m_LastPhase < 0.0f || PhaseDiff >= 0.015f)
+					NeedsUpdate = true;
+			}
+			else if(m_LastPhase < 0.0f)
+			{
+				NeedsUpdate = true;
+			}
 		}
 		if(m_Gradient != UseGradient)
+		{
 			NeedsUpdate = true;
+			m_LastPhase = -1.0f;
+		}
 		m_Gradient = UseGradient;
 		return NeedsUpdate;
 		// bestclient
 	}
 	// bestclient
 	bool SoftUpdate() const override { return m_Gradient; }
+	void Reset(CGameClient &This) override
+	{
+		CNamePlatePartText::Reset(This);
+		m_LastPhase = -1.0f;
+	}
 	// bestclient
 	void UpdateText(CGameClient &This, const CNamePlateData &Data) override
 	{
@@ -411,6 +433,7 @@ protected:
 		if(m_Gradient)
 		{
 			const float Phase = CBcGradient::AnimatePhase(This.Client()->GlobalTime());
+			m_LastPhase = Phase;
 			Cursor.m_vColorSplits = CBcGradient::BuildAnimatedTextSplits(m_aText, Data.m_ClientId, &This, Phase);
 			const unsigned OldFlags = This.TextRender()->GetRenderFlags();
 			This.TextRender()->SetRenderFlags(OldFlags | ETextRenderFlags::TEXT_RENDER_FLAG_ONE_TIME_USE);
@@ -422,6 +445,7 @@ protected:
 		}
 		else
 		{
+			m_LastPhase = -1.0f;
 			This.TextRender()->CreateOrAppendTextContainer(m_TextContainerIndex, &Cursor, m_aText);
 		}
 		// bestclient
@@ -456,6 +480,7 @@ private:
 	float m_FontSize = -INFINITY;
 	// bestclient
 	bool m_Gradient = false;
+	float m_LastPhase = -1.0f;
 	// bestclient
 
 protected:
@@ -475,16 +500,36 @@ protected:
 		if(!HasWarClanColor && g_Config.m_BcNameplateGradientClan && (!Data.m_InGame || CBcGradient::AppliesTo(Data.m_ClientId, &This)))
 		{
 			UseGradient = true;
-			NeedsUpdate = true;
+			if(g_Config.m_BcNameplateGradientAnimateSpeed != 0)
+			{
+				const float Phase = CBcGradient::AnimatePhase(This.Client()->GlobalTime());
+				float PhaseDiff = absolute(Phase - m_LastPhase);
+				if(PhaseDiff > 0.5f)
+					PhaseDiff = 1.0f - PhaseDiff;
+				if(m_LastPhase < 0.0f || PhaseDiff >= 0.015f)
+					NeedsUpdate = true;
+			}
+			else if(m_LastPhase < 0.0f)
+			{
+				NeedsUpdate = true;
+			}
 		}
 		if(m_Gradient != UseGradient)
+		{
 			NeedsUpdate = true;
+			m_LastPhase = -1.0f;
+		}
 		m_Gradient = UseGradient;
 		return NeedsUpdate;
 		// bestclient
 	}
 	// bestclient
 	bool SoftUpdate() const override { return m_Gradient; }
+	void Reset(CGameClient &This) override
+	{
+		CNamePlatePartText::Reset(This);
+		m_LastPhase = -1.0f;
+	}
 	// bestclient
 	void UpdateText(CGameClient &This, const CNamePlateData &Data) override
 	{
@@ -496,6 +541,7 @@ protected:
 		if(m_Gradient)
 		{
 			const float Phase = CBcGradient::AnimatePhase(This.Client()->GlobalTime());
+			m_LastPhase = Phase;
 			Cursor.m_vColorSplits = CBcGradient::BuildAnimatedTextSplits(m_aText, Data.m_ClientId, &This, Phase);
 			const unsigned OldFlags = This.TextRender()->GetRenderFlags();
 			This.TextRender()->SetRenderFlags(OldFlags | ETextRenderFlags::TEXT_RENDER_FLAG_ONE_TIME_USE);
@@ -507,6 +553,7 @@ protected:
 		}
 		else
 		{
+			m_LastPhase = -1.0f;
 			This.TextRender()->CreateOrAppendTextContainer(m_TextContainerIndex, &Cursor, m_aText);
 		}
 		// bestclient
@@ -957,40 +1004,43 @@ private:
 			return;
 		m_Inited = true;
 
-		AddPart<CNamePlatePartCountry>(This); // TClient
-		AddPart<CNamePlatePartPing>(This); // TClient
-		AddPart<CNamePlatePartIgnoreMark>(This); // TClient
-		AddPart<CNamePlatePartFriendMark>(This);
-		AddPart<CNamePlatePartClientId>(This, false);
-		// bestclient
-		AddPart<CNamePlatePartBClientIndicator>(This);
-		AddPart<CNamePlatePartVoiceTalking>(This);
-		// bestclient
-		AddPart<CNamePlatePartName>(This);
-		AddPart<CNamePlatePartNewLine>(This);
-		// bestclient
-		AddPart<CNamePlatePartBClientVersion>(This);
-		AddPart<CNamePlatePartNewLine>(This);
-		// bestclient
+		if(m_vpParts.empty())
+		{
+			AddPart<CNamePlatePartCountry>(This); // TClient
+			AddPart<CNamePlatePartPing>(This); // TClient
+			AddPart<CNamePlatePartIgnoreMark>(This); // TClient
+			AddPart<CNamePlatePartFriendMark>(This);
+			AddPart<CNamePlatePartClientId>(This, false);
+			// bestclient
+			AddPart<CNamePlatePartBClientIndicator>(This);
+			AddPart<CNamePlatePartVoiceTalking>(This);
+			// bestclient
+			AddPart<CNamePlatePartName>(This);
+			AddPart<CNamePlatePartNewLine>(This);
+			// bestclient
+			AddPart<CNamePlatePartBClientVersion>(This);
+			AddPart<CNamePlatePartNewLine>(This);
+			// bestclient
 
-		AddPart<CNamePlatePartClan>(This);
-		AddPart<CNamePlatePartNewLine>(This);
+			AddPart<CNamePlatePartClan>(This);
+			AddPart<CNamePlatePartNewLine>(This);
 
-		AddPart<CNamePlatePartReason>(This); // TClient
-		AddPart<CNamePlatePartNewLine>(This); // TClient
-		AddPart<CNamePlatePartSkin>(This); // TClient
-		AddPart<CNamePlatePartNewLine>(This); // TClient
+			AddPart<CNamePlatePartReason>(This); // TClient
+			AddPart<CNamePlatePartNewLine>(This); // TClient
+			AddPart<CNamePlatePartSkin>(This); // TClient
+			AddPart<CNamePlatePartNewLine>(This); // TClient
 
-		AddPart<CNamePlatePartClientId>(This, true);
-		AddPart<CNamePlatePartNewLine>(This);
+			AddPart<CNamePlatePartClientId>(This, true);
+			AddPart<CNamePlatePartNewLine>(This);
 
-		AddPart<CNamePlatePartHookStrongWeak>(This);
-		AddPart<CNamePlatePartHookStrongWeakId>(This);
-		AddPart<CNamePlatePartNewLine>(This);
+			AddPart<CNamePlatePartHookStrongWeak>(This);
+			AddPart<CNamePlatePartHookStrongWeakId>(This);
+			AddPart<CNamePlatePartNewLine>(This);
 
-		AddPart<CNamePlatePartDirection>(This, DIRECTION_LEFT);
-		AddPart<CNamePlatePartDirection>(This, DIRECTION_UP);
-		AddPart<CNamePlatePartDirection>(This, DIRECTION_RIGHT);
+			AddPart<CNamePlatePartDirection>(This, DIRECTION_LEFT);
+			AddPart<CNamePlatePartDirection>(This, DIRECTION_UP);
+			AddPart<CNamePlatePartDirection>(This, DIRECTION_RIGHT);
+		}
 	}
 
 public:
@@ -1005,6 +1055,7 @@ public:
 	}
 	void Reset(CGameClient &This)
 	{
+		m_Inited = false;
 		for(auto &Part : m_vpParts)
 			Part->Reset(This);
 	}
@@ -1085,11 +1136,31 @@ class CNamePlates::CNamePlatesData
 {
 public:
 	CNamePlate m_aNamePlates[MAX_CLIENTS];
+	int m_aLastUpdateTick[MAX_CLIENTS];
+	float m_aLastAlpha[MAX_CLIENTS];
+	int m_InitedThisFrame = 0;
+
+	CNamePlatesData()
+	{
+		ResetState();
+	}
+
+	void ResetState()
+	{
+		for(int ClientId = 0; ClientId < MAX_CLIENTS; ClientId++)
+		{
+			m_aLastUpdateTick[ClientId] = -1;
+			m_aLastAlpha[ClientId] = -1.0f;
+		}
+		m_InitedThisFrame = 0;
+	}
 };
 
 void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *pPlayerInfo, float Alpha)
 {
 	// bestclient
+	if(g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideNames)
+		return;
 	if(!GameClient()->OptimizerAllowRenderPos(Position))
 		return;
 	// bestclient
@@ -1110,11 +1181,6 @@ void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *p
 	const bool OtherTeam = GameClient()->IsOtherTeam(pPlayerInfo->m_ClientId);
 
 	Data.m_InGame = true;
-
-	// bestclient
-	if(g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideNames)
-		return;
-	// bestclient
 
 	Data.m_ShowName = pPlayerInfo->m_Local ? g_Config.m_ClNamePlatesOwn : g_Config.m_ClNamePlates;
 	str_copy(Data.m_aName, ClientData.m_aName);
@@ -1144,7 +1210,7 @@ void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *p
 	Data.m_ShowClan = Data.m_ShowName && g_Config.m_ClNamePlatesClan;
 	// bestclient
 	if(!DemoTeeClanOverride)
-	// bestclient
+		// bestclient
 		str_copy(Data.m_aClan, GameClient()->m_aClients[pPlayerInfo->m_ClientId].m_aClan);
 	Data.m_FontSizeClan = 18.0f + 20.0f * g_Config.m_ClNamePlatesClanSize / 100.0f;
 
@@ -1162,6 +1228,9 @@ void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *p
 	if(GameClient()->m_FastPractice.Enabled() && !GameClient()->m_Snap.m_SpecInfo.m_Active && !GameClient()->m_FastPractice.IsPracticeParticipant(pPlayerInfo->m_ClientId))
 		Alpha = std::min(Alpha, 0.5f);
 	// bestclient
+
+	if(Alpha <= 0.001f)
+		return;
 
 	Data.m_Color = ColorRGBA(1.0f, 1.0f, 1.0f);
 	if(g_Config.m_ClNamePlatesTeamcolors)
@@ -1282,14 +1351,32 @@ void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *p
 		Data.m_ShowClan = true;
 	Data.m_Local = pPlayerInfo->m_Local;
 
-	// Check if the nameplate is actually on screen
-	CNamePlate &NamePlate = m_pData->m_aNamePlates[pPlayerInfo->m_ClientId];
-	NamePlate.Update(*GameClient(), Data);
 	// bestclient
 	GameClient()->m_FlyingNamePlates.Update(pPlayerInfo->m_ClientId, Position);
 	const vec2 RenderPos = GameClient()->m_FlyingNamePlates.GetRenderPos(pPlayerInfo->m_ClientId, Position);
 	if(!GameClient()->OptimizerAllowRenderPos(RenderPos))
 		return;
+	// Check if the nameplate is actually on screen
+	const int ClientId = pPlayerInfo->m_ClientId;
+	CNamePlate &NamePlate = m_pData->m_aNamePlates[ClientId];
+	const int CurTick = Client()->GameTick(g_Config.m_ClDummy);
+
+	const bool NeedsUpdate = !NamePlate.IsInited() ||
+				 (CurTick != m_pData->m_aLastUpdateTick[ClientId]) ||
+				 (absolute(Alpha - m_pData->m_aLastAlpha[ClientId]) > 0.05f);
+
+	if(NeedsUpdate)
+	{
+		if(!NamePlate.IsInited())
+		{
+			if(m_pData->m_InitedThisFrame >= 4)
+				return;
+			m_pData->m_InitedThisFrame++;
+		}
+		m_pData->m_aLastUpdateTick[ClientId] = CurTick;
+		m_pData->m_aLastAlpha[ClientId] = Alpha;
+		NamePlate.Update(*GameClient(), Data);
+	}
 	NamePlate.Render(*GameClient(), RenderPos);
 	// bestclient
 }
@@ -1415,6 +1502,7 @@ void CNamePlates::ResetNamePlates()
 {
 	for(CNamePlate &NamePlate : m_pData->m_aNamePlates)
 		NamePlate.Reset(*GameClient());
+	m_pData->ResetState();
 	// bestclient
 	GameClient()->m_FlyingNamePlates.OnReset();
 	// bestclient
@@ -1436,6 +1524,8 @@ float CNamePlates::GetNamePlateOffset(int ClientId) const
 
 void CNamePlates::OnRender()
 {
+	m_pData->m_InitedThisFrame = 0;
+
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return;
 
