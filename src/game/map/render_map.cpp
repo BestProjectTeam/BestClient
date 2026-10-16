@@ -749,7 +749,7 @@ void CRenderMap::RenderTilemap(CTile *pTiles, int w, int h, float Scale, ColorRG
 	Graphics()->MapScreen(ScreenRect);
 }
 
-void CRenderMap::RenderTeleOverlay(CTeleTile *pTele, int w, int h, float Scale, int OverlayRenderFlag, float Alpha)
+void CRenderMap::RenderTeleOverlay(CTeleTile *pTele, int w, int h, float Scale, int OverlayRenderFlag, float Alpha, const std::function<float(int, int)> &ScaleAt)
 {
 	if(!(OverlayRenderFlag & OVERLAYRENDERFLAG_TEXT))
 		return;
@@ -785,9 +785,10 @@ void CRenderMap::RenderTeleOverlay(CTeleTile *pTele, int w, int h, float Scale, 
 				// Auto-resize text to fit inside the tile
 				float ScaledWidth = TextRender()->TextWidth(Size * Scale, aBuf, -1);
 				float Factor = std::clamp(Scale / ScaledWidth, 0.0f, 1.0f);
-				float LocalSize = Size * Factor;
+				float LocalSize = Size * Factor * (ScaleAt ? std::clamp(ScaleAt(x, y), 0.0f, 1.0f) : 1.0f);
 				float ToCenterOffset = (1 - LocalSize) / 2.f;
-				TextRender()->Text((x + 0.5f) * Scale - (ScaledWidth * Factor) / 2.0f, (y + ToCenterOffset) * Scale, LocalSize * Scale, aBuf);
+				float LocalWidth = TextRender()->TextWidth(LocalSize * Scale, aBuf, -1);
+				TextRender()->Text((x + 0.5f) * Scale - LocalWidth / 2.0f, (y + ToCenterOffset) * Scale, LocalSize * Scale, aBuf);
 			}
 		}
 	}
@@ -873,7 +874,7 @@ void CRenderMap::RenderSpeedupOverlay(CSpeedupTile *pSpeedup, int w, int h, floa
 	Graphics()->MapScreen(ScreenRect);
 }
 
-void CRenderMap::RenderSwitchOverlay(CSwitchTile *pSwitch, int w, int h, float Scale, int OverlayRenderFlag, float Alpha)
+void CRenderMap::RenderSwitchOverlay(CSwitchTile *pSwitch, int w, int h, float Scale, int OverlayRenderFlag, float Alpha, const std::function<float(int, int)> &ScaleAt)
 {
 	if(!(OverlayRenderFlag & OVERLAYRENDERFLAG_TEXT))
 		return;
@@ -893,7 +894,6 @@ void CRenderMap::RenderSwitchOverlay(CSwitchTile *pSwitch, int w, int h, float S
 	EndX = std::min(w, EndX);
 
 	float Size = g_Config.m_ClTextEntitiesSize / 100.f;
-	float ToCenterOffset = (1 - Size) / 2.f;
 	char aBuf[16];
 
 	TextRender()->TextColor(1.0f, 1.0f, 1.0f, Alpha);
@@ -902,19 +902,26 @@ void CRenderMap::RenderSwitchOverlay(CSwitchTile *pSwitch, int w, int h, float S
 		for(int x = StartX; x < EndX; x++)
 		{
 			int c = x + y * w;
+			const float SafeScale = ScaleAt ? std::clamp(ScaleAt(x, y), 0.0f, 1.0f) : 1.0f;
 
 			unsigned char Index = pSwitch[c].m_Number;
 			if(Index && IsSwitchTileNumberUsed(pSwitch[c].m_Type))
 			{
 				str_format(aBuf, sizeof(aBuf), "%d", Index);
-				TextRender()->Text(x * Scale, (y + ToCenterOffset / 2) * Scale, Size * Scale / 2.f, aBuf);
+				const float FullWidth = TextRender()->TextWidth(Size * Scale / 2.0f, aBuf, -1);
+				const float LocalSize = Size * SafeScale * std::clamp(Scale / std::max(FullWidth, 1.0f), 0.0f, 1.0f);
+				const float Width = TextRender()->TextWidth(LocalSize * Scale / 2.0f, aBuf, -1);
+				TextRender()->Text((x + 0.5f) * Scale - Width / 2.0f, (y + (1 - LocalSize) / 4.0f) * Scale, LocalSize * Scale / 2.f, aBuf);
 			}
 
 			unsigned char Delay = pSwitch[c].m_Delay;
 			if(Delay && IsSwitchTileDelayUsed(pSwitch[c].m_Type))
 			{
 				str_format(aBuf, sizeof(aBuf), "%d", Delay);
-				TextRender()->Text(x * Scale, (y + 0.5f + ToCenterOffset / 2) * Scale, Size * Scale / 2.f, aBuf);
+				const float FullWidth = TextRender()->TextWidth(Size * Scale / 2.0f, aBuf, -1);
+				const float LocalSize = Size * SafeScale * std::clamp(Scale / std::max(FullWidth, 1.0f), 0.0f, 1.0f);
+				const float Width = TextRender()->TextWidth(LocalSize * Scale / 2.0f, aBuf, -1);
+				TextRender()->Text((x + 0.5f) * Scale - Width / 2.0f, (y + 0.5f + (1 - LocalSize) / 4.0f) * Scale, LocalSize * Scale / 2.f, aBuf);
 			}
 		}
 	}

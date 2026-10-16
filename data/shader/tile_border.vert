@@ -1,6 +1,6 @@
 layout (location = 0) in vec2 inVertex;
 #ifdef TW_TILE_TEXTURED
-layout (location = 1) in uvec4 inVertexTexCoord;
+layout (location = 1) in vec4 inVertexTexCoord;
 #endif
 
 uniform mat4x2 gPos;

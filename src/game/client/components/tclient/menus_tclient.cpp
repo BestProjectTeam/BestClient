@@ -1018,6 +1018,22 @@ void CMenus::RenderSettingsTClientSettings(CUIRect MainView)
 
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcOutline, TCLocalize("Show any enabled outlines"), &g_Config.m_TcOutline, &Column, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcOutlineEntities, TCLocalize("Only show outlines in entities"), &g_Config.m_TcOutlineEntities, &Column, LineSize);
+	Column.HSplitTop(LineSize, &Button, &Column);
+	Ui()->DoScrollbarOption(&g_Config.m_BcEntitiesRounding, &g_Config.m_BcEntitiesRounding, &Button, TCLocalize("Entity rounding (%)"), 0, 100);
+	Column.HSplitTop(LineSize, &Button, &Column);
+	{
+		static CButtonContainer s_aCornerModes[3];
+		const char *apNames[] = {TCLocalize("Outer corners"), TCLocalize("Inner corners"), TCLocalize("All corners")};
+		const float Width = Button.w / 3.0f;
+		for(int Mode = 0; Mode < 3; ++Mode)
+		{
+			CUIRect Tab;
+			Button.VSplitLeft(Width, &Tab, &Button);
+			if(DoButton_MenuTab(&s_aCornerModes[Mode], apNames[Mode], g_Config.m_BcEntitiesRoundingMode == Mode, &Tab, Mode == 0 ? IGraphics::CORNER_L : Mode == 2 ? IGraphics::CORNER_R :
+																						 IGraphics::CORNER_NONE))
+				g_Config.m_BcEntitiesRoundingMode = Mode;
+		}
+	}
 
 	auto DoOutlineType = [&](CButtonContainer &ButtonContainer, const char *pName, int &Enable, int &Width, unsigned int &Color, const unsigned int &ColorDefault) {
 		// Checkbox & Color

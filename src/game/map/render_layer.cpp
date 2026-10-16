@@ -341,6 +341,13 @@ void CRenderLayerTile::RenderTileLayer(const ColorRGBA &Color, const CRenderLaye
 	int ScreenRectX0 = std::floor(ScreenRect.m_TopLeft.x / 32);
 	int ScreenRectY1 = std::ceil(ScreenRect.m_BottomRight.y / 32);
 	int ScreenRectX1 = std::ceil(ScreenRect.m_BottomRight.x / 32);
+	if(m_pEntityRegions && m_RoundingPercent > 0 && !pTileLayerVisuals)
+	{
+		--ScreenRectX0;
+		--ScreenRectY0;
+		++ScreenRectX1;
+		++ScreenRectY1;
+	}
 
 	if(IsVisibleInClipRegion(m_LayerClip))
 	{
@@ -360,7 +367,8 @@ void CRenderLayerTile::RenderTileLayer(const ColorRGBA &Color, const CRenderLaye
 				size_t EndIndex = Y1 * Visuals.m_Width - 1;
 				const auto &Start = Visuals.m_vTilesOfLayer[StartIndex];
 				const auto &End = Visuals.m_vTilesOfLayer[EndIndex];
-				unsigned int NumVertices = ((End.IndexBufferByteOffset() - Start.IndexBufferByteOffset()) / sizeof(unsigned int)) + (End.DoDraw() ? 6lu : 0lu);
+				dbg_assert(End.IndexBufferByteOffset() >= Start.IndexBufferByteOffset(), "Tile offsets are not monotone.");
+				unsigned int NumVertices = ((End.IndexBufferByteOffset() - Start.IndexBufferByteOffset()) / sizeof(unsigned int)) + End.QuadCount() * 6u;
 
 				if(NumVertices)
 				{
@@ -386,7 +394,7 @@ void CRenderLayerTile::RenderTileLayer(const ColorRGBA &Color, const CRenderLaye
 					const auto &Start = Visuals.m_vTilesOfLayer[StartIndex];
 					const auto &End = Visuals.m_vTilesOfLayer[EndIndex];
 					dbg_assert(End.IndexBufferByteOffset() >= Start.IndexBufferByteOffset(), "Tile offsets are not monotone.");
-					unsigned int NumVertices = ((End.IndexBufferByteOffset() - Start.IndexBufferByteOffset()) / sizeof(unsigned int)) + (End.DoDraw() ? 6lu : 0lu);
+					unsigned int NumVertices = ((End.IndexBufferByteOffset() - Start.IndexBufferByteOffset()) / sizeof(unsigned int)) + End.QuadCount() * 6u;
 
 					if(NumVertices)
 					{
@@ -463,7 +471,7 @@ void CRenderLayerTile::RenderTileBorder(const ColorRGBA &Color, int BorderX0, in
 
 	// borders
 	auto DrawBorder = [&](vec2 Offset, vec2 Scale, CTileLayerVisuals::CTileVisual &StartVisual, CTileLayerVisuals::CTileVisual &EndVisual) {
-		unsigned int DrawNum = ((EndVisual.IndexBufferByteOffset() - StartVisual.IndexBufferByteOffset()) / (sizeof(unsigned int) * 6)) + (EndVisual.DoDraw() ? 1lu : 0lu);
+		unsigned int DrawNum = ((EndVisual.IndexBufferByteOffset() - StartVisual.IndexBufferByteOffset()) / (sizeof(unsigned int) * 6)) + EndVisual.QuadCount();
 		offset_ptr_size pOffset = (offset_ptr_size)StartVisual.IndexBufferByteOffset();
 		Offset *= 32.0f;
 		Graphics()->RenderBorderTiles(Visuals.m_BufferContainerIndex, Color, pOffset, Offset, Scale, DrawNum);
@@ -581,17 +589,179 @@ ColorRGBA CRenderLayerTile::GetRenderColor(const CRenderLayerParams &Params) con
 	return Color;
 }
 
+void CRenderLayerTile::UpdateRounding()
+{
+	if(!m_pEntityRegions)
+		return;
+	const CScreenRect ScreenRect = Graphics()->GetScreen();
+	const int Percent = g_Config.m_BcEntitiesRounding;
+	const int Mode = g_Config.m_BcEntitiesRoundingMode;
+	const int Steps = RoundedTiles::Detail(Percent * 0.16f, Graphics()->ScreenWidth() / std::max(1.0f, ScreenRect.Width()));
+	const bool GeometryChanged = Percent != m_RoundingPercent || Mode != m_RoundingMode;
+	if(!GeometryChanged && Steps == m_RoundingSteps)
+		return;
+	const bool WasRounded = m_RoundingPercent > 0;
+	m_RoundingPercent = Percent;
+	m_RoundingMode = Mode;
+	m_RoundingSteps = Steps;
+	m_RoundedShapes.clear();
+	// The map-wide buffer uses a fixed sufficient detail for ordinary zoom.
+	// Zoom-only LOD changes must not synchronously re-upload every map tile.
+	if(GeometryChanged && Graphics()->IsTileBufferingEnabled() && (WasRounded || Percent > 0))
+	{
+		if(m_VisualTiles)
+			m_VisualTiles->Unload();
+		// Runtime updates must not draw the loading menu or change its projection.
+		auto LoadingCallback = std::move(m_InitCallback);
+		m_InitCallback.reset();
+		m_BuildingRoundingBuffer = true;
+		UploadTileData(m_VisualTiles, 0, false, m_RoundingGame);
+		ReuploadRoundedOverlays();
+		m_BuildingRoundingBuffer = false;
+		m_InitCallback = std::move(LoadingCallback);
+		Graphics()->MapScreen(ScreenRect);
+	}
+}
+
+const RoundedTiles::CShape *CRenderLayerTile::RoundedShape(int X, int Y, int Index)
+{
+	if(!m_pEntityRegions || m_RoundingPercent <= 0 || !Index)
+		return nullptr;
+	// A front-layer through tile and the game tile beneath it share a mesh.
+	if(!m_pEntityRegions->ShouldRoundTile(X, Y, m_RoundingLayer, Index))
+		return nullptr;
+	const int Type = m_pEntityRegions->Get(X, Y);
+	if(!Type)
+		return nullptr;
+	const unsigned Mask = m_pEntityRegions->Mask(X, Y, Type);
+	const unsigned Blockers = m_pEntityRegions->BlockerMask(X, Y, Type);
+	const unsigned Transition = m_pEntityRegions->TransitionCorners(X, Y);
+	if(Mask == 255)
+		return nullptr;
+	const int Steps = m_BuildingRoundingBuffer ? BufferedRoundingSteps : m_RoundingSteps;
+	const uint64_t Key = uint64_t(Mask) | (uint64_t(Blockers) << 8) | (uint64_t(Steps) << 16) | (uint64_t(Transition) << 23);
+	auto It = m_RoundedShapes.find(Key);
+	if(It == m_RoundedShapes.end())
+		It = m_RoundedShapes.emplace(Key, RoundedTiles::Build(Mask, m_RoundingPercent * 0.16f, m_RoundingMode, Steps, Blockers, Transition)).first;
+	return &It->second;
+}
+
+float CRenderLayerTile::RoundedOverlayScale(int X, int Y) const
+{
+	if(!m_pEntityRegions || m_RoundingPercent <= 0 || m_RoundingMode == 1)
+		return 1.0f;
+	const int Type = m_pEntityRegions->Get(X, Y);
+	if(Type != CEntityRegions::TELE && Type != CEntityRegions::SWITCH)
+		return 1.0f;
+	// A text size chosen per tile makes a number in the middle of a teleporter
+	// region much larger than the same number on its rounded end. Use one size
+	// for the whole region so labels stay consistent as the contour bends.
+	return 1.0f - (1.0f - std::sqrt(0.5f)) * (m_RoundingPercent / 100.0f);
+}
+
+void CRenderLayerTile::RenderRoundedTiles(const ColorRGBA &Color, const CRenderLayerParams &Params)
+{
+	const CScreenRect ScreenRect = Graphics()->GetScreen();
+	float X0 = ScreenRect.m_TopLeft.x, Y0 = ScreenRect.m_TopLeft.y;
+	float X1 = ScreenRect.m_BottomRight.x, Y1 = ScreenRect.m_BottomRight.y;
+	const int W = m_pLayerTilemap->m_Width, H = m_pLayerTilemap->m_Height;
+	const bool Arrays = Graphics()->HasTextureArraysSupport();
+	const float Pixels = 32.0f * Graphics()->ScreenWidth() / std::max(1.0f, X1 - X0);
+	const float Inset = std::clamp(1.25f / std::max(1.0f, Pixels), 0.0f, 0.49f);
+	const RoundedTiles::CShape Square = RoundedTiles::Build(255, 0, 0, 2);
+	if(Params.m_FpsFogEnabled && Params.m_FpsFogCullMapTiles && Params.m_FpsFogHalfW > 0.0f && Params.m_FpsFogHalfH > 0.0f)
+	{
+		const vec2 Center((X0 + X1) * 0.5f, (Y0 + Y1) * 0.5f);
+		const vec2 Half(Params.m_FpsFogHalfW, Params.m_FpsFogHalfH);
+		if(Half.x > 0 && Half.y > 0)
+		{
+			X0 = std::max(X0, Center.x - Half.x);
+			Y0 = std::max(Y0, Center.y - Half.y);
+			X1 = std::min(X1, Center.x + Half.x);
+			Y1 = std::min(Y1, Center.y + Half.y);
+		}
+	}
+	if(Arrays)
+		Graphics()->QuadsTex3DBegin();
+	else
+		Graphics()->QuadsBegin();
+	Graphics()->SetColor(Color);
+	for(int Y = (int)std::floor(Y0 / 32) - 1; Y <= (int)std::ceil(Y1 / 32); ++Y)
+		for(int X = (int)std::floor(X0 / 32) - 1; X <= (int)std::ceil(X1 / 32); ++X)
+		{
+			if(!Params.m_RenderTileBorder && (X < 0 || Y < 0 || X >= W || Y >= H))
+				continue;
+			unsigned char Index = 0, Flags = 0;
+			int Angle = -1;
+			const int MX = std::clamp(X, 0, W - 1), MY = std::clamp(Y, 0, H - 1);
+			GetTileData(&Index, &Flags, &Angle, MX, MY, 0);
+			if(!Index)
+				continue;
+			const auto *pShape = X == MX && Y == MY ? RoundedShape(X, Y, Index) : nullptr;
+			if(!pShape)
+				pShape = &Square;
+			const bool ThroughArtwork = m_RoundingLayer == 1 && CEntityRegions::IsThrough(Index);
+			const unsigned TableFlag = (Flags & (TILEFLAG_XFLIP | TILEFLAG_YFLIP)) + ((Flags & TILEFLAG_ROTATE) >> 1);
+			const auto &T = TEX_COORDS_TABLE[TableFlag];
+			for(const auto &Q : pShape->m_vQuads)
+			{
+				vec2 UV[4];
+				for(int K = 0; K < 4; ++K)
+				{
+					// Array/volume samplers clamp extrapolated corner UVs per fragment.
+					// The atlas fallback cannot do that without sampling adjacent tiles.
+					const vec2 SourceUv = RoundedTiles::SampleUv(Q, K, ThroughArtwork);
+					const vec2 SampleUv = Arrays ? SourceUv : vec2(std::clamp(SourceUv.x, 0.0f, 1.0f), std::clamp(SourceUv.y, 0.0f, 1.0f));
+					UV[K] = RoundedTiles::Bilinear({vec2(T.m_aTexX[0], T.m_aTexY[0]), vec2(T.m_aTexX[1], T.m_aTexY[1]), vec2(T.m_aTexX[2], T.m_aTexY[2]), vec2(T.m_aTexX[3], T.m_aTexY[3])}, SampleUv.x, SampleUv.y);
+					if(!Arrays)
+						UV[K] = (vec2(Index % 16, Index / 16) + vec2(Inset, Inset) + UV[K] * (1 - 2 * Inset)) / 16.0f;
+				}
+				Graphics()->QuadsSetSubsetFree(UV[0].x, UV[0].y, UV[1].x, UV[1].y, UV[3].x, UV[3].y, UV[2].x, UV[2].y, Arrays ? Index : -1);
+				const vec2 Offset(X * 32.0f, Y * 32.0f);
+				const IGraphics::CFreeformItem Item(Q.m_Pos[0] + Offset, Q.m_Pos[1] + Offset, Q.m_Pos[3] + Offset, Q.m_Pos[2] + Offset);
+				if(Arrays)
+					Graphics()->QuadsTex3DDrawFreeform(&Item, 1);
+				else
+					Graphics()->QuadsDrawFreeform(&Item, 1);
+			}
+		}
+	if(Arrays)
+		Graphics()->QuadsTex3DEnd();
+	else
+		Graphics()->QuadsEnd();
+}
+
 void CRenderLayerTile::Render(const CRenderLayerParams &Params)
 {
+	UpdateRounding();
 	UseTexture(GetTexture());
 	ColorRGBA Color = GetRenderColor(Params);
-	if(Graphics()->IsTileBufferingEnabled() && Params.m_TileAndQuadBuffering)
+	const bool Buffered = Graphics()->IsTileBufferingEnabled() && Params.m_TileAndQuadBuffering;
+	const bool DynamicRounded = m_pEntityRegions && m_RoundingPercent > 0 && (!Buffered || m_RoundingSteps > BufferedRoundingSteps);
+	if(Buffered && !DynamicRounded)
 	{
 		RenderTileLayerWithTileBuffer(Color, Params);
 	}
 	else
 	{
-		RenderTileLayerNoTileBuffer(Color, Params);
+		if(DynamicRounded)
+		{
+			Graphics()->BlendNormal();
+			if(m_RoundingGame && Params.m_RenderTileBorder)
+				RenderMap()->RenderTileRectangle(-BorderRenderDistance, -BorderRenderDistance, m_pLayerTilemap->m_Width + 2 * BorderRenderDistance, m_pLayerTilemap->m_Height + 2 * BorderRenderDistance,
+					TILE_AIR, TILE_DEATH, 32.0f, Color.Multiply(static_cast<CRenderLayerEntityGame *>(this)->GetDeathBorderColor()), TILERENDERFLAG_EXTEND | LAYERRENDERFLAG_TRANSPARENT);
+			RenderRoundedTiles(Color, Params);
+			if(m_RoundingTele)
+				RenderMap()->RenderTeleOverlay(GetData<CTeleTile>(), m_pLayerTilemap->m_Width, m_pLayerTilemap->m_Height, 32.0f,
+					(Params.m_RenderText ? OVERLAYRENDERFLAG_TEXT : 0) | (Params.m_RenderInvalidTiles ? OVERLAYRENDERFLAG_EDITOR : 0), Color.a,
+					[this](int X, int Y) { return RoundedOverlayScale(X, Y); });
+			else if(m_RoundingSwitch)
+				RenderMap()->RenderSwitchOverlay(GetData<CSwitchTile>(), m_pLayerTilemap->m_Width, m_pLayerTilemap->m_Height, 32.0f,
+					(Params.m_RenderText ? OVERLAYRENDERFLAG_TEXT : 0) | (Params.m_RenderInvalidTiles ? OVERLAYRENDERFLAG_EDITOR : 0), Color.a,
+					[this](int X, int Y) { return RoundedOverlayScale(X, Y); });
+		}
+		else
+			RenderTileLayerNoTileBuffer(Color, Params);
 	}
 
 	if(Params.m_DebugRenderTileClips && m_LayerClip.has_value())
@@ -713,9 +883,48 @@ void CRenderLayerTile::UploadTileData(std::optional<CTileLayerVisuals> &VisualsO
 			int TilesHandledCount = vTmpTiles.size();
 			Visuals.m_vTilesOfLayer[y * m_pLayerTilemap->m_Width + x].SetIndexBufferByteOffset((offset_ptr32)(TilesHandledCount));
 
-			if(AddTile(vTmpTiles, vTmpTileTexCoords, Index, Flags, x, y, DoTextureCoords, AddAsSpeedup, AngleRotate))
+			const auto *pShape = CurOverlay == 0 ? RoundedShape(x, y, Index) : nullptr;
+			if(pShape)
 			{
-				Visuals.m_vTilesOfLayer[y * m_pLayerTilemap->m_Width + x].Draw(true);
+				const bool ThroughArtwork = m_RoundingLayer == 1 && CEntityRegions::IsThrough(Index);
+				CGraphicTile Base;
+				CGraphicTileTextureCoords Tex;
+				FillTmpTile(&Base, &Tex, Flags, Index, x, y, ivec2(0, 0), 32);
+				const vec4 T[] = {Tex.m_TexCoordTopLeft, Tex.m_TexCoordTopRight, Tex.m_TexCoordBottomRight, Tex.m_TexCoordBottomLeft};
+				for(const auto &Q : pShape->m_vQuads)
+				{
+					const vec2 Offset(x * 32.0f, y * 32.0f);
+					vTmpTiles.push_back({Q.m_Pos[0] + Offset, Q.m_Pos[1] + Offset, Q.m_Pos[2] + Offset, Q.m_Pos[3] + Offset});
+					if(DoTextureCoords)
+					{
+						vec4 U[4];
+						for(int K = 0; K < 4; ++K)
+						{
+							const vec2 SourceUv = RoundedTiles::SampleUv(Q, K, ThroughArtwork);
+							U[K] = mix(mix(T[0], T[1], SourceUv.x), mix(T[3], T[2], SourceUv.x), SourceUv.y);
+						}
+						vTmpTileTexCoords.push_back({U[0], U[1], U[2], U[3]});
+					}
+				}
+			}
+			else
+				AddTile(vTmpTiles, vTmpTileTexCoords, Index, Flags, x, y, DoTextureCoords, AddAsSpeedup, AngleRotate);
+			if(CurOverlay != 0 && vTmpTiles.size() > (size_t)TilesHandledCount)
+			{
+				const float OverlayScale = RoundedOverlayScale(x, y);
+				if(OverlayScale < 1.0f)
+				{
+					auto &Tile = vTmpTiles.back();
+					const vec2 Center(x * 32.0f + 16.0f, y * 32.0f + 16.0f);
+					Tile.m_TopLeft = Center + (Tile.m_TopLeft - Center) * OverlayScale;
+					Tile.m_TopRight = Center + (Tile.m_TopRight - Center) * OverlayScale;
+					Tile.m_BottomRight = Center + (Tile.m_BottomRight - Center) * OverlayScale;
+					Tile.m_BottomLeft = Center + (Tile.m_BottomLeft - Center) * OverlayScale;
+				}
+			}
+			if(vTmpTiles.size() > (size_t)TilesHandledCount)
+			{
+				Visuals.m_vTilesOfLayer[y * m_pLayerTilemap->m_Width + x].SetQuadCount(vTmpTiles.size() - TilesHandledCount);
 
 				// calculate clip region boundaries based on draws
 				DrawLeft = std::min(DrawLeft, x);
@@ -793,6 +1002,13 @@ void CRenderLayerTile::UploadTileData(std::optional<CTileLayerVisuals> &VisualsO
 			m_LayerClip->m_Y = DrawTop * 32.0f;
 			m_LayerClip->m_Width = (DrawRight - DrawLeft + 1) * 32.0f;
 			m_LayerClip->m_Height = (DrawBottom - DrawTop + 1) * 32.0f;
+			if(m_pEntityRegions && m_RoundingPercent > 0)
+			{
+				m_LayerClip->m_X -= 16;
+				m_LayerClip->m_Y -= 16;
+				m_LayerClip->m_Width += 32;
+				m_LayerClip->m_Height += 32;
+			}
 		}
 	}
 
@@ -867,10 +1083,10 @@ void CRenderLayerTile::UploadTileData(std::optional<CTileLayerVisuals> &VisualsO
 		{
 		public:
 			vec2 m_Pos;
-			ubvec4 m_Tex;
+			vec4 m_Tex;
 		};
 
-		static_assert(sizeof(CVertex) == sizeof(vec2) + sizeof(ubvec4)); // no padding
+		static_assert(sizeof(CVertex) == sizeof(vec2) + sizeof(vec4)); // no padding
 
 		CVertex *pDst = static_cast<CVertex *>(pUploadData);
 		dbg_assert(UploadDataSize == vTmpTiles.size() * sizeof(*pDst) * 4, "invalid upload size");
@@ -898,7 +1114,7 @@ void CRenderLayerTile::UploadTileData(std::optional<CTileLayerVisuals> &VisualsO
 
 	// then create the buffer container
 	SBufferContainerInfo ContainerInfo;
-	ContainerInfo.m_Stride = (DoTextureCoords ? (sizeof(float) * 2 + sizeof(ubvec4)) : 0);
+	ContainerInfo.m_Stride = (DoTextureCoords ? (sizeof(vec2) + sizeof(vec4)) : 0);
 	ContainerInfo.m_VertBufferBindingIndex = BufferObjectIndex;
 	ContainerInfo.m_vAttributes.emplace_back();
 	SBufferContainerInfo::SAttribute *pAttr = &ContainerInfo.m_vAttributes.back();
@@ -912,10 +1128,10 @@ void CRenderLayerTile::UploadTileData(std::optional<CTileLayerVisuals> &VisualsO
 		ContainerInfo.m_vAttributes.emplace_back();
 		pAttr = &ContainerInfo.m_vAttributes.back();
 		pAttr->m_DataTypeCount = 4;
-		pAttr->m_Type = GRAPHICS_TYPE_UNSIGNED_BYTE;
+		pAttr->m_Type = GRAPHICS_TYPE_FLOAT;
 		pAttr->m_Normalized = false;
 		pAttr->m_pOffset = (void *)(sizeof(vec2));
-		pAttr->m_FuncType = 1;
+		pAttr->m_FuncType = 0;
 	}
 
 	Visuals.m_BufferContainerIndex = Graphics()->CreateBufferContainer(&ContainerInfo);
@@ -1587,6 +1803,13 @@ void CRenderLayerEntityTele::Init()
 	UploadTileData(m_VisualTeleNumbers, 1, false);
 }
 
+void CRenderLayerEntityTele::ReuploadRoundedOverlays()
+{
+	if(m_VisualTeleNumbers)
+		m_VisualTeleNumbers->Unload();
+	UploadTileData(m_VisualTeleNumbers, 1, false);
+}
+
 void CRenderLayerEntityTele::InitTileData()
 {
 	m_pTeleTiles = GetData<CTeleTile>();
@@ -1733,6 +1956,16 @@ void CRenderLayerEntitySwitch::Init()
 {
 	InitCallback();
 	UploadTileData(m_VisualTiles, 0, false);
+	UploadTileData(m_VisualSwitchNumberTop, 1, false);
+	UploadTileData(m_VisualSwitchNumberBottom, 2, false);
+}
+
+void CRenderLayerEntitySwitch::ReuploadRoundedOverlays()
+{
+	if(m_VisualSwitchNumberTop)
+		m_VisualSwitchNumberTop->Unload();
+	if(m_VisualSwitchNumberBottom)
+		m_VisualSwitchNumberBottom->Unload();
 	UploadTileData(m_VisualSwitchNumberTop, 1, false);
 	UploadTileData(m_VisualSwitchNumberBottom, 2, false);
 }

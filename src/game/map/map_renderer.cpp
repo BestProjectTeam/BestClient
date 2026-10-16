@@ -20,6 +20,8 @@ void CMapRenderer::Load(ERenderType Type, CLayers *pLayers, IMapImages *pMapImag
 {
 	Clear();
 
+	auto pEntityRegions = std::make_shared<CEntityRegions>();
+	pEntityRegions->Load(pLayers);
 	std::shared_ptr<CEnvelopeManager> pEnvelopeManager = std::make_shared<CEnvelopeManager>(pEnvelopeEval, pLayers->Map());
 	bool PassedGameLayer = false;
 
@@ -140,6 +142,8 @@ void CMapRenderer::Load(ERenderType Type, CLayers *pLayers, IMapImages *pMapImag
 			// just ignore invalid layers from rendering
 			if(pRenderLayer)
 			{
+				if(LayerType == LAYER_GAME || LayerType == LAYER_FRONT || LayerType == LAYER_TELE || LayerType == LAYER_SWITCH)
+					static_cast<CRenderLayerTile *>(pRenderLayer.get())->SetEntityRegions(pEntityRegions, LayerType == LAYER_TELE, LayerType == LAYER_GAME, LayerType == LAYER_SWITCH);
 				pRenderLayer->OnInit(Graphics(), TextRender(), RenderMap(), pEnvelopeManager, pLayers->Map(), pMapImages, CallbackLayerInitOptional);
 				if(pRenderLayer->IsValid())
 				{

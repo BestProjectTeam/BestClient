@@ -11,14 +11,17 @@ using offset_ptr32 = unsigned int;
 
 #include <engine/graphics.h>
 
+#include <game/map/entity_regions.h>
 #include <game/map/envelope_manager.h>
 #include <game/map/render_component.h>
 #include <game/map/render_map.h>
+#include <game/map/rounded_tiles.h>
 #include <game/mapitems.h>
 #include <game/mapitems_ex.h>
 
 #include <memory>
 #include <optional>
+#include <unordered_map>
 #include <vector>
 
 class CMapLayers;
@@ -127,6 +130,16 @@ class CRenderLayerTile : public CRenderLayer
 {
 public:
 	CRenderLayerTile(int GroupId, int LayerId, int Flags, CMapItemLayerTilemap *pLayerTilemap);
+	void SetEntityRegions(std::shared_ptr<CEntityRegions> pRegions, bool Tele, bool Game, bool Switch)
+	{
+		m_pEntityRegions = std::move(pRegions);
+		m_RoundingTele = Tele;
+		m_RoundingGame = Game;
+		m_RoundingSwitch = Switch;
+		m_RoundingLayer = Switch ? 3 : Tele ? 2 :
+				       Game         ? 0 :
+						      1;
+	}
 	~CRenderLayerTile() override = default;
 	void Render(const CRenderLayerParams &Params) override;
 	bool DoRender(const CRenderLayerParams &Params) override;
@@ -145,8 +158,20 @@ protected:
 	virtual ColorRGBA GetRenderColor(const CRenderLayerParams &Params) const;
 	virtual void InitTileData();
 	virtual void GetTileData(unsigned char *pIndex, unsigned char *pFlags, int *pAngleRotate, unsigned int x, unsigned int y, int CurOverlay) const;
+	virtual void ReuploadRoundedOverlays() {}
 	IGraphics::CTextureHandle GetTexture() const override { return m_TextureHandle; }
 	CTile *m_pTiles;
+	std::shared_ptr<CEntityRegions> m_pEntityRegions;
+	bool m_RoundingTele = false, m_RoundingGame = false, m_RoundingSwitch = false;
+	int m_RoundingLayer = 0;
+	int m_RoundingPercent = -1, m_RoundingMode = -1, m_RoundingSteps = 2;
+	bool m_BuildingRoundingBuffer = false;
+	static constexpr int BufferedRoundingSteps = 4;
+	std::unordered_map<uint64_t, RoundedTiles::CShape> m_RoundedShapes;
+	void UpdateRounding();
+	const RoundedTiles::CShape *RoundedShape(int X, int Y, int Index);
+	float RoundedOverlayScale(int X, int Y) const;
+	void RenderRoundedTiles(const ColorRGBA &Color, const CRenderLayerParams &Params);
 
 private:
 	IGraphics::CTextureHandle m_TextureHandle;
@@ -169,36 +194,38 @@ protected:
 		class CTileVisual
 		{
 		public:
-			CTileVisual() :
-				m_IndexBufferByteOffset(0) {}
+			CTileVisual() = default;
 
 		private:
-			offset_ptr32 m_IndexBufferByteOffset;
+			offset_ptr32 m_IndexBufferByteOffset = 0;
+			unsigned int m_QuadCount = 0;
 
 		public:
 			bool DoDraw() const
 			{
-				return (m_IndexBufferByteOffset & 0x10000000) != 0;
+				return m_QuadCount != 0;
 			}
 
 			void Draw(bool SetDraw)
 			{
-				m_IndexBufferByteOffset = (SetDraw ? 0x10000000 : (offset_ptr32)0) | (m_IndexBufferByteOffset & 0xEFFFFFFF);
+				m_QuadCount = SetDraw ? 1 : 0;
 			}
+			void SetQuadCount(unsigned int Count) { m_QuadCount = Count; }
+			unsigned int QuadCount() const { return m_QuadCount; }
 
 			offset_ptr IndexBufferByteOffset() const
 			{
-				return ((offset_ptr)(m_IndexBufferByteOffset & 0xEFFFFFFF) * 6 * sizeof(uint32_t));
+				return (offset_ptr)m_IndexBufferByteOffset * 6 * sizeof(uint32_t);
 			}
 
 			void SetIndexBufferByteOffset(offset_ptr32 IndexBufferByteOff)
 			{
-				m_IndexBufferByteOffset = IndexBufferByteOff | (m_IndexBufferByteOffset & 0x10000000);
+				m_IndexBufferByteOffset = IndexBufferByteOff;
 			}
 
 			void AddIndexBufferByteOffset(offset_ptr32 IndexBufferByteOff)
 			{
-				m_IndexBufferByteOffset = ((m_IndexBufferByteOffset & 0xEFFFFFFF) + IndexBufferByteOff) | (m_IndexBufferByteOffset & 0x10000000);
+				m_IndexBufferByteOffset += IndexBufferByteOff;
 			}
 		};
 
@@ -313,7 +340,7 @@ protected:
 	void RenderTileLayerWithTileBuffer(const ColorRGBA &Color, const CRenderLayerParams &Params) override;
 	void RenderTileLayerNoTileBuffer(const ColorRGBA &Color, const CRenderLayerParams &Params) override;
 
-private:
+public:
 	ColorRGBA GetDeathBorderColor() const;
 };
 
@@ -337,6 +364,7 @@ protected:
 	void RenderTileLayerWithTileBuffer(const ColorRGBA &Color, const CRenderLayerParams &Params) override;
 	void RenderTileLayerNoTileBuffer(const ColorRGBA &Color, const CRenderLayerParams &Params) override;
 	void GetTileData(unsigned char *pIndex, unsigned char *pFlags, int *pAngleRotate, unsigned int x, unsigned int y, int CurOverlay) const override;
+	void ReuploadRoundedOverlays() override;
 
 private:
 	std::optional<CRenderLayerTile::CTileLayerVisuals> m_VisualTeleNumbers;
@@ -378,6 +406,7 @@ protected:
 	void RenderTileLayerNoTileBuffer(const ColorRGBA &Color, const CRenderLayerParams &Params) override;
 	void GetTileData(unsigned char *pIndex, unsigned char *pFlags, int *pAngleRotate, unsigned int x, unsigned int y, int CurOverlay) const override;
 	IGraphics::CTextureHandle GetTexture() const override;
+	void ReuploadRoundedOverlays() override;
 
 private:
 	std::optional<CRenderLayerTile::CTileLayerVisuals> m_VisualSwitchNumberTop;

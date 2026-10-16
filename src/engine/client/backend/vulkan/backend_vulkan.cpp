@@ -5140,7 +5140,7 @@ public:
 		std::array<VkVertexInputAttributeDescription, HasSampler ? 2 : 1> aAttributeDescriptions = {};
 		aAttributeDescriptions[0] = {0, 0, VK_FORMAT_R32G32_SFLOAT, 0};
 		if(HasSampler)
-			aAttributeDescriptions[1] = {1, 0, VK_FORMAT_R8G8B8A8_UINT, sizeof(float) * 2};
+			aAttributeDescriptions[1] = {1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, sizeof(float) * 2};
 
 		std::array<VkDescriptorSetLayout, 1> aSetLayouts;
 		aSetLayouts[0] = m_Standard3DTexturedDescriptorSetLayout;
@@ -5155,7 +5155,7 @@ public:
 		aPushConstants[0] = {VK_SHADER_STAGE_VERTEX_BIT, 0, VertPushConstantSize};
 		aPushConstants[1] = {VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(SUniformTileGPosBorder) + sizeof(SUniformTileGVertColorAlign), FragPushConstantSize};
 
-		return CreateGraphicsPipeline<false>(pVertName, pFragName, PipeContainer, HasSampler ? (sizeof(float) * 2 + sizeof(uint8_t) * 4) : (sizeof(float) * 2), aAttributeDescriptions, aSetLayouts, aPushConstants, TexMode, BlendMode, DynamicMode);
+		return CreateGraphicsPipeline<false>(pVertName, pFragName, PipeContainer, HasSampler ? (sizeof(float) * 6) : (sizeof(float) * 2), aAttributeDescriptions, aSetLayouts, aPushConstants, TexMode, BlendMode, DynamicMode);
 	}
 
 	template<bool HasSampler>

@@ -1096,6 +1096,7 @@ public:
 	void QuadsDrawTL(const CQuadItem *pArray, int Num) override;
 
 	void QuadsTex3DDrawTL(const CQuadItem *pArray, int Num) override;
+	void QuadsTex3DDrawFreeform(const CFreeformItem *pArray, int Num) override;
 
 	void QuadsDrawFreeform(const CFreeformItem *pArray, int Num) override;
 	void QuadsText(float x, float y, float Size, const char *pText) override;

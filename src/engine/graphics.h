@@ -62,10 +62,10 @@ public:
 class CGraphicTileTextureCoords
 {
 public:
-	ubvec4 m_TexCoordTopLeft;
-	ubvec4 m_TexCoordTopRight;
-	ubvec4 m_TexCoordBottomRight;
-	ubvec4 m_TexCoordBottomLeft;
+	vec4 m_TexCoordTopLeft;
+	vec4 m_TexCoordTopRight;
+	vec4 m_TexCoordBottomRight;
+	vec4 m_TexCoordBottomLeft;
 };
 
 /*
@@ -510,6 +510,7 @@ public:
 	virtual void RenderQuadContainerAsSpriteMultiple(int ContainerIndex, int QuadOffset, int DrawCount, SRenderSpriteInfo *pRenderInfo) = 0;
 
 	virtual void QuadsDrawFreeform(const CFreeformItem *pArray, int Num) = 0;
+	virtual void QuadsTex3DDrawFreeform(const CFreeformItem *pArray, int Num) = 0;
 	virtual void QuadsText(float x, float y, float Size, const char *pText) = 0;
 
 	// sprites

@@ -2097,7 +2097,7 @@ void CCommandProcessorFragment_OpenGL2::Cmd_RenderBorderTile(const CCommandBuffe
 	if(IsTextured)
 	{
 		glEnableVertexAttribArray(1);
-		glVertexAttribIPointer(1, 4, GL_UNSIGNED_BYTE, BufferContainer.m_ContainerInfo.m_Stride, BufferContainer.m_ContainerInfo.m_vAttributes[1].m_pOffset);
+		glVertexAttribPointer(1, 4, GL_FLOAT, false, BufferContainer.m_ContainerInfo.m_Stride, BufferContainer.m_ContainerInfo.m_vAttributes[1].m_pOffset);
 	}
 
 	size_t RealDrawCount = pCommand->m_DrawNum * 4;
@@ -2151,7 +2151,7 @@ void CCommandProcessorFragment_OpenGL2::Cmd_RenderTileLayer(const CCommandBuffer
 	if(IsTextured)
 	{
 		glEnableVertexAttribArray(1);
-		glVertexAttribIPointer(1, 4, GL_UNSIGNED_BYTE, BufferContainer.m_ContainerInfo.m_Stride, BufferContainer.m_ContainerInfo.m_vAttributes[1].m_pOffset);
+		glVertexAttribPointer(1, 4, GL_FLOAT, false, BufferContainer.m_ContainerInfo.m_Stride, BufferContainer.m_ContainerInfo.m_vAttributes[1].m_pOffset);
 	}
 
 	for(int i = 0; i < pCommand->m_IndicesDrawNum; ++i)
