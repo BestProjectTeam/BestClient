@@ -3079,12 +3079,7 @@ void CClient::Update()
 					(g_Config.m_BcInputs == BC_INPUTS_DELTA && g_Config.m_BcDeltaInputAmount > 0) ||
 					(g_Config.m_BcInputs == BC_INPUTS_F && g_Config.m_BcFInputAmount > 0) ||
 					(g_Config.m_BcInputs == BC_INPUTS_CLOUD && g_Config.m_BcCloudInputAmount > 0);
-				if(HasFastInput && (g_Config.m_BcInputs == BC_INPUTS_SAIKO || g_Config.m_BcInputs == BC_INPUTS_CLOUD))
-				{
-					GameClient()->CheckNewInput();
-					Repredict = true;
-				}
-				else if(HasFastInput && GameClient()->CheckNewInput())
+				if(HasFastInput && GameClient()->CheckNewInput())
 				{
 					Repredict = true;
 				}
