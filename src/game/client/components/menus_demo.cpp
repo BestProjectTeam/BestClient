@@ -23,6 +23,7 @@
 #include <generated/client_data.h>
 #include <generated/protocol.h>
 
+#include <game/client/bc_menu_badges.h> // bestclient
 #include <game/client/components/bestclient/demo_tee_editor.h> // bestclient
 #include <game/client/components/console.h>
 #include <game/client/gameclient.h>
@@ -1710,6 +1711,46 @@ void CMenus::RenderDemoBrowserButtons(CUIRect ButtonsView, bool WasListboxItemAc
 	// play/open button
 	if(m_DemolistSelectedIndex >= 0)
 	{
+		// bestclient
+#if !defined(CONF_PLATFORM_ANDROID)
+		if(!m_vpFilteredDemos[m_DemolistSelectedIndex]->m_IsDir)
+		{
+			CUIRect OpenExternalButton;
+			ButtonBarBottom.VSplitRight(ButtonBarBottom.h * 3.0f, &ButtonBarBottom, &OpenExternalButton);
+			ButtonBarBottom.VSplitRight(ButtonBarBottom.h, &ButtonBarBottom, nullptr);
+			SetIconMode(true);
+			static CButtonContainer s_OpenExternalButton;
+			const bool OpenExternalPressed = DoButton_Menu(&s_OpenExternalButton, FontIcon::ARROW_UP_RIGHT_FROM_SQUARE, 0, &OpenExternalButton);
+			SetIconMode(false);
+			{
+				BcMenuBadges::SBadge CornerNew = BcMenuBadges::New;
+				CornerNew.m_FontSize = 8.0f;
+				CornerNew.m_Rounding = 3.0f;
+				CUIRect NewBadge;
+				NewBadge.h = 11.0f;
+				NewBadge.w = TextRender()->TextWidth(CornerNew.m_FontSize, CornerNew.m_pText) + 8.0f;
+				NewBadge.x = OpenExternalButton.x + OpenExternalButton.w - NewBadge.w + 2.0f;
+				NewBadge.y = OpenExternalButton.y - 2.0f;
+				BcMenuBadges::DrawAt(Graphics(), Ui(), TextRender(), NewBadge, CornerNew);
+			}
+			if(OpenExternalPressed)
+			{
+				const int StorageType = m_vpFilteredDemos[m_DemolistSelectedIndex]->m_StorageType;
+				char aRelativePath[IO_MAX_PATH_LENGTH];
+				str_format(aRelativePath, sizeof(aRelativePath), "%s/%s", m_aCurrentDemoFolder, m_vpFilteredDemos[m_DemolistSelectedIndex]->m_aFilename);
+				char aAbsolutePath[IO_MAX_PATH_LENGTH];
+				if(StorageType >= IStorage::TYPE_SAVE && StorageType < Storage()->NumPaths())
+					Storage()->GetCompletePath(StorageType, aRelativePath, aAbsolutePath, sizeof(aAbsolutePath));
+				else
+					aAbsolutePath[0] = '\0';
+				if(aAbsolutePath[0] == '\0' || !BestClientOpenDemoInNewClient(Storage(), aAbsolutePath))
+					PopupMessage(Localize("Error"), Localize("Could not open the demo in a second client"), Localize("Ok"));
+				return;
+			}
+			GameClient()->m_Tooltips.DoToolTip(&s_OpenExternalButton, &OpenExternalButton, Localize("Open the selected demo in a second client"));
+		}
+#endif
+		// bestclient
 		CUIRect PlayButton;
 		ButtonBarBottom.VSplitRight(ButtonBarBottom.h * 3.0f, &ButtonBarBottom, &PlayButton);
 		ButtonBarBottom.VSplitRight(ButtonBarBottom.h, &ButtonBarBottom, nullptr);

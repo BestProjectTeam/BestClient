@@ -3,9 +3,15 @@
 
 #include "chat_qol.h"
 
-#include <base/io.h>
 #include <base/color.h>
+#include <base/fs.h>
+#include <base/io.h>
+#include <base/log.h>
+#include <base/process.h>
+#include <base/str.h>
 #include <base/time.h>
+
+#include <engine/client/updater.h>
 #include <engine/console.h>
 #include <engine/editor.h>
 #include <engine/friends.h>
@@ -31,8 +37,106 @@
 #include <game/localization.h>
 
 #include <algorithm>
+#if defined(CONF_FAMILY_UNIX) && !defined(CONF_PLATFORM_ANDROID)
+#include <cerrno>
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
 
 static const int FROZEN_SKIN_MAX_DARKEN = 70;
+
+#if defined(CONF_FAMILY_WINDOWS)
+extern "C" __declspec(dllimport) int __stdcall CloseHandle(void *Handle);
+#endif
+
+bool BestClientOpenDemoInNewClient(IStorage *pStorage, const char *pAbsoluteDemoPath)
+{
+#if defined(CONF_PLATFORM_ANDROID)
+	(void)pStorage;
+	(void)pAbsoluteDemoPath;
+	return false;
+#else
+	if(pStorage == nullptr || pAbsoluteDemoPath == nullptr || pAbsoluteDemoPath[0] == '\0' || str_endswith(pAbsoluteDemoPath, ".demo") == nullptr)
+		return false;
+
+	char aBinaryPath[IO_MAX_PATH_LENGTH];
+	aBinaryPath[0] = '\0';
+	pStorage->GetBinaryPathAbsolute(PLAT_CLIENT_EXEC, aBinaryPath, sizeof(aBinaryPath));
+	if(aBinaryPath[0] == '\0' || !fs_is_file(aBinaryPath))
+	{
+		log_error("client", "Failed to open demo in a second client: '%s'", pAbsoluteDemoPath);
+		return false;
+	}
+#if defined(CONF_FAMILY_WINDOWS)
+	if(str_endswith(aBinaryPath, ".exe") == nullptr)
+	{
+		log_error("client", "Failed to open demo in a second client: '%s'", pAbsoluteDemoPath);
+		return false;
+	}
+#endif
+
+	const char *apArguments[] = {
+		pAbsoluteDemoPath,
+		"cl_save_settings 0",
+		"bc_discord_rpc 0",
+		"logfile \"\"",
+		"cl_input_fifo \"\"",
+	};
+
+#if defined(CONF_FAMILY_WINDOWS)
+	PROCESS Process = process_execute(aBinaryPath, EShellExecuteWindowState::FOREGROUND, apArguments, std::size(apArguments));
+	if(Process == INVALID_PROCESS)
+	{
+		log_error("client", "Failed to open demo in a second client: '%s'", pAbsoluteDemoPath);
+		return false;
+	}
+	CloseHandle(Process);
+	return true;
+#elif defined(CONF_FAMILY_UNIX)
+	const char *apArgv[std::size(apArguments) + 2];
+	apArgv[0] = aBinaryPath;
+	for(size_t i = 0; i < std::size(apArguments); ++i)
+		apArgv[i + 1] = apArguments[i];
+	apArgv[std::size(apArguments) + 1] = nullptr;
+
+	const pid_t Pid = fork();
+	if(Pid < 0)
+	{
+		log_error("client", "Failed to open demo in a second client: '%s'", pAbsoluteDemoPath);
+		return false;
+	}
+	if(Pid == 0)
+	{
+		const pid_t GrandChild = fork();
+		if(GrandChild == 0)
+		{
+			execvp(aBinaryPath, (char **)apArgv);
+			_exit(127);
+		}
+		_exit(GrandChild < 0 ? 1 : 0);
+	}
+
+	int Status = 0;
+	while(waitpid(Pid, &Status, 0) < 0)
+	{
+		if(errno != EINTR)
+		{
+			log_error("client", "Failed to open demo in a second client: '%s'", pAbsoluteDemoPath);
+			return false;
+		}
+	}
+	if(!WIFEXITED(Status) || WEXITSTATUS(Status) != 0)
+	{
+		log_error("client", "Failed to open demo in a second client: '%s'", pAbsoluteDemoPath);
+		return false;
+	}
+	return true;
+#else
+	(void)apArguments;
+	return false;
+#endif
+#endif
+}
 
 int CBestClient::HudFramesPerSecond(float FrameTimeAverage)
 {

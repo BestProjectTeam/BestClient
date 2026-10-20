@@ -16,6 +16,7 @@
 
 class IHttpRequest;
 class IConfigManager;
+class IStorage;
 
 class CTeeRenderInfo;
 
@@ -98,5 +99,6 @@ void BestClientRenderIndicatorIcon(class IGraphics *pGraphics, const class CUIRe
 constexpr const char *BESTCLIENT_BETTER_FONT_FACE = "ActayWide Bold";
 void BestClientApplyMenuFont(class ITextRender *pTextRender);
 void BestClientRefreshMenuFont(class CGameClient *pGameClient);
+bool BestClientOpenDemoInNewClient(IStorage *pStorage, const char *pAbsoluteDemoPath);
 
 #endif
