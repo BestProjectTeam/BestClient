@@ -154,6 +154,7 @@ public:
 		 */
 		std::optional<std::list<std::string_view>::iterator> m_UsageEntryIterator;
 
+		bool IsSuppressedForGame() const; // bestclient
 		EState DetermineInitialState() const;
 		void SetState(EState State);
 	};

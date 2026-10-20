@@ -319,8 +319,10 @@ CUi::EPopupMenuFunctionResult CDemoTeeEditor::PopupSkinPicker(void *pContext, CU
 	for(CSkins::CSkinContainer *pSkinContainer : vpLocalSkins)
 	{
 		if(pSkinContainer == nullptr || pSkinContainer->IsSpecial() ||
-			pSkinContainer->State() == CSkins::CSkinContainer::EState::ERROR ||
-			pSkinContainer->State() == CSkins::CSkinContainer::EState::NOT_FOUND)
+			pSkinContainer->State() == CSkins::CSkinContainer::EState::ERROR)
+			continue;
+		if(pSkinContainer->State() == CSkins::CSkinContainer::EState::NOT_FOUND &&
+			pSkinContainer->Type() == CSkins::CSkinContainer::EType::DOWNLOAD)
 			continue;
 		if(Editor.m_SkinSearchInput.GetString()[0] != '\0' &&
 			str_utf8_find_nocase(pSkinContainer->Name(), Editor.m_SkinSearchInput.GetString(), nullptr) == nullptr)
@@ -347,7 +349,7 @@ CUi::EPopupMenuFunctionResult CDemoTeeEditor::PopupSkinPicker(void *pContext, CU
 		if(!Item.m_Visible)
 			continue;
 
-		pSkinContainer->RequestLoad();
+		pGameClient->m_Skins.FindLocalSkin(pSkinContainer->Name());
 		const CSkin *pSkin = pSkinContainer->State() == CSkins::CSkinContainer::EState::LOADED ? pSkinContainer->Skin().get() : pDefaultSkin;
 		CUIRect Preview, Label;
 		Item.m_Rect.VSplitLeft(42.0f, &Preview, &Label);
@@ -370,7 +372,7 @@ CUi::EPopupMenuFunctionResult CDemoTeeEditor::PopupSkinPicker(void *pContext, CU
 		CSkins::CSkinContainer *pSkinContainer = vpFilteredEntries[NewSelected];
 		str_copy(Editor.m_aOverrides[ClientId].m_aSkinName, pSkinContainer->Name());
 		Editor.m_aOverrides[ClientId].m_OverrideAppearance = true;
-		pSkinContainer->RequestLoad();
+		pGameClient->m_Skins.FindLocalSkin(pSkinContainer->Name());
 		return CUi::POPUP_CLOSE_CURRENT;
 	}
 
