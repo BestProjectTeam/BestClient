@@ -111,6 +111,7 @@ void CMenusSettingsControls::OnInterfacesInit(CGameClient *pClient)
 		{EBindOptionGroup::MISCELLANEOUS, Localizable("Show HUD"), "toggle cl_showhud 0 1"},
 		{EBindOptionGroup::BEST_CLIENT, Localizable("Admin Panel"), "toggle_admin_panel"}, // bestclient
 		{EBindOptionGroup::BEST_CLIENT, Localizable("Dummy pseudo"), "+toggle cl_dummy_hammer 1 0"}, // bestclient
+		{EBindOptionGroup::BEST_CLIENT, Localizable("Reset on switch"), "toggle cl_dummy_resetonswitch 0 1"}, // bestclient
 		{EBindOptionGroup::BEST_CLIENT, Localizable("Deepfly toggle"), "BC_deepfly_toggle"}, // bestclient
 		{EBindOptionGroup::BEST_CLIENT, Localizable("45 deg bind"), "+BC_45_degrees"}, // bestclient
 		{EBindOptionGroup::BEST_CLIENT, Localizable("Small sens bind"), "BC_small_sens"}, // bestclient
