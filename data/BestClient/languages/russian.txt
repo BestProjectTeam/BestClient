@@ -95,6 +95,10 @@ Map preview in server list
 == Превью карты в списке серверов
 
 [BestClient]
+Show coordinates above tees
+== Показывать координаты над тии
+
+[BestClient]
 Show real hitbox
 == Показывать реальный хитбокс
 

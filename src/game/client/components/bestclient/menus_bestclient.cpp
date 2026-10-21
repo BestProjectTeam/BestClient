@@ -925,7 +925,7 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 	const float RealHitboxColorHeight = g_Config.m_BcShowRealHitbox ? RealHitboxColorLineSize + RealHitboxColorLineSpacing : 0.0f;
 	const float VisualsQoLBlockHeight =
 		LineSize + MarginSmall +
-		9.0f * LineSize +
+		10.0f * LineSize +
 		RealHitboxColorHeight +
 		3.0f * LineSize;
 	CUIRect VisualsQoLBlock;
@@ -947,6 +947,12 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		CUIRect MapPreviewRow;
 		VisualsQoLBlock.HSplitTop(LineSize, &MapPreviewRow, &VisualsQoLBlock);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcServerMapPreview, BcLocalize("Map preview in server list"), &g_Config.m_BcServerMapPreview, &MapPreviewRow, LineSize);
+	}
+	{
+		CUIRect TeeCoordsRow;
+		VisualsQoLBlock.HSplitTop(LineSize, &TeeCoordsRow, &VisualsQoLBlock);
+		BcMenuBadges::DrawNew(Graphics(), Ui(), TextRender(), &TeeCoordsRow, MarginSmall);
+		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowTeeCoords, BcLocalize("Show coordinates above tees"), &g_Config.m_BcShowTeeCoords, &TeeCoordsRow, LineSize);
 	}
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcShowRealHitbox, BcLocalize("Show real hitbox"), &g_Config.m_BcShowRealHitbox, &VisualsQoLBlock, LineSize);
 	if(g_Config.m_BcShowRealHitbox)

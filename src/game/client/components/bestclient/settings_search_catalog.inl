@@ -149,6 +149,7 @@
 	{"Color", SETTINGS_NAV_LEAF_BC_VISUALS, "Freeze lightning", &g_Config.m_BcFreezeLightningColor, &g_Config.m_BcFreezeLightning},
 
 	{"Map preview in server list", SETTINGS_NAV_LEAF_BC_VISUALS, "Visuals QoL", &g_Config.m_BcServerMapPreview, nullptr},
+	{"Show coordinates above tees", SETTINGS_NAV_LEAF_BC_VISUALS, "Visuals QoL", &g_Config.m_BcShowTeeCoords, nullptr},
 	{"Show real hitbox", SETTINGS_NAV_LEAF_BC_VISUALS, "Visuals QoL", &g_Config.m_BcShowRealHitbox, nullptr},
 	{"Real hitbox dot color", SETTINGS_NAV_LEAF_BC_VISUALS, "Visuals QoL", &g_Config.m_BcShowRealHitboxColor, &g_Config.m_BcShowRealHitbox},
 	{"Show player below indicator", SETTINGS_NAV_LEAF_BC_VISUALS, "Visuals QoL", &g_Config.m_BcShowhudDummyCoordIndicator, nullptr},

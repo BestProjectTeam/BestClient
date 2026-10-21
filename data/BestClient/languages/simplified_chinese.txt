@@ -95,6 +95,10 @@ Map preview in server list
 == 服务器列表中的地图预览
 
 [BestClient]
+Show coordinates above tees
+== 在 Tee 上方显示坐标
+
+[BestClient]
 Show real hitbox
 == 显示真实碰撞箱
 
