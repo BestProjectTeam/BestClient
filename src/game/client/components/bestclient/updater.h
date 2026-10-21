@@ -48,6 +48,7 @@ class CUpdater : public IUpdater
 	void SetCurrentState(EUpdaterState NewState) REQUIRES(!m_Lock);
 	void SetStatus(const char *pStatus) REQUIRES(!m_Lock);
 	void SetPercent(int Percent) REQUIRES(!m_Lock);
+	bool MainMenuOpen();
 
 public:
 	CUpdater();

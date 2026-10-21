@@ -15,6 +15,7 @@
 #include <engine/storage.h>
 
 #include <game/client/components/bestclient/version.h>
+#include <game/client/gameclient.h>
 #include <game/version.h>
 
 #include <algorithm>
@@ -508,9 +509,17 @@ void CUpdater::InitiateUpdate()
 	CheckForUpdate();
 }
 
+bool CUpdater::MainMenuOpen()
+{
+	IGameClient *pGameClient = Kernel()->RequestInterface<IGameClient>();
+	if(!pGameClient)
+		return false;
+	return static_cast<CGameClient *>(pGameClient)->m_Menus.IsMainMenuOpen();
+}
+
 void CUpdater::ApplyUpdateAndRestart()
 {
-	if(GetCurrentState() != IUpdater::NEED_RESTART)
+	if(GetCurrentState() != IUpdater::NEED_RESTART || !MainMenuOpen())
 		return;
 
 	if(!LaunchApplyScriptAndQuit())
@@ -524,7 +533,7 @@ void CUpdater::Update()
 		const EUpdaterState State = GetCurrentState();
 		if(State == IUpdater::VERSION_AVAILABLE)
 			InitiateUpdate();
-		else if(State == IUpdater::NEED_RESTART)
+		else if(State == IUpdater::NEED_RESTART && MainMenuOpen())
 			ApplyUpdateAndRestart();
 	}
 

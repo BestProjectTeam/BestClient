@@ -813,6 +813,10 @@ public:
 		return (Client()->State() == IClient::STATE_OFFLINE && m_MenuPage >= PAGE_INTERNET && m_MenuPage <= PAGE_FAVORITE_COMMUNITY_5) ||
 			(Client()->State() == IClient::STATE_ONLINE && m_GamePage == PAGE_NETWORK);
 	}
+	bool IsMainMenuOpen() const
+	{
+		return Client()->State() == IClient::STATE_OFFLINE && m_ShowStart && m_Popup == POPUP_NONE && g_Config.m_ClEditor == 0;
+	}
 	// bestclient
 
 	enum
