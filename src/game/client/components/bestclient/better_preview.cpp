@@ -70,15 +70,22 @@ void RenderGunpackCard(IGraphics *pGraphics, CUi *pUi, const IGraphics::CTexture
 	static constexpr float Pad = 10.0f;
 	static constexpr float LabelH = 18.0f;
 	static constexpr float Gap = 6.0f;
-	static constexpr int COLS = 2;
 	static constexpr int ROWS = 3;
-	static constexpr int s_aWeaponSprites[6] = {
-		SPRITE_WEAPON_HAMMER_BODY,
-		SPRITE_WEAPON_GUN_BODY,
-		SPRITE_WEAPON_SHOTGUN_BODY,
-		SPRITE_WEAPON_GRENADE_BODY,
-		SPRITE_WEAPON_LASER_BODY,
-		SPRITE_WEAPON_NINJA_BODY,
+	struct SSlot
+	{
+		int m_Sprite;
+		int m_Row;
+		int m_Col;
+		int m_Cols;
+	};
+	static constexpr SSlot s_aSlots[] = {
+		{SPRITE_WEAPON_HAMMER_BODY, 0, 0, 2},
+		{SPRITE_WEAPON_GUN_BODY, 0, 1, 2},
+		{SPRITE_WEAPON_SHOTGUN_BODY, 1, 0, 3},
+		{SPRITE_WEAPON_GUN_CURSOR, 1, 1, 3},
+		{SPRITE_WEAPON_GRENADE_BODY, 1, 2, 3},
+		{SPRITE_WEAPON_LASER_BODY, 2, 0, 2},
+		{SPRITE_WEAPON_NINJA_BODY, 2, 1, 2},
 	};
 
 	CUIRect Content = CardRect;
@@ -94,7 +101,6 @@ void RenderGunpackCard(IGraphics *pGraphics, CUi *pUi, const IGraphics::CTexture
 	if(!Texture.IsValid())
 		return;
 
-	const float CellW = GridRect.w / (float)COLS;
 	const float CellH = GridRect.h / (float)ROWS;
 	const float CellPad = 4.0f;
 
@@ -102,25 +108,24 @@ void RenderGunpackCard(IGraphics *pGraphics, CUi *pUi, const IGraphics::CTexture
 	pGraphics->TextureSet(Texture);
 	pGraphics->QuadsBegin();
 	pGraphics->SetColor(1, 1, 1, 1);
-	for(int i = 0; i < 6; i++)
+	for(const SSlot &Slot : s_aSlots)
 	{
-		const int Col = i % COLS;
-		const int Row = i / COLS;
+		const float SlotW = GridRect.w / (float)Slot.m_Cols;
 		CUIRect Cell;
-		Cell.x = GridRect.x + Col * CellW + CellPad;
-		Cell.y = GridRect.y + Row * CellH + CellPad;
-		Cell.w = CellW - CellPad * 2.0f;
+		Cell.x = GridRect.x + Slot.m_Col * SlotW + CellPad;
+		Cell.y = GridRect.y + Slot.m_Row * CellH + CellPad;
+		Cell.w = SlotW - CellPad * 2.0f;
 		Cell.h = CellH - CellPad * 2.0f;
 
 		float ScaleX, ScaleY;
-		pGraphics->GetSpriteScale(s_aWeaponSprites[i], ScaleX, ScaleY);
+		pGraphics->GetSpriteScale(Slot.m_Sprite, ScaleX, ScaleY);
 		const float MaxDim = std::min(Cell.w / ScaleX, Cell.h / ScaleY);
 		const float DrawW = MaxDim * ScaleX;
 		const float DrawH = MaxDim * ScaleY;
 		const float DrawX = Cell.x + (Cell.w - DrawW) / 2.0f;
 		const float DrawY = Cell.y + (Cell.h - DrawH) / 2.0f;
 
-		pGraphics->SelectSprite(s_aWeaponSprites[i]);
+		pGraphics->SelectSprite(Slot.m_Sprite);
 		IGraphics::CQuadItem QuadItem(DrawX, DrawY, DrawW, DrawH);
 		pGraphics->QuadsDrawTL(&QuadItem, 1);
 	}
