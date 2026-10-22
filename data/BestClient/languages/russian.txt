@@ -783,6 +783,10 @@ Custom size
 == Свой размер
 
 [BestClient]
+Cursor as without stretch
+== Курсор как без растяжения
+
+[BestClient]
 Looks like you're on a server where this feature is forbidden
 == Похоже, на этом сервере эта фича запрещена
 

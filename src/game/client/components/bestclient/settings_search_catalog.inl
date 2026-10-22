@@ -93,6 +93,7 @@
 	{"Enable mouse", SETTINGS_NAV_LEAF_BC_VISUALS, "Keystrokes", &g_Config.m_BcKeystrokesMouse, nullptr},
 
 	{"Aspect Ratio", SETTINGS_NAV_LEAF_BC_VISUALS, "Visuals", &g_Config.m_BcCustomAspectRatioMode, nullptr},
+	{"Cursor as without stretch", SETTINGS_NAV_LEAF_BC_VISUALS, "Aspect Ratio", &g_Config.m_BcCustomAspectRatioCursorNative, nullptr},
 
 	{"Physic Balls", SETTINGS_NAV_LEAF_BC_VISUALS, "Visuals", &g_Config.m_BcPhysicBallsSpawnCount, nullptr},
 	{"Spawn count", SETTINGS_NAV_LEAF_BC_VISUALS, "Physic Balls", &g_Config.m_BcPhysicBallsSpawnCount, nullptr},

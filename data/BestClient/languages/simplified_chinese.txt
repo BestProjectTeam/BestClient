@@ -783,6 +783,10 @@ Custom size
 == 自定义大小
 
 [BestClient]
+Cursor as without stretch
+== 光标如同未拉伸
+
+[BestClient]
 Looks like you're on a server where this feature is forbidden
 == 当前服务器似乎禁止此功能
 

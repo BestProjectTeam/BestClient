@@ -508,6 +508,9 @@ bool CControls::OnCursorMove(float x, float y, IInput::ECursorType CursorType)
 	if(GameClient()->m_Snap.m_SpecInfo.m_Active && GameClient()->m_Snap.m_SpecInfo.m_SpectatorId < 0)
 		Factor *= GameClient()->m_Camera.m_Zoom;
 
+	// bestclient
+	GameClient()->m_AspectRatio.ScaleIngameCursorDelta(x, y);
+	// bestclient
 	m_aMousePos[g_Config.m_ClDummy] += vec2(x, y) * Factor;
 	GameClient()->m_Controls.m_aMouseInputType[g_Config.m_ClDummy] = CControls::EMouseInputType::RELATIVE;
 	ClampMousePos();

@@ -103,6 +103,41 @@ bool CAspectRatio::ShouldApplyCustomAspect(bool IsActiveGameplay) const
 	return !IsAspectBlocked() && (g_Config.m_BcCustomAspectRatioApplyMode == 1 || IsActiveGameplay);
 }
 
+void CAspectRatio::ScaleIngameCursorDelta(float &X, float &Y) const
+{
+	if(!g_Config.m_BcCustomAspectRatioCursorNative)
+		return;
+
+	const int State = Client()->State();
+	const bool IsActiveGameplay = State == IClient::STATE_ONLINE || State == IClient::STATE_DEMOPLAYBACK;
+	if(!ShouldApplyCustomAspect(IsActiveGameplay))
+		return;
+
+	const int AspectMode = g_Config.m_BcCustomAspectRatioMode >= 0 ? g_Config.m_BcCustomAspectRatioMode : (g_Config.m_BcCustomAspectRatio > 0 ? 1 : 0);
+	if(AspectMode <= 0 || g_Config.m_BcCustomAspectRatio < 100)
+		return;
+
+	float ForcedAspect;
+	if(AspectMode == 2 && g_Config.m_BcCustomAspectRatioNum > 0 && g_Config.m_BcCustomAspectRatioDen > 0)
+		ForcedAspect = (float)g_Config.m_BcCustomAspectRatioNum / (float)g_Config.m_BcCustomAspectRatioDen;
+	else
+		ForcedAspect = g_Config.m_BcCustomAspectRatio / 100.0f;
+
+	const int ScreenW = Graphics()->ScreenWidth();
+	const int ScreenH = Graphics()->ScreenHeight();
+	if(ScreenW <= 0 || ScreenH <= 0)
+		return;
+
+	float ForcedW, ForcedH, NativeW, NativeH;
+	Graphics()->CalcScreenParams(ForcedAspect, 1.0f, &ForcedW, &ForcedH);
+	Graphics()->CalcScreenParams((float)ScreenW / (float)ScreenH, 1.0f, &NativeW, &NativeH);
+	if(NativeW <= 0.001f || NativeH <= 0.001f)
+		return;
+
+	X *= ForcedW / NativeW;
+	Y *= ForcedH / NativeH;
+}
+
 void CAspectRatio::BeginFrame()
 {
 	Graphics()->SetScreenAspectOverrideEnabled(true);

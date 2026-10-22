@@ -46,6 +46,7 @@ public:
 	bool IsAspectBlocked() const;
 	bool UseGameNoHudAspect() const;
 	bool ShouldApplyCustomAspect(bool IsActiveGameplay) const;
+	void ScaleIngameCursorDelta(float &X, float &Y) const;
 
 	void BeginFrame();
 	void PrepareComponent(const CComponent *pComponent);
