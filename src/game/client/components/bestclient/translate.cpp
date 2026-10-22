@@ -719,7 +719,22 @@ void CTranslate::OnConsoleInit()
 
 void CTranslate::AutoTranslate(CChat::CLine &Line)
 {
-	(void)Line;
+	if(!g_Config.m_BcTranslateMessageButton)
+		return;
+	const bool IncomingWhisper = Line.m_TeamNumber == TEAM_WHISPER_RECV;
+	const bool Mention = Line.m_Highlighted && !Line.m_Whisper;
+	if(!IncomingWhisper && !Mention)
+		return;
+	if(Line.m_ClientId < 0 || Line.m_aName[0] == '\0' || Line.m_aText[0] == '\0')
+		return;
+	for(const int LocalId : GameClient()->m_aLocalIds)
+		if(LocalId >= 0 && LocalId == Line.m_ClientId)
+			return;
+	if(Line.m_pTranslateResponse)
+		return;
+	if(LanguagesEqual(IncomingSourceLanguage(), IncomingTargetLanguage()))
+		return;
+	TranslateLine(Line, true);
 }
 
 void CTranslate::TranslateMessage(CChat::CLine &Line)
