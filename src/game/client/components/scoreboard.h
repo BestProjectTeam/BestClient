@@ -104,6 +104,9 @@ class CScoreboard : public CComponent
 		CCachedText m_ScoreMillis;
 		CCachedText m_Name;
 		CCachedText m_MuteMark;
+		// bestclient
+		CCachedText m_FriendMark;
+		// bestclient
 		CCachedText m_ReadyMark;
 		CCachedText m_Clan;
 		CCachedText m_Ping;

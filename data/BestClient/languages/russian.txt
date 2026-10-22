@@ -119,6 +119,10 @@ Show points in tab
 == Показывать поинты в табе
 
 [BestClient]
+Show friend icon in scoreboard
+== Показывать иконку друга в скорборде
+
+[BestClient]
 Show spectator nicknames
 == Показывать ники наблюдателей
 
