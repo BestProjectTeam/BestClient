@@ -2949,6 +2949,9 @@ if(CLIENT)
     components/bestclient/menus_assets_editor.cpp
     components/bestclient/menus_bestclient.cpp
     components/bestclient/menus_games.cpp
+    components/bestclient/keybind_map.cpp
+    components/bestclient/keybind_map.h
+    components/bestclient/keybind_map_ui.h
     components/bestclient/motion_blur.h
     components/bestclient/motion_blur_opengl.h
     components/bestclient/motion_blur_opengl.inl

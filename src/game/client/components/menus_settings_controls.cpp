@@ -139,10 +139,49 @@ void CMenusSettingsControls::Render(CUIRect MainView)
 
 	CUIRect QuickSearch, SearchMatches, ResetToDefault;
 	MainView.HSplitBottom(BUTTON_HEIGHT, &MainView, &QuickSearch);
-	QuickSearch.VSplitRight(200.0f, &QuickSearch, &ResetToDefault);
+	// bestclient
+	CUIRect KeybindMapButton;
+	const bool ShowSearchMatches = !m_KeybindMap && !m_FilterInput.IsEmpty();
+	float ResetW = 200.0f;
+	float MapW = 120.0f;
+	float MatchW = ShowSearchMatches ? 140.0f : 0.0f;
+	const float Gaps = MARGIN * (ShowSearchMatches ? 3.0f : 2.0f);
+	float SearchW = QuickSearch.w - ResetW - MapW - MatchW - Gaps;
+	const float SearchFloor = QuickSearch.w * 0.46f < 260.0f ? QuickSearch.w * 0.46f : 260.0f;
+	if(SearchW < SearchFloor)
+	{
+		float Debt = SearchFloor - SearchW;
+		const float ResetGive = Debt < ResetW - 140.0f ? Debt : ResetW - 140.0f;
+		if(ResetGive > 0.0f)
+		{
+			ResetW -= ResetGive;
+			Debt -= ResetGive;
+		}
+		const float MatchGive = Debt < MatchW - 96.0f ? Debt : MatchW - 96.0f;
+		if(MatchGive > 0.0f)
+		{
+			MatchW -= MatchGive;
+			Debt -= MatchGive;
+		}
+		const float MapGive = Debt < MapW - 96.0f ? Debt : MapW - 96.0f;
+		if(MapGive > 0.0f)
+			MapW -= MapGive;
+	}
+	QuickSearch.VSplitRight(ResetW, &QuickSearch, &ResetToDefault);
 	QuickSearch.VSplitRight(MARGIN, &QuickSearch, nullptr);
-	QuickSearch.VSplitRight(150.0f, &QuickSearch, &SearchMatches);
+	QuickSearch.VSplitRight(MapW, &QuickSearch, &KeybindMapButton);
 	QuickSearch.VSplitRight(MARGIN, &QuickSearch, nullptr);
+	if(ShowSearchMatches)
+	{
+		QuickSearch.VSplitRight(MatchW, &QuickSearch, &SearchMatches);
+		QuickSearch.VSplitRight(MARGIN, &QuickSearch, nullptr);
+	}
+	else
+		SearchMatches = {};
+	const char *pKeybindMapLabel = m_KeybindMap ? BcLocalize("Bind list") : BcLocalize("Keybind map");
+	if(GameClient()->m_Menus.DoButton_Menu(&m_KeybindMapButton, pKeybindMapLabel, m_KeybindMap ? 1 : 0, &KeybindMapButton))
+		m_KeybindMap ^= true;
+	// bestclient
 	MainView.HSplitBottom(MARGIN, &MainView, nullptr);
 
 	// Quick search
@@ -152,7 +191,7 @@ void CMenusSettingsControls::Render(CUIRect MainView)
 		UpdateSearchMatches();
 		m_SearchMatchReveal = true;
 	}
-	else if(!m_vSearchMatches.empty() && (Ui()->ConsumeHotkey(CUi::EHotkey::HOTKEY_ENTER) || Ui()->ConsumeHotkey(CUi::EHotkey::HOTKEY_TAB)))
+	else if(!m_KeybindMap && !m_vSearchMatches.empty() && (Ui()->ConsumeHotkey(CUi::EHotkey::HOTKEY_ENTER) || Ui()->ConsumeHotkey(CUi::EHotkey::HOTKEY_TAB))) // bestclient
 	{
 		UpdateSearchMatches();
 		m_CurrentSearchMatch += Input()->ShiftIsPressed() ? -1 : 1;
@@ -167,7 +206,7 @@ void CMenusSettingsControls::Render(CUIRect MainView)
 		m_SearchMatchReveal = true;
 	}
 
-	if(!m_FilterInput.IsEmpty())
+	if(!m_KeybindMap && !m_FilterInput.IsEmpty()) // bestclient
 	{
 		if(!m_vSearchMatches.empty())
 		{
@@ -188,6 +227,20 @@ void CMenusSettingsControls::Render(CUIRect MainView)
 			Localize("Reset"), Localize("Cancel"), &CMenus::ResetSettingsControls);
 	}
 
+	// bestclient
+	if(m_KeybindMap)
+	{
+		m_KeybindMapUi.m_vActions.clear();
+		m_KeybindMapUi.m_vActions.reserve(m_vBindOptions.size());
+		for(const CBindOption &Option : m_vBindOptions)
+		{
+			const char *pLabel = Option.m_pLabel == nullptr ? Option.m_Command.c_str() : Localize(Option.m_pLabel);
+			m_KeybindMapUi.m_vActions.push_back({pLabel, Option.m_Command.c_str()});
+		}
+		RenderBestClientKeybindMap(GameClient(), Ui(), MainView, m_KeybindMapUi, m_KeybindMapUi.m_vActions.data(), (int)m_KeybindMapUi.m_vActions.size(), m_FilterInput.GetString());
+		return;
+	}
+	// bestclient
 	CScrollRegionParams ScrollParams;
 	ScrollParams.m_ScrollUnit = 6.0f * BUTTON_HEIGHT;
 	ScrollParams.m_ForceShowScrollbar = true;

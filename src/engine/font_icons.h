@@ -47,6 +47,9 @@ namespace FontIcon
 	inline const char *const FILE = "\uF15B";
 	inline const char *const FILM = "\uF008";
 	inline const char *const FLAG_CHECKERED = "\uF11E";
+	// bestclient
+	inline const char *const FLOPPY_DISK = "\uF0C7";
+	// bestclient
 	inline const char *const FOLDER = "\uF07B";
 	inline const char *const FOLDER_OPEN = "\uF07C";
 	inline const char *const FOLDER_TREE = "\uF802";

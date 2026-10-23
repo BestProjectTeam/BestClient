@@ -622,3 +622,6 @@ MACRO_CONFIG_COL(BcAmbientDustColor, bc_ambient_dust_color, 1981660, CFGFLAG_CLI
 MACRO_CONFIG_INT(BcAmbientDustAmount, bc_ambient_dust_amount, 100, 25, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Amount of ambient dust motes in percent")
 MACRO_CONFIG_INT(BcWeatherDustSize, bc_weather_dust_size, 100, 25, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Size of dust motes in percent")
 MACRO_CONFIG_INT(BcWeatherDustSpeed, bc_weather_dust_speed, 100, 25, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Speed of dust motes in percent")
+
+// KeybindMap
+MACRO_CONFIG_INT(BcKeybindMapFormat, bc_keybind_map_format, 2, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Last keybind map format (0=100%, 1=86%, 2=60%)")
