@@ -18,6 +18,7 @@ struct CParsedPlayerInfo
 {
 	bool m_Developer = false;
 	bool m_Fake = false;
+	bool m_Light = false;
 	std::string m_Version;
 };
 
@@ -64,7 +65,7 @@ static bool NormalizeServerAddress(const char *pAddress, char *pBuffer, int Buff
 	return true;
 }
 
-static void AddPlayer(TParsedPlayers &Map, const char *pServerAddress, const char *pName, bool Developer = false, bool Fake = false, const char *pVersion = nullptr)
+static void AddPlayer(TParsedPlayers &Map, const char *pServerAddress, const char *pName, bool Developer = false, bool Fake = false, const char *pVersion = nullptr, bool Light = false)
 {
 	if(!pServerAddress || !pName || pServerAddress[0] == '\0' || pName[0] == '\0')
 		return;
@@ -76,6 +77,7 @@ static void AddPlayer(TParsedPlayers &Map, const char *pServerAddress, const cha
 	CParsedPlayerInfo &Info = Map[aNormalizedAddress][pName];
 	Info.m_Developer = Info.m_Developer || Developer;
 	Info.m_Fake = Info.m_Fake || Fake;
+	Info.m_Light = Info.m_Light || Light;
 	if(pVersion && pVersion[0] != '\0' && Info.m_Version.empty())
 		Info.m_Version = pVersion;
 }
@@ -86,16 +88,17 @@ static void ParsePlayerObject(TParsedPlayers &Map, const char *pServerAddress, c
 		return;
 	const bool Developer = GetBoolField(Player, "developer");
 	const bool Fake = GetBoolField(Player, "fake");
+	const bool Light = GetBoolField(Player, "light");
 	const char *pVersion = GetStringField(Player, "version");
 
 	if(const char *pName = GetStringField(Player, "name"))
 	{
-		AddPlayer(Map, pServerAddress, pName, Developer, Fake, pVersion);
+		AddPlayer(Map, pServerAddress, pName, Developer, Fake, pVersion, Light);
 		return;
 	}
 	if(const char *pName = GetStringField(Player, "player_name"))
 	{
-		AddPlayer(Map, pServerAddress, pName, Developer, Fake, pVersion);
+		AddPlayer(Map, pServerAddress, pName, Developer, Fake, pVersion, Light);
 		return;
 	}
 
@@ -105,7 +108,7 @@ static void ParsePlayerObject(TParsedPlayers &Map, const char *pServerAddress, c
 		if(Entry.value->type == json_object)
 		{
 			if(const char *pName = GetStringField(*Entry.value, "name"))
-				AddPlayer(Map, pServerAddress, pName, GetBoolField(*Entry.value, "developer"), GetBoolField(*Entry.value, "fake"), GetStringField(*Entry.value, "version"));
+				AddPlayer(Map, pServerAddress, pName, GetBoolField(*Entry.value, "developer"), GetBoolField(*Entry.value, "fake"), GetStringField(*Entry.value, "version"), GetBoolField(*Entry.value, "light"));
 		}
 		else if(Entry.value->type == json_string)
 		{
@@ -184,6 +187,7 @@ bool CBrowserCache::Load(const json_value &Json)
 	m_PlayerVersionsByServer.clear();
 	m_DeveloperByServer.clear();
 	m_FakeByServer.clear();
+	m_LightByServer.clear();
 	for(const auto &ServerEntry : Parsed)
 	{
 		for(const auto &Name : ServerEntry.second)
@@ -193,21 +197,25 @@ bool CBrowserCache::Load(const json_value &Json)
 			str_copy(Entry.m_aName, Name.first.c_str(), sizeof(Entry.m_aName));
 			Entry.m_Developer = Name.second.m_Developer;
 			Entry.m_Fake = Name.second.m_Fake;
+			Entry.m_Light = Name.second.m_Light;
 			m_PlayerVersionsByServer[ServerEntry.first][Name.first] = Name.second.m_Version.empty() ? "under" : BestClientStripVersionProofStr(Name.second.m_Version);
 			m_DeveloperByServer[ServerEntry.first][Name.first] = Name.second.m_Developer;
 			m_FakeByServer[ServerEntry.first][Name.first] = Name.second.m_Fake;
+			m_LightByServer[ServerEntry.first][Name.first] = Name.second.m_Light;
 			m_vPlayers.push_back(Entry);
 		}
 	}
 	return true;
 }
 
-bool CBrowserCache::HasPlayer(const char *pServerAddress, const char *pName, bool *pDeveloper, bool *pFake) const
+bool CBrowserCache::HasPlayer(const char *pServerAddress, const char *pName, bool *pDeveloper, bool *pFake, bool *pLight) const
 {
 	if(pDeveloper)
 		*pDeveloper = false;
 	if(pFake)
 		*pFake = false;
+	if(pLight)
+		*pLight = false;
 	if(!pServerAddress || !pName || pServerAddress[0] == '\0' || pName[0] == '\0')
 		return false;
 
@@ -233,6 +241,16 @@ bool CBrowserCache::HasPlayer(const char *pServerAddress, const char *pName, boo
 			const auto FakePlayerIt = FakeServerIt->second.find(pName);
 			if(FakePlayerIt != FakeServerIt->second.end())
 				*pFake = FakePlayerIt->second;
+		}
+	}
+	if(pLight)
+	{
+		const auto LightServerIt = m_LightByServer.find(aNormalizedAddress);
+		if(LightServerIt != m_LightByServer.end())
+		{
+			const auto LightPlayerIt = LightServerIt->second.find(pName);
+			if(LightPlayerIt != LightServerIt->second.end())
+				*pLight = LightPlayerIt->second;
 		}
 	}
 	return true;

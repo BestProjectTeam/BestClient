@@ -471,6 +471,26 @@ bool ReadPeerVersionStatePacket(const uint8_t *pData, int DataSize, CPeerVersion
 	return Offset == DataSize;
 }
 
+bool ReadPeerEditionStatePacket(const uint8_t *pData, int DataSize, CPeerState &Out)
+{
+	int Offset = 0;
+	EPacketType Type;
+	if(!ReadHeader(pData, DataSize, Type, Offset) || Type != PACKET_PEER_EDITION_STATE)
+		return false;
+	int16_t ClientId = -1;
+	uint8_t Light = 0;
+	if(!ReadString(pData, DataSize, Offset, Out.m_ServerAddress) ||
+		!ReadString(pData, DataSize, Offset, Out.m_PlayerName) ||
+		!ReadS16(pData, DataSize, Offset, ClientId) ||
+		!ReadU8(pData, DataSize, Offset, Light))
+	{
+		return false;
+	}
+	Out.m_ClientId = ClientId;
+	Out.m_Light = Light == 1;
+	return Offset == DataSize;
+}
+
 bool ReadDevAuthResultPacket(const uint8_t *pData, int DataSize, CDevAuthResult &Out)
 {
 	int Offset = 0;

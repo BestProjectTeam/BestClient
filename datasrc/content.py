@@ -278,6 +278,7 @@ container.images.Add(Image("raceflag", "race_flag.png"))
 container.images.Add(Image("bcicon", "BestClient/bc_icon.png"))
 container.images.Add(Image("bcdevicon", "BestClient/bc_dev_icon.png"))
 container.images.Add(Image("bcfakeicon", "BestClient/bc_fake_icon.png"))
+container.images.Add(Image("bclighticon", "BestClient/bc_light_icon.png"))
 
 container.pickups.Add(Pickup("health"))
 container.pickups.Add(Pickup("armor"))

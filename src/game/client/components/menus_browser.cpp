@@ -60,7 +60,7 @@ static void RenderCenteredBestClientTabIcon(IGraphics *pGraphics, const CUIRect 
 	Icon.h = Size;
 	Icon.x += (Rect.w - Size) / 2.0f;
 	Icon.y += (Rect.h - Size) / 2.0f;
-	BestClientRenderIndicatorIcon(pGraphics, Icon, false, false, Color);
+	BestClientRenderIndicatorIcon(pGraphics, Icon, false, false, false, Color);
 }
 // bestclient
 
@@ -251,7 +251,7 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 		else if(Col.m_Id == COL_BESTCLIENT)
 		{
 			const CUIRect Icon = CenterSquareIcon(Col.m_Rect, 2.0f);
-			BestClientRenderIndicatorIcon(Graphics(), Icon, false, false, ColorRGBA(1.0f, 1.0f, 1.0f, 0.9f));
+			BestClientRenderIndicatorIcon(Graphics(), Icon, false, false, false, ColorRGBA(1.0f, 1.0f, 1.0f, 0.9f));
 		}
 		// bestclient
 		else if(Col.m_Id == COL_FLAG_FAV)
@@ -536,7 +536,7 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 				if(pItem->m_HasBestClientDeveloperPlayers && HasRegularBestClientPlayers)
 				{
 					const CUIRect Icon = CenterSquareIcon(Button, 2.0f);
-					BestClientRenderIndicatorIcon(Graphics(), Icon, true, false, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));
+					BestClientRenderIndicatorIcon(Graphics(), Icon, true, false, false, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));
 
 					if(pItem->m_NumBestClientDeveloperPlayers > 1)
 					{
@@ -554,8 +554,9 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 					const bool HasDeveloperPlayers = pItem->m_HasBestClientDeveloperPlayers;
 					const int NumRegularBestClientPlayers = std::max(0, pItem->m_NumBestClientPlayers - pItem->m_NumBestClientDeveloperPlayers);
 					const bool OnlyDevelopers = HasDeveloperPlayers && NumRegularBestClientPlayers == 0;
+					const bool AllLight = pItem->m_NumBestClientPlayers > 0 && pItem->m_NumBestClientLightPlayers == pItem->m_NumBestClientPlayers;
 					const CUIRect Icon = CenterSquareIcon(Button, 2.0f);
-					BestClientRenderIndicatorIcon(Graphics(), Icon, OnlyDevelopers, false, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));
+					BestClientRenderIndicatorIcon(Graphics(), Icon, OnlyDevelopers, false, !OnlyDevelopers && AllLight, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));
 
 					const int CounterValue = OnlyDevelopers ? pItem->m_NumBestClientDeveloperPlayers : NumRegularBestClientPlayers;
 					if(CounterValue > 1)
@@ -1892,7 +1893,7 @@ void CMenus::RenderServerbrowserBestClient(CUIRect View)
 		BestClientIcon.h = BestClientIconSize;
 		BestClientIcon.x = std::min(NameCursor.m_X + BestClientIconSpacing, Name.x + Name.w - BestClientIcon.w);
 		BestClientIcon.y = Name.y + (Name.h - BestClientIcon.h) / 2.0f;
-		BestClientRenderIndicatorIcon(Graphics(), BestClientIcon, Client.m_BestClientDeveloper, Client.m_BestClientFake, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));
+		BestClientRenderIndicatorIcon(Graphics(), BestClientIcon, Client.m_BestClientDeveloper, Client.m_BestClientFake, Client.m_BestClientLight, ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f));
 		Ui()->DoLabel(&Clan, Client.m_aClan, FontSize - 2.0f, TEXTALIGN_ML);
 	}
 

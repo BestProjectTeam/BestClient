@@ -833,7 +833,8 @@ void CScoreboard::RenderScoreboard(CUIRect Scoreboard, int Team, int CountStart,
 					IndicatorIconSize};
 				BestClientRenderIndicatorIcon(Graphics(), IconRect,
 					GameClient()->m_ClientIndicator.IsPlayerDeveloper(pInfo->m_ClientId),
-					GameClient()->m_ClientIndicator.IsPlayerFakeVersion(pInfo->m_ClientId));
+					GameClient()->m_ClientIndicator.IsPlayerFakeVersion(pInfo->m_ClientId),
+					GameClient()->m_ClientIndicator.IsPlayerLightEdition(pInfo->m_ClientId));
 			}
 			// bestclient
 

@@ -1722,8 +1722,9 @@ void CServerBrowser::SetBestClientPlayers(const std::vector<CBestClientPlayerEnt
 		if(Entry.m_aServerAddress[0] == '\0' || Entry.m_aName[0] == '\0')
 			continue;
 		auto &Flags = m_BestClientPlayersByServer[Entry.m_aServerAddress][Entry.m_aName];
-		Flags.first = Flags.first || Entry.m_Developer;
-		Flags.second = Flags.second || Entry.m_Fake;
+		Flags.m_Developer = Flags.m_Developer || Entry.m_Developer;
+		Flags.m_Fake = Flags.m_Fake || Entry.m_Fake;
+		Flags.m_Light = Flags.m_Light || Entry.m_Light;
 	}
 
 	for(CServerEntry *pEntry : m_vpServerlist)
@@ -1740,14 +1741,16 @@ void CServerBrowser::UpdateServerBestClients(CServerInfo *pInfo) const
 	pInfo->m_HasBestClientPlayers = false;
 	pInfo->m_NumBestClientDeveloperPlayers = 0;
 	pInfo->m_HasBestClientDeveloperPlayers = false;
+	pInfo->m_NumBestClientLightPlayers = 0;
 	for(auto &Client : pInfo->m_vClients)
 	{
 		Client.m_BestClient = false;
 		Client.m_BestClientDeveloper = false;
 		Client.m_BestClientFake = false;
+		Client.m_BestClientLight = false;
 	}
 
-	std::vector<const std::unordered_map<std::string, std::pair<bool, bool>> *> vpAddressMatches;
+	std::vector<const std::unordered_map<std::string, CBestClientBrowserFlags> *> vpAddressMatches;
 	vpAddressMatches.reserve(pInfo->m_NumAddresses);
 	for(int AddressIndex = 0; AddressIndex < pInfo->m_NumAddresses; ++AddressIndex)
 	{
@@ -1769,14 +1772,17 @@ void CServerBrowser::UpdateServerBestClients(CServerInfo *pInfo) const
 			if(PlayerIt == pPlayers->end())
 				continue;
 			Client.m_BestClient = true;
-			Client.m_BestClientDeveloper = Client.m_BestClientDeveloper || PlayerIt->second.first;
-			Client.m_BestClientFake = Client.m_BestClientFake || PlayerIt->second.second;
+			Client.m_BestClientDeveloper = Client.m_BestClientDeveloper || PlayerIt->second.m_Developer;
+			Client.m_BestClientFake = Client.m_BestClientFake || PlayerIt->second.m_Fake;
+			Client.m_BestClientLight = Client.m_BestClientLight || PlayerIt->second.m_Light;
 		}
 		if(Client.m_BestClient)
 		{
 			pInfo->m_NumBestClientPlayers++;
 			if(Client.m_BestClientDeveloper)
 				pInfo->m_NumBestClientDeveloperPlayers++;
+			if(Client.m_BestClientLight)
+				pInfo->m_NumBestClientLightPlayers++;
 		}
 	}
 

@@ -61,6 +61,7 @@ public:
 	bool m_IsUserBClientIndicator;
 	bool m_IsUserDeveloperIndicator;
 	bool m_IsUserFakeIndicator;
+	bool m_IsUserLightIndicator;
 	bool m_ShowBClientVersion;
 	float m_FontSizeBClientVersion;
 	char m_aBClientVersion[32];
@@ -876,7 +877,7 @@ protected:
 		m_ShiftOnInvis = !g_Config.m_BcClientIndicatorInNamePlateDynamic;
 		m_Size = vec2(Data.m_FontSizeBClientIndicator + DEFAULT_PADDING, Data.m_FontSizeBClientIndicator + DEFAULT_PADDING);
 		m_Visible = Data.m_IsUserBClientIndicator;
-		const int ImageId = Data.m_IsUserDeveloperIndicator ? IMAGE_BCDEVICON : (Data.m_IsUserFakeIndicator ? IMAGE_BCFAKEICON : IMAGE_BCICON);
+		const int ImageId = Data.m_IsUserDeveloperIndicator ? IMAGE_BCDEVICON : (Data.m_IsUserFakeIndicator ? IMAGE_BCFAKEICON : (Data.m_IsUserLightIndicator ? IMAGE_BCLIGHTICON : IMAGE_BCICON));
 		m_Texture = g_pData->m_aImages[ImageId].m_Id;
 		m_Color = ColorRGBA(1.0f, 1.0f, 1.0f, Data.m_Color.a);
 	}
@@ -1347,6 +1348,7 @@ void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *p
 	Data.m_IsUserBClientIndicator = Data.m_ShowBClientIndicator && GameClient()->m_ClientIndicator.IsPlayerBClient(pPlayerInfo->m_ClientId);
 	Data.m_IsUserDeveloperIndicator = Data.m_ShowBClientIndicator && GameClient()->m_ClientIndicator.IsPlayerDeveloper(pPlayerInfo->m_ClientId);
 	Data.m_IsUserFakeIndicator = Data.m_ShowBClientIndicator && GameClient()->m_ClientIndicator.IsPlayerFakeVersion(pPlayerInfo->m_ClientId);
+	Data.m_IsUserLightIndicator = Data.m_ShowBClientIndicator && GameClient()->m_ClientIndicator.IsPlayerLightEdition(pPlayerInfo->m_ClientId);
 	Data.m_ShowVoiceTalking = g_Config.m_BcVoiceChatNameplateIcon != 0 &&
 				  GameClient()->m_VoiceChat.IsClientTalking(pPlayerInfo->m_ClientId);
 	Data.m_ShowBClientVersion = false;
@@ -1503,6 +1505,7 @@ void CNamePlates::RenderNamePlatePreview(vec2 Position, int Dummy)
 	Data.m_IsUserBClientIndicator = Data.m_ShowBClientIndicator;
 	Data.m_IsUserDeveloperIndicator = false;
 	Data.m_IsUserFakeIndicator = false;
+	Data.m_IsUserLightIndicator = false;
 	Data.m_ShowVoiceTalking = g_Config.m_BcVoiceChatNameplateIcon != 0;
 	Data.m_ShowBClientVersion = false;
 	Data.m_FontSizeBClientVersion = std::max(10.0f, FontSize * 0.75f);

@@ -33,6 +33,7 @@ public:
 	bool IsPlayerBClient(int ClientId) { return IsPlayerBestClient(ClientId); }
 	bool IsPlayerDeveloper(int ClientId) const;
 	bool IsPlayerFakeVersion(int ClientId) const;
+	bool IsPlayerLightEdition(int ClientId) const;
 	bool GetPlayerVersionLabel(int ClientId, char *pVersion, int VersionSize) const;
 
 	const std::unordered_map<std::string, std::unordered_map<std::string, std::string>> &AllPlayerVersions() const { return m_BrowserCache.PlayerVersionsByServer(); }
@@ -67,6 +68,7 @@ private:
 	std::unordered_set<int> m_RegisteredClientIds;
 	std::unordered_set<int> m_DeveloperClientIds;
 	std::unordered_set<int> m_FakeClientIds;
+	std::unordered_set<int> m_LightClientIds;
 	std::unordered_map<int, std::string> m_ClientVersions;
 	CPresenceCache m_PresenceCache;
 

@@ -355,7 +355,13 @@ private:
 	std::vector<CCommunity> m_vCommunities;
 	std::unordered_map<NETADDR, CCommunityServer> m_CommunityServersByAddr;
 	// bestclient
-	std::unordered_map<std::string, std::unordered_map<std::string, std::pair<bool, bool>>> m_BestClientPlayersByServer;
+	struct CBestClientBrowserFlags
+	{
+		bool m_Developer = false;
+		bool m_Fake = false;
+		bool m_Light = false;
+	};
+	std::unordered_map<std::string, std::unordered_map<std::string, CBestClientBrowserFlags>> m_BestClientPlayersByServer;
 	// bestclient
 
 	int m_OwnLocation = CServerInfo::LOC_UNKNOWN;

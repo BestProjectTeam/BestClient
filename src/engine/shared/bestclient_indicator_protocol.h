@@ -34,6 +34,7 @@ enum EPacketType : uint8_t
 	PACKET_DEV_AUTH_RESULT = 10,
 	PACKET_VERSION_ANNOUNCE = 11,
 	PACKET_PEER_VERSION_STATE = 12,
+	PACKET_PEER_EDITION_STATE = 13,
 };
 
 struct CClientPresencePacket
@@ -53,6 +54,7 @@ struct CPeerState
 	std::string m_PlayerName;
 	int m_ClientId = -1;
 	bool m_Developer = false;
+	bool m_Light = false;
 };
 
 struct CPeerList
@@ -126,6 +128,7 @@ bool ReadPeerListPacket(const uint8_t *pData, int DataSize, CPeerList &Out);
 bool ReadPeerDevStatePacket(const uint8_t *pData, int DataSize, CPeerState &Out);
 bool ReadPeerDevListPacket(const uint8_t *pData, int DataSize, CPeerList &Out);
 bool ReadPeerVersionStatePacket(const uint8_t *pData, int DataSize, CPeerVersionState &Out);
+bool ReadPeerEditionStatePacket(const uint8_t *pData, int DataSize, CPeerState &Out);
 bool ReadDevAuthResultPacket(const uint8_t *pData, int DataSize, CDevAuthResult &Out);
 
 void WritePeerStatePacket(std::vector<uint8_t> &vOut, EPacketType Type, const char *pServerAddress, const char *pPlayerName, int ClientId);

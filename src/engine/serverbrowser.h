@@ -81,7 +81,8 @@ public:
 		// bestclient
 		bool m_BestClient = false;
 		bool m_BestClientDeveloper = false;
-		bool m_BestClientFake = false; // bestclient
+		bool m_BestClientFake = false;
+		bool m_BestClientLight = false; // bestclient
 
 		// bestclient
 		// skin info 0.6
@@ -138,6 +139,7 @@ public:
 	bool m_HasBestClientPlayers = false;
 	int m_NumBestClientDeveloperPlayers = 0;
 	bool m_HasBestClientDeveloperPlayers = false;
+	int m_NumBestClientLightPlayers = 0;
 	bool m_HasMapSha256 = false;
 	SHA256_DIGEST m_MapSha256{};
 	char m_aMapUrl[512]{};
@@ -377,6 +379,7 @@ public:
 		char m_aName[MAX_NAME_LENGTH];
 		bool m_Developer;
 		bool m_Fake;
+		bool m_Light;
 	};
 	// bestclient
 

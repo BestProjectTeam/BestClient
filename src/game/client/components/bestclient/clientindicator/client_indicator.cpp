@@ -178,6 +178,8 @@ namespace
 			return "version_announce";
 		case BestClientIndicator::PACKET_PEER_VERSION_STATE:
 			return "peer_version_state";
+		case BestClientIndicator::PACKET_PEER_EDITION_STATE:
+			return "peer_edition_state";
 		default:
 			return "unknown";
 		}
@@ -356,6 +358,46 @@ bool CClientIndicator::IsPlayerFakeVersion(int ClientId) const
 					return true;
 			}
 		}
+	}
+
+	return false;
+}
+
+bool CClientIndicator::IsPlayerLightEdition(int ClientId) const
+{
+	if(Client()->State() != IClient::STATE_ONLINE)
+		return false;
+	for(const int LocalId : GameClient()->m_aLocalIds)
+	{
+		if(LocalId >= 0 && ClientId == LocalId)
+			return false;
+	}
+	if(m_LightClientIds.find(ClientId) != m_LightClientIds.end())
+		return true;
+
+	const char *pPlayerName = PlayerNameForClient(ClientId);
+	if(pPlayerName[0] == '\0')
+		return false;
+
+	const char *pServerAddress = m_aCachedGameServerAddr[0] != '\0' ? m_aCachedGameServerAddr : nullptr;
+	char aFallbackAddress[NETADDR_MAXSTRSIZE];
+	if(!pServerAddress)
+	{
+		net_addr_str(&Client()->ServerAddress(), aFallbackAddress, sizeof(aFallbackAddress), true);
+		pServerAddress = aFallbackAddress;
+	}
+	bool BrowserLight = false;
+	if(m_BrowserCache.HasPlayer(pServerAddress, pPlayerName, nullptr, nullptr, &BrowserLight) && BrowserLight)
+		return true;
+
+	const IServerBrowser::CServerEntry *pCurrentServer = ServerBrowser()->Find(Client()->ServerAddress());
+	if(!pCurrentServer)
+		return false;
+
+	for(const auto &ClientInfo : pCurrentServer->m_Info.m_vClients)
+	{
+		if(ClientInfo.m_BestClientLight && str_comp(ClientInfo.m_aName, pPlayerName) == 0)
+			return true;
 	}
 
 	return false;
@@ -903,6 +945,7 @@ void CClientIndicator::ProcessIncomingPackets(bool Force)
 				m_PresenceCache.SetPresent(PeerState.m_ClientId, false);
 				m_DeveloperClientIds.erase(PeerState.m_ClientId);
 				m_FakeClientIds.erase(PeerState.m_ClientId);
+				m_LightClientIds.erase(PeerState.m_ClientId);
 				m_ClientVersions.erase(PeerState.m_ClientId);
 			}
 			continue;
@@ -917,6 +960,13 @@ void CClientIndicator::ProcessIncomingPackets(bool Force)
 							    [](int ClientId) { return !IsValidPeerClientId(ClientId); }),
 				PeerList.m_vClientIds.end());
 			m_PresenceCache.Replace(PeerList.m_vClientIds);
+			for(auto It = m_LightClientIds.begin(); It != m_LightClientIds.end();)
+			{
+				if(!m_PresenceCache.IsPresent(*It))
+					It = m_LightClientIds.erase(It);
+				else
+					++It;
+			}
 			continue;
 		}
 
@@ -957,6 +1007,19 @@ void CClientIndicator::ProcessIncomingPackets(bool Force)
 					m_FakeClientIds.insert(PeerVersionState.m_ClientId);
 				else
 					m_FakeClientIds.erase(PeerVersionState.m_ClientId);
+			}
+			continue;
+		}
+
+		if(BestClientIndicator::ReadPeerEditionStatePacket(pRawData, DataSize, PeerState))
+		{
+			DebugLogF("received peer_edition_state client_id=%d light=%d player='%s' server=%s", PeerState.m_ClientId, PeerState.m_Light ? 1 : 0, PeerState.m_PlayerName.c_str(), PeerState.m_ServerAddress.c_str());
+			if(IsValidPeerClientId(PeerState.m_ClientId) && PeerState.m_ServerAddress == m_PresenceCache.ServerAddress())
+			{
+				if(PeerState.m_Light)
+					m_LightClientIds.insert(PeerState.m_ClientId);
+				else
+					m_LightClientIds.erase(PeerState.m_ClientId);
 			}
 			continue;
 		}
@@ -1028,6 +1091,7 @@ void CClientIndicator::SyncLocalRegistrations(bool Force)
 			SendPresencePacket(*It, BestClientIndicator::PACKET_LEAVE);
 			m_PresenceCache.SetPresent(*It, false);
 			m_DeveloperClientIds.erase(*It);
+			m_LightClientIds.erase(*It);
 			DebugLogF("unregistered local client_id=%d", *It);
 			It = m_RegisteredClientIds.erase(It);
 		}
@@ -1073,6 +1137,7 @@ void CClientIndicator::UpdatePresence()
 		{
 			m_RegisteredClientIds.clear();
 			m_DeveloperClientIds.clear();
+			m_LightClientIds.clear();
 			m_LastHeartbeatTick = 0;
 		}
 		m_WasPresenceEnabled = true;
@@ -1084,6 +1149,7 @@ void CClientIndicator::UpdatePresence()
 		m_RegisteredClientIds.clear();
 		m_DeveloperClientIds.clear();
 		m_FakeClientIds.clear();
+		m_LightClientIds.clear();
 		m_ClientVersions.clear();
 		m_LastHeartbeatTick = 0;
 	}
@@ -1208,6 +1274,7 @@ void CClientIndicator::ResetPresenceState()
 	m_RegisteredClientIds.clear();
 	m_DeveloperClientIds.clear();
 	m_FakeClientIds.clear();
+	m_LightClientIds.clear();
 	m_ClientVersions.clear();
 	m_PresenceCache.Clear();
 	m_aLastGameServerAddr[0] = '\0';

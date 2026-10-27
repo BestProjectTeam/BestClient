@@ -16,6 +16,7 @@ class CBrowserCache
 	std::unordered_map<std::string, std::unordered_map<std::string, std::string>> m_PlayerVersionsByServer;
 	std::unordered_map<std::string, std::unordered_map<std::string, bool>> m_DeveloperByServer;
 	std::unordered_map<std::string, std::unordered_map<std::string, bool>> m_FakeByServer;
+	std::unordered_map<std::string, std::unordered_map<std::string, bool>> m_LightByServer;
 
 public:
 	bool Load(const json_value &Json);
@@ -25,9 +26,10 @@ public:
 		m_PlayerVersionsByServer.clear();
 		m_DeveloperByServer.clear();
 		m_FakeByServer.clear();
+		m_LightByServer.clear();
 	}
 	const std::vector<IServerBrowser::CBestClientPlayerEntry> &Players() const { return m_vPlayers; }
-	bool HasPlayer(const char *pServerAddress, const char *pName, bool *pDeveloper = nullptr, bool *pFake = nullptr) const;
+	bool HasPlayer(const char *pServerAddress, const char *pName, bool *pDeveloper = nullptr, bool *pFake = nullptr, bool *pLight = nullptr) const;
 	bool GetPlayerVersion(const char *pServerAddress, const char *pName, char *pVersion, int VersionSize) const;
 	const std::unordered_map<std::string, std::unordered_map<std::string, std::string>> &PlayerVersionsByServer() const { return m_PlayerVersionsByServer; }
 };
