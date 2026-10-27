@@ -982,7 +982,11 @@ void CMenus::RenderSettingsBestClientVisuals(CUIRect MainView)
 		BcMenuBadges::DrawNew(Graphics(), Ui(), TextRender(), &MaxFpsRow, MarginSmall);
 		DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcDisplayMaxFps, BcLocalize("Display max FPS"), &g_Config.m_BcDisplayMaxFps, &MaxFpsRow, LineSize);
 	}
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcDiscordRPC, BcLocalize("Bestclient discord rpc (restart requires)"), &g_Config.m_BcDiscordRPC, &VisualsQoLBlock, LineSize);
+	static int s_DiscordRpcApplied = -1;
+	if(s_DiscordRpcApplied < 0)
+		s_DiscordRpcApplied = g_Config.m_BcDiscordRPC;
+	if(DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_BcDiscordRPC, BcLocalize("Bestclient discord rpc (restart requires)"), &g_Config.m_BcDiscordRPC, &VisualsQoLBlock, LineSize))
+		m_NeedRestartDiscord = g_Config.m_BcDiscordRPC != s_DiscordRpcApplied;
 	VisualsQoLBlock.HSplitTop(LineSize, &Button, &VisualsQoLBlock);
 	Ui()->DoScrollbarOption(&g_Config.m_BcWheelScale, &g_Config.m_BcWheelScale, &Button, BcLocalize("Bind/Emote wheel scale"), 50, 100, &CUi::ms_LinearScrollbarScale, CUi::SCROLLBAR_OPTION_DELAYUPDATE, "%");
 	VisualsQoLBlock.HSplitTop(LineSize, &Button, &VisualsQoLBlock);

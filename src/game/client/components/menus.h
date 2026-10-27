@@ -309,6 +309,7 @@ protected:
 	bool m_NeedRestartGraphics;
 	bool m_NeedRestartSound;
 	bool m_NeedRestartUpdate;
+	bool m_NeedRestartDiscord; // bestclient
 	bool m_NeedSendinfo;
 	bool m_NeedSendDummyinfo;
 
