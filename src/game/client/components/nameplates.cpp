@@ -109,6 +109,7 @@ protected:
 	virtual void UpdateText(CGameClient &This, const CNamePlateData &Data) = 0;
 	// bestclient
 	virtual bool SoftUpdate() const { return false; }
+	virtual void FinishLayout() {}
 	// bestclient
 	ColorRGBA m_Color = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
 	CNamePlatePartText(CGameClient &This) :
@@ -156,6 +157,9 @@ public:
 
 		const STextBoundingBox Container = This.TextRender()->GetBoundingBoxTextContainer(m_TextContainerIndex);
 		m_Size = vec2(Container.m_W, Container.m_H);
+		// bestclient
+		FinishLayout();
+		// bestclient
 	}
 	void Reset(CGameClient &This) override
 	{
@@ -944,7 +948,48 @@ class CNamePlatePartTeeCoord : public CNamePlatePartText
 private:
 	int m_X100 = -1;
 	float m_FontSize = -INFINITY;
+	float m_DigitWidth = -1.0f;
+	float m_FirstStep = -1.0f;
+	float m_LayoutWidth = 0.0f;
+	float m_aCharWidth[128];
 	char m_aText[16] = "";
+
+	float AdvanceOf(CGameClient &This, char Char)
+	{
+		const int Index = (unsigned char)Char;
+		if(Index >= (int)(sizeof(m_aCharWidth) / sizeof(m_aCharWidth[0])))
+			return 0.0f;
+		if(m_aCharWidth[Index] < 0.0f)
+		{
+			char aOne[2] = {Char, '\0'};
+			char aTwo[3] = {Char, Char, '\0'};
+			const float One = This.TextRender()->TextWidth(m_FontSize, aOne);
+			const float Two = This.TextRender()->TextWidth(m_FontSize, aTwo);
+			m_aCharWidth[Index] = std::max(0.0f, Two - One);
+		}
+		return m_aCharWidth[Index];
+	}
+
+	float FirstStep(CGameClient &This, char Char)
+	{
+		if(m_FirstStep >= 0.0f)
+			return m_FirstStep;
+		const unsigned Flags = This.TextRender()->GetRenderFlags();
+		This.TextRender()->SetRenderFlags(Flags | ETextRenderFlags::TEXT_RENDER_FLAG_NO_X_BEARING);
+		char aOne[2] = {Char, '\0'};
+		char aTwo[3] = {Char, Char, '\0'};
+		m_FirstStep = std::max(0.0f, This.TextRender()->TextWidth(m_FontSize, aTwo) - This.TextRender()->TextWidth(m_FontSize, aOne));
+		This.TextRender()->SetRenderFlags(Flags);
+		return m_FirstStep;
+	}
+
+	void ClearWidths()
+	{
+		for(float &Width : m_aCharWidth)
+			Width = -1.0f;
+		m_DigitWidth = -1.0f;
+		m_FirstStep = -1.0f;
+	}
 
 protected:
 	bool UpdateNeeded(CGameClient &This, const CNamePlateData &Data) override
@@ -958,17 +1003,64 @@ protected:
 
 	void UpdateText(CGameClient &This, const CNamePlateData &Data) override
 	{
+		if(m_FontSize != Data.m_FontSizeTeeCoords)
+			ClearWidths();
 		m_FontSize = Data.m_FontSizeTeeCoords;
 		m_X100 = Data.m_TeeCoordX100;
 		str_format(m_aText, sizeof(m_aText), "X:%.2f", m_X100 / 100.0f);
+		const int Length = str_length(m_aText);
+
+		if(m_DigitWidth < 0.0f)
+			m_DigitWidth = AdvanceOf(This, '0');
+
+		CTextCursor ColorCursor;
+		CBcGradient::ApplyEverythingGradient(&ColorCursor, m_aText, Length, &This);
+
+		const unsigned OldFlags = This.TextRender()->GetRenderFlags();
+		This.TextRender()->SetRenderFlags(OldFlags | ETextRenderFlags::TEXT_RENDER_FLAG_NO_AUTOMATIC_QUAD_UPLOAD);
+
 		CTextCursor Cursor;
 		Cursor.m_FontSize = m_FontSize;
-		This.TextRender()->CreateOrAppendTextContainer(m_TextContainerIndex, &Cursor, m_aText);
+		float Pen = 0.0f;
+		for(int i = 0; i < Length; i++)
+		{
+			const char Char = m_aText[i];
+			Cursor.SetPosition(vec2(Pen, 0.0f));
+			Cursor.m_vColorSplits.clear();
+			if(i < (int)ColorCursor.m_vColorSplits.size())
+			{
+				const STextColorSplit &Split = ColorCursor.m_vColorSplits[i];
+				Cursor.m_vColorSplits.emplace_back(Cursor.m_CharCount, Split.m_Length, Split.m_Color);
+			}
+			char aChar[2] = {Char, '\0'};
+			This.TextRender()->CreateOrAppendTextContainer(m_TextContainerIndex, &Cursor, aChar);
+			const float Step = i == 0 ? FirstStep(This, Char) : ((Char >= '0' && Char <= '9') ? m_DigitWidth : AdvanceOf(This, Char));
+			Pen += Step;
+		}
+		m_LayoutWidth = Pen;
+		if(m_TextContainerIndex.Valid())
+			This.TextRender()->UploadTextContainer(m_TextContainerIndex);
+		This.TextRender()->SetRenderFlags(OldFlags);
+	}
+
+	void FinishLayout() override
+	{
+		if(m_LayoutWidth > 0.0f)
+			m_Size.x = m_LayoutWidth;
+	}
+
+	void Reset(CGameClient &This) override
+	{
+		CNamePlatePartText::Reset(This);
+		ClearWidths();
 	}
 
 public:
 	CNamePlatePartTeeCoord(CGameClient &This) :
-		CNamePlatePartText(This) {}
+		CNamePlatePartText(This)
+	{
+		ClearWidths();
+	}
 };
 // bestclient
 
