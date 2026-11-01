@@ -2250,6 +2250,11 @@ vec2 CChatMedia::ChatMousePos() const
 
 bool CChatMedia::OnChatInput(CChat &Chat, const IInput::CEvent &Event)
 {
+	const bool MenuCoversGame = GameClient()->m_Menus.IsActive() &&
+		(GameClient()->m_Menus.m_Popup != CMenus::POPUP_NONE || !GameClient()->m_Menus.IsIngameGamePage());
+	if(MenuCoversGame)
+		return false;
+
 	if((Event.m_Flags & IInput::FLAG_PRESS) && HasValidFullscreenMedia(Chat))
 	{
 		if(Event.m_Key == KEY_MOUSE_1 || Event.m_Key == KEY_MOUSE_2 || Event.m_Key == KEY_ESCAPE)
