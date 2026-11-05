@@ -43,7 +43,6 @@ void CControls::OnReset()
 
 void CControls::ResetInput(int Dummy)
 {
-	m_aInputDebounce[Dummy] = {};
 	m_aLastData[Dummy].m_Direction = 0;
 	// simulate releasing the fire button
 	if((m_aLastData[Dummy].m_Fire & 1) != 0)
@@ -68,7 +67,6 @@ struct CInputState
 {
 	CControls *m_pControls;
 	int *m_apVariables[NUM_DUMMIES];
-	int m_Input;
 };
 
 void CControls::ConKeyInputState(IConsole::IResult *pResult, void *pUserData)
@@ -78,22 +76,7 @@ void CControls::ConKeyInputState(IConsole::IResult *pResult, void *pUserData)
 	if(pState->m_pControls->GameClient()->m_GameInfo.m_BugDDRaceInput && pState->m_pControls->GameClient()->m_Snap.m_SpecInfo.m_Active)
 		return;
 
-	int *pVariable = pState->m_apVariables[g_Config.m_ClDummy];
-	const int Value = pResult->GetInteger(0);
-	if(!Value && *pVariable && g_Config.m_BcInputDebounce && pState->m_Input >= 0)
-		pState->m_pControls->InputDebounce(g_Config.m_ClDummy, pState->m_Input);
-	*pVariable = Value;
-}
-
-void CControls::InputDebounce(int Dummy, int Input)
-{
-	switch(Input)
-	{
-	case INPUT_LEFT: if(m_aLastData[Dummy].m_Direction != -1) m_aInputDebounce[Dummy].m_Direction = -1; break;
-	case INPUT_RIGHT: if(m_aLastData[Dummy].m_Direction != 1) m_aInputDebounce[Dummy].m_Direction = 1; break;
-	case INPUT_JUMP: m_aInputDebounce[Dummy].m_Jump = m_aLastData[Dummy].m_Jump ? -1 : 1; break;
-	case INPUT_HOOK: m_aInputDebounce[Dummy].m_Hook = m_aLastData[Dummy].m_Hook ? -1 : 1; break;
-	}
+	*pState->m_apVariables[g_Config.m_ClDummy] = pResult->GetInteger(0);
 }
 
 void CControls::ConKeyInputCounter(IConsole::IResult *pResult, void *pUserData)
@@ -140,27 +123,27 @@ void CControls::OnConsoleInit()
 {
 	// game commands
 	{
-		static CInputState s_State = {this, {&m_aInputDirectionLeft[0], &m_aInputDirectionLeft[1]}, INPUT_LEFT};
+		static CInputState s_State = {this, {&m_aInputDirectionLeft[0], &m_aInputDirectionLeft[1]}};
 		Console()->Register("+left", "", CFGFLAG_CLIENT, ConKeyInputState, &s_State, "Move left");
 	}
 	{
-		static CInputState s_State = {this, {&m_aInputDirectionRight[0], &m_aInputDirectionRight[1]}, INPUT_RIGHT};
+		static CInputState s_State = {this, {&m_aInputDirectionRight[0], &m_aInputDirectionRight[1]}};
 		Console()->Register("+right", "", CFGFLAG_CLIENT, ConKeyInputState, &s_State, "Move right");
 	}
 	{
-		static CInputState s_State = {this, {&m_aInputData[0].m_Jump, &m_aInputData[1].m_Jump}, INPUT_JUMP};
+		static CInputState s_State = {this, {&m_aInputData[0].m_Jump, &m_aInputData[1].m_Jump}};
 		Console()->Register("+jump", "", CFGFLAG_CLIENT, ConKeyInputState, &s_State, "Jump");
 	}
 	{
-		static CInputState s_State = {this, {&m_aInputData[0].m_Hook, &m_aInputData[1].m_Hook}, INPUT_HOOK};
+		static CInputState s_State = {this, {&m_aInputData[0].m_Hook, &m_aInputData[1].m_Hook}};
 		Console()->Register("+hook", "", CFGFLAG_CLIENT, ConKeyInputState, &s_State, "Hook");
 	}
 	{
-		static CInputState s_State = {this, {&m_aInputData[0].m_Fire, &m_aInputData[1].m_Fire}, -1};
+		static CInputState s_State = {this, {&m_aInputData[0].m_Fire, &m_aInputData[1].m_Fire}};
 		Console()->Register("+fire", "", CFGFLAG_CLIENT, ConKeyInputCounter, &s_State, "Fire");
 	}
 	{
-		static CInputState s_State = {this, {&m_aShowHookColl[0], &m_aShowHookColl[1]}, -1};
+		static CInputState s_State = {this, {&m_aShowHookColl[0], &m_aShowHookColl[1]}};
 		Console()->Register("+showhookcoll", "", CFGFLAG_CLIENT, ConKeyInputState, &s_State, "Show Hook Collision");
 	}
 
@@ -209,9 +192,6 @@ void CControls::OnMessage(int Msg, void *pRawMsg)
 
 int CControls::SnapInput(int *pData)
 {
-	const int UnlatchedJump = m_aInputData[g_Config.m_ClDummy].m_Jump;
-	const int UnlatchedHook = m_aInputData[g_Config.m_ClDummy].m_Hook;
-
 	// bestclient
 	GameClient()->m_BestClient.UpdateGoresMode();
 	// bestclient
@@ -320,13 +300,6 @@ int CControls::SnapInput(int *pData)
 		const bool LeftPressed = m_aInputDirectionLeft[g_Config.m_ClDummy] != 0;
 		const bool RightPressed = m_aInputDirectionRight[g_Config.m_ClDummy] != 0;
 		m_aInputData[g_Config.m_ClDummy].m_Direction = GameClient()->m_SnapTap.ResolveMovementDirection(g_Config.m_ClDummy, LeftPressed, RightPressed, true);
-		const CInputDebounceState &DebounceState = m_aInputDebounce[g_Config.m_ClDummy];
-		if(m_aInputData[g_Config.m_ClDummy].m_Direction == 0 && DebounceState.m_Direction)
-			m_aInputData[g_Config.m_ClDummy].m_Direction = DebounceState.m_Direction;
-		if(DebounceState.m_Jump)
-			m_aInputData[g_Config.m_ClDummy].m_Jump = DebounceState.m_Jump > 0;
-		if(DebounceState.m_Hook)
-			m_aInputData[g_Config.m_ClDummy].m_Hook = DebounceState.m_Hook > 0;
 		// bestclient
 
 		// dummy copy moves
@@ -404,22 +377,10 @@ int CControls::SnapInput(int *pData)
 	m_aLastData[g_Config.m_ClDummy] = m_aInputData[g_Config.m_ClDummy];
 
 	if(!Send)
-	{
-		if(m_aInputDebounce[g_Config.m_ClDummy].m_Jump)
-			m_aInputData[g_Config.m_ClDummy].m_Jump = UnlatchedJump;
-		if(m_aInputDebounce[g_Config.m_ClDummy].m_Hook)
-			m_aInputData[g_Config.m_ClDummy].m_Hook = UnlatchedHook;
-		m_aInputDebounce[g_Config.m_ClDummy] = {};
 		return 0;
-	}
 
 	m_LastSendTime = time_get();
 	mem_copy(pData, &m_aInputData[g_Config.m_ClDummy], sizeof(m_aInputData[0]));
-	if(m_aInputDebounce[g_Config.m_ClDummy].m_Jump)
-		m_aInputData[g_Config.m_ClDummy].m_Jump = UnlatchedJump;
-	if(m_aInputDebounce[g_Config.m_ClDummy].m_Hook)
-		m_aInputData[g_Config.m_ClDummy].m_Hook = UnlatchedHook;
-	m_aInputDebounce[g_Config.m_ClDummy] = {};
 	return sizeof(m_aInputData[0]);
 }
 
@@ -579,10 +540,6 @@ bool CControls::CheckNewInput()
 		const bool LeftPressed = m_aInputDirectionLeft[g_Config.m_ClDummy] != 0;
 		const bool RightPressed = m_aInputDirectionRight[g_Config.m_ClDummy] != 0;
 		TestInput.m_Direction = GameClient()->m_SnapTap.ResolveMovementDirection(g_Config.m_ClDummy, LeftPressed, RightPressed, false);
-		const CInputDebounceState &DebounceState = m_aInputDebounce[g_Config.m_ClDummy];
-		if(TestInput.m_Direction == 0 && DebounceState.m_Direction) TestInput.m_Direction = DebounceState.m_Direction;
-		if(DebounceState.m_Jump) TestInput.m_Jump = DebounceState.m_Jump > 0;
-		if(DebounceState.m_Hook) TestInput.m_Hook = DebounceState.m_Hook > 0;
 
 		bool NewInput = false;
 		if(m_aFastInput[g_Config.m_ClDummy].m_Direction != TestInput.m_Direction)
@@ -621,10 +578,6 @@ bool CControls::CheckNewInput()
 			const bool LeftPressed = m_aInputDirectionLeft[Dummy] != 0;
 			const bool RightPressed = m_aInputDirectionRight[Dummy] != 0;
 			TestInput.m_Direction = GameClient()->m_SnapTap.ResolveMovementDirection(Dummy, LeftPressed, RightPressed, false);
-			const CInputDebounceState &DebounceState = m_aInputDebounce[Dummy];
-			if(TestInput.m_Direction == 0 && DebounceState.m_Direction) TestInput.m_Direction = DebounceState.m_Direction;
-			if(DebounceState.m_Jump) TestInput.m_Jump = DebounceState.m_Jump > 0;
-			if(DebounceState.m_Hook) TestInput.m_Hook = DebounceState.m_Hook > 0;
 			// bestclient
 		}
 
