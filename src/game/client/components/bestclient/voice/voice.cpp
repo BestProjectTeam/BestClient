@@ -674,6 +674,38 @@ void CVoiceChat::SaveMutedNamesToFile()
 	io_close(File);
 }
 
+void CVoiceChat::SyncNameLists()
+{
+	if(str_comp(m_aLastMutedNames, g_Config.m_BcVoiceChatMutedNames) != 0)
+	{
+		ParseVoiceNameList(g_Config.m_BcVoiceChatMutedNames, m_MutedNameKeys);
+		str_copy(m_aLastMutedNames, g_Config.m_BcVoiceChatMutedNames, sizeof(m_aLastMutedNames));
+		m_PeerListDirty = true;
+	}
+	if(str_comp(m_aLastNameVolumes, g_Config.m_BcVoiceChatNameVolumes) != 0)
+	{
+		ParseVoiceNameVolumeList(g_Config.m_BcVoiceChatNameVolumes, m_NameVolumePercent);
+		str_copy(m_aLastNameVolumes, g_Config.m_BcVoiceChatNameVolumes, sizeof(m_aLastNameVolumes));
+		m_PeerListDirty = true;
+	}
+	LoadMutedNamesFromFile();
+	if(str_comp(m_aLastPersistedMutedNames, g_Config.m_BcVoiceChatMutedNames) != 0)
+	{
+		str_copy(m_aLastPersistedMutedNames, g_Config.m_BcVoiceChatMutedNames, sizeof(m_aLastPersistedMutedNames));
+		m_MutedListDirty = true;
+	}
+	if(m_MutedListDirty)
+	{
+		const int64_t Now = time_get();
+		if(m_LastMuteSaveTime == 0 || Now - m_LastMuteSaveTime >= time_freq())
+		{
+			SaveMutedNamesToFile();
+			m_LastMuteSaveTime = Now;
+			m_MutedListDirty = false;
+		}
+	}
+}
+
 void CVoiceChat::OnStateChange(int NewState, int OldState)
 {
 	(void)OldState;
@@ -708,6 +740,8 @@ void CVoiceChat::OnUpdate()
 	{
 		ResetServerListTask();
 	}
+
+	SyncNameLists();
 
 	const bool Enabled = g_Config.m_BcVoiceChatEnable != 0;
 	if(!Enabled)
@@ -752,35 +786,6 @@ void CVoiceChat::OnUpdate()
 			SDL_ClearQueuedAudio(m_PlaybackDevice);
 		ClearPeerState();
 		InvalidatePeerCaches();
-	}
-
-	if(str_comp(m_aLastMutedNames, g_Config.m_BcVoiceChatMutedNames) != 0)
-	{
-		ParseVoiceNameList(g_Config.m_BcVoiceChatMutedNames, m_MutedNameKeys);
-		str_copy(m_aLastMutedNames, g_Config.m_BcVoiceChatMutedNames, sizeof(m_aLastMutedNames));
-		m_PeerListDirty = true;
-	}
-	if(str_comp(m_aLastNameVolumes, g_Config.m_BcVoiceChatNameVolumes) != 0)
-	{
-		ParseVoiceNameVolumeList(g_Config.m_BcVoiceChatNameVolumes, m_NameVolumePercent);
-		str_copy(m_aLastNameVolumes, g_Config.m_BcVoiceChatNameVolumes, sizeof(m_aLastNameVolumes));
-		m_PeerListDirty = true;
-	}
-	LoadMutedNamesFromFile();
-	if(str_comp(m_aLastPersistedMutedNames, g_Config.m_BcVoiceChatMutedNames) != 0)
-	{
-		str_copy(m_aLastPersistedMutedNames, g_Config.m_BcVoiceChatMutedNames, sizeof(m_aLastPersistedMutedNames));
-		m_MutedListDirty = true;
-	}
-	if(m_MutedListDirty)
-	{
-		const int64_t Now = time_get();
-		if(m_LastMuteSaveTime == 0 || Now - m_LastMuteSaveTime >= time_freq())
-		{
-			SaveMutedNamesToFile();
-			m_LastMuteSaveTime = Now;
-			m_MutedListDirty = false;
-		}
 	}
 
 	const std::string EffectiveServerAddr = EffectiveServerAddress();
@@ -1429,6 +1434,7 @@ bool CVoiceChat::TryHandleChatCommand(const char *pLine)
 			return true;
 		}
 
+		SyncNameLists();
 		if(m_MutedNameKeys.find(Key) != m_MutedNameKeys.end())
 		{
 			GameClient()->m_Chat.Echo(Localize("Voice mute: already muted"));
@@ -1461,6 +1467,7 @@ bool CVoiceChat::TryHandleChatCommand(const char *pLine)
 			return true;
 		}
 
+		SyncNameLists();
 		if(m_MutedNameKeys.find(Key) == m_MutedNameKeys.end())
 		{
 			GameClient()->m_Chat.Echo(Localize("Voice unmute: nickname not muted"));
@@ -1493,6 +1500,7 @@ bool CVoiceChat::TryHandleChatCommand(const char *pLine)
 			return true;
 		}
 
+		SyncNameLists();
 		int Percent = 0;
 		if(!str_toint(aValue, &Percent) || Percent < 0 || Percent > 100)
 		{

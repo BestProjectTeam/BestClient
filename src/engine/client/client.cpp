@@ -5380,9 +5380,33 @@ int main(int argc, const char **argv)
 	g_Config.m_ClConfigVersion = 1;
 
 	// parse the command line arguments
+	// bestclient
 	pConsole->SetUnknownCommandCallback(UnknownArgumentCallback, pClient);
-	pConsole->ParseArguments(argc - 1, &argv[1]);
+	for(int i = 1; i < argc; i++)
+	{
+		const char *pArgument = argv[i];
+		if(pArgument[0] == '-' && pArgument[1] == 'f' && pArgument[2] == '\0')
+		{
+			if(argc - i > 1)
+				pConsole->ExecuteFile(argv[++i], IConsole::CLIENT_ID_UNSPECIFIED, true, IStorage::TYPE_ABSOLUTE);
+			continue;
+		}
+		if(!str_comp("-s", pArgument) || !str_comp("--silent", pArgument))
+			continue;
+		if(str_endswith(pArgument, ".demo"))
+		{
+			pClient->HandleDemoPath(pArgument);
+			continue;
+		}
+		if(str_endswith(pArgument, ".map"))
+		{
+			pClient->HandleMapPath(pArgument);
+			continue;
+		}
+		pConsole->ExecuteLine(pArgument);
+	}
 	pConsole->SetUnknownCommandCallback(IConsole::EmptyUnknownCommandCallback, nullptr);
+	// bestclient
 
 	if(pSteam->GetConnectAddress())
 	{

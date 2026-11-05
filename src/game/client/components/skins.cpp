@@ -125,7 +125,7 @@ bool CSkins::CSkinContainer::IsSuppressedForGame() const
 	{
 		return true;
 	}
-	return !g_Config.m_ClDownloadSkins && (m_Type == EType::DOWNLOAD || m_Type == EType::CACHED);
+	return !g_Config.m_ClDownloadSkins && m_Type == EType::DOWNLOAD && !m_CacheAvailable;
 }
 // bestclient
 

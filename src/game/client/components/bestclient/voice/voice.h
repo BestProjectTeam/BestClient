@@ -377,6 +377,7 @@ private:
 	void CloseServerListPingSocket();
 	void LoadMutedNamesFromFile();
 	void SaveMutedNamesToFile();
+	void SyncNameLists();
 	std::string EffectiveServerAddress() const;
 	const char *EffectiveServerLabel() const;
 	bool IsManagedServerConfig() const;
