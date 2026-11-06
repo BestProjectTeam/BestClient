@@ -2251,7 +2251,7 @@ vec2 CChatMedia::ChatMousePos() const
 bool CChatMedia::OnChatInput(CChat &Chat, const IInput::CEvent &Event)
 {
 	const bool MenuCoversGame = GameClient()->m_Menus.IsActive() &&
-		(GameClient()->m_Menus.m_Popup != CMenus::POPUP_NONE || !GameClient()->m_Menus.IsIngameGamePage());
+		(GameClient()->m_Menus.Popup() != CMenus::POPUP_NONE || !GameClient()->m_Menus.IsIngameGamePage());
 	if(MenuCoversGame)
 		return false;
 

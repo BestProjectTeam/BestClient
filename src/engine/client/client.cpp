@@ -5403,7 +5403,7 @@ int main(int argc, const char **argv)
 			pClient->HandleMapPath(pArgument);
 			continue;
 		}
-		pConsole->ExecuteLine(pArgument);
+		pConsole->ExecuteLine(pArgument, IConsole::CLIENT_ID_UNSPECIFIED);
 	}
 	pConsole->SetUnknownCommandCallback(IConsole::EmptyUnknownCommandCallback, nullptr);
 	// bestclient

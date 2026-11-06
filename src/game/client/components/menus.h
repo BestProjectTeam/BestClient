@@ -808,6 +808,7 @@ public:
 	};
 
 	// bestclient
+	int Popup() const { return m_Popup; }
 	bool IsIngameGamePage() const { return m_MenuActive && Client()->State() == IClient::STATE_ONLINE && m_GamePage == PAGE_GAME; }
 	bool IsServerBrowserPageActive() const
 	{

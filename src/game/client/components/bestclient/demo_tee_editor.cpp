@@ -133,7 +133,7 @@ CUi::EPopupMenuFunctionResult CDemoTeeEditor::PopupEditor(void *pContext, CUIRec
 	CMenus *pMenus = &pGameClient->m_Menus;
 	const int ClientId = Editor.m_SelectedClient;
 	if(pGameClient->Client()->State() != IClient::STATE_DEMOPLAYBACK ||
-		ClientId < 0 || ClientId >= MAX_CLIENTS || pMenus->m_Popup != CMenus::POPUP_NONE)
+		ClientId < 0 || ClientId >= MAX_CLIENTS || pMenus->Popup() != CMenus::POPUP_NONE)
 		return CUi::POPUP_CLOSE_CURRENT_AND_DESCENDANTS;
 	SDemoTeeOverride &TeeOverride = Editor.m_aOverrides[ClientId];
 	const CGameClient::CClientData &ClientData = pGameClient->m_aClients[ClientId];
@@ -291,7 +291,7 @@ CUi::EPopupMenuFunctionResult CDemoTeeEditor::PopupSkinPicker(void *pContext, CU
 	CMenus *pMenus = &pGameClient->m_Menus;
 	const int ClientId = Editor.m_SelectedClient;
 	if(pGameClient->Client()->State() != IClient::STATE_DEMOPLAYBACK || !pMenus->IsActive() ||
-		ClientId < 0 || ClientId >= MAX_CLIENTS || pMenus->m_Popup != CMenus::POPUP_NONE)
+		ClientId < 0 || ClientId >= MAX_CLIENTS || pMenus->Popup() != CMenus::POPUP_NONE)
 		return CUi::POPUP_CLOSE_CURRENT;
 	if(!Active)
 		return CUi::POPUP_KEEP_OPEN;
@@ -387,7 +387,7 @@ void CDemoTeeEditor::UpdateSelection(CGameClient *pGameClient, const CUIRect &De
 		m_SelectedClient = -1;
 
 	CUi *pUi = pGameClient->Ui();
-	const bool CanSelect = pGameClient->m_Menus.IsActive() && pGameClient->m_Menus.m_Popup == CMenus::POPUP_NONE &&
+	const bool CanSelect = pGameClient->m_Menus.IsActive() && pGameClient->m_Menus.Popup() == CMenus::POPUP_NONE &&
 		!pGameClient->m_GameConsole.IsActive() && !pGameClient->m_AspectRatio.ConfirmWantsInput() &&
 		(!pUi->IsPopupOpen() || (EditorPopupOpen(pGameClient) && !EditorPopupHovered(pGameClient))) &&
 		pUi->MouseButton(0) == 0 && pUi->LastMouseButton(0) &&
