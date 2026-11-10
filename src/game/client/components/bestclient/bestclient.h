@@ -10,6 +10,7 @@
 #include <game/client/component.h>
 #include <game/teamscore.h>
 
+#include "changelog.h"
 #include "menu_media_background.h"
 
 #include <memory>
@@ -35,6 +36,7 @@ void BestClientPlayHammerHit(CGameClient *pGameClient, vec2 Pos, float Alpha, fl
 class CBestClient : public CComponent
 {
 	CMenuMediaBackground m_MenuMediaBackground;
+	CChangelog m_Changelog;
 	bool m_GoresHeavyWeapon = false;
 
 	int m_aAutoTeamLockLastTeam[NUM_DUMMIES] = {TEAM_FLOCK, TEAM_FLOCK};
@@ -69,6 +71,7 @@ public:
 
 	CMenuMediaBackground &MenuMediaBackground() { return m_MenuMediaBackground; }
 	const CMenuMediaBackground &MenuMediaBackground() const { return m_MenuMediaBackground; }
+	CChangelog &Changelog() { return m_Changelog; }
 
 	bool ApplyFrozenSkin(CTeeRenderInfo &RenderInfo, bool Frozen);
 

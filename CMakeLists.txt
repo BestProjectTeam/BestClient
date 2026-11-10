@@ -3086,6 +3086,8 @@ if(CLIENT)
     components/bestclient/subsystem_runtime.h
     components/bestclient/updater.cpp
     components/bestclient/updater.h
+    components/bestclient/changelog.cpp
+    components/bestclient/changelog.h
     components/bestclient/version.h
     components/bestclient/visualizer/analyzer.cpp
     components/bestclient/visualizer/analyzer.h

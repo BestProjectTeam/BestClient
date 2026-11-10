@@ -2237,3 +2237,51 @@ Others
 [Gradient]
 All
 == Все
+
+[BestClient]
+Changelog
+== Список изменений
+
+[BestClient]
+Refresh
+== Обновить
+
+[BestClient]
+Open
+== Открыть
+
+[BestClient]
+Latest
+== Последний
+
+[BestClient]
+Pre-release
+== Пререлиз
+
+[BestClient]
+No description
+== Нет описания
+
+[BestClient]
+No releases
+== Релизов нет
+
+[BestClient]
+Loading releases...
+== Загрузка релизов...
+
+[BestClient]
+Updating...
+== Обновление...
+
+[BestClient]
+Couldn't load releases
+== Не удалось загрузить релизы
+
+[BestClient]
+Couldn't parse releases
+== Не удалось прочитать релизы
+
+[BestClient]
+GitHub rate limit reached
+== Лимит запросов GitHub

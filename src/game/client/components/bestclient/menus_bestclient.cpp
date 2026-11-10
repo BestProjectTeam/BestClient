@@ -20,6 +20,7 @@
 #include <game/client/components/bestclient/fast_actions.h>
 #include <game/client/components/bestclient/gradient.h>
 #include <game/client/components/bestclient/bestclient.h>
+#include <game/client/components/bestclient/changelog.h>
 #include <game/client/components/bestclient/cursor_trail.h>
 #include <game/client/components/bestclient/physicball.h>
 #include <game/client/components/bestclient/media_decoder.h>
@@ -4965,4 +4966,469 @@ void CMenus::DoRocketPreview(const CUIRect *pRect)
 		Graphics()->DrawSprite(Pos.x, Pos.y, 24.0f);
 		Graphics()->QuadsEnd();
 	}
+}
+
+struct CChangelogLine
+{
+	std::string m_Text;
+	float m_FontSize = 13.5f;
+	float m_Height = 16.0f;
+	float m_TextHeight = 13.5f;
+	float m_WrapOffset = 0.0f;
+	ColorRGBA m_Color = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
+};
+
+static void TrimChangelogLine(std::string &Line)
+{
+	while(!Line.empty() && (Line.back() == ' ' || Line.back() == '\t' || Line.back() == '\r'))
+		Line.pop_back();
+	size_t Start = 0;
+	while(Start < Line.size() && (Line[Start] == ' ' || Line[Start] == '\t'))
+		++Start;
+	if(Start > 0)
+		Line.erase(0, Start);
+}
+
+static void CleanChangelogInline(std::string &Text)
+{
+	std::string Out;
+	Out.reserve(Text.size());
+	for(size_t i = 0; i < Text.size();)
+	{
+		if(Text[i] == '!' && i + 1 < Text.size() && Text[i + 1] == '[')
+		{
+			const size_t Close = Text.find(']', i + 2);
+			const size_t End = Close == std::string::npos ? std::string::npos : Text.find(')', Close);
+			if(Close != std::string::npos && End != std::string::npos && Text[Close + 1] == '(')
+			{
+				i = End + 1;
+				continue;
+			}
+		}
+		if(Text[i] == '[')
+		{
+			const size_t Close = Text.find(']', i + 1);
+			if(Close != std::string::npos && Close + 1 < Text.size() && Text[Close + 1] == '(')
+			{
+				const size_t End = Text.find(')', Close + 2);
+				if(End != std::string::npos)
+				{
+					Out.append(Text, i + 1, Close - i - 1);
+					i = End + 1;
+					continue;
+				}
+			}
+		}
+		if((Text[i] == '*' || Text[i] == '_') && i + 1 < Text.size() && Text[i + 1] == Text[i])
+		{
+			i += 2;
+			continue;
+		}
+		if(Text[i] == '`')
+		{
+			++i;
+			continue;
+		}
+		Out.push_back(Text[i]);
+		++i;
+	}
+	Text = std::move(Out);
+}
+
+static unsigned HashChangelogRelease(const CChangelog::CRelease &Release)
+{
+	unsigned Hash = 2166136261u;
+	auto Mix = [&](const std::string &Text) {
+		for(unsigned char Byte : Text)
+			Hash = (Hash ^ Byte) * 16777619u;
+		Hash ^= 0xFFu;
+	};
+	Mix(Release.m_Tag);
+	Mix(Release.m_Title);
+	Mix(Release.m_Date);
+	Mix(Release.m_Body);
+	Mix(Release.m_Url);
+	Hash ^= Release.m_Prerelease ? 0x1u : 0x2u;
+	Hash ^= Release.m_Latest ? 0x4u : 0x8u;
+	return Hash;
+}
+
+static float MeasureChangelogText(ITextRender *pTextRender, float FontSize, float Width, float StartX, const char *pText)
+{
+	CTextCursor Cursor;
+	Cursor.m_Flags = 0;
+	Cursor.SetPosition(vec2(0.0f, 0.0f));
+	Cursor.m_FontSize = FontSize;
+	Cursor.m_LineWidth = Width;
+	if(StartX > 0.0f)
+		Cursor.m_StartX = StartX;
+	pTextRender->TextEx(&Cursor, pText, -1);
+	return std::max(FontSize, Cursor.Height());
+}
+
+static std::vector<CChangelogLine> BuildChangelogLines(ITextRender *pTextRender, float Width, const std::string &Body)
+{
+	std::vector<CChangelogLine> vLines;
+	const ColorRGBA DefaultColor = pTextRender->DefaultTextColor();
+	auto AddSpacer = [&]() {
+		CChangelogLine Line;
+		Line.m_Height = 8.0f;
+		Line.m_TextHeight = 0.0f;
+		Line.m_Color = DefaultColor;
+		vLines.push_back(std::move(Line));
+	};
+	auto AddNoDescription = [&]() {
+		CChangelogLine Line;
+		Line.m_Text = BcLocalize("No description");
+		Line.m_Color = DefaultColor;
+		Line.m_Color.a *= 0.65f;
+		Line.m_TextHeight = MeasureChangelogText(pTextRender, Line.m_FontSize, Width, 0.0f, Line.m_Text.c_str());
+		Line.m_Height = std::max(16.0f, Line.m_TextHeight);
+		vLines.push_back(std::move(Line));
+	};
+
+	if(Body.empty())
+	{
+		AddNoDescription();
+		return vLines;
+	}
+
+	size_t Start = 0;
+	while(Start <= Body.size())
+	{
+		const size_t End = Body.find('\n', Start);
+		std::string Raw = Body.substr(Start, End == std::string::npos ? std::string::npos : End - Start);
+		Start = End == std::string::npos ? Body.size() + 1 : End + 1;
+		TrimChangelogLine(Raw);
+		if(Raw.size() >= 3 && Raw[0] == '`' && Raw[1] == '`' && Raw[2] == '`')
+			continue;
+		if(Raw == "---" || Raw == "***")
+		{
+			AddSpacer();
+			continue;
+		}
+		if(Raw.empty())
+		{
+			AddSpacer();
+			continue;
+		}
+
+		CChangelogLine Line;
+		Line.m_Color = DefaultColor;
+		Line.m_FontSize = 13.5f;
+		float MinHeight = 16.0f;
+		int Level = 0;
+		while(Level < (int)Raw.size() && Level < 3 && Raw[Level] == '#')
+			++Level;
+		if(Level > 0 && Level < (int)Raw.size() && Raw[Level] == ' ')
+		{
+			Raw.erase(0, Level + 1);
+			TrimChangelogLine(Raw);
+			Line.m_FontSize = Level == 1 ? 18.0f : Level == 2 ? 16.0f : 14.5f;
+			MinHeight = Line.m_FontSize + 4.0f;
+		}
+		else if(Raw.size() >= 2 && (Raw[0] == '-' || Raw[0] == '*' || Raw[0] == '+') && Raw[1] == ' ')
+		{
+			Raw.erase(0, 2);
+			Raw.insert(0, "• ");
+			Line.m_WrapOffset = pTextRender->TextWidth(Line.m_FontSize, "• ");
+		}
+		else if(Raw.size() >= 2 && Raw[0] == '>' && Raw[1] == ' ')
+		{
+			Raw.erase(0, 2);
+			Line.m_Color.a *= 0.75f;
+		}
+
+		CleanChangelogInline(Raw);
+		Line.m_Text = std::move(Raw);
+		if(Line.m_Text.empty())
+		{
+			AddSpacer();
+			continue;
+		}
+		Line.m_TextHeight = MeasureChangelogText(pTextRender, Line.m_FontSize, Width, Line.m_WrapOffset, Line.m_Text.c_str());
+		Line.m_Height = std::max(MinHeight, Line.m_TextHeight);
+		vLines.push_back(std::move(Line));
+	}
+
+	if(vLines.empty())
+		AddNoDescription();
+	return vLines;
+}
+
+static void RenderChangelogTextLine(ITextRender *pTextRender, const CUIRect &Rect, const CChangelogLine &Line)
+{
+	if(Line.m_Text.empty())
+		return;
+
+	CTextCursor Cursor;
+	const float OffsetY = std::max(0.0f, (Rect.h - Line.m_TextHeight) / 2.0f);
+	Cursor.SetPosition(vec2(Rect.x, Rect.y + OffsetY));
+	Cursor.m_FontSize = Line.m_FontSize;
+	Cursor.m_Flags = TEXTFLAG_RENDER;
+	Cursor.m_LineWidth = Rect.w;
+	if(Line.m_WrapOffset > 0.0f)
+		Cursor.m_StartX = Rect.x + Line.m_WrapOffset;
+	pTextRender->TextColor(Line.m_Color);
+	pTextRender->TextEx(&Cursor, Line.m_Text.c_str(), -1);
+	pTextRender->TextColor(pTextRender->DefaultTextColor());
+}
+
+void CMenus::RenderChangelog(CUIRect MainView)
+{
+	GameClient()->m_MenuBackground.ChangePosition(CMenuBackground::POS_NEWS);
+	CChangelog &Changelog = GameClient()->m_BestClient.Changelog();
+	Changelog.NotifyPageOpen(Http());
+
+	MainView.Draw(ms_ColorTabbarActive, IGraphics::CORNER_B, 10.0f);
+	MainView.HSplitTop(10.0f, nullptr, &MainView);
+	MainView.HSplitBottom(8.0f, &MainView, nullptr);
+	MainView.VSplitLeft(12.0f, nullptr, &MainView);
+	MainView.VSplitRight(8.0f, &MainView, nullptr);
+
+	CUIRect Header;
+	MainView.HSplitTop(22.0f, &Header, &MainView);
+	CUIRect Refresh;
+	Header.VSplitRight(96.0f, &Header, &Refresh);
+	Header.VSplitRight(8.0f, &Header, nullptr);
+	Ui()->DoLabel(&Header, BcLocalize("Changelog"), 18.0f, TEXTALIGN_ML);
+
+	static CButtonContainer s_RefreshButton;
+	if(DoButton_Menu(&s_RefreshButton, BcLocalize("Refresh"), 0, &Refresh, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+		Changelog.RequestRefresh(Http());
+
+	const std::vector<CChangelog::CRelease> &vReleases = Changelog.Releases();
+	if(Changelog.Loading() && !vReleases.empty())
+	{
+		CUIRect Status;
+		MainView.HSplitTop(4.0f, nullptr, &MainView);
+		MainView.HSplitTop(14.0f, &Status, &MainView);
+		Ui()->DoLabel(&Status, BcLocalize("Updating..."), 12.0f, TEXTALIGN_ML);
+	}
+	else if(Changelog.HasError() && !vReleases.empty())
+	{
+		CUIRect Status;
+		MainView.HSplitTop(4.0f, nullptr, &MainView);
+		MainView.HSplitTop(14.0f, &Status, &MainView);
+		TextRender()->TextColor(ColorRGBA(1.0f, 0.45f, 0.4f, 1.0f));
+		Ui()->DoLabel(&Status, BcLocalize(Changelog.Error()), 12.0f, TEXTALIGN_ML);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+	}
+
+	MainView.HSplitTop(8.0f, nullptr, &MainView);
+
+	if(vReleases.empty())
+	{
+		if(Changelog.Loading())
+		{
+			SProgressSpinnerProperties Props;
+			Props.m_Color = ms_GuiColor;
+			Ui()->RenderProgressSpinner(vec2(MainView.x + MainView.w * 0.5f, MainView.y + 24.0f), 10.0f, Props);
+			CUIRect Label;
+			MainView.HSplitTop(46.0f, nullptr, &MainView);
+			MainView.HSplitTop(18.0f, &Label, &MainView);
+			Ui()->DoLabel(&Label, BcLocalize("Loading releases..."), 14.0f, TEXTALIGN_MC);
+		}
+		else if(Changelog.HasError())
+		{
+			TextRender()->TextColor(ColorRGBA(1.0f, 0.45f, 0.4f, 1.0f));
+			Ui()->DoLabel(&MainView, BcLocalize(Changelog.Error()), 14.0f, TEXTALIGN_MC);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+		}
+		else
+		{
+			Ui()->DoLabel(&MainView, BcLocalize("No releases"), 14.0f, TEXTALIGN_MC);
+		}
+		return;
+	}
+
+	static CScrollRegion s_ScrollRegion;
+	CScrollRegionParams ScrollParams;
+	ScrollParams.m_ScrollUnit = 48.0f;
+	s_ScrollRegion.Begin(&MainView, &ScrollParams);
+	MainView.VSplitRight(4.0f, &MainView, nullptr);
+
+	const float TextWidth = std::max(20.0f, MainView.w - 22.0f);
+	const int WidthKey = (int)std::round(TextWidth * 2.0f);
+	static int s_CachedWidthKey = -1;
+	static std::vector<unsigned> s_vCachedHash;
+	static std::vector<std::vector<CChangelogLine>> s_vCachedLines;
+	static std::vector<float> s_vCachedTitleHeight;
+	static std::vector<float> s_vCachedTitleTextHeight;
+	static std::vector<float> s_vCachedCardHeight;
+	static CButtonContainer s_aOpenButtons[CChangelog::MAX_RELEASES];
+	static std::string s_CachedLanguage;
+
+	bool Rebuild = s_CachedWidthKey != WidthKey || s_vCachedHash.size() != vReleases.size() || s_CachedLanguage != g_Config.m_ClLanguagefile;
+	if(!Rebuild)
+	{
+		for(size_t i = 0; i < vReleases.size(); ++i)
+		{
+			if(s_vCachedHash[i] != HashChangelogRelease(vReleases[i]))
+			{
+				Rebuild = true;
+				break;
+			}
+		}
+	}
+	if(Rebuild)
+	{
+		s_CachedWidthKey = WidthKey;
+		s_CachedLanguage = g_Config.m_ClLanguagefile;
+		s_vCachedHash.clear();
+		s_vCachedLines.clear();
+		s_vCachedTitleHeight.clear();
+		s_vCachedTitleTextHeight.clear();
+		s_vCachedCardHeight.clear();
+		const size_t Count = std::min(vReleases.size(), std::size(s_aOpenButtons));
+		s_vCachedHash.reserve(Count);
+		s_vCachedLines.reserve(Count);
+		s_vCachedTitleHeight.reserve(Count);
+		s_vCachedTitleTextHeight.reserve(Count);
+		s_vCachedCardHeight.reserve(Count);
+		for(size_t i = 0; i < Count; ++i)
+		{
+			const CChangelog::CRelease &Release = vReleases[i];
+			std::vector<CChangelogLine> vLines = BuildChangelogLines(TextRender(), TextWidth, Release.m_Body);
+			float TitleHeight = 0.0f;
+			float TitleTextHeight = 0.0f;
+			if(!Release.m_Title.empty())
+			{
+				TitleTextHeight = MeasureChangelogText(TextRender(), 15.0f, TextWidth, 0.0f, Release.m_Title.c_str());
+				TitleHeight = std::max(18.0f, TitleTextHeight);
+			}
+
+			float CardHeight = 8.0f + 18.0f;
+			if(TitleHeight > 0.0f)
+				CardHeight += 4.0f + TitleHeight;
+			CardHeight += 6.0f;
+			for(const CChangelogLine &Line : vLines)
+				CardHeight += Line.m_Height;
+			if(!Release.m_Url.empty())
+				CardHeight += 6.0f + 20.0f;
+			CardHeight += 8.0f;
+
+			s_vCachedHash.push_back(HashChangelogRelease(Release));
+			s_vCachedLines.push_back(std::move(vLines));
+			s_vCachedTitleHeight.push_back(TitleHeight);
+			s_vCachedTitleTextHeight.push_back(TitleTextHeight);
+			s_vCachedCardHeight.push_back(CardHeight);
+		}
+	}
+
+	const size_t Count = std::min(vReleases.size(), s_vCachedLines.size());
+	for(size_t i = 0; i < Count; ++i)
+	{
+		const CChangelog::CRelease &Release = vReleases[i];
+		const std::vector<CChangelogLine> &vLines = s_vCachedLines[i];
+		const float TitleHeight = s_vCachedTitleHeight[i];
+		const float TitleTextHeight = s_vCachedTitleTextHeight[i];
+		const float CardHeight = s_vCachedCardHeight[i];
+		const bool HasTitle = TitleHeight > 0.0f;
+
+		CUIRect Card;
+		MainView.HSplitTop(CardHeight, &Card, &MainView);
+		CUIRect Gap;
+		MainView.HSplitTop(8.0f, &Gap, &MainView);
+		s_ScrollRegion.AddRect(Gap);
+		if(!s_ScrollRegion.AddRect(Card))
+			continue;
+
+		const ColorRGBA CardColor = Release.m_Latest ? ColorRGBA(0.0f, 0.0f, 0.0f, 0.16f) : ColorRGBA(0.0f, 0.0f, 0.0f, 0.30f);
+		Card.Draw(CardColor, IGraphics::CORNER_ALL, 6.0f);
+		CUIRect Accent = Card;
+		Accent.w = 3.0f;
+		ColorRGBA AccentColor = ms_GuiColor;
+		if(!Release.m_Latest)
+			AccentColor.a *= 0.45f;
+		Accent.Draw(AccentColor, IGraphics::CORNER_L, 6.0f);
+
+		CUIRect Inner = Card;
+		Inner.VSplitLeft(12.0f, nullptr, &Inner);
+		Inner.VSplitRight(10.0f, &Inner, nullptr);
+		Inner.HSplitTop(8.0f, nullptr, &Inner);
+
+		CUIRect Row;
+		Inner.HSplitTop(18.0f, &Row, &Inner);
+		if(!s_ScrollRegion.RectClipped(Row))
+		{
+			if(!Release.m_Date.empty())
+			{
+				const float DateWidth = TextRender()->TextWidth(11.0f, Release.m_Date.c_str());
+				CUIRect DateRect;
+				Row.VSplitRight(DateWidth, &Row, &DateRect);
+				Row.VSplitRight(8.0f, &Row, nullptr);
+				ColorRGBA DateColor = TextRender()->DefaultTextColor();
+				DateColor.a *= 0.65f;
+				TextRender()->TextColor(DateColor);
+				Ui()->DoLabel(&DateRect, Release.m_Date.c_str(), 11.0f, TEXTALIGN_MR);
+				TextRender()->TextColor(TextRender()->DefaultTextColor());
+			}
+
+			const char *pTag = Release.m_Tag.empty() ? Release.m_Title.c_str() : Release.m_Tag.c_str();
+			const float PillWidth = std::clamp(TextRender()->TextWidth(11.0f, pTag) + 12.0f, 0.0f, std::max(0.0f, Row.w));
+			CUIRect Pill;
+			Row.VSplitLeft(PillWidth, &Pill, &Row);
+			Row.VSplitLeft(6.0f, nullptr, &Row);
+			ColorRGBA PillColor = ms_GuiColor;
+			PillColor.a = 0.30f;
+			Pill.Draw(PillColor, IGraphics::CORNER_ALL, Pill.h * 0.5f);
+			Ui()->DoLabel(&Pill, pTag, 11.0f, TEXTALIGN_MC);
+
+			auto DrawBadge = [&](const char *pText, ColorRGBA Color) {
+				const float BadgeWidth = TextRender()->TextWidth(11.0f, pText) + 8.0f;
+				if(Row.w < BadgeWidth)
+					return;
+				CUIRect Badge;
+				Row.VSplitLeft(BadgeWidth, &Badge, &Row);
+				Row.VSplitLeft(4.0f, nullptr, &Row);
+				TextRender()->TextColor(Color);
+				Ui()->DoLabel(&Badge, pText, 11.0f, TEXTALIGN_ML);
+				TextRender()->TextColor(TextRender()->DefaultTextColor());
+			};
+			if(Release.m_Latest)
+				DrawBadge(BcLocalize("Latest"), ms_GuiColor);
+			if(Release.m_Prerelease)
+				DrawBadge(BcLocalize("Pre-release"), ColorRGBA(0.95f, 0.72f, 0.35f, 1.0f));
+		}
+
+		if(HasTitle)
+		{
+			Inner.HSplitTop(4.0f, nullptr, &Inner);
+			CUIRect Title;
+			Inner.HSplitTop(TitleHeight, &Title, &Inner);
+			if(!s_ScrollRegion.RectClipped(Title))
+			{
+				CChangelogLine TitleLine;
+				TitleLine.m_Text = Release.m_Title;
+				TitleLine.m_FontSize = 15.0f;
+				TitleLine.m_Height = TitleHeight;
+				TitleLine.m_TextHeight = TitleTextHeight;
+				TitleLine.m_Color = TextRender()->DefaultTextColor();
+				RenderChangelogTextLine(TextRender(), Title, TitleLine);
+			}
+		}
+
+		Inner.HSplitTop(6.0f, nullptr, &Inner);
+		for(const CChangelogLine &Line : vLines)
+		{
+			CUIRect LineRect;
+			Inner.HSplitTop(Line.m_Height, &LineRect, &Inner);
+			if(!s_ScrollRegion.RectClipped(LineRect))
+				RenderChangelogTextLine(TextRender(), LineRect, Line);
+		}
+
+		if(!Release.m_Url.empty())
+		{
+			Inner.HSplitTop(6.0f, nullptr, &Inner);
+			CUIRect ButtonRow;
+			Inner.HSplitTop(20.0f, &ButtonRow, &Inner);
+			CUIRect Open;
+			ButtonRow.VSplitRight(78.0f, nullptr, &Open);
+			if(!s_ScrollRegion.RectClipped(Open) && DoButton_Menu(&s_aOpenButtons[i], BcLocalize("Open"), 0, &Open, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+				Client()->ViewLink(Release.m_Url.c_str());
+		}
+	}
+
+	s_ScrollRegion.End();
 }

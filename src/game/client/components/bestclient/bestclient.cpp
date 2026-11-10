@@ -304,6 +304,7 @@ void CBestClient::OnMapLoad()
 void CBestClient::OnUpdate()
 {
 	UpdateFindHours();
+	m_Changelog.Update();
 
 	if(!g_Config.m_BcNotifySavesOnMap || Client()->State() == IClient::STATE_DEMOPLAYBACK)
 	{
@@ -330,6 +331,7 @@ void CBestClient::OnUpdate()
 
 void CBestClient::OnShutdown()
 {
+	m_Changelog.Shutdown();
 	ResetFindHours();
 	m_MenuMediaBackground.Shutdown();
 	m_SavesNotifySchedule = false;

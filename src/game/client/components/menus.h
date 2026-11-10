@@ -803,6 +803,7 @@ public:
 		PAGE_SETTINGS,
 		PAGE_NETWORK,
 		PAGE_GHOST,
+		PAGE_CHANGELOG, // bestclient
 
 		PAGE_LENGTH,
 	};
@@ -871,6 +872,7 @@ public:
 		SMALL_TAB_BROWSER_BESTCLIENT,
 		// bestclient
 		SMALL_TAB_BROWSER_FRIENDS,
+		SMALL_TAB_CHANGELOG, // bestclient
 
 		SMALL_TAB_LENGTH,
 	};
@@ -1021,6 +1023,7 @@ private:
 	void RenderSettingsBestClientFun(CUIRect MainView);
 	// bestclient
 	void RenderSettingsBestClientInfo(CUIRect MainView); // bestclient
+	void RenderChangelog(CUIRect MainView); // bestclient
 	void RenderSettingsBestClientConfigPresets(CUIRect MainView); // bestclient
 	void RenderSettingsBestClientChatMediaBlock(CUIRect &Column); // bestclient
 	void RenderPopupStylePicker(CUIRect Box); // bestclient

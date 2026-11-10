@@ -233,8 +233,23 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 			UpdateRow.y += SettingsButton.h + ButtonGap;
 			UpdateRow.h = 22.0f;
 
-			CUIRect UpdateLabel, UpdateButton;
-			UpdateRow.VSplitRight(120.0f, &UpdateLabel, &UpdateButton);
+			// bestclient
+			CUIRect UpdateLabel, UpdateButton, ChangelogButton{};
+			const bool ShowChangelogButton = ShowDownloadButton || ShowRetryButton;
+			if(ShowChangelogButton)
+			{
+				const float ButtonFont = 14.0f;
+				const float DownloadW = std::max(90.0f, TextRender()->TextWidth(ButtonFont, Localize("Download")) + 16.0f);
+				const float ChangelogW = std::max(90.0f, TextRender()->TextWidth(ButtonFont, BcLocalize("Changelog")) + 16.0f);
+				UpdateRow.VSplitRight(DownloadW, &UpdateRow, &UpdateButton);
+				UpdateRow.VSplitRight(6.0f, &UpdateRow, nullptr);
+				UpdateRow.VSplitRight(ChangelogW, &UpdateLabel, &ChangelogButton);
+			}
+			else
+			{
+				UpdateRow.VSplitRight(120.0f, &UpdateLabel, &UpdateButton);
+			}
+			// bestclient
 			UpdateLabel.VSplitRight(10.0f, &UpdateLabel, nullptr);
 
 			if(ShowDownloadButton)
@@ -268,6 +283,11 @@ void CMenusStart::RenderStartMenu(CUIRect MainView)
 				static CButtonContainer s_MenuUpdateDownload;
 				if(GameClient()->m_Menus.DoButton_Menu(&s_MenuUpdateDownload, Localize("Download"), 0, &UpdateButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
 					Updater()->InitiateUpdate();
+				// bestclient
+				static CButtonContainer s_MenuUpdateChangelog;
+				if(GameClient()->m_Menus.DoButton_Menu(&s_MenuUpdateChangelog, BcLocalize("Changelog"), 0, &ChangelogButton, BUTTONFLAG_LEFT, nullptr, IGraphics::CORNER_ALL, 5.0f, 0.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.25f)))
+					NewPage = CMenus::PAGE_CHANGELOG;
+				// bestclient
 			}
 			else if(ShowRestartButton)
 			{
