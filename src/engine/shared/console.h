@@ -170,6 +170,9 @@ class CConsole : public IConsole
 	CCommand *FindCommand(const char *pName, int FlagMask);
 
 	bool m_Cheated;
+	// bestclient
+	int m_InstantStrokeDepth = 0;
+	// bestclient
 
 public:
 	CConsole(int FlagMask);
@@ -191,6 +194,9 @@ public:
 
 	bool LineIsValid(const char *pStr) override;
 	void ExecuteLine(const char *pStr, int ClientId = IConsole::CLIENT_ID_UNSPECIFIED, bool InterpretSemicolons = true) override;
+	// bestclient
+	int InstantStrokeDepth() const { return m_InstantStrokeDepth; }
+	// bestclient
 	void ExecuteLineFlag(const char *pStr, int FlagMask, int ClientId = IConsole::CLIENT_ID_UNSPECIFIED, bool InterpretSemicolons = true) override;
 	bool ExecuteFile(const char *pFilename, int ClientId = IConsole::CLIENT_ID_UNSPECIFIED, bool LogFailure = false, int StorageType = IStorage::TYPE_ALL) override;
 

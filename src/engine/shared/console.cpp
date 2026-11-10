@@ -732,8 +732,12 @@ CConsole::CCommand *CConsole::FindCommand(const char *pName, int FlagMask)
 
 void CConsole::ExecuteLine(const char *pStr, int ClientId, bool InterpretSemicolons)
 {
+	// bestclient
+	m_InstantStrokeDepth++;
 	CConsole::ExecuteLineStroked(1, pStr, ClientId, InterpretSemicolons); // press it
 	CConsole::ExecuteLineStroked(0, pStr, ClientId, InterpretSemicolons); // then release it
+	m_InstantStrokeDepth--;
+	// bestclient
 }
 
 void CConsole::ExecuteLineFlag(const char *pStr, int FlagMask, int ClientId, bool InterpretSemicolons)
