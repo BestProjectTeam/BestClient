@@ -570,13 +570,10 @@ void CHud::RenderTextInfo()
 			CTextCursor Cursor;
 			Cursor.SetPosition(vec2(m_Width - 10 - TextW, 5));
 			Cursor.m_FontSize = 12.0f;
-			auto OldFlags = TextRender()->GetRenderFlags();
-			TextRender()->SetRenderFlags(OldFlags | TEXT_RENDER_FLAG_ONE_TIME_USE);
 			if(m_FPSTextContainerIndex.Valid())
 				TextRender()->RecreateTextContainerSoft(m_FPSTextContainerIndex, &Cursor, aBuf);
 			else
 				TextRender()->CreateTextContainer(m_FPSTextContainerIndex, &Cursor, aBuf);
-			TextRender()->SetRenderFlags(OldFlags);
 		}
 		if(m_FPSTextContainerIndex.Valid())
 		{

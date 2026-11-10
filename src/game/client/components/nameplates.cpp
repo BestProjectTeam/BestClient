@@ -443,13 +443,10 @@ protected:
 			const float Phase = CBcGradient::AnimatePhase(This.Client()->GlobalTime());
 			m_LastPhase = Phase;
 			Cursor.m_vColorSplits = CBcGradient::BuildAnimatedTextSplits(m_aText, Data.m_ClientId, &This, Phase);
-			const unsigned OldFlags = This.TextRender()->GetRenderFlags();
-			This.TextRender()->SetRenderFlags(OldFlags | ETextRenderFlags::TEXT_RENDER_FLAG_ONE_TIME_USE);
 			if(m_TextContainerIndex.Valid())
 				This.TextRender()->RecreateTextContainerSoft(m_TextContainerIndex, &Cursor, m_aText);
 			else
 				This.TextRender()->CreateOrAppendTextContainer(m_TextContainerIndex, &Cursor, m_aText);
-			This.TextRender()->SetRenderFlags(OldFlags);
 		}
 		else
 		{
@@ -551,13 +548,10 @@ protected:
 			const float Phase = CBcGradient::AnimatePhase(This.Client()->GlobalTime());
 			m_LastPhase = Phase;
 			Cursor.m_vColorSplits = CBcGradient::BuildAnimatedTextSplits(m_aText, Data.m_ClientId, &This, Phase);
-			const unsigned OldFlags = This.TextRender()->GetRenderFlags();
-			This.TextRender()->SetRenderFlags(OldFlags | ETextRenderFlags::TEXT_RENDER_FLAG_ONE_TIME_USE);
 			if(m_TextContainerIndex.Valid())
 				This.TextRender()->RecreateTextContainerSoft(m_TextContainerIndex, &Cursor, m_aText);
 			else
 				This.TextRender()->CreateOrAppendTextContainer(m_TextContainerIndex, &Cursor, m_aText);
-			This.TextRender()->SetRenderFlags(OldFlags);
 		}
 		else
 		{

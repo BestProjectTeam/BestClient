@@ -1841,13 +1841,10 @@ void CCachedText::UpdateColored(ITextRender *pTextRender, const char *pText, flo
 
 	const ColorRGBA OldColor = pTextRender->GetTextColor();
 	pTextRender->TextColor(pTextRender->DefaultTextColor());
-	const unsigned OldFlags = pTextRender->GetRenderFlags();
-	pTextRender->SetRenderFlags(OldFlags | TEXT_RENDER_FLAG_ONE_TIME_USE);
 	if(ReuseContainer)
 		pTextRender->RecreateTextContainerSoft(m_TextContainerIndex, &Cursor, m_Text.c_str());
 	else
 		pTextRender->RecreateTextContainer(m_TextContainerIndex, &Cursor, m_Text.c_str());
-	pTextRender->SetRenderFlags(OldFlags);
 	pTextRender->TextColor(OldColor);
 
 	m_BoundingBox = Cursor.BoundingBox();
