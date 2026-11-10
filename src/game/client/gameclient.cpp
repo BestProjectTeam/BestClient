@@ -5,6 +5,7 @@
 
 #include "components/background.h"
 #include "components/bestclient/inputs.h" // bestclient
+#include "components/bestclient/profiler.h" // bestclient
 #include "components/binds.h"
 #include "components/broadcast.h"
 #include "components/camera.h"
@@ -593,17 +594,37 @@ void CGameClient::OnUpdate()
 		m_Binds.m_MouseOnAction = false;
 	}
 
-	for(auto &pComponent : m_vpAll)
+	// bestclient
+	if(g_Config.m_BcProfiler || g_Config.m_Debug)
 	{
-		int64_t TimeStart = g_Config.m_Debug ? time_get_nanoseconds().count() : 0;
-		pComponent->OnUpdate();
-		if(g_Config.m_Debug)
+		if(g_Config.m_BcProfiler)
+			BestClientProfilerBeginPass();
+		for(auto &pComponent : m_vpAll)
 		{
-			int64_t TimeDelta = time_get_nanoseconds().count() - TimeStart;
-			m_mCompTiming[pComponent].m_UpdateTicks += TimeDelta;
-			m_mCompTiming[pComponent].m_pName = GetComponentName(pComponent);
+			const int64_t TimeStart = time_get_nanoseconds().count();
+			pComponent->OnUpdate();
+			const int64_t TimeDelta = time_get_nanoseconds().count() - TimeStart;
+			bool MissingName = false;
+			if(g_Config.m_BcProfiler)
+				MissingName = BestClientProfilerAddUpdate(pComponent, TimeDelta);
+			const char *pName = nullptr;
+			if(g_Config.m_Debug || MissingName)
+				pName = GetComponentName(pComponent);
+			if(MissingName)
+				BestClientProfilerSetComponentName(pComponent, pName);
+			if(g_Config.m_Debug)
+			{
+				m_mCompTiming[pComponent].m_UpdateTicks += TimeDelta;
+				m_mCompTiming[pComponent].m_pName = pName;
+			}
 		}
 	}
+	else
+	{
+		for(auto &pComponent : m_vpAll)
+			pComponent->OnUpdate();
+	}
+	// bestclient
 
 	m_LocalServer.Update();
 }
@@ -923,6 +944,8 @@ void CGameClient::OnRender()
 	UpdatePositions();
 
 	// bestclient
+	if(g_Config.m_BcProfiler)
+		BestClientProfilerObserve(this);
 	m_BestClient.UpdateSpecMovedNotify();
 	// bestclient
 
@@ -959,20 +982,43 @@ void CGameClient::OnRender()
 	// bestclient
 
 	// render all systems
-	for(auto &pComponent : m_vpAll)
+	// bestclient
+	if(g_Config.m_BcProfiler || g_Config.m_Debug)
 	{
-		int64_t TimeStart = g_Config.m_Debug ? time_get_nanoseconds().count() : 0;
-		// bestclient
-		m_AspectRatio.PrepareComponent(pComponent);
-		// bestclient
-		pComponent->OnRender();
-		if(g_Config.m_Debug)
+		if(g_Config.m_BcProfiler)
+			BestClientProfilerBeginPass();
+		for(auto &pComponent : m_vpAll)
 		{
-			int64_t TimeDelta = time_get_nanoseconds().count() - TimeStart;
-			m_mCompTiming[pComponent].m_RenderTicks += TimeDelta;
-			m_mCompTiming[pComponent].m_pName = GetComponentName(pComponent);
+			const int64_t TimeStart = time_get_nanoseconds().count();
+			m_AspectRatio.PrepareComponent(pComponent);
+			pComponent->OnRender();
+			const int64_t TimeDelta = time_get_nanoseconds().count() - TimeStart;
+			bool MissingName = false;
+			if(g_Config.m_BcProfiler)
+				MissingName = BestClientProfilerAddRender(pComponent, TimeDelta);
+			const char *pName = nullptr;
+			if(g_Config.m_Debug || MissingName)
+				pName = GetComponentName(pComponent);
+			if(MissingName)
+				BestClientProfilerSetComponentName(pComponent, pName);
+			if(g_Config.m_Debug)
+			{
+				m_mCompTiming[pComponent].m_RenderTicks += TimeDelta;
+				m_mCompTiming[pComponent].m_pName = pName;
+			}
+		}
+		if(g_Config.m_BcProfiler)
+			BestClientProfilerCommitFrame();
+	}
+	else
+	{
+		for(auto &pComponent : m_vpAll)
+		{
+			m_AspectRatio.PrepareComponent(pComponent);
+			pComponent->OnRender();
 		}
 	}
+	// bestclient
 
 	if(g_Config.m_Debug)
 	{

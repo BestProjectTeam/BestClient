@@ -624,3 +624,6 @@ MACRO_CONFIG_INT(BcWeatherDustSpeed, bc_weather_dust_speed, 100, 25, 300, CFGFLA
 
 // KeybindMap
 MACRO_CONFIG_INT(BcKeybindMapFormat, bc_keybind_map_format, 2, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Last keybind map format (0=100%, 1=86%, 2=60%)")
+
+// Profiler
+MACRO_CONFIG_INT(BcProfiler, bc_profiler, 0, 0, 1, CFGFLAG_CLIENT, "Show the BestClient profiler overlay")

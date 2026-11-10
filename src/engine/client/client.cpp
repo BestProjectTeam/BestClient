@@ -68,6 +68,8 @@
 #include <game/localization.h>
 #include <game/version.h>
 
+#include <game/client/components/bestclient/profiler.h> // bestclient
+
 #if defined(CONF_VIDEORECORDER)
 #include "video.h"
 #endif
@@ -1288,6 +1290,12 @@ void CClient::Render()
 
 	RenderDebug();
 	RenderGraphs();
+	// bestclient
+	if(g_Config.m_BcProfiler)
+		BestClientRenderProfiler(Graphics(), TextRender(), m_FrameTimeAverage);
+	if(BestClientProfilerHasNotice())
+		BestClientRenderProfilerNotice(Graphics(), TextRender());
+	// bestclient
 }
 
 const char *CClient::LoadMap(const char *pName, const char *pFilename, const std::optional<SHA256_DIGEST> &WantedSha256, unsigned WantedCrc)
@@ -3450,6 +3458,8 @@ void CClient::Run()
 	bool LastD = false;
 	bool LastE = false;
 	bool LastG = false;
+	bool LastP = false; // bestclient
+	bool LastShiftSP = false; // bestclient
 
 	int64_t NextUpdateTime = time_get();
 	int64_t NextRenderTime = time_get();
@@ -3519,6 +3529,18 @@ void CClient::Run()
 		if(CtrlShiftKey(KEY_G, LastG))
 			g_Config.m_DbgGraphs ^= 1;
 
+		// bestclient
+		if(CtrlShiftKey(KEY_P, LastP))
+		{
+			g_Config.m_BcProfiler ^= 1;
+			BestClientProfilerReset();
+		}
+		const bool ShiftSP = Input()->ShiftIsPressed() && !Input()->ModifierIsPressed() && Input()->KeyIsPressed(KEY_S) && Input()->KeyIsPressed(KEY_P);
+		if(ShiftSP && !LastShiftSP)
+			BestClientProfilerDump(Storage());
+		LastShiftSP = ShiftSP;
+		// bestclient
+
 		if(CtrlShiftKey(KEY_E, LastE))
 		{
 			if(g_Config.m_ClEditor)
@@ -3554,13 +3576,18 @@ void CClient::Run()
 				m_ClientPerfFrames = 0;
 			}
 
-			int64_t TimeUp0 = g_Config.m_Debug ? time_get_nanoseconds().count() : 0;
+			// bestclient
+			int64_t TimeUp0 = (g_Config.m_Debug || g_Config.m_BcProfiler) ? time_get_nanoseconds().count() : 0;
 			Update();
-			if(g_Config.m_Debug)
+			if(g_Config.m_Debug || g_Config.m_BcProfiler)
 			{
 				int64_t TimeUp1 = time_get_nanoseconds().count();
-				m_AccUpdateNs += (TimeUp1 - TimeUp0);
+				if(g_Config.m_BcProfiler)
+					BestClientProfilerAddClientUpdate(TimeUp1 - TimeUp0);
+				if(g_Config.m_Debug)
+					m_AccUpdateNs += (TimeUp1 - TimeUp0);
 			}
+			// bestclient
 			int64_t Now = time_get();
 
 			bool IsRenderActive = (g_Config.m_GfxBackgroundRender || m_pGraphics->WindowOpen());
@@ -3623,30 +3650,37 @@ void CClient::Run()
 					NextRenderTime = std::max(NextRenderTime + time_freq() / GfxRefreshRate, Now);
 				m_LastRenderTime = Now;
 
-				int64_t TimeRender0 = g_Config.m_Debug ? time_get_nanoseconds().count() : 0;
+				// bestclient
+				int64_t TimeRender0 = (g_Config.m_Debug || g_Config.m_BcProfiler) ? time_get_nanoseconds().count() : 0;
 				Render();
-				int64_t TimeRender1 = g_Config.m_Debug ? time_get_nanoseconds().count() : 0;
+				int64_t TimeRender1 = (g_Config.m_Debug || g_Config.m_BcProfiler) ? time_get_nanoseconds().count() : 0;
 				m_pGraphics->Swap();
-				if(g_Config.m_Debug)
+				if(g_Config.m_Debug || g_Config.m_BcProfiler)
 				{
 					int64_t TimeRender2 = time_get_nanoseconds().count();
-					m_AccRenderNs += (TimeRender1 - TimeRender0);
-					m_AccSwapNs += (TimeRender2 - TimeRender1);
-					m_ClientPerfFrames++;
-					if(m_ClientPerfFrames >= 120)
+					if(g_Config.m_BcProfiler)
+						BestClientProfilerSetFrameStages(TimeRender1 - TimeRender0, TimeRender2 - TimeRender1);
+					if(g_Config.m_Debug)
 					{
-						double AvgUpUs = (m_AccUpdateNs / 1000.0) / m_ClientPerfFrames;
-						double AvgRnUs = (m_AccRenderNs / 1000.0) / m_ClientPerfFrames;
-						double AvgSwUs = (m_AccSwapNs / 1000.0) / m_ClientPerfFrames;
-						double AvgTotUs = AvgUpUs + AvgRnUs + AvgSwUs;
-						log_info("perf", "[FRAME] avg: Update=%6.1f us | Render=%6.1f us | Swap=%6.1f us | Total=%6.1f us (%.1f FPS)",
-							AvgUpUs, AvgRnUs, AvgSwUs, AvgTotUs, AvgTotUs > 0 ? (1000000.0 / AvgTotUs) : 0.0);
-						m_AccUpdateNs = 0;
-						m_AccRenderNs = 0;
-						m_AccSwapNs = 0;
-						m_ClientPerfFrames = 0;
+						m_AccRenderNs += (TimeRender1 - TimeRender0);
+						m_AccSwapNs += (TimeRender2 - TimeRender1);
+						m_ClientPerfFrames++;
+						if(m_ClientPerfFrames >= 120)
+						{
+							double AvgUpUs = (m_AccUpdateNs / 1000.0) / m_ClientPerfFrames;
+							double AvgRnUs = (m_AccRenderNs / 1000.0) / m_ClientPerfFrames;
+							double AvgSwUs = (m_AccSwapNs / 1000.0) / m_ClientPerfFrames;
+							double AvgTotUs = AvgUpUs + AvgRnUs + AvgSwUs;
+							log_info("perf", "[FRAME] avg: Update=%6.1f us | Render=%6.1f us | Swap=%6.1f us | Total=%6.1f us (%.1f FPS)",
+								AvgUpUs, AvgRnUs, AvgSwUs, AvgTotUs, AvgTotUs > 0 ? (1000000.0 / AvgTotUs) : 0.0);
+							m_AccUpdateNs = 0;
+							m_AccRenderNs = 0;
+							m_AccSwapNs = 0;
+							m_ClientPerfFrames = 0;
+						}
 					}
 				}
+				// bestclient
 			}
 
 			// Wake up for the next update or frame, whichever comes first. While playing, also wake up for

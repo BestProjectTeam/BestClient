@@ -128,6 +128,14 @@ bool CBinds::OnInput(const IInput::CEvent &Event)
 
 	if(Event.m_Flags & IInput::FLAG_PRESS)
 	{
+		// bestclient
+		if(Input()->ShiftIsPressed() && !Input()->ModifierIsPressed() && (Event.m_Key == KEY_S || Event.m_Key == KEY_P))
+		{
+			const bool Chord = Input()->KeyIsPressed(KEY_S) && Input()->KeyIsPressed(KEY_P);
+			if(Chord || g_Config.m_BcProfiler)
+				return false;
+		}
+		// bestclient
 		auto ActiveBind = std::find_if(m_vActiveBinds.begin(), m_vActiveBinds.end(), [&](const CBindSlot &Bind) {
 			return Event.m_Key == Bind.m_Key;
 		});

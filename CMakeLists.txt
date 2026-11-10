@@ -2909,6 +2909,8 @@ if(CLIENT)
     components/bestclient/config_presets.h
     components/bestclient/profile_assets.cpp
     components/bestclient/profile_assets.h
+    components/bestclient/profiler.cpp
+    components/bestclient/profiler.h
     components/bestclient/admin_panel.cpp
     components/bestclient/admin_panel.h
     components/bestclient/aspect_ratio.cpp
@@ -3528,6 +3530,9 @@ if(CLIENT)
       PROPERTY OUTPUT_NAME ${CLIENT_EXECUTABLE}
   )
   target_link_libraries(game-client ${LIBS_CLIENT})
+  if(WIN32)
+    target_link_libraries(game-client psapi)
+  endif()
 
   if(TARGET_OS STREQUAL "ios")
     set(IOS_INFO_PLIST "${PROJECT_BINARY_DIR}/ios-Info.plist")

@@ -53,7 +53,9 @@ void CPrompt::SetInactive()
 
 bool CPrompt::OnInput(const IInput::CEvent &Event)
 {
-	if(Editor()->m_Dialog == DIALOG_NONE && Input()->ModifierIsPressed() && Input()->KeyPress(KEY_P))
+	// bestclient
+	if(Editor()->m_Dialog == DIALOG_NONE && Input()->ModifierIsPressed() && !Input()->ShiftIsPressed() && Input()->KeyPress(KEY_P))
+	// bestclient
 	{
 		SetActive();
 	}
