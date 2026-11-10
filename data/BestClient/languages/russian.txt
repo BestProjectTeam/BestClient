@@ -1511,12 +1511,20 @@ BestClient Links
 == Ссылки BestClient
 
 [BestClient]
+Discord
+== Дискорд
+
+[BestClient]
 Telegram
-== Telegram
+== Телеграм
 
 [BestClient]
 Check update
 == Чек апдейт
+
+[BestClient]
+Try Light
+== Попробовать Лайт
 
 [BestClient]
 Config Files

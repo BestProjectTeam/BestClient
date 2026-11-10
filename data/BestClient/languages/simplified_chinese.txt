@@ -1515,6 +1515,10 @@ Check update
 == 检查更新
 
 [BestClient]
+Try Light
+== 试用 Light
+
+[BestClient]
 Config Files
 == 配置文件
 
