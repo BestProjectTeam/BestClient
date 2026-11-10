@@ -73,9 +73,12 @@ struct CInputState
 {
 	CControls *m_pControls;
 	int *m_apVariables[NUM_DUMMIES];
-	int m_Input;
+	// bestclient
+	int m_Input = -1;
+	// bestclient
 };
 
+// bestclient
 namespace
 {
 	bool IsEternalGoresInfo(const CServerInfo *pInfo)
@@ -158,6 +161,7 @@ void CControls::ApplyInputDebounce(int Dummy, CNetObj_PlayerInput &Input) const
 	if(DebounceState.m_Hook)
 		Input.m_Hook = DebounceState.m_Hook > 0;
 }
+// bestclient
 
 void CControls::ConKeyInputState(IConsole::IResult *pResult, void *pUserData)
 {
@@ -166,11 +170,13 @@ void CControls::ConKeyInputState(IConsole::IResult *pResult, void *pUserData)
 	if(pState->m_pControls->GameClient()->m_GameInfo.m_BugDDRaceInput && pState->m_pControls->GameClient()->m_Snap.m_SpecInfo.m_Active)
 		return;
 
+	// bestclient
 	int *pVariable = pState->m_apVariables[g_Config.m_ClDummy];
 	const int Value = pResult->GetInteger(0);
 	if(!Value && *pVariable && g_Config.m_BcInputDebounce && pState->m_Input >= 0 && pState->m_pControls->IsInputDebounceAllowed() && static_cast<CConsole *>(pState->m_pControls->Console())->InstantStrokeDepth() == 0)
 		pState->m_pControls->InputDebounce(g_Config.m_ClDummy, pState->m_Input);
 	*pVariable = Value;
+	// bestclient
 }
 
 void CControls::ConKeyInputCounter(IConsole::IResult *pResult, void *pUserData)
@@ -217,27 +223,35 @@ void CControls::OnConsoleInit()
 {
 	// game commands
 	{
+		// bestclient
 		static CInputState s_State = {this, {&m_aInputDirectionLeft[0], &m_aInputDirectionLeft[1]}, INPUT_LEFT};
+		// bestclient
 		Console()->Register("+left", "", CFGFLAG_CLIENT, ConKeyInputState, &s_State, "Move left");
 	}
 	{
+		// bestclient
 		static CInputState s_State = {this, {&m_aInputDirectionRight[0], &m_aInputDirectionRight[1]}, INPUT_RIGHT};
+		// bestclient
 		Console()->Register("+right", "", CFGFLAG_CLIENT, ConKeyInputState, &s_State, "Move right");
 	}
 	{
+		// bestclient
 		static CInputState s_State = {this, {&m_aInputData[0].m_Jump, &m_aInputData[1].m_Jump}, INPUT_JUMP};
+		// bestclient
 		Console()->Register("+jump", "", CFGFLAG_CLIENT, ConKeyInputState, &s_State, "Jump");
 	}
 	{
+		// bestclient
 		static CInputState s_State = {this, {&m_aInputData[0].m_Hook, &m_aInputData[1].m_Hook}, INPUT_HOOK};
+		// bestclient
 		Console()->Register("+hook", "", CFGFLAG_CLIENT, ConKeyInputState, &s_State, "Hook");
 	}
 	{
-		static CInputState s_State = {this, {&m_aInputData[0].m_Fire, &m_aInputData[1].m_Fire}, -1};
+		static CInputState s_State = {this, {&m_aInputData[0].m_Fire, &m_aInputData[1].m_Fire}};
 		Console()->Register("+fire", "", CFGFLAG_CLIENT, ConKeyInputCounter, &s_State, "Fire");
 	}
 	{
-		static CInputState s_State = {this, {&m_aShowHookColl[0], &m_aShowHookColl[1]}, -1};
+		static CInputState s_State = {this, {&m_aShowHookColl[0], &m_aShowHookColl[1]}};
 		Console()->Register("+showhookcoll", "", CFGFLAG_CLIENT, ConKeyInputState, &s_State, "Show Hook Collision");
 	}
 
@@ -481,20 +495,12 @@ int CControls::SnapInput(int *pData)
 	// bestclient
 	m_aLastData[g_Config.m_ClDummy] = m_aInputData[g_Config.m_ClDummy];
 
-	if(!Send)
+	if(Send)
 	{
-		// bestclient
-		if(DebounceState.m_Jump)
-			m_aInputData[g_Config.m_ClDummy].m_Jump = UnlatchedJump;
-		if(DebounceState.m_Hook)
-			m_aInputData[g_Config.m_ClDummy].m_Hook = UnlatchedHook;
-		m_aInputDebounce[g_Config.m_ClDummy] = {};
-		// bestclient
-		return 0;
+		m_LastSendTime = time_get();
+		mem_copy(pData, &m_aInputData[g_Config.m_ClDummy], sizeof(m_aInputData[0]));
 	}
 
-	m_LastSendTime = time_get();
-	mem_copy(pData, &m_aInputData[g_Config.m_ClDummy], sizeof(m_aInputData[0]));
 	// bestclient
 	if(DebounceState.m_Jump)
 		m_aInputData[g_Config.m_ClDummy].m_Jump = UnlatchedJump;
@@ -502,7 +508,7 @@ int CControls::SnapInput(int *pData)
 		m_aInputData[g_Config.m_ClDummy].m_Hook = UnlatchedHook;
 	m_aInputDebounce[g_Config.m_ClDummy] = {};
 	// bestclient
-	return sizeof(m_aInputData[0]);
+	return Send ? sizeof(m_aInputData[0]) : 0;
 }
 
 void CControls::OnRender()

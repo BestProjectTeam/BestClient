@@ -49,7 +49,7 @@ bool CCloudInput::CheckNewInput(const CControls &Controls)
 			const bool LeftPressed = Controls.m_aInputDirectionLeft[Dummy] != 0;
 			const bool RightPressed = Controls.m_aInputDirectionRight[Dummy] != 0;
 			NextInput.m_Direction = GameClient()->m_SnapTap.ResolveMovementDirection(Dummy, LeftPressed, RightPressed, false);
-			if(NextInput.m_Direction == 0 && Controls.m_aInputDebounce[Dummy].m_Direction && Controls.IsInputDebounceAllowed())
+			if(g_Config.m_BcInputDebounce && NextInput.m_Direction == 0 && Controls.m_aInputDebounce[Dummy].m_Direction && Controls.IsInputDebounceAllowed())
 				NextInput.m_Direction = Controls.m_aInputDebounce[Dummy].m_Direction;
 		}
 

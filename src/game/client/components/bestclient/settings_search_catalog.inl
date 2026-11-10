@@ -200,6 +200,7 @@
 	{"Inputs", SETTINGS_NAV_LEAF_BC_GAMEPLAY, "Gameplay", &g_Config.m_BcInputs, nullptr},
 	{"Sub-Tick aiming", SETTINGS_NAV_LEAF_BC_GAMEPLAY, "Inputs", &g_Config.m_ClSubTickAiming, nullptr},
 	{"Auto margin", SETTINGS_NAV_LEAF_BC_GAMEPLAY, "Inputs", &g_Config.m_BcAutoMargin, nullptr},
+	{"Input Debounce", SETTINGS_NAV_LEAF_BC_GAMEPLAY, "Inputs", &g_Config.m_BcInputDebounce, nullptr},
 
 	{"Snap Tap", SETTINGS_NAV_LEAF_BC_GAMEPLAY, "Gameplay", &g_Config.m_BcSnapTap, nullptr},
 	{"Delay", SETTINGS_NAV_LEAF_BC_GAMEPLAY, "Snap Tap", &g_Config.m_BcSnapTapDelay, &g_Config.m_BcSnapTap},
