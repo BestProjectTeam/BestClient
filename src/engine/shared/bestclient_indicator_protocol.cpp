@@ -13,7 +13,7 @@ namespace
 bool ConstantTimeDigestEqual(const SHA256_DIGEST &Left, const SHA256_DIGEST &Right)
 {
 	unsigned char Diff = 0;
-	for(int i = 0; i < SHA256_DIGEST_LENGTH; ++i)
+	for(size_t i = 0; i < SHA256_DIGEST_LENGTH; ++i)
 		Diff |= Left.data[i] ^ Right.data[i];
 	return Diff == 0;
 }
