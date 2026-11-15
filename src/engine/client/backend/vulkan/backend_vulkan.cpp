@@ -2566,7 +2566,7 @@ protected:
 		ClearFrameMemoryUsage();
 
 		// clear frame
-		vkResetCommandBuffer(GetMainGraphicCommandBuffer(), VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
+		vkResetCommandBuffer(GetMainGraphicCommandBuffer(), 0);
 
 		auto &CommandBuffer = GetMainGraphicCommandBuffer();
 		VkCommandBufferBeginInfo BeginInfo{};
@@ -6549,7 +6549,7 @@ public:
 		{
 			m_vUsedMemoryCommandBuffer[m_CurImageIndex] = true;
 
-			vkResetCommandBuffer(MemCommandBuffer, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
+			vkResetCommandBuffer(MemCommandBuffer, 0);
 
 			VkCommandBufferBeginInfo BeginInfo{};
 			BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -6578,7 +6578,7 @@ public:
 			{
 				m_vvUsedThreadDrawCommandBuffer[RenderThreadIndex][m_CurImageIndex] = true;
 
-				vkResetCommandBuffer(DrawCommandBuffer, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
+				vkResetCommandBuffer(DrawCommandBuffer, 0);
 
 				VkCommandBufferBeginInfo BeginInfo{};
 				BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;

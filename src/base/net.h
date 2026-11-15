@@ -199,6 +199,7 @@ void net_stats(NETSTATS *stats);
  *         and `NETTYPE_WEBSOCKET_IPV6`, or `NETTYPE_INVALID` if the socket is invalid.
  */
 int net_socket_type(NETSOCKET sock);
+void net_socket_set_active_type(NETSOCKET sock, int type);
 
 /**
  * Make a socket not block on operations.

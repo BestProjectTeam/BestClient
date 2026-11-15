@@ -2825,6 +2825,8 @@ void CClient::PumpNetwork()
 	{
 		if(Conn == CONN_DUMMY && !DummyConnecting() && !DummyConnected())
 			continue;
+		if(Conn == CONN_CONTACT && State() == IClient::STATE_ONLINE && !m_ServerBrowser.IsRefreshing())
+			continue;
 		m_aNetClient[Conn].Update();
 	}
 
@@ -2884,6 +2886,8 @@ void CClient::PumpNetwork()
 	for(int Conn = 0; Conn < NUM_CONNS; Conn++)
 	{
 		if(Conn == CONN_DUMMY && !DummyConnecting() && !DummyConnected())
+			continue;
+		if(Conn == CONN_CONTACT && State() == IClient::STATE_ONLINE && !m_ServerBrowser.IsRefreshing())
 			continue;
 		while(m_aNetClient[Conn].Recv(&Packet, &ResponseToken, IsSixup()))
 		{

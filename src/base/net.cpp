@@ -117,10 +117,11 @@ struct NETSOCKET_INTERNAL
 	int web_ipv4sock;
 	int web_ipv6sock;
 	bool broken;
+	int active_type;
 
 	NETSOCKET_BUFFER buffer;
 };
-static NETSOCKET_INTERNAL invalid_socket = {NETTYPE_INVALID, -1, -1, -1, -1, false};
+static NETSOCKET_INTERNAL invalid_socket = {NETTYPE_INVALID, -1, -1, -1, -1, false, NETTYPE_ALL, {}};
 
 const NETADDR NETADDR_ZEROED = {NETTYPE_INVALID, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, 0};
 
@@ -687,6 +688,12 @@ int net_socket_type(NETSOCKET sock)
 	return sock->type;
 }
 
+void net_socket_set_active_type(NETSOCKET sock, int type)
+{
+	if(sock)
+		sock->active_type = type ? type : NETTYPE_ALL;
+}
+
 static int net_set_blocking_impl(NETSOCKET sock, bool blocking)
 {
 	unsigned long mode = blocking ? 0 : 1;
@@ -915,6 +922,7 @@ NETSOCKET net_udp_create(NETADDR bindaddr)
 {
 	NETSOCKET sock = (NETSOCKET_INTERNAL *)malloc(sizeof(*sock));
 	*sock = invalid_socket;
+	sock->active_type = bindaddr.type ? bindaddr.type : NETTYPE_ALL;
 
 	if(bindaddr.type & NETTYPE_IPV4)
 	{
@@ -1155,7 +1163,7 @@ int net_udp_recv(NETSOCKET sock, NETADDR *addr, unsigned char **data)
 
 	int bytes = 0;
 #if defined(CONF_PLATFORM_LINUX)
-	if(sock->ipv4sock >= 0)
+	if(sock->ipv4sock >= 0 && (sock->active_type & NETTYPE_IPV4))
 	{
 		if(sock->buffer.pos >= sock->buffer.size)
 		{
@@ -1166,7 +1174,7 @@ int net_udp_recv(NETSOCKET sock, NETADDR *addr, unsigned char **data)
 		}
 	}
 
-	if(sock->ipv6sock >= 0)
+	if(sock->ipv6sock >= 0 && (sock->active_type & NETTYPE_IPV6))
 	{
 		if(sock->buffer.pos >= sock->buffer.size)
 		{
@@ -1273,6 +1281,7 @@ NETSOCKET net_tcp_create(NETADDR bindaddr)
 {
 	NETSOCKET sock = (NETSOCKET_INTERNAL *)malloc(sizeof(*sock));
 	*sock = invalid_socket;
+	sock->active_type = bindaddr.type ? bindaddr.type : NETTYPE_ALL;
 
 	if(bindaddr.type & NETTYPE_IPV4)
 	{

@@ -185,7 +185,7 @@ void FrameBlendImageBarrier(VkCommandBuffer &CommandBuffer, VkImage Image, VkIma
 	if(UseSecondaryCommandBuffer)
 	{
 		CommandBuffer = m_vFrameBlendCommandBuffers[m_CurImageIndex];
-		vkResetCommandBuffer(CommandBuffer, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
+		vkResetCommandBuffer(CommandBuffer, 0);
 
 		VkCommandBufferInheritanceInfo InheritanceInfo{};
 		InheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
