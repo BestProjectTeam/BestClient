@@ -2566,7 +2566,7 @@ protected:
 		ClearFrameMemoryUsage();
 
 		// clear frame
-		vkResetCommandBuffer(GetMainGraphicCommandBuffer(), 0);
+		vkResetCommandBuffer(GetMainGraphicCommandBuffer(), VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
 
 		auto &CommandBuffer = GetMainGraphicCommandBuffer();
 		VkCommandBufferBeginInfo BeginInfo{};
@@ -3291,21 +3291,19 @@ protected:
 
 	void GetStateMatrix(const CCommandBuffer::SState &State, std::array<float, (size_t)4 * 2> &Matrix)
 	{
-		const float InvW = 1.0f / (State.m_ScreenBR.x - State.m_ScreenTL.x);
-		const float InvH = 1.0f / (State.m_ScreenBR.y - State.m_ScreenTL.y);
 		Matrix = {
 			// column 1
-			2.f * InvW,
+			2.f / (State.m_ScreenBR.x - State.m_ScreenTL.x),
 			0,
 			// column 2
 			0,
-			2.f * InvH,
+			2.f / (State.m_ScreenBR.y - State.m_ScreenTL.y),
 			// column 3
 			0,
 			0,
 			// column 4
-			-((State.m_ScreenTL.x + State.m_ScreenBR.x) * InvW),
-			-((State.m_ScreenTL.y + State.m_ScreenBR.y) * InvH),
+			-((State.m_ScreenTL.x + State.m_ScreenBR.x) / (State.m_ScreenBR.x - State.m_ScreenTL.x)),
+			-((State.m_ScreenTL.y + State.m_ScreenBR.y) / (State.m_ScreenBR.y - State.m_ScreenTL.y)),
 		};
 	}
 
@@ -6551,7 +6549,7 @@ public:
 		{
 			m_vUsedMemoryCommandBuffer[m_CurImageIndex] = true;
 
-			vkResetCommandBuffer(MemCommandBuffer, 0);
+			vkResetCommandBuffer(MemCommandBuffer, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
 
 			VkCommandBufferBeginInfo BeginInfo{};
 			BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -6580,7 +6578,7 @@ public:
 			{
 				m_vvUsedThreadDrawCommandBuffer[RenderThreadIndex][m_CurImageIndex] = true;
 
-				vkResetCommandBuffer(DrawCommandBuffer, 0);
+				vkResetCommandBuffer(DrawCommandBuffer, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
 
 				VkCommandBufferBeginInfo BeginInfo{};
 				BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;

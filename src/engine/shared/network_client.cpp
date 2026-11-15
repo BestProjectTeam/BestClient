@@ -57,18 +57,6 @@ void CNetClient::Update()
 		Disconnect(m_Connection.ErrorString());
 	m_pStun->Update();
 	m_TokenCache.Update();
-
-	if(m_Socket)
-	{
-		if(m_Connection.State() == CNetConnection::EState::ONLINE && m_Connection.PeerAddress())
-		{
-			net_socket_set_active_type(m_Socket, m_Connection.PeerAddress()->type & (NETTYPE_IPV4 | NETTYPE_IPV6));
-		}
-		else
-		{
-			net_socket_set_active_type(m_Socket, NETTYPE_ALL);
-		}
-	}
 }
 
 void CNetClient::Connect(const NETADDR *pAddr, int NumAddrs)
