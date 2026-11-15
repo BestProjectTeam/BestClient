@@ -796,6 +796,7 @@ class CGraphics_Threaded : public IEngineGraphics
 	int m_NumVertices;
 
 	CCommandBuffer::SColor m_aColor[4];
+	ColorRGBA m_CurrentColor = ColorRGBA(1.0f, 1.0f, 1.0f, 1.0f);
 	CCommandBuffer::STexCoord m_aTexture[4];
 
 	bool m_RenderEnable;

@@ -96,8 +96,14 @@ static void FormatServerbrowserPing(char (&aBuffer)[N], const CServerInfo *pInfo
 		Localizable("SA"), // LOC_SOUTH_AMERICA
 		Localizable("CHN"), // LOC_CHINA
 	};
-	dbg_assert(0 <= pInfo->m_Location && pInfo->m_Location < CServerInfo::NUM_LOCS, "location out of range");
-	str_copy(aBuffer, Localize(LOCATION_NAMES[pInfo->m_Location]));
+	if(0 <= pInfo->m_Location && pInfo->m_Location < CServerInfo::NUM_LOCS)
+	{
+		str_copy(aBuffer, Localize(LOCATION_NAMES[pInfo->m_Location]));
+	}
+	else
+	{
+		aBuffer[0] = '\0';
+	}
 }
 
 static ColorRGBA GetPingTextColor(int Latency)
@@ -367,14 +373,8 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 		const CServerInfo *pItem = ServerBrowser()->SortedGet(i);
 		const CCommunity *pCommunity = ServerBrowser()->Community(pItem->m_aCommunityId);
 
-		if(vpServerBrowserUiElements[i] == nullptr)
-		{
-			vpServerBrowserUiElements[i] = Ui()->GetNewUIElement(NUM_UI_ELEMS);
-		}
-		CUIElement *pUiElement = vpServerBrowserUiElements[i];
-
 		// bestclient
-		const bool AddressSelected = str_comp(pItem->m_aAddress, g_Config.m_UiServerAddress) == 0;
+		const bool AddressSelected = pItem->m_aAddress[0] == g_Config.m_UiServerAddress[0] && str_comp(pItem->m_aAddress, g_Config.m_UiServerAddress) == 0;
 		const bool PreviewRow = g_Config.m_BcServerMapPreview != 0 && m_ServerMapPreview.ShowsAddress(pItem->m_aAddress);
 		if(PreviewRow)
 		{
@@ -417,6 +417,12 @@ void CMenus::RenderServerbrowserServerList(CUIRect View, bool &WasListboxItemAct
 			// bestclient
 			continue;
 		}
+
+		if(vpServerBrowserUiElements[i] == nullptr)
+		{
+			vpServerBrowserUiElements[i] = Ui()->GetNewUIElement(NUM_UI_ELEMS);
+		}
+		CUIElement *pUiElement = vpServerBrowserUiElements[i];
 
 		const float FontSize = 12.0f;
 		char aTemp[64];
@@ -1913,43 +1919,59 @@ void CMenus::RenderServerbrowserFriends(CUIRect View)
 	List.VSplitLeft(5.0f, nullptr, &List);
 
 	// calculate friends
-	// TODO: optimize this
 	m_pRemoveFriend = nullptr;
-	for(auto &vFriends : m_avFriends)
-		vFriends.clear();
-	m_avFriends[FRIEND_OFF].reserve(GameClient()->Friends()->NumFriends());
-	for(int FriendIndex = 0; FriendIndex < GameClient()->Friends()->NumFriends(); ++FriendIndex)
-	{
-		m_avFriends[FRIEND_OFF].emplace_back(GameClient()->Friends()->GetFriend(FriendIndex));
-	}
-	bool HasFriend = std::any_of(m_avFriends[FRIEND_OFF].begin(), m_avFriends[FRIEND_OFF].end(), [&](const auto &Friend) {
-		return Friend.Name()[0] != '\0';
-	}),
-	     HasClan = std::any_of(m_avFriends[FRIEND_OFF].begin(), m_avFriends[FRIEND_OFF].end(), [&](const auto &Friend) {
-		     return Friend.Name()[0] == '\0';
-	     });
+	const int64_t Now = time_get();
+	const int NumCurServers = ServerBrowser()->NumServers();
+	const int NumCurFriends = GameClient()->Friends()->NumFriends();
+	const bool RebuildNeeded = (m_LastFriendsCalcTime == 0) ||
+				   (Now - m_LastFriendsCalcTime >= (time_freq() / 5)) ||
+				   (NumCurServers != m_LastFriendsNumServers) ||
+				   (NumCurFriends != m_LastFriendsNumFriends);
 
-	for(int ServerIndex = 0; ServerIndex < ServerBrowser()->NumServers(); ++ServerIndex)
+	if(RebuildNeeded)
 	{
-		const CServerInfo *pEntry = ServerBrowser()->Get(ServerIndex);
-		if(pEntry->m_FriendState == IFriends::FRIEND_NO)
-			continue;
+		m_LastFriendsCalcTime = Now;
+		m_LastFriendsNumServers = NumCurServers;
+		m_LastFriendsNumFriends = NumCurFriends;
 
-		for(const CServerInfo::CClient &CurrentClient : pEntry->m_vClients)
+		for(auto &vFriends : m_avFriends)
+			vFriends.clear();
+		m_avFriends[FRIEND_OFF].reserve(NumCurFriends);
+		for(int FriendIndex = 0; FriendIndex < NumCurFriends; ++FriendIndex)
 		{
-			if(CurrentClient.m_FriendState == IFriends::FRIEND_NO)
+			m_avFriends[FRIEND_OFF].emplace_back(GameClient()->Friends()->GetFriend(FriendIndex));
+		}
+		m_FriendsHasFriend = std::any_of(m_avFriends[FRIEND_OFF].begin(), m_avFriends[FRIEND_OFF].end(), [&](const auto &Friend) {
+			return Friend.Name()[0] != '\0';
+		});
+		m_FriendsHasClan = std::any_of(m_avFriends[FRIEND_OFF].begin(), m_avFriends[FRIEND_OFF].end(), [&](const auto &Friend) {
+			return Friend.Name()[0] == '\0';
+		});
+
+		for(int ServerIndex = 0; ServerIndex < NumCurServers; ++ServerIndex)
+		{
+			const CServerInfo *pEntry = ServerBrowser()->Get(ServerIndex);
+			if(pEntry->m_FriendState == IFriends::FRIEND_NO)
 				continue;
 
-			const int FriendIndex = CurrentClient.m_FriendState == IFriends::FRIEND_PLAYER ? FRIEND_PLAYER_ON : FRIEND_CLAN_ON;
-			m_avFriends[FriendIndex].emplace_back(CurrentClient, pEntry);
-			const auto &&RemovalPredicate = [CurrentClient](const CFriendItem &Friend) {
-				return (Friend.Name()[0] == '\0' || str_comp(Friend.Name(), CurrentClient.m_aName) == 0) && ((Friend.Name()[0] != '\0' && g_Config.m_ClFriendsIgnoreClan) || str_comp(Friend.Clan(), CurrentClient.m_aClan) == 0);
-			};
-			m_avFriends[FRIEND_OFF].erase(std::remove_if(m_avFriends[FRIEND_OFF].begin(), m_avFriends[FRIEND_OFF].end(), RemovalPredicate), m_avFriends[FRIEND_OFF].end());
+			for(const CServerInfo::CClient &CurrentClient : pEntry->m_vClients)
+			{
+				if(CurrentClient.m_FriendState == IFriends::FRIEND_NO)
+					continue;
+
+				const int FriendIndex = CurrentClient.m_FriendState == IFriends::FRIEND_PLAYER ? FRIEND_PLAYER_ON : FRIEND_CLAN_ON;
+				m_avFriends[FriendIndex].emplace_back(CurrentClient, pEntry);
+				const auto &&RemovalPredicate = [CurrentClient](const CFriendItem &Friend) {
+					return (Friend.Name()[0] == '\0' || str_comp(Friend.Name(), CurrentClient.m_aName) == 0) && ((Friend.Name()[0] != '\0' && g_Config.m_ClFriendsIgnoreClan) || str_comp(Friend.Clan(), CurrentClient.m_aClan) == 0);
+				};
+				m_avFriends[FRIEND_OFF].erase(std::remove_if(m_avFriends[FRIEND_OFF].begin(), m_avFriends[FRIEND_OFF].end(), RemovalPredicate), m_avFriends[FRIEND_OFF].end());
+			}
 		}
+		for(auto &vFriends : m_avFriends)
+			std::sort(vFriends.begin(), vFriends.end());
 	}
-	for(auto &vFriends : m_avFriends)
-		std::sort(vFriends.begin(), vFriends.end());
+	const bool HasFriend = m_FriendsHasFriend;
+	const bool HasClan = m_FriendsHasClan;
 
 	// friends list
 	static CScrollRegion s_ScrollRegion;

@@ -2,20 +2,6 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include "ringbuffer.h"
 
-CRingBufferBase::CItem *CRingBufferBase::NextBlock(CItem *pItem)
-{
-	if(pItem->m_pNext)
-		return pItem->m_pNext;
-	return m_pFirst;
-}
-
-CRingBufferBase::CItem *CRingBufferBase::PrevBlock(CItem *pItem)
-{
-	if(pItem->m_pPrev)
-		return pItem->m_pPrev;
-	return m_pLast;
-}
-
 CRingBufferBase::CItem *CRingBufferBase::MergeBack(CItem *pItem)
 {
 	// make sure that this block and previous block is free
@@ -168,44 +154,4 @@ int CRingBufferBase::PopFirst()
 	// we might stand on a free block so merge em
 	MergeBack(m_pConsume);
 	return 1;
-}
-
-void *CRingBufferBase::Prev(void *pCurrent)
-{
-	CItem *pItem = ((CItem *)pCurrent) - 1;
-
-	while(true)
-	{
-		pItem = PrevBlock(pItem);
-		if(pItem == m_pProduce)
-			return nullptr;
-		if(!pItem->m_Free)
-			return pItem + 1;
-	}
-}
-
-void *CRingBufferBase::Next(void *pCurrent)
-{
-	CItem *pItem = ((CItem *)pCurrent) - 1;
-
-	while(true)
-	{
-		pItem = NextBlock(pItem);
-		if(pItem == m_pProduce)
-			return nullptr;
-		if(!pItem->m_Free)
-			return pItem + 1;
-	}
-}
-
-void *CRingBufferBase::First()
-{
-	if(m_pConsume->m_Free)
-		return nullptr;
-	return (void *)(m_pConsume + 1);
-}
-
-void *CRingBufferBase::Last()
-{
-	return Prev(m_pProduce + 1);
 }

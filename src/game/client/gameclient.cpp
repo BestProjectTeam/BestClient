@@ -571,9 +571,10 @@ void CGameClient::OnUpdate()
 	}
 
 	// handle touch events
-	std::vector<IInput::CTouchFingerState> vTouchFingerStates = Input()->TouchFingerStates();
-	if(!vTouchFingerStates.empty())
+	const auto &vTouchFingerStatesRef = Input()->TouchFingerStates();
+	if(!vTouchFingerStatesRef.empty())
 	{
+		std::vector<IInput::CTouchFingerState> vTouchFingerStates = vTouchFingerStatesRef;
 		for(auto &pComponent : m_vpInput)
 		{
 			if(pComponent->OnTouchState(vTouchFingerStates))
@@ -3420,6 +3421,7 @@ void CGameClient::OnPredict()
 		int PredTime = std::clamp(Client()->GetPredictionTime(), 0, 800);
 		float SmoothPace = 4 - 1.5f * PredTime / 800.f; // smoothing pace (a lower value will make the smoothing quicker)
 		int64_t Len = 1000 * PredTime * SmoothPace;
+		const int64_t NowSmooth = time_get();
 
 		for(int i = 0; i < MAX_CLIENTS; i++)
 		{
@@ -3450,7 +3452,7 @@ void CGameClient::OnPredict()
 							aMixAmount[j] = 1.f - std::pow(1.f - aMixAmount[j], 1 / 1.2f);
 						}
 					}
-					int64_t TimePassed = time_get() - m_aClients[i].m_aSmoothStart[j];
+					int64_t TimePassed = NowSmooth - m_aClients[i].m_aSmoothStart[j];
 					if(in_range(TimePassed, (int64_t)0, Len - 1))
 						aMixAmount[j] = std::min(aMixAmount[j], (float)(TimePassed / (double)Len));
 				}
@@ -3465,7 +3467,7 @@ void CGameClient::OnPredict()
 						time_freq() * 0.700f,
 						(1.f - aMixAmount[j ^ 1]) * Len + time_freq() * 0.300f,
 					});
-					int64_t Start = time_get() - (Len - Remaining);
+					int64_t Start = NowSmooth - (Len - Remaining);
 					if(!in_range(Start + Len, m_aClients[i].m_aSmoothStart[j], m_aClients[i].m_aSmoothStart[j] + Len))
 					{
 						m_aClients[i].m_aSmoothStart[j] = Start;

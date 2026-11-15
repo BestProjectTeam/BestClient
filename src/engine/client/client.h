@@ -93,6 +93,9 @@ class CClient : public IClient, public CDemoPlayer::IListener
 
 	CUuid m_ConnectionId = UUID_ZEROED;
 	bool m_Sixup;
+	int64_t m_LastNetworkPumpTime = 0;
+	int64_t m_LastServerBrowserUpdateTime = 0;
+	int64_t m_LastFifoUpdateTime = 0;
 
 	bool m_HaveGlobalTcpAddr = false;
 	NETADDR m_GlobalTcpAddr = NETADDR_ZEROED;
@@ -199,6 +202,9 @@ class CClient : public IClient, public CDemoPlayer::IListener
 	CGraph m_aInputtimeMarginGraphs[NUM_DUMMIES];
 	CGraph m_aGametimeMarginGraphs[NUM_DUMMIES];
 	CGraph m_FpsGraph;
+	STextContainerIndex m_DbgGraphsHintTextContainer;
+	float m_DbgGraphsHintLastX = -1.0f;
+	float m_DbgGraphsHintLastY = -1.0f;
 
 	// the game snapshots are modifiable by the game
 	CSnapshotStorage m_aSnapshotStorage[NUM_DUMMIES];

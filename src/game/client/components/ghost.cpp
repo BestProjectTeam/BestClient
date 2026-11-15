@@ -315,6 +315,18 @@ void CGhost::OnRender()
 	if(!m_Rendering || !g_Config.m_ClRaceShowGhost)
 		return;
 
+	bool HasActiveGhost = false;
+	for(const auto &Ghost : m_aActiveGhosts)
+	{
+		if(!Ghost.Empty())
+		{
+			HasActiveGhost = true;
+			break;
+		}
+	}
+	if(!HasActiveGhost)
+		return;
+
 	int PlaybackTick = Client()->PredGameTick(g_Config.m_ClDummy) - m_StartRenderTick;
 
 	CScreenRect ScreenRect = Graphics()->GetScreen();

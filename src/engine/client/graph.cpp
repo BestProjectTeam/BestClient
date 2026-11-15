@@ -44,33 +44,35 @@ void CGraph::Scale(int64_t WantedTotalTime)
 	if(m_Entries.First() != nullptr)
 	{
 		const int64_t EndTime = m_Entries.Last()->m_Time;
+		const int64_t MinTime = EndTime - WantedTotalTime;
 		bool ScaleTotalTime = false;
-		m_pFirstScaled = nullptr;
 
-		if(m_Entries.First()->m_Time >= EndTime - WantedTotalTime)
+		if(m_Entries.First()->m_Time >= MinTime)
 		{
 			m_pFirstScaled = m_Entries.First();
 		}
 		else
 		{
-			m_pFirstScaled = m_Entries.Last();
-			while(m_pFirstScaled)
+			// Advance forward from previous frame's m_pFirstScaled if still valid
+			if(m_pFirstScaled == nullptr || m_pFirstScaled->m_Time < m_Entries.First()->m_Time)
 			{
-				CEntry *pPrev = m_Entries.Prev(m_pFirstScaled);
-				if(pPrev == nullptr)
-					break;
-				if(pPrev->m_Time < EndTime - WantedTotalTime)
+				m_pFirstScaled = m_Entries.First();
+			}
+
+			while(m_pFirstScaled != nullptr)
+			{
+				CEntry *pNext = m_Entries.Next(m_pFirstScaled);
+				if(pNext == nullptr || pNext->m_Time > MinTime)
 				{
-					// Scale based on actual total time instead of based on wanted total time,
-					// to avoid flickering last segment due to rounding errors.
-					ScaleTotalTime = true;
+					if(m_pFirstScaled->m_Time < MinTime)
+						ScaleTotalTime = true;
 					break;
 				}
-				m_pFirstScaled = pPrev;
+				m_pFirstScaled = pNext;
 			}
 		}
 
-		m_RenderedTotalTime = ScaleTotalTime ? (EndTime - m_pFirstScaled->m_Time) : WantedTotalTime;
+		m_RenderedTotalTime = (ScaleTotalTime && m_pFirstScaled) ? (EndTime - m_pFirstScaled->m_Time) : WantedTotalTime;
 
 		// Ensure that color is applied to first line segment
 		if(m_pFirstScaled)
@@ -165,7 +167,7 @@ void CGraph::InsertAt(int64_t Time, float Value, ColorRGBA Color)
 
 void CGraph::RenderDataLines(IGraphics *pGraphics, float x, float y, float w, float h)
 {
-	if(m_pFirstScaled == nullptr)
+	if(m_pFirstScaled == nullptr || m_RenderedTotalTime <= 0)
 	{
 		return;
 	}
@@ -174,36 +176,76 @@ void CGraph::RenderDataLines(IGraphics *pGraphics, float x, float y, float w, fl
 	pGraphics->LinesBatchBegin(&LineItemBatch);
 
 	const int64_t StartTime = m_pFirstScaled->m_Time;
+	const float TimeScale = w / (float)m_RenderedTotalTime;
+	const float ValueRange = m_MaxAxis - m_MinAxis;
+	const float ValueScale = ValueRange > 0.0001f ? (h / ValueRange) : 0.0f;
 
 	CEntry *pEntry0 = m_pFirstScaled;
-	int a0 = round_to_int((pEntry0->m_Time - StartTime) * w / m_RenderedTotalTime);
-	int v0 = round_to_int((pEntry0->m_Value - m_MinAxis) * h / (m_MaxAxis - m_MinAxis));
-	while(pEntry0 != nullptr)
+	int CurA = round_to_int((pEntry0->m_Time - StartTime) * TimeScale);
+	int CurV = round_to_int((pEntry0->m_Value - m_MinAxis) * ValueScale);
+	int MinV = CurV;
+	int MaxV = CurV;
+	int LastV = CurV;
+	ColorRGBA CurColor1 = pEntry0->m_Color;
+
+	CEntry *pEntry = m_Entries.Next(pEntry0);
+	while(pEntry != nullptr)
 	{
-		CEntry *pEntry1 = m_Entries.Next(pEntry0);
-		if(pEntry1 == nullptr)
-			break;
+		const int NextA = round_to_int((pEntry->m_Time - StartTime) * TimeScale);
+		const int NextV = round_to_int((pEntry->m_Value - m_MinAxis) * ValueScale);
 
-		const int a1 = round_to_int((pEntry1->m_Time - StartTime) * w / m_RenderedTotalTime);
-		const int v1 = round_to_int((pEntry1->m_Value - m_MinAxis) * h / (m_MaxAxis - m_MinAxis));
-
-		if(pEntry1->m_ApplyColor)
+		if(NextA == CurA && !pEntry->m_ApplyColor)
 		{
-			pGraphics->LinesBatchEnd(&LineItemBatch);
-			pGraphics->LinesBatchBegin(&LineItemBatch);
-			pGraphics->SetColor2(pEntry0->m_Color, pEntry1->m_Color);
+			MinV = std::min(MinV, NextV);
+			MaxV = std::max(MaxV, NextV);
+			LastV = NextV;
 		}
-		const IGraphics::CLineItem Item = IGraphics::CLineItem(
-			x + a0,
-			y + h - v0,
-			x + a1,
-			y + h - v1);
-		pGraphics->LinesBatchDraw(&LineItemBatch, &Item, 1);
+		else
+		{
+			if(MinV != MaxV)
+			{
+				const IGraphics::CLineItem ColItem(
+					x + CurA,
+					y + h - MinV,
+					x + CurA,
+					y + h - MaxV);
+				pGraphics->LinesBatchDraw(&LineItemBatch, &ColItem, 1);
+			}
 
-		pEntry0 = pEntry1;
-		a0 = a1;
-		v0 = v1;
+			if(pEntry->m_ApplyColor)
+			{
+				pGraphics->LinesBatchEnd(&LineItemBatch);
+				pGraphics->LinesBatchBegin(&LineItemBatch);
+				pGraphics->SetColor2(CurColor1, pEntry->m_Color);
+				CurColor1 = pEntry->m_Color;
+			}
+
+			const IGraphics::CLineItem ConnItem(
+				x + CurA,
+				y + h - LastV,
+				x + NextA,
+				y + h - NextV);
+			pGraphics->LinesBatchDraw(&LineItemBatch, &ConnItem, 1);
+
+			CurA = NextA;
+			MinV = NextV;
+			MaxV = NextV;
+			LastV = NextV;
+		}
+
+		pEntry = m_Entries.Next(pEntry);
 	}
+
+	if(MinV != MaxV)
+	{
+		const IGraphics::CLineItem ColItem(
+			x + CurA,
+			y + h - MinV,
+			x + CurA,
+			y + h - MaxV);
+		pGraphics->LinesBatchDraw(&LineItemBatch, &ColItem, 1);
+	}
+
 	pGraphics->LinesBatchEnd(&LineItemBatch);
 }
 
@@ -237,19 +279,104 @@ void CGraph::Render(IGraphics *pGraphics, ITextRender *pTextRender, float x, flo
 
 	RenderDataLines(pGraphics, ItemGraph.m_X, ItemGraph.m_Y + 1.0f, ItemGraph.m_Width, ItemGraph.m_Height + 2.0f);
 
-	char aBuf[128];
+	const bool GeometryChanged = (x != m_LastX || y != m_LastY || w != m_LastW || h != m_LastH);
+	m_LastX = x;
+	m_LastY = y;
+	m_LastW = w;
+	m_LastH = h;
 
-	pTextRender->Text(ItemHeader.m_X + Spacing, ItemHeader.m_Y + Spacing, FontSize, pDescription);
+	const int64_t Now = time_get();
+	const bool TimeToUpdate = (Now - m_LastTextUpdateTime >= time_freq() / 25) || GeometryChanged;
 
-	if(m_SummaryStats)
+	if(GeometryChanged || str_comp(pDescription, m_aCachedDesc) != 0)
 	{
-		str_format(aBuf, sizeof(aBuf), "Avg. %.*f   ↓ %.*f   ↑ %.*f", m_Precision, m_Average, m_Precision, m_MinValue, m_Precision, m_MaxValue);
-		pTextRender->Text(ItemFooter.m_X + Spacing, ItemFooter.m_Y + ItemFooter.m_Height - FontSize - Spacing, FontSize, aBuf);
+		str_copy(m_aCachedDesc, pDescription, sizeof(m_aCachedDesc));
+		CTextCursor Cursor;
+		Cursor.m_FontSize = FontSize;
+		Cursor.m_X = ItemHeader.m_X + Spacing;
+		Cursor.m_Y = ItemHeader.m_Y + Spacing;
+		if(m_DescTextContainer.Valid())
+			pTextRender->RecreateTextContainerSoft(m_DescTextContainer, &Cursor, pDescription);
+		else
+			pTextRender->CreateTextContainer(m_DescTextContainer, &Cursor, pDescription);
 	}
 
-	str_format(aBuf, sizeof(aBuf), "%.*f", m_Precision, m_MaxAxis);
-	pTextRender->Text(ItemHeader.m_X + ItemHeader.m_Width - pTextRender->TextWidth(FontSize, aBuf) - Spacing, ItemHeader.m_Y + Spacing, FontSize, aBuf);
+	if(TimeToUpdate)
+	{
+		m_LastTextUpdateTime = Now;
+		char aBuf[128];
 
-	str_format(aBuf, sizeof(aBuf), "%.*f", m_Precision, m_MinAxis);
-	pTextRender->Text(ItemFooter.m_X + ItemFooter.m_Width - pTextRender->TextWidth(FontSize, aBuf) - Spacing, ItemFooter.m_Y + ItemFooter.m_Height - FontSize - Spacing, FontSize, aBuf);
+		if(m_SummaryStats)
+		{
+			str_format(aBuf, sizeof(aBuf), "Avg. %.*f   ↓ %.*f   ↑ %.*f", m_Precision, m_Average, m_Precision, m_MinValue, m_Precision, m_MaxValue);
+			if(GeometryChanged || str_comp(aBuf, m_aCachedStats) != 0)
+			{
+				str_copy(m_aCachedStats, aBuf, sizeof(m_aCachedStats));
+				CTextCursor Cursor;
+				Cursor.m_FontSize = FontSize;
+				Cursor.m_X = ItemFooter.m_X + Spacing;
+				Cursor.m_Y = ItemFooter.m_Y + ItemFooter.m_Height - FontSize - Spacing;
+				if(m_StatsTextContainer.Valid())
+					pTextRender->RecreateTextContainerSoft(m_StatsTextContainer, &Cursor, aBuf);
+				else
+					pTextRender->CreateTextContainer(m_StatsTextContainer, &Cursor, aBuf);
+			}
+		}
+
+		str_format(aBuf, sizeof(aBuf), "%.*f", m_Precision, m_MaxAxis);
+		if(GeometryChanged || str_comp(aBuf, m_aCachedMaxAxis) != 0)
+		{
+			str_copy(m_aCachedMaxAxis, aBuf, sizeof(m_aCachedMaxAxis));
+			const float TextW = pTextRender->TextWidth(FontSize, aBuf);
+			CTextCursor Cursor;
+			Cursor.m_FontSize = FontSize;
+			Cursor.m_X = ItemHeader.m_X + ItemHeader.m_Width - TextW - Spacing;
+			Cursor.m_Y = ItemHeader.m_Y + Spacing;
+			if(m_MaxAxisTextContainer.Valid())
+				pTextRender->RecreateTextContainerSoft(m_MaxAxisTextContainer, &Cursor, aBuf);
+			else
+				pTextRender->CreateTextContainer(m_MaxAxisTextContainer, &Cursor, aBuf);
+		}
+
+		str_format(aBuf, sizeof(aBuf), "%.*f", m_Precision, m_MinAxis);
+		if(GeometryChanged || str_comp(aBuf, m_aCachedMinAxis) != 0)
+		{
+			str_copy(m_aCachedMinAxis, aBuf, sizeof(m_aCachedMinAxis));
+			const float TextW = pTextRender->TextWidth(FontSize, aBuf);
+			CTextCursor Cursor;
+			Cursor.m_FontSize = FontSize;
+			Cursor.m_X = ItemFooter.m_X + ItemFooter.m_Width - TextW - Spacing;
+			Cursor.m_Y = ItemFooter.m_Y + ItemFooter.m_Height - FontSize - Spacing;
+			if(m_MinAxisTextContainer.Valid())
+				pTextRender->RecreateTextContainerSoft(m_MinAxisTextContainer, &Cursor, aBuf);
+			else
+				pTextRender->CreateTextContainer(m_MinAxisTextContainer, &Cursor, aBuf);
+		}
+	}
+
+	if(m_DescTextContainer.Valid())
+		pTextRender->RenderTextContainer(m_DescTextContainer, pTextRender->DefaultTextColor(), pTextRender->DefaultTextOutlineColor());
+	if(m_SummaryStats && m_StatsTextContainer.Valid())
+		pTextRender->RenderTextContainer(m_StatsTextContainer, pTextRender->DefaultTextColor(), pTextRender->DefaultTextOutlineColor());
+	if(m_MaxAxisTextContainer.Valid())
+		pTextRender->RenderTextContainer(m_MaxAxisTextContainer, pTextRender->DefaultTextColor(), pTextRender->DefaultTextOutlineColor());
+	if(m_MinAxisTextContainer.Valid())
+		pTextRender->RenderTextContainer(m_MinAxisTextContainer, pTextRender->DefaultTextColor(), pTextRender->DefaultTextOutlineColor());
+}
+
+void CGraph::DropTextContainers(ITextRender *pTextRender)
+{
+	if(pTextRender != nullptr)
+	{
+		pTextRender->DeleteTextContainer(m_DescTextContainer);
+		pTextRender->DeleteTextContainer(m_StatsTextContainer);
+		pTextRender->DeleteTextContainer(m_MaxAxisTextContainer);
+		pTextRender->DeleteTextContainer(m_MinAxisTextContainer);
+	}
+	m_aCachedDesc[0] = '\0';
+	m_aCachedStats[0] = '\0';
+	m_aCachedMaxAxis[0] = '\0';
+	m_aCachedMinAxis[0] = '\0';
+	m_LastX = m_LastY = m_LastW = m_LastH = -1.0f;
+	m_LastTextUpdateTime = 0;
 }

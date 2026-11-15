@@ -7,6 +7,7 @@
 #include <base/color.h>
 
 #include <engine/shared/ringbuffer.h>
+#include <engine/textrender.h>
 
 #include <cstdint>
 
@@ -34,6 +35,20 @@ private:
 	int m_Precision;
 	bool m_SummaryStats;
 
+	STextContainerIndex m_DescTextContainer;
+	STextContainerIndex m_StatsTextContainer;
+	STextContainerIndex m_MaxAxisTextContainer;
+	STextContainerIndex m_MinAxisTextContainer;
+	char m_aCachedDesc[64] = {0};
+	char m_aCachedStats[128] = {0};
+	char m_aCachedMaxAxis[32] = {0};
+	char m_aCachedMinAxis[32] = {0};
+	int64_t m_LastTextUpdateTime = 0;
+	float m_LastX = -1.0f;
+	float m_LastY = -1.0f;
+	float m_LastW = -1.0f;
+	float m_LastH = -1.0f;
+
 	void RenderDataLines(IGraphics *pGraphics, float x, float y, float w, float h);
 
 public:
@@ -47,6 +62,7 @@ public:
 	void Add(float Value, ColorRGBA Color = ColorRGBA(1.0f, 1.0f, 1.0f, 0.75f));
 	void InsertAt(int64_t Time, float Value, ColorRGBA Color = ColorRGBA(1.0f, 1.0f, 1.0f, 0.75f));
 	void Render(IGraphics *pGraphics, ITextRender *pTextRender, float x, float y, float w, float h, const char *pDescription);
+	void DropTextContainers(ITextRender *pTextRender);
 };
 
 #endif

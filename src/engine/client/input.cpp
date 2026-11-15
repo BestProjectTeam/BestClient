@@ -103,7 +103,28 @@ void CInput::Init()
 
 	MouseModeRelative();
 
-	InitJoysticks();
+#if !defined(CONF_PLATFORM_ANDROID) && !defined(CONF_PLATFORM_IOS)
+	if(SDL_GetNumTouchDevices() == 0)
+	{
+		SDL_EventState(SDL_FINGERDOWN, SDL_DISABLE);
+		SDL_EventState(SDL_FINGERUP, SDL_DISABLE);
+		SDL_EventState(SDL_FINGERMOTION, SDL_DISABLE);
+	}
+#endif
+
+	if(g_Config.m_InpControllerEnable != 0)
+		InitJoysticks();
+	else
+	{
+		SDL_EventState(SDL_JOYAXISMOTION, SDL_DISABLE);
+		SDL_EventState(SDL_JOYBALLMOTION, SDL_DISABLE);
+		SDL_EventState(SDL_JOYHATMOTION, SDL_DISABLE);
+		SDL_EventState(SDL_JOYBUTTONDOWN, SDL_DISABLE);
+		SDL_EventState(SDL_JOYBUTTONUP, SDL_DISABLE);
+	}
+
+	Console()->Chain("inp_controller_enable", ConchainJoystickEnableChanged, this);
+	Console()->Chain("inp_controller_guid", ConchainJoystickGuidChanged, this);
 }
 
 void CInput::Shutdown()
@@ -113,6 +134,12 @@ void CInput::Shutdown()
 
 void CInput::InitJoysticks()
 {
+	SDL_EventState(SDL_JOYAXISMOTION, SDL_ENABLE);
+	SDL_EventState(SDL_JOYBALLMOTION, SDL_ENABLE);
+	SDL_EventState(SDL_JOYHATMOTION, SDL_ENABLE);
+	SDL_EventState(SDL_JOYBUTTONDOWN, SDL_ENABLE);
+	SDL_EventState(SDL_JOYBUTTONUP, SDL_ENABLE);
+
 	if(!SDL_WasInit(SDL_INIT_JOYSTICK))
 	{
 		if(SDL_InitSubSystem(SDL_INIT_JOYSTICK) < 0)
@@ -127,8 +154,6 @@ void CInput::InitJoysticks()
 	for(int i = 0; i < NumJoysticks; i++)
 		OpenJoystick(i);
 	UpdateActiveJoystick();
-
-	Console()->Chain("inp_controller_guid", ConchainJoystickGuidChanged, this);
 }
 
 bool CInput::OpenJoystick(int JoystickIndex)
@@ -169,6 +194,16 @@ void CInput::UpdateActiveJoystick()
 		m_pActiveJoystick = &m_vJoysticks.front();
 }
 
+void CInput::ConchainJoystickEnableChanged(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData)
+{
+	pfnCallback(pResult, pCallbackUserData);
+	auto *pThis = static_cast<CInput *>(pUserData);
+	if(g_Config.m_InpControllerEnable != 0)
+		pThis->InitJoysticks();
+	else
+		pThis->CloseJoysticks();
+}
+
 void CInput::ConchainJoystickGuidChanged(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData)
 {
 	pfnCallback(pResult, pCallbackUserData);
@@ -199,6 +234,12 @@ CInput::CJoystick::CJoystick(CInput *pInput, int Index, SDL_Joystick *pDelegate)
 
 void CInput::CloseJoysticks()
 {
+	SDL_EventState(SDL_JOYAXISMOTION, SDL_DISABLE);
+	SDL_EventState(SDL_JOYBALLMOTION, SDL_DISABLE);
+	SDL_EventState(SDL_JOYHATMOTION, SDL_DISABLE);
+	SDL_EventState(SDL_JOYBUTTONDOWN, SDL_DISABLE);
+	SDL_EventState(SDL_JOYBUTTONUP, SDL_DISABLE);
+
 	if(SDL_WasInit(SDL_INIT_JOYSTICK))
 		SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
 

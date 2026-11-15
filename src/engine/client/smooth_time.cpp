@@ -31,28 +31,6 @@ void CSmoothTime::SetAdjustSpeed(EAdjustDirection Direction, float Value)
 	m_aAdjustSpeed[Direction] = Value;
 }
 
-int64_t CSmoothTime::Get(int64_t Now) const
-{
-	int64_t c = m_Current + (Now - m_Snap);
-	int64_t t = m_Target + (Now - m_Snap);
-
-	// it's faster to adjust upward instead of downward
-	// we might need to adjust these abit
-
-	float AdjustSpeed = m_aAdjustSpeed[ADJUSTDIRECTION_DOWN];
-	if(t > c)
-		AdjustSpeed = m_aAdjustSpeed[ADJUSTDIRECTION_UP];
-
-	float a = ((Now - m_Snap) / (float)time_freq()) * AdjustSpeed;
-	if(a > 1.0f)
-		a = 1.0f;
-
-	int64_t r = c + (int64_t)((t - c) * a);
-	if(g_Config.m_TcSmoothPredictionMargin)
-		return r + GetMargin(Now);
-	return r + m_Margin;
-}
-
 void CSmoothTime::UpdateInt(int64_t Target)
 {
 	if(g_Config.m_TcSmoothPredictionMargin)

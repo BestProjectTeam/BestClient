@@ -520,6 +520,11 @@ protected:
 	};
 	std::vector<CFriendItem> m_avFriends[NUM_FRIEND_TYPES];
 	const CFriendItem *m_pRemoveFriend = nullptr;
+	int64_t m_LastFriendsCalcTime = 0;
+	int m_LastFriendsNumServers = -1;
+	int m_LastFriendsNumFriends = -1;
+	bool m_FriendsHasFriend = false;
+	bool m_FriendsHasClan = false;
 
 	// found in menus.cpp
 	void Render();

@@ -62,10 +62,13 @@ int CSnapshot::GetExternalItemType(int InternalType) const
 
 int CSnapshot::GetItemIndex(int Key) const
 {
-	// TODO: OPT: this should not be a linear search. very bad
-	for(int i = 0; i < m_NumItems; i++)
+	const int NumItems = m_NumItems;
+	const int *pOffsets = Offsets();
+	const char *pData = DataStart();
+	for(int i = 0; i < NumItems; i++)
 	{
-		if(GetItem(i)->Key() == Key)
+		const CSnapshotItem *pItem = (const CSnapshotItem *)(pData + pOffsets[i]);
+		if(pItem->m_TypeAndId == Key)
 			return i;
 	}
 	return -1;
@@ -531,23 +534,27 @@ int CSnapshotDelta::UnpackDelta(const CSnapshot *pFrom, CSnapshotBuffer *pTo, co
 		return -101;
 	pData += pDelta->m_NumDeletedItems;
 
+	std::sort(pDeleted, pDeleted + pDelta->m_NumDeletedItems);
+
+	CItemList aFromHashlist[HASHLIST_SIZE];
+	GenerateHash(aFromHashlist, pFrom);
+
+	int aFromToBuilder[CSnapshot::MAX_ITEMS];
+	std::fill(std::begin(aFromToBuilder), std::end(aFromToBuilder), -1);
+	int KeptCount = 0;
+
 	// copy all non deleted stuff
-	for(int i = 0; i < pFrom->NumItems(); i++)
+	const int FromNumItems = pFrom->NumItems();
+	for(int i = 0; i < FromNumItems; i++)
 	{
 		const CSnapshotItem *pFromItem = pFrom->GetItem(i);
 		const int ItemSize = pFrom->GetItemSize(i);
-		bool Keep = true;
-		for(int d = 0; d < pDelta->m_NumDeletedItems; d++)
-		{
-			if(pDeleted[d] == pFromItem->Key())
-			{
-				Keep = false;
-				break;
-			}
-		}
+		const bool Keep = !std::binary_search(pDeleted, pDeleted + pDelta->m_NumDeletedItems, pFromItem->Key());
 
 		if(Keep)
 		{
+			if(i < (int)std::size(aFromToBuilder))
+				aFromToBuilder[i] = KeptCount++;
 			// keep it
 			if(!Builder.NewItem(pFromItem->InternalType(), pFromItem->Id(), pFromItem->Data(), ItemSize))
 			{
@@ -586,27 +593,39 @@ int CSnapshotDelta::UnpackDelta(const CSnapshot *pFrom, CSnapshotBuffer *pTo, co
 			return -205;
 
 		const int Key = (Type << 16) | Id;
+		const int FromIndex = GetItemIndexHashed(Key, aFromHashlist);
 
 		// create the item if needed
-		std::optional<int> ExistingIndex = Builder.FindItemIndexByKey(Key);
+		const int ExistingIndex = (FromIndex >= 0 && FromIndex < (int)std::size(aFromToBuilder)) ? aFromToBuilder[FromIndex] : -1;
 		int *pNewData;
-		if(ExistingIndex)
+		if(ExistingIndex != -1)
 		{
-			if(ItemSize != Builder.GetItemSize(ExistingIndex.value()))
+			if(ItemSize != Builder.GetItemSize(ExistingIndex))
 			{
 				return -206;
 			}
-			pNewData = Builder.GetItemData(ExistingIndex.value());
+			pNewData = Builder.GetItemData(ExistingIndex);
 		}
 		else
 		{
-			pNewData = (int *)Builder.NewItemRaw(Type, Id, ItemSize);
+			std::optional<int> OptIdx = Builder.FindItemIndexByKey(Key);
+			if(OptIdx)
+			{
+				if(ItemSize != Builder.GetItemSize(OptIdx.value()))
+				{
+					return -206;
+				}
+				pNewData = Builder.GetItemData(OptIdx.value());
+			}
+			else
+			{
+				pNewData = (int *)Builder.NewItemRaw(Type, Id, ItemSize);
+			}
 		}
 
 		if(!pNewData)
 			return -302;
 
-		const int FromIndex = pFrom->GetItemIndex(Key);
 		if(FromIndex != -1)
 		{
 			if(pFrom->GetItemSize(FromIndex) != ItemSize)

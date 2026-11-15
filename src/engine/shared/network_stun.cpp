@@ -64,10 +64,9 @@ void CStun::CProtocol::Refresh()
 	m_NextTry = time_get();
 }
 
-void CStun::CProtocol::Update()
+void CStun::CProtocol::Update(int64_t Now)
 {
-	int64_t Now = time_get();
-	if(m_NextTry == -1 || Now < m_NextTry || !m_HaveStunServer)
+	if(m_NextTry == -1 || !m_HaveStunServer || Now < m_NextTry)
 	{
 		return;
 	}
@@ -165,9 +164,15 @@ void CStun::Refresh()
 
 void CStun::Update()
 {
+	if((m_aProtocols[0].m_NextTry == -1 || !m_aProtocols[0].m_HaveStunServer) &&
+		(m_aProtocols[1].m_NextTry == -1 || !m_aProtocols[1].m_HaveStunServer))
+	{
+		return;
+	}
+	const int64_t Now = time_get();
 	for(auto &Protocol : m_aProtocols)
 	{
-		Protocol.Update();
+		Protocol.Update(Now);
 	}
 }
 

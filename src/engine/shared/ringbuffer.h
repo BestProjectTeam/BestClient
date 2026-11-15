@@ -8,6 +8,7 @@
 
 class CRingBufferBase
 {
+public:
 	class CItem
 	{
 	public:
@@ -17,6 +18,7 @@ class CRingBufferBase
 		int m_Size;
 	};
 
+protected:
 	CItem *m_pBuffer;
 
 	CItem *m_pProduce;
@@ -30,17 +32,61 @@ class CRingBufferBase
 
 	std::function<void(void *pCurrent)> m_PopCallback = nullptr;
 
-	CItem *NextBlock(CItem *pItem);
-	CItem *PrevBlock(CItem *pItem);
+	inline CItem *NextBlock(CItem *pItem)
+	{
+		if(pItem->m_pNext)
+			return pItem->m_pNext;
+		return m_pFirst;
+	}
+
+	inline CItem *PrevBlock(CItem *pItem)
+	{
+		if(pItem->m_pPrev)
+			return pItem->m_pPrev;
+		return m_pLast;
+	}
+
 	CItem *MergeBack(CItem *pItem);
 
-protected:
 	void *Allocate(int Size);
 
-	void *Prev(void *pCurrent);
-	void *Next(void *pCurrent);
-	void *First();
-	void *Last();
+	inline void *Prev(void *pCurrent)
+	{
+		CItem *pItem = ((CItem *)pCurrent) - 1;
+		while(true)
+		{
+			pItem = PrevBlock(pItem);
+			if(pItem == m_pProduce)
+				return nullptr;
+			if(!pItem->m_Free)
+				return pItem + 1;
+		}
+	}
+
+	inline void *Next(void *pCurrent)
+	{
+		CItem *pItem = ((CItem *)pCurrent) - 1;
+		while(true)
+		{
+			pItem = NextBlock(pItem);
+			if(pItem == m_pProduce)
+				return nullptr;
+			if(!pItem->m_Free)
+				return pItem + 1;
+		}
+	}
+
+	inline void *First()
+	{
+		if(m_pConsume->m_Free)
+			return nullptr;
+		return (void *)(m_pConsume + 1);
+	}
+
+	inline void *Last()
+	{
+		return Prev(m_pProduce + 1);
+	}
 
 	void Init(void *pMemory, int Size, int Flags);
 	int PopFirst();

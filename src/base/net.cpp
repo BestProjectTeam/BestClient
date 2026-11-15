@@ -86,9 +86,10 @@ static void net_buffer_init(NETSOCKET_BUFFER *buffer)
 }
 
 #if defined(CONF_PLATFORM_LINUX)
-static void net_buffer_reinit(NETSOCKET_BUFFER *buffer)
+static inline void net_buffer_reinit_used(NETSOCKET_BUFFER *buffer, int num_used)
 {
-	for(size_t i = 0; i < VLEN; i++)
+	int n = std::min(num_used, (int)VLEN);
+	for(int i = 0; i < n; i++)
 	{
 		buffer->msgs[i].msg_hdr.msg_namelen = sizeof(buffer->sockaddrs[i]);
 	}
@@ -1158,7 +1159,8 @@ int net_udp_recv(NETSOCKET sock, NETADDR *addr, unsigned char **data)
 	{
 		if(sock->buffer.pos >= sock->buffer.size)
 		{
-			net_buffer_reinit(&sock->buffer);
+			if(sock->buffer.size > 0)
+				net_buffer_reinit_used(&sock->buffer, sock->buffer.size);
 			sock->buffer.size = recvmmsg(sock->ipv4sock, sock->buffer.msgs, VLEN, 0, nullptr);
 			sock->buffer.pos = 0;
 		}
@@ -1168,7 +1170,8 @@ int net_udp_recv(NETSOCKET sock, NETADDR *addr, unsigned char **data)
 	{
 		if(sock->buffer.pos >= sock->buffer.size)
 		{
-			net_buffer_reinit(&sock->buffer);
+			if(sock->buffer.size > 0)
+				net_buffer_reinit_used(&sock->buffer, sock->buffer.size);
 			sock->buffer.size = recvmmsg(sock->ipv6sock, sock->buffer.msgs, VLEN, 0, nullptr);
 			sock->buffer.pos = 0;
 		}

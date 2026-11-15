@@ -21,6 +21,25 @@
 #include <cstdlib>
 #endif
 
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+#include <immintrin.h>
+static inline void cpu_relax()
+{
+	_mm_pause();
+}
+#elif defined(__aarch64__) || defined(__arm__)
+static inline void cpu_relax()
+{
+	asm volatile("yield" ::: "memory");
+}
+#else
+static inline void cpu_relax()
+{
+}
+#endif
+
+static constexpr int BUFFER_SPIN_COUNT = 12000;
+
 class IStorage;
 
 // ------------ CGraphicsBackend_Threaded
@@ -31,25 +50,54 @@ class IStorage;
 void CGraphicsBackend_Threaded::ThreadFunc(void *pUser)
 {
 	auto *pSelf = (CGraphicsBackend_Threaded *)pUser;
-	std::unique_lock<std::mutex> Lock(pSelf->m_BufferSwapMutex);
-	// notify, that the thread started
-	pSelf->m_Started = true;
-	pSelf->m_BufferSwapCond.notify_all();
-	while(!pSelf->m_Shutdown)
 	{
-		pSelf->m_BufferSwapCond.wait(Lock, [&pSelf] { return pSelf->m_pBuffer != nullptr || pSelf->m_Shutdown; });
-		if(pSelf->m_pBuffer)
+		std::unique_lock<std::mutex> Lock(pSelf->m_BufferSwapMutex);
+		// notify, that the thread started
+		pSelf->m_Started = true;
+		pSelf->m_BufferSwapCond.notify_all();
+	}
+
+	while(!pSelf->m_Shutdown.load(std::memory_order_relaxed))
+	{
+		CCommandBuffer *pBuffer = pSelf->m_pBuffer.load(std::memory_order_acquire);
+		if(pBuffer == nullptr && !pSelf->m_Shutdown.load(std::memory_order_relaxed))
+		{
+			// Adaptive spin-wait for the next buffer before sleeping
+			for(int i = 0; i < BUFFER_SPIN_COUNT; ++i)
+			{
+				pBuffer = pSelf->m_pBuffer.load(std::memory_order_acquire);
+				if(pBuffer != nullptr || pSelf->m_Shutdown.load(std::memory_order_relaxed))
+					break;
+				cpu_relax();
+			}
+		}
+
+		if(pBuffer == nullptr && !pSelf->m_Shutdown.load(std::memory_order_relaxed))
+		{
+			std::unique_lock<std::mutex> Lock(pSelf->m_BufferSwapMutex);
+			pSelf->m_IsWaiting.store(true, std::memory_order_seq_cst);
+			pSelf->m_BufferSwapCond.wait(Lock, [&pSelf] {
+				return pSelf->m_pBuffer.load(std::memory_order_relaxed) != nullptr || pSelf->m_Shutdown.load(std::memory_order_relaxed);
+			});
+			pSelf->m_IsWaiting.store(false, std::memory_order_seq_cst);
+			pBuffer = pSelf->m_pBuffer.load(std::memory_order_acquire);
+		}
+
+		if(pBuffer)
 		{
 #if defined(CONF_PLATFORM_MACOS) || defined(CONF_PLATFORM_IOS)
 			CAutoreleasePool AutoreleasePool;
 #endif
-			Lock.unlock();
-			pSelf->m_pProcessor->RunBuffer(pSelf->m_pBuffer);
-			Lock.lock();
+			pSelf->m_pProcessor->RunBuffer(pBuffer);
 
-			pSelf->m_pBuffer = nullptr;
-			pSelf->m_BufferInProcess.store(false, std::memory_order_relaxed);
-			pSelf->m_BufferSwapCond.notify_all();
+			pSelf->m_pBuffer.store(nullptr, std::memory_order_release);
+			pSelf->m_BufferInProcess.store(false, std::memory_order_release);
+
+			if(pSelf->m_IsMainWaiting.load(std::memory_order_acquire))
+			{
+				std::unique_lock<std::mutex> Lock(pSelf->m_BufferSwapMutex);
+				pSelf->m_BufferSwapCond.notify_all();
+			}
 
 #if defined(CONF_VIDEORECORDER) && !defined(BACKEND_NO_SDL)
 			if(IVideo::Current())
@@ -66,7 +114,7 @@ CGraphicsBackend_Threaded::CGraphicsBackend_Threaded(TTranslateFunc &&TranslateF
 	m_pProcessor = nullptr;
 	m_Shutdown = true;
 #if !defined(CONF_PLATFORM_EMSCRIPTEN)
-	m_pBuffer = nullptr;
+	m_pBuffer.store(nullptr, std::memory_order_relaxed);
 	m_BufferInProcess.store(false, std::memory_order_relaxed);
 #endif
 }
@@ -115,14 +163,15 @@ void CGraphicsBackend_Threaded::RunBuffer(CCommandBuffer *pBuffer)
 	}
 #else
 	WaitForIdle();
+	Error = m_pProcessor->GetError();
+	if(Error.m_ErrorType == GFX_ERROR_TYPE_NONE)
 	{
-		std::unique_lock<std::mutex> Lock(m_BufferSwapMutex);
-		Error = m_pProcessor->GetError();
-		if(Error.m_ErrorType == GFX_ERROR_TYPE_NONE)
+		m_BufferInProcess.store(true, std::memory_order_release);
+		m_pBuffer.store(pBuffer, std::memory_order_seq_cst);
+		if(m_IsWaiting.load(std::memory_order_seq_cst))
 		{
-			m_pBuffer = pBuffer;
-			m_BufferInProcess.store(true, std::memory_order_relaxed);
-			m_BufferSwapCond.notify_all();
+			std::unique_lock<std::mutex> Lock(m_BufferSwapMutex);
+			m_BufferSwapCond.notify_one();
 		}
 	}
 #endif
@@ -144,24 +193,38 @@ bool CGraphicsBackend_Threaded::IsIdle() const
 #if defined(CONF_PLATFORM_EMSCRIPTEN)
 	return true;
 #else
-	return !m_BufferInProcess.load(std::memory_order_relaxed);
+	return !m_BufferInProcess.load(std::memory_order_acquire) && m_pBuffer.load(std::memory_order_acquire) == nullptr;
 #endif
 }
 
 void CGraphicsBackend_Threaded::WaitForIdle()
 {
 #if !defined(CONF_PLATFORM_EMSCRIPTEN)
+	// Fast path: already idle
+	if(!m_BufferInProcess.load(std::memory_order_acquire) && m_pBuffer.load(std::memory_order_acquire) == nullptr)
+		return;
+
+	// Adaptive spin-wait (up to ~150-200 us at high frame rates)
+	for(int i = 0; i < BUFFER_SPIN_COUNT; ++i)
+	{
+		if(!m_BufferInProcess.load(std::memory_order_acquire) && m_pBuffer.load(std::memory_order_acquire) == nullptr)
+			return;
+		cpu_relax();
+	}
+
+	m_IsMainWaiting.store(true, std::memory_order_seq_cst);
 	std::unique_lock<std::mutex> Lock(m_BufferSwapMutex);
 #if defined(CONF_PLATFORM_MACOS)
-	while(!m_BufferSwapCond.wait_for(Lock, std::chrono::milliseconds(1), [this]() { return m_pBuffer == nullptr; }))
+	while(!m_BufferSwapCond.wait_for(Lock, std::chrono::milliseconds(1), [this]() { return m_pBuffer.load(std::memory_order_acquire) == nullptr; }))
 	{
 		Lock.unlock();
 		CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0, true);
 		Lock.lock();
 	}
 #else
-	m_BufferSwapCond.wait(Lock, [this]() { return m_pBuffer == nullptr; });
+	m_BufferSwapCond.wait(Lock, [this]() { return m_pBuffer.load(std::memory_order_acquire) == nullptr; });
 #endif
+	m_IsMainWaiting.store(false, std::memory_order_seq_cst);
 #endif
 }
 

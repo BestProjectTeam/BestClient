@@ -54,7 +54,32 @@ class CHud : public CComponent
 	int m_HudQuadContainerIndex;
 	SScoreInfo m_aScoreInfo[2];
 	STextContainerIndex m_FPSTextContainerIndex;
+	int m_PrevFps = -1;
+	float m_PrevFpsWidth = -1.0f;
+	int64_t m_LastFpsUpdate = 0;
+
+	STextContainerIndex m_ShowPredTextContainerIndex;
+	int m_PrevPredTime = -1;
+	float m_PrevPredWidth = -1.0f;
+	int m_PrevPredShowfps = -1;
+	int64_t m_LastPredUpdate = 0;
+
 	STextContainerIndex m_DDRaceEffectsTextContainerIndex;
+	int m_PrevFinishTimeDDRaceTime = 0;
+	float m_PrevFinishTimeDiff = 0.0f;
+	float m_PrevTimeCpDiff = 0.0f;
+
+	STextContainerIndex m_ServerRecordLabelContainerIndex;
+	STextContainerIndex m_ServerRecordTextContainerIndex;
+	int m_PrevServerBestTimeSeconds = FinishTime::UNSET;
+	int m_PrevServerBestTimeMillis = FinishTime::UNSET;
+
+	STextContainerIndex m_PlayerRecordLabelContainerIndex;
+	STextContainerIndex m_PlayerRecordTextContainerIndex;
+	int m_PrevPlayerFinishTimeSeconds = FinishTime::UNSET;
+	int m_PrevPlayerFinishTimeMillis = FinishTime::UNSET;
+	float m_PrevPlayerRecord = -1.0f;
+
 	STextContainerIndex m_PlayerAngleTextContainerIndex;
 	float m_PlayerPrevAngle;
 	STextContainerIndex m_aPlayerSpeedTextContainers[2];
@@ -69,6 +94,48 @@ class CHud : public CComponent
 	ESpeedChange m_aLastPlayerSpeedChange[2];
 	STextContainerIndex m_aPlayerPositionContainers[2];
 	float m_aPlayerPrevPosition[2];
+
+	STextContainerIndex m_MovementLabelsContainerIndex;
+	bool m_MovementLabelsValid = false;
+	int64_t m_LastMovementUpdate = 0;
+
+	STextContainerIndex m_LocalTimeTextContainerIndex;
+	char m_aCachedLocalTimeStr[16] = "";
+	float m_CachedLocalTimeTextX = -1.0f;
+	float m_CachedLocalTimeTextY = -1.0f;
+	float m_CachedLocalTimeFontSize = -1.0f;
+
+	STextContainerIndex m_SpectatorCountTextContainerIndex;
+	int m_PrevSpectatorCount = -1;
+
+	STextContainerIndex m_GameTimerContainerIndex;
+	int m_PrevGameTimerTime = -1;
+	float m_PrevGameTimerHalf = -1.0f;
+	float m_PrevGameTimerW = -1.0f;
+
+	STextContainerIndex m_SpectatorHudContainerIndex;
+	char m_aCachedSpectatorText[128] = "";
+	float m_CachedSpectatorTextX = -1.0f;
+	float m_CachedSpectatorTextY = -1.0f;
+
+	STextContainerIndex m_SpectatorAutoCameraContainerIndex;
+	STextContainerIndex m_SpectatorAutoCameraIconContainerIndex;
+	float m_CachedAutoCameraTextWidth = -1.0f;
+	float m_CachedAutoCameraIconX = -1.0f;
+	float m_CachedAutoCameraTagY = -1.0f;
+
+	STextContainerIndex m_WarmupTitleContainerIndex;
+	STextContainerIndex m_WarmupTimeContainerIndex;
+	int m_PrevWarmupSeconds = -1;
+	int m_PrevWarmupTenths = -1;
+	float m_PrevWarmupTitleCenterX = -1.0f;
+	float m_PrevWarmupTimeCenterX = -1.0f;
+
+	STextContainerIndex m_PauseNotificationContainerIndex;
+	float m_PrevPauseNotificationHalf = -1.0f;
+
+	STextContainerIndex m_SuddenDeathContainerIndex;
+	float m_PrevSuddenDeathCenterX = -1.0f;
 
 	void RenderCursor();
 

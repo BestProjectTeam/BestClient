@@ -861,13 +861,23 @@ void CGraphics_Threaded::SetColor(float r, float g, float b, float a)
 
 void CGraphics_Threaded::SetColor(ColorRGBA Color)
 {
-	std::fill(std::begin(m_aColor), std::end(m_aColor), NormalizeColor(Color));
+	m_CurrentColor = Color;
+	const CCommandBuffer::SColor Normalized = NormalizeColor(Color);
+	if(m_aColor[0] == Normalized && m_aColor[1] == Normalized &&
+		m_aColor[2] == Normalized && m_aColor[3] == Normalized)
+		return;
+
+	m_aColor[0] = Normalized;
+	m_aColor[1] = Normalized;
+	m_aColor[2] = Normalized;
+	m_aColor[3] = Normalized;
 }
 
 void CGraphics_Threaded::SetColor2(ColorRGBA First, ColorRGBA Second)
 {
 	dbg_assert(m_Drawing == EDrawing::LINES, "Called Graphics()->SetColor2 while not drawing lines");
 
+	m_CurrentColor = First;
 	m_aColor[0] = NormalizeColor(First);
 	m_aColor[1] = NormalizeColor(Second);
 }
@@ -876,6 +886,7 @@ void CGraphics_Threaded::SetColor4(ColorRGBA TopLeft, ColorRGBA TopRight, ColorR
 {
 	dbg_assert(m_Drawing == EDrawing::QUADS || m_Drawing == EDrawing::TRIANGLES, "Called Graphics()->SetColor4 while not drawing quads or triangles");
 
+	m_CurrentColor = TopLeft;
 	m_aColor[0] = NormalizeColor(TopLeft);
 	m_aColor[1] = NormalizeColor(TopRight);
 	m_aColor[2] = NormalizeColor(BottomRight);
@@ -1757,7 +1768,6 @@ void CGraphics_Threaded::RenderQuadContainerEx(int ContainerIndex, int QuadOffse
 		if(Container.m_QuadBufferContainerIndex == -1)
 			return;
 
-		SQuadContainer::SQuad &Quad = Container.m_vQuads[QuadOffset];
 		CCommandBuffer::SCommand_RenderQuadContainerEx Cmd;
 
 		WrapClamp();
@@ -1774,16 +1784,17 @@ void CGraphics_Threaded::RenderQuadContainerEx(int ContainerIndex, int QuadOffse
 		Cmd.m_pOffset = (void *)(QuadOffset * 6 * sizeof(unsigned int));
 		Cmd.m_BufferContainerIndex = Container.m_QuadBufferContainerIndex;
 
-		Cmd.m_VertexColor.r = (float)m_aColor[0].r / 255.f;
-		Cmd.m_VertexColor.g = (float)m_aColor[0].g / 255.f;
-		Cmd.m_VertexColor.b = (float)m_aColor[0].b / 255.f;
-		Cmd.m_VertexColor.a = (float)m_aColor[0].a / 255.f;
+		Cmd.m_VertexColor = m_CurrentColor;
 
 		Cmd.m_Rotation = m_Rotation;
 
 		// rotate before positioning
-		Cmd.m_Center.x = Quad.m_aVertices[0].m_Pos.x + (Quad.m_aVertices[1].m_Pos.x - Quad.m_aVertices[0].m_Pos.x) / 2.f;
-		Cmd.m_Center.y = Quad.m_aVertices[0].m_Pos.y + (Quad.m_aVertices[2].m_Pos.y - Quad.m_aVertices[0].m_Pos.y) / 2.f;
+		if(m_Rotation != 0.0f)
+		{
+			SQuadContainer::SQuad &Quad = Container.m_vQuads[QuadOffset];
+			Cmd.m_Center.x = Quad.m_aVertices[0].m_Pos.x + (Quad.m_aVertices[1].m_Pos.x - Quad.m_aVertices[0].m_Pos.x) / 2.f;
+			Cmd.m_Center.y = Quad.m_aVertices[0].m_Pos.y + (Quad.m_aVertices[2].m_Pos.y - Quad.m_aVertices[0].m_Pos.y) / 2.f;
+		}
 
 		AddCmd(Cmd);
 		m_pCommandBuffer->AddRenderCalls(1);
@@ -1891,10 +1902,7 @@ void CGraphics_Threaded::RenderQuadContainerAsSpriteMultiple(int ContainerIndex,
 		Cmd.m_pOffset = (void *)(QuadOffset * 6 * sizeof(unsigned int));
 		Cmd.m_BufferContainerIndex = Container.m_QuadBufferContainerIndex;
 
-		Cmd.m_VertexColor.r = (float)m_aColor[0].r / 255.f;
-		Cmd.m_VertexColor.g = (float)m_aColor[0].g / 255.f;
-		Cmd.m_VertexColor.b = (float)m_aColor[0].b / 255.f;
-		Cmd.m_VertexColor.a = (float)m_aColor[0].a / 255.f;
+		Cmd.m_VertexColor = m_CurrentColor;
 
 		// rotate before positioning
 		Cmd.m_Center.x = Quad.m_aVertices[0].m_Pos.x + (Quad.m_aVertices[1].m_Pos.x - Quad.m_aVertices[0].m_Pos.x) / 2.f;

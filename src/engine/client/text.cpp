@@ -341,6 +341,17 @@ private:
 	CAtlas m_TextureAtlas;
 	std::unordered_map<std::tuple<FT_Face, int, int>, SGlyph, SGlyphKeyHash, SGlyphKeyEquals> m_Glyphs;
 
+	class CFastGlyphCacheEntry
+	{
+	public:
+		int m_Chr = -1;
+		int m_FontSize = 0;
+		FT_Face m_Face = nullptr;
+		const SGlyph *m_pGlyph = nullptr;
+	};
+	static constexpr size_t FAST_GLYPH_CACHE_SIZE = 1024;
+	CFastGlyphCacheEntry m_aFastGlyphCache[FAST_GLYPH_CACHE_SIZE];
+
 	// Font faces
 	FT_Face m_DefaultFace = nullptr;
 	FT_Face m_IconFace = nullptr;
@@ -737,12 +748,26 @@ public:
 
 		m_TextureAtlas.Clear(m_TextureDimension);
 		m_Glyphs.clear();
+		for(auto &Entry : m_aFastGlyphCache)
+			Entry.m_Chr = -1;
 	}
 
 	const SGlyph *GetGlyph(int Chr, int FontSize)
 	{
 		FontSize = std::clamp(FontSize, MIN_FONT_SIZE, MAX_FONT_SIZE);
 
+		const size_t CacheHash = ((size_t)(uint32_t)Chr * 31 + (size_t)(uint32_t)FontSize + (size_t)m_SelectedFace) % FAST_GLYPH_CACHE_SIZE;
+		const CFastGlyphCacheEntry &Entry = m_aFastGlyphCache[CacheHash];
+		if(Entry.m_Chr == Chr && Entry.m_FontSize == FontSize && Entry.m_Face == m_SelectedFace)
+			return Entry.m_pGlyph;
+
+		const SGlyph *pGlyph = GetGlyphSlow(Chr, FontSize);
+		m_aFastGlyphCache[CacheHash] = {Chr, FontSize, m_SelectedFace, pGlyph};
+		return pGlyph;
+	}
+
+	const SGlyph *GetGlyphSlow(int Chr, int FontSize)
+	{
 		// Find glyph index and most appropriate font face.
 		FT_Face Face;
 		FT_UInt GlyphIndex = GetCharGlyph(Chr, &Face, false);
@@ -1658,7 +1683,9 @@ public:
 	void AppendTextContainer(STextContainerIndex TextContainerIndex, CTextCursor *pCursor, const char *pText, int Length = -1) override
 	{
 		STextContainer &TextContainer = GetTextContainer(TextContainerIndex);
+#if defined(CONF_DEBUG)
 		str_append(TextContainer.m_aDebugText, pText);
+#endif
 
 		CScreenRect ScreenRect = Graphics()->GetScreen();
 
@@ -1679,6 +1706,8 @@ public:
 		if(BCGradient_ApplyEverythingHook && pCursor->m_vColorSplits.empty())
 			BCGradient_ApplyEverythingHook(pCursor, pText, Length);
 		// bestclient
+
+		TextContainer.m_StringInfo.m_vCharacterQuads.reserve(TextContainer.m_StringInfo.m_vCharacterQuads.size() + Length);
 
 		const char *pCurrent = pText;
 		const char *pEnd = pCurrent + Length;
@@ -1986,6 +2015,12 @@ public:
 					// don't add text that isn't drawn, the color overwrite is used for that
 					if(Color.a != 0.f && IsRendered)
 					{
+						const STextCharQuadVertexColor VertColor(
+							(unsigned char)(Color.r * 255.f),
+							(unsigned char)(Color.g * 255.f),
+							(unsigned char)(Color.b * 255.f),
+							(unsigned char)(Color.a * 255.f));
+
 						TextContainer.m_StringInfo.m_vCharacterQuads.emplace_back();
 						STextCharQuad &TextCharQuad = TextContainer.m_StringInfo.m_vCharacterQuads.back();
 
@@ -1993,37 +2028,25 @@ public:
 						TextCharQuad.m_aVertices[0].m_Y = CharY;
 						TextCharQuad.m_aVertices[0].m_U = pGlyph->m_aUVs[0];
 						TextCharQuad.m_aVertices[0].m_V = pGlyph->m_aUVs[3];
-						TextCharQuad.m_aVertices[0].m_Color.r = (unsigned char)(Color.r * 255.f);
-						TextCharQuad.m_aVertices[0].m_Color.g = (unsigned char)(Color.g * 255.f);
-						TextCharQuad.m_aVertices[0].m_Color.b = (unsigned char)(Color.b * 255.f);
-						TextCharQuad.m_aVertices[0].m_Color.a = (unsigned char)(Color.a * 255.f);
+						TextCharQuad.m_aVertices[0].m_Color = VertColor;
 
 						TextCharQuad.m_aVertices[1].m_X = CharX + CharWidth;
 						TextCharQuad.m_aVertices[1].m_Y = CharY;
 						TextCharQuad.m_aVertices[1].m_U = pGlyph->m_aUVs[2];
 						TextCharQuad.m_aVertices[1].m_V = pGlyph->m_aUVs[3];
-						TextCharQuad.m_aVertices[1].m_Color.r = (unsigned char)(Color.r * 255.f);
-						TextCharQuad.m_aVertices[1].m_Color.g = (unsigned char)(Color.g * 255.f);
-						TextCharQuad.m_aVertices[1].m_Color.b = (unsigned char)(Color.b * 255.f);
-						TextCharQuad.m_aVertices[1].m_Color.a = (unsigned char)(Color.a * 255.f);
+						TextCharQuad.m_aVertices[1].m_Color = VertColor;
 
 						TextCharQuad.m_aVertices[2].m_X = CharX + CharWidth;
 						TextCharQuad.m_aVertices[2].m_Y = CharY - CharHeight;
 						TextCharQuad.m_aVertices[2].m_U = pGlyph->m_aUVs[2];
 						TextCharQuad.m_aVertices[2].m_V = pGlyph->m_aUVs[1];
-						TextCharQuad.m_aVertices[2].m_Color.r = (unsigned char)(Color.r * 255.f);
-						TextCharQuad.m_aVertices[2].m_Color.g = (unsigned char)(Color.g * 255.f);
-						TextCharQuad.m_aVertices[2].m_Color.b = (unsigned char)(Color.b * 255.f);
-						TextCharQuad.m_aVertices[2].m_Color.a = (unsigned char)(Color.a * 255.f);
+						TextCharQuad.m_aVertices[2].m_Color = VertColor;
 
 						TextCharQuad.m_aVertices[3].m_X = CharX;
 						TextCharQuad.m_aVertices[3].m_Y = CharY - CharHeight;
 						TextCharQuad.m_aVertices[3].m_U = pGlyph->m_aUVs[0];
 						TextCharQuad.m_aVertices[3].m_V = pGlyph->m_aUVs[1];
-						TextCharQuad.m_aVertices[3].m_Color.r = (unsigned char)(Color.r * 255.f);
-						TextCharQuad.m_aVertices[3].m_Color.g = (unsigned char)(Color.g * 255.f);
-						TextCharQuad.m_aVertices[3].m_Color.b = (unsigned char)(Color.b * 255.f);
-						TextCharQuad.m_aVertices[3].m_Color.a = (unsigned char)(Color.a * 255.f);
+						TextCharQuad.m_aVertices[3].m_Color = VertColor;
 					}
 
 					// calculate the full width from the last selection point to the end of this selection draw on screen

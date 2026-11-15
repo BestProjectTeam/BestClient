@@ -200,6 +200,7 @@ class CStun
 {
 	class CProtocol
 	{
+		friend class CStun;
 		int m_Index;
 		NETSOCKET m_Socket;
 		CStunData m_Stun;
@@ -215,7 +216,7 @@ class CStun
 		CProtocol(int Index, NETSOCKET Socket);
 		void FeedStunServer(NETADDR StunServer);
 		void Refresh();
-		void Update();
+		void Update(int64_t Now);
 		bool OnPacket(NETADDR Addr, unsigned char *pData, int DataSize);
 		CONNECTIVITY GetConnectivity(NETADDR *pGlobalAddr);
 	};

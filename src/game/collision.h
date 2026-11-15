@@ -7,6 +7,7 @@
 
 #include <engine/shared/protocol.h>
 
+#include <algorithm>
 #include <map>
 #include <vector>
 
@@ -78,7 +79,12 @@ public:
 	int GetTile(int x, int y) const;
 	int GetFrontTile(int x, int y) const;
 	int Entity(int x, int y, int Layer) const;
-	int GetPureMapIndex(float x, float y) const;
+	int GetPureMapIndex(float x, float y) const
+	{
+		int Nx = std::clamp(round_to_int(x) / 32, 0, m_Width - 1);
+		int Ny = std::clamp(round_to_int(y) / 32, 0, m_Height - 1);
+		return Ny * m_Width + Nx;
+	}
 	int GetPureMapIndex(vec2 Pos) const { return GetPureMapIndex(Pos.x, Pos.y); }
 	std::vector<int> GetMapIndices(vec2 PrevPos, vec2 Pos, unsigned MaxIndices = 0) const;
 	int GetMapIndex(vec2 Pos) const;

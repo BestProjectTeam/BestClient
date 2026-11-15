@@ -519,8 +519,6 @@ void CPlayers::RenderHook(
 	Prev = *pPrevChar;
 	Player = *pPlayerChar;
 
-	CTeeRenderInfo RenderInfo = *pRenderInfo;
-
 	// don't render hooks to not active character cores
 	if(pPlayerChar->m_HookedPlayer != -1 && !GameClient()->m_Snap.m_aCharacters[pPlayerChar->m_HookedPlayer].m_Active)
 		return;
@@ -543,10 +541,6 @@ void CPlayers::RenderHook(
 	// bestclient
 	if(ClientId >= 0 && GameClient()->m_FastPractice.Enabled() && !GameClient()->m_Snap.m_SpecInfo.m_Active && !GameClient()->m_FastPractice.IsPracticeParticipant(ClientId))
 		Alpha = std::min(Alpha, 0.5f);
-	// bestclient
-
-	// bestclient
-	RenderInfo.m_Size = BestClientTeeRenderSize(GameClient(), ClientId);
 	// bestclient
 
 	vec2 Position;
@@ -596,10 +590,20 @@ void CPlayers::RenderHook(
 		return;
 	// bestclient
 
+	const CTeeRenderInfo *pInfo = pRenderInfo;
+	CTeeRenderInfo LocalRenderInfo;
+	if(pInfo == nullptr && in_range(ClientId, MAX_CLIENTS - 1))
+	{
+		LocalRenderInfo = GameClient()->m_aClients[ClientId].m_RenderInfo;
+		LocalRenderInfo.m_Size = BestClientTeeRenderSize(GameClient(), ClientId);
+		pInfo = &LocalRenderInfo;
+	}
+
 	// bestclient
 	if(GameClient()->m_HookRope.RenderRope(ClientId, Pos, HookPos, Player.m_HookState, Alpha))
 	{
-		RenderHand(&RenderInfo, Position, normalize(HookPos - Pos), -pi / 2, vec2(20, 0) * (RenderInfo.m_Size / 64.0f), Alpha); // bestclient
+		if(pInfo != nullptr)
+			RenderHand(pInfo, Position, normalize(HookPos - Pos), -pi / 2, vec2(20, 0) * (pInfo->m_Size / 64.0f), Alpha); // bestclient
 		return;
 	}
 	// bestclient
@@ -645,7 +649,10 @@ void CPlayers::RenderHook(
 	GameClient()->m_HookRope.RenderOverlay(ClientId, Pos, HookPos, Player.m_HookState, Alpha);
 	// bestclient
 
-	RenderHand(&RenderInfo, Position, normalize(HookPos - Pos), -pi / 2, vec2(20, 0) * (RenderInfo.m_Size / 64.0f), Alpha); // bestclient
+	if(pInfo != nullptr)
+	{
+		RenderHand(pInfo, Position, normalize(HookPos - Pos), -pi / 2, vec2(20, 0) * (pInfo->m_Size / 64.0f), Alpha);
+	}
 }
 
 void CPlayers::RenderPlayer(
@@ -697,7 +704,97 @@ void CPlayers::RenderPlayer(
 	if(!ScreenRect.Inside(Position))
 		return;
 
-	CTeeRenderInfo RenderInfo = *pRenderInfo;
+	CTeeRenderInfo RenderInfo;
+	if(pRenderInfo != nullptr)
+	{
+		RenderInfo = *pRenderInfo;
+	}
+	else if(in_range(ClientId, MAX_CLIENTS - 1))
+	{
+		RenderInfo = GameClient()->m_aClients[ClientId].m_RenderInfo;
+		RenderInfo.m_TeeRenderFlags = 0;
+
+		bool Frozen = false;
+		// bestclient
+		const bool PracticeParticipant = GameClient()->m_FastPractice.Active() && GameClient()->m_FastPractice.IsPracticeParticipant(ClientId);
+		if(PracticeParticipant)
+		{
+			if(GameClient()->m_aClients[ClientId].m_Predicted.m_LiveFrozen)
+				RenderInfo.m_TeeRenderFlags |= TEE_EFFECT_FROZEN;
+			if(GameClient()->m_aClients[ClientId].m_Predicted.m_Invincible)
+				RenderInfo.m_TeeRenderFlags |= TEE_EFFECT_SPARKLE;
+
+			Frozen = GameClient()->m_FastPractice.ShouldShowPracticeFrozenSkin(ClientId);
+			if(Frozen)
+				RenderInfo.m_TeeRenderFlags |= TEE_EFFECT_FROZEN | TEE_NO_WEAPON;
+		}
+		else if(ClientId == GameClient()->m_aLocalIds[0] || ClientId == GameClient()->m_aLocalIds[1])
+		// bestclient
+		{
+			if(GameClient()->m_aClients[ClientId].m_Predicted.m_FreezeEnd != 0)
+				RenderInfo.m_TeeRenderFlags |= TEE_EFFECT_FROZEN | TEE_NO_WEAPON;
+			if(GameClient()->m_aClients[ClientId].m_Predicted.m_LiveFrozen)
+				RenderInfo.m_TeeRenderFlags |= TEE_EFFECT_FROZEN;
+			if(GameClient()->m_aClients[ClientId].m_Predicted.m_Invincible)
+				RenderInfo.m_TeeRenderFlags |= TEE_EFFECT_SPARKLE;
+
+			Frozen = GameClient()->m_aClients[ClientId].m_Predicted.m_FreezeEnd != 0;
+			// bestclient
+			if(g_Config.m_BcInputs != BC_INPUTS_OFF)
+				Frozen = GameClient()->m_aClients[ClientId].m_RegularPredicted.m_FreezeEnd != 0;
+			// bestclient
+		}
+		else
+		{
+			if(GameClient()->m_aClients[ClientId].m_FreezeEnd != 0)
+				RenderInfo.m_TeeRenderFlags |= TEE_EFFECT_FROZEN | TEE_NO_WEAPON;
+			if(GameClient()->m_aClients[ClientId].m_LiveFrozen)
+				RenderInfo.m_TeeRenderFlags |= TEE_EFFECT_FROZEN;
+			if(GameClient()->m_aClients[ClientId].m_Invincible)
+				RenderInfo.m_TeeRenderFlags |= TEE_EFFECT_SPARKLE;
+
+			Frozen = GameClient()->m_Snap.m_aCharacters[ClientId].m_HasExtendedData && GameClient()->m_Snap.m_aCharacters[ClientId].m_ExtendedData.m_FreezeEnd != 0;
+		}
+
+		// TClient
+		if(g_Config.m_TcFrozenKatana > 0 && Frozen)
+		{
+			GameClient()->m_aClients[ClientId].m_RenderCur.m_Weapon = WEAPON_NINJA;
+			RenderInfo.m_TeeRenderFlags &= ~TEE_NO_WEAPON;
+		}
+
+		// bestclient
+		if(!GameClient()->m_BestClient.ApplyFrozenSkin(RenderInfo, Frozen) &&
+			(GameClient()->m_aClients[ClientId].m_RenderCur.m_Weapon == WEAPON_NINJA || (Frozen && !GameClient()->m_GameInfo.m_NoSkinChangeForFrozen)) && g_Config.m_ClShowNinja)
+		// bestclient
+		{
+			const bool IsTeamPlay = GameClient()->IsTeamPlay();
+			RenderInfo.m_aSixup[g_Config.m_ClDummy].Reset();
+			RenderInfo.ApplySkin(NinjaTeeRenderInfo()->TeeRenderInfo());
+			RenderInfo.m_CustomColoredSkin = IsTeamPlay;
+			if(!IsTeamPlay)
+			{
+				RenderInfo.m_ColorBody = ColorRGBA(1, 1, 1);
+				RenderInfo.m_ColorFeet = ColorRGBA(1, 1, 1);
+
+				if(g_Config.m_TcColorFreeze)
+				{
+					bool CustomColor = GameClient()->m_aClients[ClientId].m_RenderInfo.m_CustomColoredSkin;
+					RenderInfo.m_CustomColoredSkin = true;
+
+					RenderInfo.m_ColorFeet = g_Config.m_TcColorFreezeFeet ? GameClient()->m_aClients[ClientId].m_RenderInfo.m_ColorFeet : ColorRGBA(1, 1, 1);
+					float Darken = (g_Config.m_TcColorFreezeDarken / 100.0f) * 0.5f + 0.5f;
+
+					RenderInfo.m_ColorBody = GameClient()->m_aClients[ClientId].m_RenderInfo.m_ColorBody;
+					if(!CustomColor)
+						RenderInfo.m_ColorBody = GameClient()->m_aClients[ClientId].m_RenderInfo.m_BloodColor;
+
+					RenderInfo.m_ColorBody = ColorRGBA(RenderInfo.m_ColorBody.r * Darken, RenderInfo.m_ColorBody.g * Darken, RenderInfo.m_ColorBody.b * Darken, 1.0);
+				}
+			}
+		}
+	}
+
 	// bestclient
 	const SDemoTeeOverride *pDemoTeeOverride = ClientId >= 0 ? GameClient()->m_DemoTeeEditor.Override(ClientId) : nullptr;
 	if(ClientId >= 0 && Client()->State() == IClient::STATE_DEMOPLAYBACK && pDemoTeeOverride != nullptr &&
@@ -709,6 +806,7 @@ void CPlayers::RenderPlayer(
 		RenderInfo.m_aSixup[g_Config.m_ClDummy].Reset();
 		RenderInfo.ApplyColors(pDemoTeeOverride->m_UseCustomColors, pDemoTeeOverride->m_BodyColor, pDemoTeeOverride->m_FeetColor);
 	}
+	RenderInfo.m_Size = BestClientTeeRenderSize(GameClient(), ClientId);
 	// bestclient
 
 	const bool Paused = GameClient()->IsWorldPaused() || GameClient()->IsDemoPlaybackPaused();
@@ -1278,98 +1376,6 @@ void CPlayers::OnRender()
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		return;
 
-	// update render info for ninja
-	CTeeRenderInfo aRenderInfo[MAX_CLIENTS];
-	const bool IsTeamPlay = GameClient()->IsTeamPlay();
-	for(int i = 0; i < MAX_CLIENTS; ++i)
-	{
-		if(!IsPlayerInfoAvailable(i))
-			continue;
-
-		aRenderInfo[i] = GameClient()->m_aClients[i].m_RenderInfo;
-		aRenderInfo[i].m_TeeRenderFlags = 0;
-
-		bool Frozen = false;
-		// bestclient
-		const bool PracticeParticipant = GameClient()->m_FastPractice.Active() && GameClient()->m_FastPractice.IsPracticeParticipant(i);
-		if(PracticeParticipant)
-		{
-			if(GameClient()->m_aClients[i].m_Predicted.m_LiveFrozen)
-				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_FROZEN;
-			if(GameClient()->m_aClients[i].m_Predicted.m_Invincible)
-				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_SPARKLE;
-
-			Frozen = GameClient()->m_FastPractice.ShouldShowPracticeFrozenSkin(i);
-			if(Frozen)
-				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_FROZEN | TEE_NO_WEAPON;
-		}
-		else if(i == GameClient()->m_aLocalIds[0] || i == GameClient()->m_aLocalIds[1])
-		// bestclient
-		{
-			if(GameClient()->m_aClients[i].m_Predicted.m_FreezeEnd != 0)
-				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_FROZEN | TEE_NO_WEAPON;
-			if(GameClient()->m_aClients[i].m_Predicted.m_LiveFrozen)
-				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_FROZEN;
-			if(GameClient()->m_aClients[i].m_Predicted.m_Invincible)
-				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_SPARKLE;
-
-			Frozen = GameClient()->m_aClients[i].m_Predicted.m_FreezeEnd != 0;
-			// bestclient
-			if(g_Config.m_BcInputs != BC_INPUTS_OFF)
-				Frozen = GameClient()->m_aClients[i].m_RegularPredicted.m_FreezeEnd != 0;
-			// bestclient
-		}
-		else
-		{
-			if(GameClient()->m_aClients[i].m_FreezeEnd != 0)
-				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_FROZEN | TEE_NO_WEAPON;
-			if(GameClient()->m_aClients[i].m_LiveFrozen)
-				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_FROZEN;
-			if(GameClient()->m_aClients[i].m_Invincible)
-				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_SPARKLE;
-
-			Frozen = GameClient()->m_Snap.m_aCharacters[i].m_HasExtendedData && GameClient()->m_Snap.m_aCharacters[i].m_ExtendedData.m_FreezeEnd != 0;
-		}
-
-		// TClient
-		if(g_Config.m_TcFrozenKatana > 0 && Frozen)
-		{
-			GameClient()->m_aClients[i].m_RenderCur.m_Weapon = WEAPON_NINJA;
-			aRenderInfo[i].m_TeeRenderFlags &= ~TEE_NO_WEAPON;
-		}
-
-		// bestclient
-		if(!GameClient()->m_BestClient.ApplyFrozenSkin(aRenderInfo[i], Frozen) &&
-			(GameClient()->m_aClients[i].m_RenderCur.m_Weapon == WEAPON_NINJA || (Frozen && !GameClient()->m_GameInfo.m_NoSkinChangeForFrozen)) && g_Config.m_ClShowNinja)
-		// bestclient
-		{
-			// change the skin for the player to the ninja
-			aRenderInfo[i].m_aSixup[g_Config.m_ClDummy].Reset();
-			aRenderInfo[i].ApplySkin(NinjaTeeRenderInfo()->TeeRenderInfo());
-			aRenderInfo[i].m_CustomColoredSkin = IsTeamPlay;
-			if(!IsTeamPlay)
-			{
-				aRenderInfo[i].m_ColorBody = ColorRGBA(1, 1, 1);
-				aRenderInfo[i].m_ColorFeet = ColorRGBA(1, 1, 1);
-
-				if(g_Config.m_TcColorFreeze)
-				{
-					bool CustomColor = GameClient()->m_aClients[i].m_RenderInfo.m_CustomColoredSkin;
-					aRenderInfo[i].m_CustomColoredSkin = true;
-
-					aRenderInfo[i].m_ColorFeet = g_Config.m_TcColorFreezeFeet ? GameClient()->m_aClients[i].m_RenderInfo.m_ColorFeet : ColorRGBA(1, 1, 1);
-					float Darken = (g_Config.m_TcColorFreezeDarken / 100.0f) * 0.5f + 0.5f;
-
-					aRenderInfo[i].m_ColorBody = GameClient()->m_aClients[i].m_RenderInfo.m_ColorBody;
-					if(!CustomColor)
-						aRenderInfo[i].m_ColorBody = GameClient()->m_aClients[i].m_RenderInfo.m_BloodColor;
-
-					aRenderInfo[i].m_ColorBody = ColorRGBA(aRenderInfo[i].m_ColorBody.r * Darken, aRenderInfo[i].m_ColorBody.g * Darken, aRenderInfo[i].m_ColorBody.b * Darken, 1.0);
-				}
-			}
-		}
-	}
-
 	// get screen edges to avoid rendering offscreen
 	CScreenRect ScreenRect = Graphics()->GetScreen();
 	// expand the edges to prevent popping in/out onscreen
@@ -1387,12 +1393,12 @@ void CPlayers::OnRender()
 		{
 			continue;
 		}
-		RenderHook(ScreenRect, &GameClient()->m_aClients[ClientId].m_RenderPrev, &GameClient()->m_aClients[ClientId].m_RenderCur, &aRenderInfo[ClientId], ClientId);
+		RenderHook(ScreenRect, &GameClient()->m_aClients[ClientId].m_RenderPrev, &GameClient()->m_aClients[ClientId].m_RenderCur, nullptr, ClientId);
 	}
 	if(LocalClientId != -1 && IsPlayerInfoAvailable(LocalClientId))
 	{
 		const CGameClient::CClientData *pLocalClientData = &GameClient()->m_aClients[LocalClientId];
-		RenderHook(ScreenRect, &pLocalClientData->m_RenderPrev, &pLocalClientData->m_RenderCur, &aRenderInfo[LocalClientId], LocalClientId);
+		RenderHook(ScreenRect, &pLocalClientData->m_RenderPrev, &pLocalClientData->m_RenderCur, nullptr, LocalClientId);
 	}
 
 	// render spectating players
@@ -1435,12 +1441,12 @@ void CPlayers::OnRender()
 				       (g_Config.m_TcUnpredOthersInFreeze && Client()->m_IsLocalFrozen);
 		if(g_Config.m_TcShowOthersGhosts && !HideGhost && !GameClient()->m_Snap.m_SpecInfo.m_Active && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		{
-			RenderPlayer(ScreenRect, &GameClient()->m_aClients[ClientId].m_RenderPrev, &GameClient()->m_aClients[ClientId].m_RenderCur, &aRenderInfo[ClientId], ClientId, 0.0f, true);
+			RenderPlayer(ScreenRect, &GameClient()->m_aClients[ClientId].m_RenderPrev, &GameClient()->m_aClients[ClientId].m_RenderCur, nullptr, ClientId, 0.0f, true);
 		}
 		// bestclient
 		GameClient()->m_FlyingNamePlates.RenderRopeGame(GameClient()->m_aClients[ClientId].m_RenderPos, GameClient()->m_Snap.m_apPlayerInfos[ClientId], 1.0f);
 		// bestclient
-		RenderPlayer(ScreenRect, &GameClient()->m_aClients[ClientId].m_RenderPrev, &GameClient()->m_aClients[ClientId].m_RenderCur, &aRenderInfo[ClientId], ClientId);
+		RenderPlayer(ScreenRect, &GameClient()->m_aClients[ClientId].m_RenderPrev, &GameClient()->m_aClients[ClientId].m_RenderCur, nullptr, ClientId);
 	}
 	if(RenderLastId != -1 && IsPlayerInfoAvailable(RenderLastId))
 	{
@@ -1449,7 +1455,7 @@ void CPlayers::OnRender()
 		// bestclient
 		GameClient()->m_FlyingNamePlates.RenderRopeGame(pClientData->m_RenderPos, GameClient()->m_Snap.m_apPlayerInfos[RenderLastId], 1.0f);
 		// bestclient
-		RenderPlayer(ScreenRect, &pClientData->m_RenderPrev, &pClientData->m_RenderCur, &aRenderInfo[RenderLastId], RenderLastId);
+		RenderPlayer(ScreenRect, &pClientData->m_RenderPrev, &pClientData->m_RenderCur, nullptr, RenderLastId);
 	}
 }
 

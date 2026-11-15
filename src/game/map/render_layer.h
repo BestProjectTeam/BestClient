@@ -231,6 +231,8 @@ protected:
 	void RenderTileBorder(const ColorRGBA &Color, int BorderX0, int BorderY0, int BorderX1, int BorderY1, CTileLayerVisuals *pTileLayerVisuals);
 	void RenderKillTileBorder(const ColorRGBA &Color);
 
+	std::vector<char *> m_vpIndexOffsets;
+	std::vector<unsigned int> m_vDrawCounts;
 	std::optional<CRenderLayerTile::CTileLayerVisuals> m_VisualTiles;
 	CMapItemLayerTilemap *m_pLayerTilemap;
 	ColorRGBA m_Color;

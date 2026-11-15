@@ -339,21 +339,37 @@ int CCollision::IntersectLine(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2 *p
 	float Distance = distance(Pos0, Pos1);
 	int End(Distance + 1);
 	vec2 Last = Pos0;
+	const float InvEnd = 1.0f / (float)End;
+	const vec2 DPos = (Pos1 - Pos0) * InvEnd;
+
+	int LastIndex = -1;
+	int LastHit = 0;
+
 	for(int i = 0; i <= End; i++)
 	{
-		float a = i / (float)End;
-		vec2 Pos = mix(Pos0, Pos1, a);
+		vec2 Pos = Pos0 + DPos * (float)i;
 		// Temporary position for checking collision
 		int ix = round_to_int(Pos.x);
 		int iy = round_to_int(Pos.y);
 
-		if(CheckPoint(ix, iy))
+		int Nx = std::clamp(ix / 32, 0, m_Width - 1);
+		int Ny = std::clamp(iy / 32, 0, m_Height - 1);
+		int Index = Ny * m_Width + Nx;
+
+		if(Index != LastIndex)
+		{
+			LastIndex = Index;
+			int Tile = (m_pTiles && m_pTiles[Index].m_Index >= TILE_SOLID && m_pTiles[Index].m_Index <= TILE_NOLASER) ? m_pTiles[Index].m_Index : 0;
+			LastHit = (Tile == TILE_SOLID || Tile == TILE_NOHOOK) ? Tile : 0;
+		}
+
+		if(LastHit)
 		{
 			if(pOutCollision)
 				*pOutCollision = Pos;
 			if(pOutBeforeCollision)
 				*pOutBeforeCollision = Last;
-			return GetCollisionAt(ix, iy);
+			return LastHit;
 		}
 
 		Last = Pos;
@@ -372,24 +388,65 @@ int CCollision::IntersectLineTeleHook(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision,
 	vec2 Last = Pos0;
 	int dx = 0, dy = 0; // Offset for checking the "through" tile
 	ThroughOffset(Pos0, Pos1, &dx, &dy);
+
+	const float InvEnd = 1.0f / (float)End;
+	const vec2 DPos = (Pos1 - Pos0) * InvEnd;
+
+	int LastIndex = -1;
+	int LastHit = 0;
+	bool LastIsTele = false;
+	int LastTeleNr = 0;
+
 	for(int i = 0; i <= End; i++)
 	{
-		float a = i / (float)End;
-		vec2 Pos = mix(Pos0, Pos1, a);
+		vec2 Pos = Pos0 + DPos * (float)i;
 		// Temporary position for checking collision
 		int ix = round_to_int(Pos.x);
 		int iy = round_to_int(Pos.y);
 
-		int Index = GetPureMapIndex(Pos);
-		if(pTeleNr)
+		int Nx = std::clamp(ix / 32, 0, m_Width - 1);
+		int Ny = std::clamp(iy / 32, 0, m_Height - 1);
+		int Index = Ny * m_Width + Nx;
+
+		if(Index != LastIndex)
 		{
-			if(g_Config.m_SvOldTeleportHook)
-				*pTeleNr = IsTeleport(Index);
+			LastIndex = Index;
+			if(pTeleNr)
+			{
+				if(g_Config.m_SvOldTeleportHook)
+					LastTeleNr = IsTeleport(Index);
+				else
+					LastTeleNr = IsTeleportHook(Index);
+				LastIsTele = (LastTeleNr != 0);
+			}
 			else
-				*pTeleNr = IsTeleportHook(Index);
+			{
+				LastIsTele = false;
+			}
+
+			int Tile = (m_pTiles && m_pTiles[Index].m_Index >= TILE_SOLID && m_pTiles[Index].m_Index <= TILE_NOLASER) ? m_pTiles[Index].m_Index : 0;
+			bool Solid = (Tile == TILE_SOLID || Tile == TILE_NOHOOK);
+
+			if(Solid)
+			{
+				if(!IsThrough(ix, iy, dx, dy, Pos0, Pos1))
+					LastHit = Tile;
+				else
+					LastHit = 0;
+			}
+			else if(IsHookBlocker(ix, iy, Pos0, Pos1))
+			{
+				LastHit = TILE_NOHOOK;
+			}
+			else
+			{
+				LastHit = 0;
+			}
 		}
-		if(pTeleNr && *pTeleNr)
+
+		if(pTeleNr && LastIsTele)
 		{
+			*pTeleNr = LastTeleNr;
 			if(pOutCollision)
 				*pOutCollision = Pos;
 			if(pOutBeforeCollision)
@@ -397,23 +454,13 @@ int CCollision::IntersectLineTeleHook(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision,
 			return TILE_TELEINHOOK;
 		}
 
-		int Hit = 0;
-		if(CheckPoint(ix, iy))
-		{
-			if(!IsThrough(ix, iy, dx, dy, Pos0, Pos1))
-				Hit = GetCollisionAt(ix, iy);
-		}
-		else if(IsHookBlocker(ix, iy, Pos0, Pos1))
-		{
-			Hit = TILE_NOHOOK;
-		}
-		if(Hit)
+		if(LastHit)
 		{
 			if(pOutCollision)
 				*pOutCollision = Pos;
 			if(pOutBeforeCollision)
 				*pOutBeforeCollision = Last;
-			return Hit;
+			return LastHit;
 		}
 
 		Last = Pos;
@@ -430,24 +477,48 @@ int CCollision::IntersectLineTeleWeapon(vec2 Pos0, vec2 Pos1, vec2 *pOutCollisio
 	float Distance = distance(Pos0, Pos1);
 	int End(Distance + 1);
 	vec2 Last = Pos0;
+	const float InvEnd = 1.0f / (float)End;
+	const vec2 DPos = (Pos1 - Pos0) * InvEnd;
+
+	int LastIndex = -1;
+	int LastHit = 0;
+	bool LastIsTele = false;
+	int LastTeleNr = 0;
+
 	for(int i = 0; i <= End; i++)
 	{
-		float a = i / (float)End;
-		vec2 Pos = mix(Pos0, Pos1, a);
+		vec2 Pos = Pos0 + DPos * (float)i;
 		// Temporary position for checking collision
 		int ix = round_to_int(Pos.x);
 		int iy = round_to_int(Pos.y);
 
-		int Index = GetPureMapIndex(Pos);
-		if(pTeleNr)
+		int Nx = std::clamp(ix / 32, 0, m_Width - 1);
+		int Ny = std::clamp(iy / 32, 0, m_Height - 1);
+		int Index = Ny * m_Width + Nx;
+
+		if(Index != LastIndex)
 		{
-			if(g_Config.m_SvOldTeleportWeapons)
-				*pTeleNr = IsTeleport(Index);
+			LastIndex = Index;
+			if(pTeleNr)
+			{
+				if(g_Config.m_SvOldTeleportWeapons)
+					LastTeleNr = IsTeleport(Index);
+				else
+					LastTeleNr = IsTeleportWeapon(Index);
+				LastIsTele = (LastTeleNr != 0);
+			}
 			else
-				*pTeleNr = IsTeleportWeapon(Index);
+			{
+				LastIsTele = false;
+			}
+
+			int Tile = (m_pTiles && m_pTiles[Index].m_Index >= TILE_SOLID && m_pTiles[Index].m_Index <= TILE_NOLASER) ? m_pTiles[Index].m_Index : 0;
+			LastHit = (Tile == TILE_SOLID || Tile == TILE_NOHOOK) ? Tile : 0;
 		}
-		if(pTeleNr && *pTeleNr)
+
+		if(pTeleNr && LastIsTele)
 		{
+			*pTeleNr = LastTeleNr;
 			if(pOutCollision)
 				*pOutCollision = Pos;
 			if(pOutBeforeCollision)
@@ -455,13 +526,13 @@ int CCollision::IntersectLineTeleWeapon(vec2 Pos0, vec2 Pos1, vec2 *pOutCollisio
 			return TILE_TELEINWEAPON;
 		}
 
-		if(CheckPoint(ix, iy))
+		if(LastHit)
 		{
 			if(pOutCollision)
 				*pOutCollision = Pos;
 			if(pOutBeforeCollision)
 				*pOutBeforeCollision = Last;
-			return GetCollisionAt(ix, iy);
+			return LastHit;
 		}
 
 		Last = Pos;
@@ -844,13 +915,6 @@ int CCollision::MoverSpeed(int x, int y, vec2 *pSpeed) const
 bool CCollision::HasHookTeleIns() const
 {
 	return m_HasHookTeleIns || (g_Config.m_SvOldTeleportHook && !m_TeleIns.empty());
-}
-
-int CCollision::GetPureMapIndex(float x, float y) const
-{
-	int Nx = std::clamp(round_to_int(x) / 32, 0, m_Width - 1);
-	int Ny = std::clamp(round_to_int(y) / 32, 0, m_Height - 1);
-	return Ny * m_Width + Nx;
 }
 
 bool CCollision::TileExists(int Index) const

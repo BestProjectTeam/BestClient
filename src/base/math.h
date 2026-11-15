@@ -5,6 +5,7 @@
 
 #include <cmath>
 #include <concepts>
+#include <cstdint>
 #include <cstdlib>
 #include <limits>
 
@@ -59,9 +60,31 @@ constexpr T mix_polynomial(const TB time[], const T data[], int samples, TB amou
 	return result;
 }
 
+/**
+ * Fast pseudo-random 32-bit unsigned integer generator.
+ *
+ * Uses XorShift32 with a thread-local seed.
+ *
+ * @return A pseudo-random 32-bit unsigned integer.
+ */
+inline uint32_t fast_rand()
+{
+	static thread_local uint32_t s_Seed = 0;
+	if(s_Seed == 0)
+	{
+		s_Seed = 0x8a5b3c4d ^ (uint32_t)(uintptr_t)&s_Seed;
+		if(s_Seed == 0)
+			s_Seed = 0x8a5b3c4d;
+	}
+	s_Seed ^= s_Seed << 13;
+	s_Seed ^= s_Seed >> 17;
+	s_Seed ^= s_Seed << 5;
+	return s_Seed;
+}
+
 inline float random_float()
 {
-	return rand() / (float)(RAND_MAX);
+	return (fast_rand() & 0x00FFFFFF) * (1.0f / 16777216.0f);
 }
 
 inline float random_float(float min, float max)
@@ -76,7 +99,7 @@ inline float random_float(float max)
 
 inline float random_angle()
 {
-	return 2.0f * pi * (rand() / std::nextafter((float)RAND_MAX, std::numeric_limits<float>::max()));
+	return 2.0f * pi * random_float();
 }
 
 constexpr int fxpscale = 1 << 10;
