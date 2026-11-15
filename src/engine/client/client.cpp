@@ -4796,6 +4796,15 @@ void CClient::Notify(const char *pTitle, const char *pMessage)
 void CClient::OnWindowResize()
 {
 	TextRender()->OnPreWindowResize();
+	m_FpsGraph.DropTextContainers(TextRender());
+	for(size_t i = 0; i < NUM_DUMMIES; ++i)
+	{
+		m_aInputtimeMarginGraphs[i].DropTextContainers(TextRender());
+		m_aGametimeMarginGraphs[i].DropTextContainers(TextRender());
+	}
+	TextRender()->DeleteTextContainer(m_DbgGraphsHintTextContainer);
+	m_DbgGraphsHintLastX = -1.0f;
+	m_DbgGraphsHintLastY = -1.0f;
 	GameClient()->OnWindowResize();
 	m_pEditor->OnWindowResize();
 	TextRender()->OnWindowResize();

@@ -24,6 +24,8 @@ public:
 	CDebugHud();
 	int Sizeof() const override { return sizeof(*this); }
 	void OnRender() override;
+	void OnWindowResize() override;
+	void OnShutdown() override;
 };
 
 #endif

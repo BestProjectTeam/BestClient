@@ -268,3 +268,15 @@ void CDebugHud::OnRender()
 	RenderNetCorrections();
 	RenderHint();
 }
+
+void CDebugHud::OnWindowResize()
+{
+	m_RampGraph.DropTextContainers(TextRender());
+	m_ZoomedInGraph.DropTextContainers(TextRender());
+}
+
+void CDebugHud::OnShutdown()
+{
+	m_RampGraph.DropTextContainers(TextRender());
+	m_ZoomedInGraph.DropTextContainers(TextRender());
+}
