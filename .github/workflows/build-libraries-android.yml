@@ -14,14 +14,14 @@ jobs:
       run: |
         sudo apt-get update -y
         sudo apt-get install autoconf automake cmake libtool m4 ninja-build
-        scripts/android/download_android_sdk.sh /home/runner
+        bash scripts/android/download_android_sdk.sh /home/runner
 
     - name: Build Android libraries
       run: |
         export ANDROID_HOME="/home/runner/Android/Sdk"
         unset ANDROID_SDK_ROOT
         export M4=/usr/bin/m4
-        scripts/compile_libs/gen_libs.sh build-android-libs android
+        bash scripts/compile_libs/gen_libs.sh build-android-libs android
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v6

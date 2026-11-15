@@ -358,7 +358,7 @@ jobs:
         rustup target add i686-linux-android
         rustup target add aarch64-linux-android
         rustup target add x86_64-linux-android
-        scripts/android/download_android_sdk.sh /home/runner
+        bash scripts/android/download_android_sdk.sh /home/runner
 
     - name: Install Vulkan SDK
       uses: humbletim/install-vulkan-sdk@v1.2
@@ -385,7 +385,7 @@ jobs:
         export ANDROID_HOME="/home/runner/Android/Sdk"
         unset ANDROID_SDK_ROOT
         export PATH=/home/runner/cmake/bin:$PATH
-        scripts/android/cmake_android.sh all DDNet org.ddnet.client Release build-android
+        bash scripts/android/cmake_android.sh all DDNet org.ddnet.client Release build-android
         mkdir artifacts
         mv build-android/DDNet.apk artifacts
 
@@ -485,7 +485,7 @@ jobs:
           workspaces: ./
 
     - name: Build iOS simulator app in debug mode
-      run: scripts/ios/cmake_ios.sh sim-arm64 DDNet org.ddnet.client Debug build-ios-sim
+      run: bash scripts/ios/cmake_ios.sh sim-arm64 DDNet org.ddnet.client Debug build-ios-sim
 
     - name: Smoke test iOS simulator app in debug mode
       timeout-minutes: 15
@@ -498,7 +498,7 @@ jobs:
         grep -q "config: saved to settings_ddnet.cfg" simulator-console.log
 
     - name: Build iOS device app in release mode
-      run: scripts/ios/cmake_ios.sh device DDNet org.ddnet.client Release build-ios-device
+      run: bash scripts/ios/cmake_ios.sh device DDNet org.ddnet.client Release build-ios-device
 
     - name: Package
       run: |

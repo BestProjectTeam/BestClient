@@ -168,7 +168,7 @@ jobs:
         export TW_KEY_PW="$(openssl rand -base64 32)"
         keytool -genkey -v -keystore "$TW_KEY_NAME" -keyalg RSA -keysize 2048 -validity 10000 -alias "$TW_KEY_ALIAS" -storepass "$TW_KEY_PW" -dname "CN=DDNet CI, OU=DDNet, O=DDNet"
         mkdir build-android
-        scripts/android/cmake_android.sh all DDNet org.ddnet.client Release build-android
+        bash scripts/android/cmake_android.sh all DDNet org.ddnet.client Release build-android
         mkdir artifacts
         mv build-android/DDNet.apk artifacts
 
