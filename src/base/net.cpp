@@ -951,6 +951,14 @@ NETSOCKET net_udp_create(NETADDR bindaddr)
 					log_error("net", "Setting IP_TOS on IPv4 failed (%s)", net_error_message().c_str());
 				}
 			}
+
+			// Set buffer sizes
+			{
+				int rcvbuf = 2 * 1024 * 1024;
+				setsockopt(socket, SOL_SOCKET, SO_RCVBUF, (const char *)&rcvbuf, sizeof(rcvbuf));
+				int sndbuf = 1024 * 1024;
+				setsockopt(socket, SOL_SOCKET, SO_SNDBUF, (const char *)&sndbuf, sizeof(sndbuf));
+			}
 		}
 	}
 
@@ -998,6 +1006,14 @@ NETSOCKET net_udp_create(NETADDR bindaddr)
 				}
 			}
 #endif
+
+			// Set buffer sizes
+			{
+				int rcvbuf = 2 * 1024 * 1024;
+				setsockopt(socket, SOL_SOCKET, SO_RCVBUF, (const char *)&rcvbuf, sizeof(rcvbuf));
+				int sndbuf = 1024 * 1024;
+				setsockopt(socket, SOL_SOCKET, SO_SNDBUF, (const char *)&sndbuf, sizeof(sndbuf));
+			}
 		}
 	}
 
