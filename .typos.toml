@@ -38,3 +38,7 @@ extend-ignore-re = [
 	'I\*\*nteger',
 	's\*\*tring',
 ]
+
+[default.extend-words]
+Weeknd = "Weeknd"
+

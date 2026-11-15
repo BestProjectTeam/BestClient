@@ -2775,27 +2775,33 @@ public:
 		do
 		{
 			Seq1 = m_PublishSeq.load(std::memory_order_acquire);
-			int Spins = 0;
-			while(Seq1 & 1)
+			if(Seq1 & 1)
 			{
-				if(++Spins > 32)
+				int Spins = 0;
+				while(Seq1 & 1)
 				{
-					std::this_thread::yield();
-					break;
-				}
+					if(++Spins > 32)
+					{
+						std::this_thread::yield();
+						Spins = 0;
+					}
+					else
+					{
 #if defined(_MSC_VER)
-				_mm_pause();
+						_mm_pause();
 #elif defined(__x86_64__) || defined(__i386__)
-				__builtin_ia32_pause();
+						__builtin_ia32_pause();
 #else
-				std::atomic_thread_fence(std::memory_order_relaxed);
+						std::atomic_thread_fence(std::memory_order_relaxed);
 #endif
-				Seq1 = m_PublishSeq.load(std::memory_order_acquire);
+					}
+					Seq1 = m_PublishSeq.load(std::memory_order_acquire);
+				}
 			}
 			Result = m_aPublished;
 			std::atomic_thread_fence(std::memory_order_acquire);
-			Seq2 = m_PublishSeq.load(std::memory_order_relaxed);
-		} while(Seq1 != Seq2);
+			Seq2 = m_PublishSeq.load(std::memory_order_acquire);
+		} while((Seq1 & 1) || Seq1 != Seq2);
 		return Result;
 	}
 
@@ -3639,10 +3645,10 @@ public:
 		const bool StateChanged = Snapshot.m_PlaybackState != m_PlaybackAnchorState;
 		const int64_t PredictedPosition = DisplayPositionMs();
 		const int64_t Drift = SnapshotPosition - PredictedPosition;
-		const bool SnapshotSeekedBackwards =
+		const bool SnapshotSeekBackwards =
 			m_LastRawSnapshotPositionMs >= 0 &&
 			SnapshotPosition + 500 < m_LastRawSnapshotPositionMs;
-		const bool StaleRewind = Drift < -1500 && !SnapshotSeekedBackwards;
+		const bool StaleRewind = Drift < -1500 && !SnapshotSeekBackwards;
 		const bool NeedsHardResync =
 			TrackIdentityChanged ||
 			m_PlaybackAnchorTick == 0 ||
