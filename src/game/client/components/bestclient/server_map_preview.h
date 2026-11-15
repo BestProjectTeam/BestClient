@@ -30,6 +30,7 @@ public:
 
 	void OnInterfacesInit(CGameClient *pClient) override;
 	void Clear();
+	void Shutdown();
 	void Tick();
 	float RowHeight() const;
 	void Collapse();

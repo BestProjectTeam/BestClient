@@ -57,11 +57,14 @@ void CMapImages::OnInit()
 
 void CMapImages::Unload()
 {
+	if(!Graphics())
+		return;
 	// unload all textures
 	for(int i = 0; i < m_Count; i++)
 	{
 		Graphics()->UnloadTexture(&m_aTextures[i]);
 	}
+	m_Count = 0;
 }
 
 namespace {

@@ -2569,7 +2569,7 @@ void CMenus::OnShutdown()
 {
 	m_CommunityIcons.Shutdown();
 	// bestclient
-	m_ServerMapPreview.Clear();
+	m_ServerMapPreview.Shutdown();
 	// bestclient
 }
 

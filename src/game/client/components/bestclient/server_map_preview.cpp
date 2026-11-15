@@ -279,20 +279,37 @@ CServerMapPreview::CServerMapPreview() = default;
 
 CServerMapPreview::~CServerMapPreview()
 {
+	Shutdown();
+}
+
+void CServerMapPreview::Shutdown()
+{
 	if(m_pMapInfoRequest)
-		m_pMapInfoRequest->Abort();
-	if(GameClient() != nullptr)
 	{
-		if(m_pSlot)
+		m_pMapInfoRequest->Abort();
+		m_pMapInfoRequest.reset();
+	}
+	AbortDownload();
+	if(m_pSlot)
+	{
+		if(GameClient() != nullptr && Graphics() != nullptr)
 			m_pSlot->m_Images.Unload();
-		if(m_pCache)
+		m_pSlot.reset();
+	}
+	if(m_pCache)
+	{
+		if(GameClient() != nullptr && Graphics() != nullptr)
 		{
 			for(auto &pSlot : m_pCache->m_vpSlots)
-				pSlot->m_Images.Unload();
+			{
+				if(pSlot)
+					pSlot->m_Images.Unload();
+			}
 		}
+		m_pCache->m_vpSlots.clear();
+		m_pCache.reset();
 	}
-	m_pSlot.reset();
-	m_pCache.reset();
+	m_pMapDatabase.reset();
 }
 
 void CServerMapPreview::OnInterfacesInit(CGameClient *pClient)
